@@ -1,11 +1,8 @@
 "use client";
 
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
-import { createContext, use, useEffect, useState } from "react";
 
 import { cn } from "@workspace/ui/lib/utils";
-
-const TooltipDelayContext = createContext<((d: number) => void) | null>(null);
 
 function TooltipProvider({
   delay = 0,
@@ -21,33 +18,11 @@ function TooltipProvider({
 }
 
 function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
-  const [delay, setDelay] = useState(0);
-  return (
-    <TooltipDelayContext.Provider value={setDelay}>
-      <TooltipProvider delay={delay}>
-        <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-      </TooltipProvider>
-    </TooltipDelayContext.Provider>
-  );
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
-function TooltipTrigger({
-  delay: delayProp,
-  ...props
-}: TooltipPrimitive.Trigger.Props & { delay?: number }) {
-  const setDelay = use(TooltipDelayContext);
-  useEffect(() => {
-    if (delayProp !== undefined && setDelay) {
-      setDelay(delayProp);
-    }
-  }, [delayProp, setDelay]);
-  return (
-    <TooltipPrimitive.Trigger
-      data-slot="tooltip-trigger"
-      delay={delayProp}
-      {...props}
-    />
-  );
+function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
 function TooltipContent({
@@ -93,4 +68,4 @@ function TooltipContent({
   );
 }
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

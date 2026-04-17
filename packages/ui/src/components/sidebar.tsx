@@ -16,6 +16,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
@@ -512,7 +513,9 @@ function SidebarMenuButton({
 }: useRender.ComponentProps<"button"> &
   React.ComponentProps<"button"> & {
     isActive?: boolean;
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+    tooltip?:
+      | string
+      | (React.ComponentProps<typeof TooltipContent> & { delay?: number });
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar();
 
@@ -521,6 +524,18 @@ function SidebarMenuButton({
     isActive && "selected",
     className
   );
+
+  let tooltipOpenDelay: number | undefined;
+  let tooltipContentProps: React.ComponentProps<typeof TooltipContent> | undefined;
+  if (tooltip) {
+    if (typeof tooltip === "string") {
+      tooltipContentProps = { children: tooltip };
+    } else {
+      const { delay, ...rest } = tooltip;
+      tooltipOpenDelay = delay;
+      tooltipContentProps = rest;
+    }
+  }
 
   // With `render` (e.g. Next.js `Link`), `useRender` merges `className` onto the outer
   // `TooltipTrigger`, not the custom element — clone so variants + `.selected` hit the real control.
@@ -544,7 +559,7 @@ function SidebarMenuButton({
       props
     ),
     render: tooltip ? (
-      <TooltipTrigger render={resolvedRender} />
+      <TooltipTrigger delay={tooltipOpenDelay} render={resolvedRender} />
     ) : (
       resolvedRender
     ),
@@ -556,27 +571,32 @@ function SidebarMenuButton({
     },
   });
 
-  if (!tooltip) {
+  if (!(tooltip && tooltipContentProps)) {
     return comp;
   }
 
-  if (typeof tooltip === "string") {
-    tooltip = {
-      children: tooltip,
-    };
-  }
-
-  return (
+  const tooltipElement = (
     <Tooltip>
       {comp}
       <TooltipContent
         align="center"
         hidden={state !== "collapsed" || isMobile}
         side="right"
-        {...tooltip}
+        {...tooltipContentProps}
       />
     </Tooltip>
   );
+
+  // Wrap in a provider so this tooltip's delay wins over any ancestor
+  // `TooltipProvider` group delay (Base UI's group logic otherwise clamps
+  // per-trigger delay to 0 when the group provider delay is 0).
+  if (tooltipOpenDelay !== undefined) {
+    return (
+      <TooltipProvider delay={tooltipOpenDelay}>{tooltipElement}</TooltipProvider>
+    );
+  }
+
+  return tooltipElement;
 }
 
 function SidebarMenuAction({

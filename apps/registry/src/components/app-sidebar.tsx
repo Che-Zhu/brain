@@ -12,6 +12,7 @@ import type {
   RegistryPreviewState,
   RegistrySidebarSection,
 } from "@registry/nav-types";
+import { registryItemHref } from "@registry/nav-utils";
 import {
   Collapsible,
   CollapsibleContent,
@@ -83,10 +84,6 @@ function flattenNavItems(
   return out.sort((a, b) => a.title.localeCompare(b.title));
 }
 
-function itemHref(item: RegistryNavItem) {
-  return `/registry/${item.style}/${item.group}/${encodeURIComponent(item.name)}`;
-}
-
 const REGISTRY_STATE_ICONS: Record<RegistryPreviewState, typeof BrushIcon> = {
   designing: BrushIcon,
   coding: SourceCodeIcon,
@@ -149,7 +146,7 @@ export default function AppSidebar({
   };
 
   const linkButton = (item: RegistryNavItem) => {
-    const href = itemHref(item);
+    const href = registryItemHref(item);
     const active = pathname === href;
     const stateIcon = REGISTRY_STATE_ICONS[item.state];
     const stateLabel = REGISTRY_STATE_LABEL[item.state];
@@ -187,6 +184,7 @@ export default function AppSidebar({
             </Link>
           }
           tooltip={{
+            delay: 400,
             children: (
               <div className="flex max-w-xs flex-col gap-1.5 text-left">
                 <span className="font-medium text-foreground">
@@ -204,7 +202,7 @@ export default function AppSidebar({
             ),
             hidden: isMobile,
             className:
-              "border border-sidebar-border bg-background-selected text-xs text-foreground shadow-md",
+              "rounded-xl border border-sidebar-border bg-background-selected text-xs text-foreground shadow-md",
           }}
         />
       </SidebarMenuItem>
@@ -215,7 +213,7 @@ export default function AppSidebar({
     <div className="[--sidebar-width:14rem]">
       <Sidebar collapsible="icon">
         <SidebarHeader className="flex flex-col gap-1 bg-background p-2 pb-0 group-data-[collapsible=icon]:hidden">
-          <StyleSwitcher />
+          <StyleSwitcher registrySections={registrySections} />
         </SidebarHeader>
         <SidebarContent className="bg-background pt-0">
           <div className="group-data-[collapsible=icon]:hidden">
@@ -268,7 +266,7 @@ export default function AppSidebar({
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarRail className="opacity-100 transition-opacity duration-200 ease-out group-data-[side=left]:right-0 group-data-[side=left]:translate-x-0 group-data-[side=left]:after:right-0 group-data-[side=left]:after:left-auto" />
+        <SidebarRail />
       </Sidebar>
     </div>
   );

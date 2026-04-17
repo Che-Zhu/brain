@@ -1,7 +1,5 @@
 "use client";
 
-import { ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,11 +15,16 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@workspace/ui/components/sidebar";
+import { cn } from "@workspace/ui/lib/utils";
+import type { RegistrySidebarSection } from "@registry/nav-types";
+import { firstRegistryItemHrefForStyle } from "@registry/nav-utils";
+import { ChevronsUpDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 import {
   registryStyleBrandUrl,
   useRegistryStyle,
 } from "@/context/registry-style-context";
-import { cn } from "@workspace/ui/lib/utils";
 
 /** Same frame in the sidebar trigger and in each dropdown row: bordered tile + 16px glyph */
 function StyleBrandIcon({
@@ -74,9 +77,27 @@ function StyleBrandIcon({
  * Registry style switcher for the sidebar header. Icon loads
  * `public/registry/{style}/brand.jpg`.
  */
-export function StyleSwitcher({ className }: { className?: string }) {
+export function StyleSwitcher({
+  className,
+  registrySections,
+}: {
+  className?: string;
+  registrySections: RegistrySidebarSection[];
+}) {
+  const router = useRouter();
   const { isMobile } = useSidebar();
   const { styles, selectedStyle, setSelectedStyle } = useRegistryStyle();
+
+  const onStyleChange = useCallback(
+    (style: string) => {
+      setSelectedStyle(style);
+      const href = firstRegistryItemHrefForStyle(registrySections, style);
+      if (href) {
+        router.push(href);
+      }
+    },
+    [registrySections, router, setSelectedStyle]
+  );
 
   if (styles.length === 0) {
     return null;
@@ -115,10 +136,7 @@ export function StyleSwitcher({ className }: { className?: string }) {
               <DropdownMenuLabel className="text-muted-foreground text-xs">
                 Style
               </DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                onValueChange={setSelectedStyle}
-                value={active}
-              >
+              <DropdownMenuRadioGroup onValueChange={onStyleChange} value={active}>
                 {styles.map((style) => (
                   <DropdownMenuRadioItem
                     className="gap-2 py-2 pr-8 pl-2"
