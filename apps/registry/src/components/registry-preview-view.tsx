@@ -13,9 +13,9 @@ export default function RegistryPreviewView({
   const { effectiveVariantId } = useRegistryPreviewVariant(previewKey);
 
   const loader =
-    effectiveVariantId != null
-      ? getRegistryPreviewLoaderByKey(previewKey, effectiveVariantId)
-      : undefined;
+    effectiveVariantId == null
+      ? undefined
+      : getRegistryPreviewLoaderByKey(previewKey, effectiveVariantId);
 
   if (!loader) {
     return (

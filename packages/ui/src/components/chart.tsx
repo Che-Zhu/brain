@@ -1,9 +1,13 @@
 "use client";
 
-import * as React from "react";
-import * as RechartsPrimitive from "recharts";
-
 import { cn } from "@workspace/ui/lib/utils";
+import React from "react";
+import type {
+  DefaultLegendContentProps,
+  TooltipContentProps,
+  TooltipPayloadEntry,
+} from "recharts";
+import * as RechartsPrimitive from "recharts";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
@@ -119,7 +123,7 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+}: Partial<TooltipContentProps> &
   React.ComponentProps<"div"> & {
     hideLabel?: boolean;
     hideIndicator?: boolean;
@@ -183,7 +187,7 @@ function ChartTooltipContent({
       <div className="grid gap-1.5">
         {payload
           .filter((item) => item.type !== "none")
-          .map((item, index) => {
+          .map((item: TooltipPayloadEntry, index: number) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
             const indicatorColor = color || item.payload.fill || item.color;
@@ -194,7 +198,11 @@ function ChartTooltipContent({
                   "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center"
                 )}
-                key={item.dataKey}
+                key={
+                  typeof item.dataKey === "function"
+                    ? index
+                    : String(item.dataKey ?? item.name ?? index)
+                }
               >
                 {formatter && item?.value !== undefined && item.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
@@ -262,8 +270,8 @@ function ChartLegendContent({
   payload,
   verticalAlign = "bottom",
   nameKey,
-}: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+}: DefaultLegendContentProps &
+  React.ComponentProps<"div"> & {
     hideIcon?: boolean;
     nameKey?: string;
   }) {
@@ -352,9 +360,9 @@ function getPayloadConfigFromPayload(
 
 export {
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  ChartTooltip,
+  ChartTooltipContent,
 };

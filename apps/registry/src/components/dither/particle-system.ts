@@ -1,18 +1,18 @@
 export interface Shockwave {
+  start: number;
   x: number;
   y: number;
-  start: number;
 }
 
 export interface DotSystem {
-  count: number;
   baseX: Float32Array;
   baseY: Float32Array;
+  brightness: Float32Array;
+  count: number;
   dx: Float32Array;
   dy: Float32Array;
-  brightness: Float32Array;
-  tint: Float32Array;
   size: number;
+  tint: Float32Array;
 }
 
 const SHOCKWAVE_SPEED = 225;
@@ -59,6 +59,7 @@ export function createDotSystem(
   };
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: physics loop couples mouse + N shockwaves per dot
 export function updateDots(
   sys: DotSystem,
   mouseX: number,
@@ -98,8 +99,7 @@ export function updateDots(
       }
     }
 
-    for (let k = 0; k < shockwaves.length; k++) {
-      const sw = shockwaves[k];
+    for (const sw of shockwaves) {
       const elapsed = now - sw.start;
       const radius = (elapsed / 1000) * SHOCKWAVE_SPEED;
       const life = 1 - elapsed / SHOCKWAVE_DURATION;
@@ -125,10 +125,16 @@ export function updateDots(
     dx[i] += (targetFx - dx[i]) * EASING;
     dy[i] += (targetFy - dy[i]) * EASING;
 
-    if (Math.abs(dx[i]) < SNAP_THRESHOLD) dx[i] = 0;
-    if (Math.abs(dy[i]) < SNAP_THRESHOLD) dy[i] = 0;
+    if (Math.abs(dx[i]) < SNAP_THRESHOLD) {
+      dx[i] = 0;
+    }
+    if (Math.abs(dy[i]) < SNAP_THRESHOLD) {
+      dy[i] = 0;
+    }
 
-    if (dx[i] !== 0 || dy[i] !== 0) hasMotion = true;
+    if (dx[i] !== 0 || dy[i] !== 0) {
+      hasMotion = true;
+    }
   }
 
   return hasMotion || shockwaves.length > 0 || mouseActive;
@@ -149,7 +155,9 @@ export function renderDots(
   const b = invert ? 0 : 152;
 
   const buckets: number[][] = new Array(126);
-  for (let z = 0; z < 126; z++) buckets[z] = [];
+  for (let z = 0; z < 126; z++) {
+    buckets[z] = [];
+  }
 
   for (let i = 0; i < sys.count; i++) {
     const bucket =
@@ -164,13 +172,14 @@ export function renderDots(
 
   for (let z = 0; z < 126; z++) {
     const ids = buckets[z];
-    if (ids.length === 0) continue;
+    if (ids.length === 0) {
+      continue;
+    }
 
     const alpha = Math.floor(z / 6) / 20;
     ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
 
-    for (let j = 0; j < ids.length; j++) {
-      const i = ids[j];
+    for (const i of ids) {
       const rx = (sys.baseX[i] + sys.dx[i]) * dpr;
       const ry = (sys.baseY[i] + sys.dy[i]) * dpr;
       ctx.fillRect(rx - pad, ry - pad, size + padSize, size + padSize);

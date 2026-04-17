@@ -1,5 +1,7 @@
 "use client";
 
+import type { RegistrySidebarSection } from "@registry/nav-types";
+import { firstRegistryItemHrefForStyle } from "@registry/nav-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,8 +18,6 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
-import type { RegistrySidebarSection } from "@registry/nav-types";
-import { firstRegistryItemHrefForStyle } from "@registry/nav-utils";
 import { ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -59,6 +59,7 @@ function StyleBrandIcon({
     <div className={frame}>
       {/* eslint-disable-next-line @next/next/no-img-element -- public brand assets per style */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: letter fallback on load error */}
+      {/* biome-ignore lint/performance/noImgElement: dynamic public/ URLs; next/image needs static src or full URL config */}
       <img
         alt=""
         className="size-4 object-contain"
@@ -136,7 +137,10 @@ export function StyleSwitcher({
               <DropdownMenuLabel className="text-muted-foreground text-xs">
                 Style
               </DropdownMenuLabel>
-              <DropdownMenuRadioGroup onValueChange={onStyleChange} value={active}>
+              <DropdownMenuRadioGroup
+                onValueChange={onStyleChange}
+                value={active}
+              >
                 {styles.map((style) => (
                   <DropdownMenuRadioItem
                     className="gap-2 py-2 pr-8 pl-2"

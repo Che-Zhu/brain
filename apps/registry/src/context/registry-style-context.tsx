@@ -21,9 +21,9 @@ function uniqueSortedStyles(sections: RegistrySidebarSection[]): string[] {
 }
 
 export interface RegistryStyleContextValue {
-  styles: string[];
   selectedStyle: string;
   setSelectedStyle: (style: string) => void;
+  styles: string[];
 }
 
 const RegistryStyleContext = createContext<RegistryStyleContextValue | null>(

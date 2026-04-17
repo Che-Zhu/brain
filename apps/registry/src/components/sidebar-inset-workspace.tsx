@@ -1,9 +1,5 @@
 "use client";
 
-import { ChevronsUpDown } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { type ReactNode, useMemo } from "react";
-
 import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
@@ -15,6 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
+import { ChevronsUpDown } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { type ReactNode, useMemo } from "react";
 import { useRegistryPreviewVariant } from "@/hooks/use-registry-preview-variant";
 import { parseRegistryPathname } from "@/lib/parse-registry-pathname";
 

@@ -1,27 +1,24 @@
 export type DitherAlgorithm = "floyd-steinberg" | "bayer" | "blue-noise";
 
 export interface DitherOptions {
-  threshold: number;
-  serpentine: boolean;
   errorStrength: number;
+  serpentine: boolean;
+  threshold: number;
 }
 
 // prettier-ignore
 const BAYER_8X8 = [
-   0, 32,  8, 40,  2, 34, 10, 42,
-  48, 16, 56, 24, 50, 18, 58, 26,
-  12, 44,  4, 36, 14, 46,  6, 38,
-  60, 28, 52, 20, 62, 30, 54, 22,
-   3, 35, 11, 43,  1, 33,  9, 41,
-  51, 19, 59, 27, 49, 17, 57, 25,
-  15, 47,  7, 39, 13, 45,  5, 37,
-  63, 31, 55, 23, 61, 29, 53, 21,
+  0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36,
+  14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41,
+  51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23,
+  61, 29, 53, 21,
 ];
 
 /**
  * Floyd-Steinberg error-diffusion dithering.
  * Returns packed Float32Array of [x,y, x,y, ...] for every "on" pixel.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: error-diffusion kernel; splitting obscures the algorithm
 export function floydSteinberg(
   grayscale: Uint8Array,
   width: number,
@@ -47,7 +44,9 @@ export function floydSteinberg(
     for (let x = startX; x !== endX; x += step) {
       const idx = y * width + x;
 
-      if (hasAlpha && alpha[idx] < 128) continue;
+      if (hasAlpha && alpha[idx] < 128) {
+        continue;
+      }
 
       const oldVal = errors[idx];
       const newVal = oldVal > opts.threshold ? 255 : 0;
@@ -58,9 +57,13 @@ export function floydSteinberg(
       }
 
       const diffuse = (nx: number, ny: number, weight: number) => {
-        if (nx < 0 || nx >= width || ny >= height) return;
+        if (nx < 0 || nx >= width || ny >= height) {
+          return;
+        }
         const ni = ny * width + nx;
-        if (hasAlpha && alpha[ni] < 128) return;
+        if (hasAlpha && alpha[ni] < 128) {
+          return;
+        }
         errors[ni] += err * weight;
       };
 
@@ -91,9 +94,11 @@ export function bayerDither(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
-      if (hasAlpha && alpha[idx] < 128) continue;
+      if (hasAlpha && alpha[idx] < 128) {
+        continue;
+      }
       const luma = grayscale[idx] / 255;
-      const bayerVal = (BAYER_8X8[(y & 7) * 8 + (x & 7)] + 1) / 65;
+      const bayerVal = (BAYER_8X8[(y % 8) * 8 + (x % 8)] + 1) / 65;
       if (luma + bias > bayerVal) {
         positions.push(x, y);
       }
@@ -123,7 +128,9 @@ export function blueNoiseDither(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
-      if (hasAlpha && alpha[idx] < 128) continue;
+      if (hasAlpha && alpha[idx] < 128) {
+        continue;
+      }
       const luma = grayscale[idx] / 255;
       const nx = x % noiseSize;
       const ny = y % noiseSize;
@@ -141,7 +148,12 @@ export function blueNoiseDither(
  * Returns a Set of grid indices inside a rounded square.
  * radiusPct is the corner radius as a fraction of min(w, h).
  */
-export function roundedSquareMask(w: number, h: number, radiusPct = 0.22): Set<number> {
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: corner/edge/center cases are clearer kept inline
+export function roundedSquareMask(
+  w: number,
+  h: number,
+  radiusPct = 0.22
+): Set<number> {
   const r = Math.round(radiusPct * Math.min(w, h));
   const mask = new Set<number>();
 
@@ -159,7 +171,9 @@ export function roundedSquareMask(w: number, h: number, radiusPct = 0.22): Set<n
         const dy = y - cy;
         inside = dx * dx + dy * dy <= r * r;
       }
-      if (inside) mask.add(y * w + x);
+      if (inside) {
+        mask.add(y * w + x);
+      }
     }
   }
 
@@ -181,13 +195,17 @@ export function invertWithMask(
   const mask = roundedSquareMask(gridW, gridH, radiusPct);
   const logoSet = new Set<number>();
   for (let i = 0; i < positions.length; i += 2) {
-    logoSet.add(Math.round(positions[i + 1]) * gridW + Math.round(positions[i]));
+    logoSet.add(
+      Math.round(positions[i + 1]) * gridW + Math.round(positions[i])
+    );
   }
 
   const inverted: number[] = [];
   for (const idx of mask) {
     if (!logoSet.has(idx)) {
-      if (alpha && alpha[idx] < 128) continue;
+      if (alpha && alpha[idx] < 128) {
+        continue;
+      }
       inverted.push(idx % gridW, Math.floor(idx / gridW));
     }
   }

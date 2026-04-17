@@ -5,10 +5,10 @@ import {
   AlertAction,
   AlertDescription,
   AlertTitle,
-} from "@shadcn/ui/alert";
-import { Badge } from "@shadcn/ui/badge";
-import { Button } from "@shadcn/ui/button";
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
+} from "@workspace/ui/components/alert";
+import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { AlertCircle } from "lucide-react";
 
 export default function AlertExample() {

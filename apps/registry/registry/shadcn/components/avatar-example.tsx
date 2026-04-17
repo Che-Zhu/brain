@@ -7,8 +7,8 @@ import {
   AvatarGroup,
   AvatarGroupCount,
   AvatarImage,
-} from "@shadcn/ui/avatar";
-import { Button } from "@shadcn/ui/button";
+} from "@workspace/ui/components/avatar";
+import { Button } from "@workspace/ui/components/button";
 import {
   Empty,
   EmptyContent,
@@ -16,8 +16,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@shadcn/ui/empty";
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
+} from "@workspace/ui/components/empty";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { Check, Plus } from "lucide-react";
 
 export default function AvatarExample() {

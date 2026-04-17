@@ -11,9 +11,9 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@shadcn/ui/alert-dialog";
-import { Button } from "@shadcn/ui/button";
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
+} from "@workspace/ui/components/alert-dialog";
+import { Button } from "@workspace/ui/components/button";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { Bluetooth } from "lucide-react";
 
 export default function AlertDialogExampleV0() {

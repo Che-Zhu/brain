@@ -22,7 +22,6 @@
     "paths": {
       "@/*": ["./src/*"],
       "@registry/*": ["./registry/*"],
-      "@shadcn/ui/*": ["./registry/shadcn/components/ui/*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"]
     }
   },

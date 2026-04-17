@@ -35,17 +35,16 @@ function useIsMobile() {
 }
 
 export interface DitherCanvasProps {
+  algorithm?: DitherAlgorithm;
+  className?: string;
+  dither?: {
+    errorStrength?: number;
+    serpentine?: boolean;
+  };
+  dotScale?: number;
+  gridResolution?: number;
   /** Raster to dither: URL, ImageBitmap, canvas, ImageData, Blob, File, etc. */
   image: DitherImageInput | null | undefined;
-  className?: string;
-  style?: React.CSSProperties;
-  algorithm?: DitherAlgorithm;
-  gridResolution?: number;
-  scale?: number;
-  dotScale?: number;
-  invert?: boolean;
-  /** Mouse repulsion + click shockwaves */
-  interaction?: boolean;
   imageProcessing?: {
     threshold?: number;
     contrast?: number;
@@ -53,13 +52,14 @@ export interface DitherCanvasProps {
     blur?: number;
     highlightsCompression?: number;
   };
-  dither?: {
-    errorStrength?: number;
-    serpentine?: boolean;
-  };
+  /** Mouse repulsion + click shockwaves */
+  interaction?: boolean;
+  invert?: boolean;
+  scale?: number;
   shape?: {
     cornerRadius?: number;
   };
+  style?: React.CSSProperties;
 }
 
 export function DitherCanvas({

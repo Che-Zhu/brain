@@ -43,7 +43,7 @@ export interface RegistryPreviewItem {
 export type RegistryIndex = Record<string, RegistryPreviewItem>;
 
 const previewUiFile: RegistryFile = {
-  path: "registry/shadcn/components/ui/preview.tsx",
+  path: "packages/ui/src/components/preview.tsx",
   target: "",
   type: "registry:ui",
 };
@@ -179,7 +179,12 @@ export const Index: RegistryIndex = {
       "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
     state: "designing",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "dropdown-menu", "alert-dialog"],
+    registryDependencies: [
+      "preview",
+      "button",
+      "dropdown-menu",
+      "alert-dialog",
+    ],
     files: [
       {
         path: "registry/linear/components/container-node/container-node-preview.tsx",
@@ -194,7 +199,9 @@ export const Index: RegistryIndex = {
       previewUiFile,
     ],
     load: () =>
-      import("@registry/linear/components/container-node/container-node-preview"),
+      import(
+        "@registry/linear/components/container-node/container-node-preview"
+      ),
   },
 
   "shadcn/components/accordion": {

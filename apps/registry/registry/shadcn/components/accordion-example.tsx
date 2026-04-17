@@ -5,16 +5,16 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@shadcn/ui/accordion";
-import { Button } from "@shadcn/ui/button";
+} from "@workspace/ui/components/accordion";
+import { Button } from "@workspace/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@shadcn/ui/card";
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
+} from "@workspace/ui/components/card";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { ArrowUpRight } from "lucide-react";
 
 export default function AccordionExample() {

@@ -11,21 +11,21 @@ export const REGISTRY_PREVIEW_STATES = [
 export type RegistryPreviewState = (typeof REGISTRY_PREVIEW_STATES)[number];
 
 export interface RegistryNavItem {
-  /** Registry style pack folder, e.g. `linear` */
-  style: string;
+  description: string;
   /** Category under the style, e.g. `blocks` | `components` */
   group: string;
   /** URL segment / leaf id, e.g. `log-viewer` */
   name: string;
-  title: string;
-  description: string;
   /** Design / build / review / shipped — drives sidebar icon. */
   state: RegistryPreviewState;
+  /** Registry style pack folder, e.g. `linear` */
+  style: string;
+  title: string;
 }
 
 /** One sidebar section: items under `style` / `group`. */
 export interface RegistrySidebarSection {
-  style: string;
   group: string;
   items: RegistryNavItem[];
+  style: string;
 }

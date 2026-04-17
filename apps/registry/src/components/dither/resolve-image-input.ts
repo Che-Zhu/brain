@@ -29,7 +29,9 @@ function imageDataToCanvas(data: ImageData): HTMLCanvasElement {
 /**
  * Normalize any supported input to a `CanvasImageSource` for processing.
  */
-export function resolveDitherImageInput(input: DitherImageInput): Promise<CanvasImageSource> {
+export function resolveDitherImageInput(
+  input: DitherImageInput
+): Promise<CanvasImageSource> {
   if (typeof input === "string") {
     return loadImage(input);
   }

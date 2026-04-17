@@ -17,7 +17,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@shadcn/ui/collapsible";
+} from "@workspace/ui/components/collapsible";
 import {
   Sidebar,
   SidebarContent,

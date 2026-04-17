@@ -67,11 +67,7 @@
       "title": "Container Node",
       "description": "Composable container node with Crossplane-style status, header actions, and collapsible layout",
       "dependencies": ["lucide-react"],
-      "registryDependencies": [
-        "button",
-        "dropdown-menu",
-        "alert-dialog"
-      ],
+      "registryDependencies": ["button", "dropdown-menu", "alert-dialog"],
       "files": [
         {
           "path": "registry/linear/components/container-node/container-node.tsx",

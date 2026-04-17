@@ -11,8 +11,8 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@shadcn/ui/alert-dialog";
-import { Button } from "@shadcn/ui/button";
+} from "@workspace/ui/components/alert-dialog";
+import { Button } from "@workspace/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@shadcn/ui/dialog";
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
+} from "@workspace/ui/components/dialog";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { Trash2 } from "lucide-react";
 
 export default function AlertDialogExampleV1() {

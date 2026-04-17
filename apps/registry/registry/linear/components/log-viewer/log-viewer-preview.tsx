@@ -1,7 +1,7 @@
 "use client";
 
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
-import type { TimeRange } from "@shadcn/ui/time-range-selector";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
+import type { TimeRange } from "@workspace/ui/components/time-range-selector";
 import { useState } from "react";
 import { LogViewer } from "./log-viewer";
 import type { LogsData } from "./log-viewer-context";

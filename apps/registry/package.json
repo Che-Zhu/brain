@@ -8,9 +8,8 @@
     "registry:build": "shadcn build registry.json -o public/r",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "check": "npx ultracite check",
+    "fix": "npx ultracite fix"
   },
   "dependencies": {
     "@workspace/crossplane": "workspace:*",

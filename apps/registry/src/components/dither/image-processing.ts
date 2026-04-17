@@ -1,8 +1,8 @@
 export interface ProcessedImage {
-  grayscale: Uint8Array;
   alpha: Uint8Array;
-  width: number;
+  grayscale: Uint8Array;
   height: number;
+  width: number;
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
@@ -15,9 +15,15 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function getSourceDimensions(source: CanvasImageSource): { w: number; h: number } {
+function getSourceDimensions(source: CanvasImageSource): {
+  w: number;
+  h: number;
+} {
   if (source instanceof HTMLImageElement) {
-    return { w: source.naturalWidth || source.width, h: source.naturalHeight || source.height };
+    return {
+      w: source.naturalWidth || source.width,
+      h: source.naturalHeight || source.height,
+    };
   }
   if (source instanceof SVGImageElement) {
     return { w: source.width.baseVal.value, h: source.height.baseVal.value };
@@ -28,7 +34,10 @@ function getSourceDimensions(source: CanvasImageSource): { w: number; h: number 
   if (source instanceof ImageBitmap) {
     return { w: source.width, h: source.height };
   }
-  if (source instanceof HTMLCanvasElement || source instanceof OffscreenCanvas) {
+  if (
+    source instanceof HTMLCanvasElement ||
+    source instanceof OffscreenCanvas
+  ) {
     return { w: source.width, h: source.height };
   }
   return { w: 0, h: 0 };
@@ -87,7 +96,10 @@ function sampleGrayscaleGrid(
         luma = compressed * 255;
       }
 
-      grayscale[sy * sampledW + sx] = Math.max(0, Math.min(255, Math.round(luma)));
+      grayscale[sy * sampledW + sx] = Math.max(
+        0,
+        Math.min(255, Math.round(luma))
+      );
     }
   }
 
@@ -109,7 +121,12 @@ export function processImageSource(
 ): ProcessedImage {
   const { w: srcW, h: srcH } = getSourceDimensions(source);
   if (srcW === 0 || srcH === 0) {
-    return { grayscale: new Uint8Array(0), alpha: new Uint8Array(0), width: 0, height: 0 };
+    return {
+      grayscale: new Uint8Array(0),
+      alpha: new Uint8Array(0),
+      width: 0,
+      height: 0,
+    };
   }
 
   const aspect = srcW / srcH;
@@ -121,7 +138,12 @@ export function processImageSource(
   alphaCanvas.height = outH;
   const alphaCtx = alphaCanvas.getContext("2d");
   if (!alphaCtx) {
-    return { grayscale: new Uint8Array(0), alpha: new Uint8Array(0), width: 0, height: 0 };
+    return {
+      grayscale: new Uint8Array(0),
+      alpha: new Uint8Array(0),
+      width: 0,
+      height: 0,
+    };
   }
   alphaCtx.imageSmoothingEnabled = true;
   alphaCtx.imageSmoothingQuality = "high";
@@ -134,7 +156,12 @@ export function processImageSource(
   srcCanvas.height = srcH + pad * 2;
   const srcCtx = srcCanvas.getContext("2d");
   if (!srcCtx) {
-    return { grayscale: new Uint8Array(0), alpha: new Uint8Array(0), width: 0, height: 0 };
+    return {
+      grayscale: new Uint8Array(0),
+      alpha: new Uint8Array(0),
+      width: 0,
+      height: 0,
+    };
   }
 
   if (blur > 0) {
@@ -148,7 +175,12 @@ export function processImageSource(
   canvas.height = outH;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    return { grayscale: new Uint8Array(0), alpha: new Uint8Array(0), width: 0, height: 0 };
+    return {
+      grayscale: new Uint8Array(0),
+      alpha: new Uint8Array(0),
+      width: 0,
+      height: 0,
+    };
   }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
@@ -180,5 +212,13 @@ export async function processImageFromUrl(
   highlightsCompression = 0
 ): Promise<ProcessedImage> {
   const img = await loadImage(src);
-  return processImageSource(img, maxDimension, scale, contrast, gamma, blur, highlightsCompression);
+  return processImageSource(
+    img,
+    maxDimension,
+    scale,
+    contrast,
+    gamma,
+    blur,
+    highlightsCompression
+  );
 }
