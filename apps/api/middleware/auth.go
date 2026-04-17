@@ -1,0 +1,200 @@
+package middleware
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+)
+
+// SECURITY: Admin config for query-only. Must NEVER be used in mutation operations.
+const CrossplaneSystemNS = "crossplane-system"
+
+var crossplaneResources = map[string]bool{
+	"composition": true, "compositions": true,
+	"xrd": true, "xrds": true,
+	"compositionrevisions": true,
+}
+
+// ErrMissingAuth is returned when Authorization header is missing.
+var ErrMissingAuth = errors.New("missing Authorization header")
+
+// AuthInput is embedded in Huma operations that need kubeconfig auth.
+type AuthInput struct {
+	Authorization string `header:"Authorization" required:"true" doc:"Bearer token with url-encoded kubeconfig"`
+}
+
+type contextKey string
+
+const authHeaderKey contextKey = "auth"
+
+// Auth wraps the next handler and extracts the Authorization header into the request context.
+func Auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		ctx := context.WithValue(r.Context(), authHeaderKey, auth)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// AuthHeader returns the Authorization header value from the request context.
+func AuthHeader(r *http.Request) string {
+	if v := r.Context().Value(authHeaderKey); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+// ConfigFromAuth parses Authorization header (Bearer <url-encoded-kubeconfig>) and returns clientcmdapi.Config.
+func ConfigFromAuth(auth string) (*clientcmdapi.Config, error) {
+	auth = strings.TrimPrefix(auth, "Bearer ")
+	if auth == "" {
+		return nil, ErrMissingAuth
+	}
+	kubeconfig, err := url.QueryUnescape(auth)
+	if err != nil {
+		return nil, fmt.Errorf("invalid kubeconfig encoding")
+	}
+	return clientcmd.Load([]byte(kubeconfig))
+}
+
+type ResolveOptions struct {
+	Namespace        string
+	AllNamespaces    bool
+	DefaultNamespace string
+	AdminCheckGVR    *schema.GroupVersionResource
+}
+
+type ResolvedContext struct {
+	RestConfig *rest.Config
+	Namespace  string
+	Server     string
+	IsAdmin    bool
+}
+
+func PodsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+}
+
+// ResolveContext resolves rest config, effective namespace, server and optional admin status.
+func ResolveContext(cfg *clientcmdapi.Config, opts ResolveOptions) (*ResolvedContext, error) {
+	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	userNS := ""
+	server := ""
+	if cfg != nil && cfg.CurrentContext != "" {
+		if ctx := cfg.Contexts[cfg.CurrentContext]; ctx != nil {
+			userNS = ctx.Namespace
+			if c := cfg.Clusters[ctx.Cluster]; c != nil && c.Server != "" {
+				if u, parseErr := url.Parse(c.Server); parseErr == nil {
+					server = u.Hostname()
+				}
+			}
+		}
+	}
+
+	isAdmin := false
+	if opts.AdminCheckGVR != nil {
+		client, err := dynamic.NewForConfig(restConfig)
+		if err != nil {
+			return nil, err
+		}
+		_, err = client.Resource(*opts.AdminCheckGVR).Namespace(corev1.NamespaceAll).List(context.Background(), metav1.ListOptions{Limit: 1})
+		if err != nil {
+			if !apierrors.IsForbidden(err) {
+				return nil, err
+			}
+		} else {
+			isAdmin = true
+		}
+	}
+
+	ns := ""
+	if opts.AdminCheckGVR != nil {
+		if isAdmin {
+			if opts.Namespace != "" {
+				ns = opts.Namespace
+			} else if opts.AllNamespaces {
+				ns = corev1.NamespaceAll
+			} else if userNS != "" {
+				ns = userNS
+			} else {
+				ns = opts.DefaultNamespace
+			}
+		} else {
+			// Not admin: use namespace from kc directly, ignore opts.Namespace
+			if userNS != "" {
+				ns = userNS
+			} else if opts.AllNamespaces {
+				ns = corev1.NamespaceAll
+			} else {
+				ns = opts.DefaultNamespace
+			}
+		}
+	} else if opts.Namespace != "" {
+		ns = opts.Namespace
+	} else if userNS != "" {
+		ns = userNS
+	} else if opts.AllNamespaces {
+		ns = corev1.NamespaceAll
+	} else {
+		ns = opts.DefaultNamespace
+	}
+
+	return &ResolvedContext{RestConfig: restConfig, Namespace: ns, Server: server, IsAdmin: isAdmin}, nil
+}
+
+// RestConfigFromAuth parses Authorization header and returns rest.Config and clientcmd Config.
+func RestConfigFromAuth(auth string) (*rest.Config, *clientcmdapi.Config, error) {
+	cfg, err := ConfigFromAuth(auth)
+	if err != nil {
+		return nil, nil, err
+	}
+	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	return restConfig, cfg, nil
+}
+
+// IsCrossplaneResource returns true if the resource type uses admin config (query-only).
+func IsCrossplaneResource(resource string) bool {
+	return crossplaneResources[strings.ToLower(resource)]
+}
+
+// AdminConfigForQuery returns admin config and namespace for crossplane resources.
+// For composition, xrd, compositionrevisions: uses ENCODED_ADMIN_KUBECONFIG and crossplane-system.
+// Otherwise returns nil, "". SECURITY: Query-only; never use for mutations.
+func AdminConfigForQuery(resource string) (cfg *clientcmdapi.Config, namespace string, err error) {
+	if !IsCrossplaneResource(resource) {
+		return nil, "", nil
+	}
+	encoded := os.Getenv("ENCODED_ADMIN_KUBECONFIG")
+	if encoded == "" {
+		return nil, "", nil
+	}
+	decoded, err := url.QueryUnescape(encoded)
+	if err != nil {
+		return nil, "", err
+	}
+	cfg, err = clientcmd.Load([]byte(decoded))
+	if err != nil {
+		return nil, "", err
+	}
+	return cfg, CrossplaneSystemNS, nil
+}

@@ -1,0 +1,84 @@
+package k8s
+
+import (
+	"bytes"
+	"context"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/yaml"
+)
+
+// ApplyYAML applies YAML manifests to the cluster using the given config.
+// Supports multi-document YAML (documents separated by "---").
+func ApplyYAML(config *rest.Config, yamlBytes []byte) error {
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	discoveryClient := memory.NewMemCacheClient(clientset.Discovery())
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+
+	docs := splitYAMLDocuments(yamlBytes)
+	ctx := context.Background()
+
+	for _, doc := range docs {
+		doc = strings.TrimSpace(doc)
+		if doc == "" {
+			continue
+		}
+		var m map[string]interface{}
+		if err := yaml.Unmarshal([]byte(doc), &m); err != nil {
+			return err
+		}
+		if len(m) == 0 {
+			continue
+		}
+		obj := &unstructured.Unstructured{Object: m}
+		gvk := obj.GroupVersionKind()
+		if gvk.Kind == "" {
+			continue
+		}
+		restMapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+		gvr := restMapping.Resource
+		var ns string
+		if restMapping.Scope.Name() == meta.RESTScopeNameNamespace {
+			ns = obj.GetNamespace()
+			if ns == "" {
+				ns = "default"
+			}
+		}
+		applyOpts := metav1.ApplyOptions{FieldManager: "k8s-apply"}
+		_, err = client.Resource(gvr).Namespace(ns).Apply(ctx, obj.GetName(), obj, applyOpts)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func splitYAMLDocuments(data []byte) []string {
+	parts := bytes.Split(data, []byte("\n---"))
+	docs := make([]string, 0, len(parts))
+	for _, p := range parts {
+		doc := strings.TrimSpace(string(p))
+		if doc != "" {
+			docs = append(docs, doc)
+		}
+	}
+	return docs
+}
