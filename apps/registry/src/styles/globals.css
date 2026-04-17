@@ -1,6 +1,7 @@
 @import "../../../../packages/ui/src/styles/globals.css";
 
 @source "../**/*.{ts,tsx}";
+@source "../../../../packages/crossplane/src/**/*.ts";
 
 @theme {
   /* Registry preview lifecycle (sidebar icon + tooltips) — maps to shared theme palette */

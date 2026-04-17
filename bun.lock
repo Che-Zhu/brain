@@ -23,6 +23,7 @@
         "@hugeicons/core-free-icons": "^4.1.1",
         "@hugeicons/react": "^1.1.6",
         "@radix-ui/react-select": "^2.2.6",
+        "@workspace/crossplane": "workspace:*",
         "@workspace/ui": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -81,6 +82,17 @@
         "@types/react": "19.2.14",
         "@types/react-dom": "19.2.3",
         "@workspace/eslint-config": "workspace:^",
+        "@workspace/typescript-config": "workspace:*",
+        "eslint": "^9.39.2",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/crossplane": {
+      "name": "@workspace/crossplane",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "^25.1.0",
+        "@workspace/eslint-config": "workspace:*",
         "@workspace/typescript-config": "workspace:*",
         "eslint": "^9.39.2",
         "typescript": "^5.9.3",
@@ -793,6 +805,8 @@
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.11.1", "", { "os": "win32", "cpu": "x64" }, "sha512-lrW200hZdbfRtztbygyaq/6jP6AKE8qQN2KvPcJ+x7wiD038YtnYtZ82IMNJ69GJibV7bwL3y9FgK+5w/pYt6g=="],
 
     "@upsetjs/venn.js": ["@upsetjs/venn.js@2.0.0", "", { "optionalDependencies": { "d3-selection": "^3.0.0", "d3-transition": "^3.0.1" } }, "sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw=="],
+
+    "@workspace/crossplane": ["@workspace/crossplane@workspace:packages/crossplane"],
 
     "@workspace/eslint-config": ["@workspace/eslint-config@workspace:packages/eslint-config"],
 

@@ -22,17 +22,17 @@ export interface RegistryPreviewVariant {
  * Object key must equal `\`${style}/${group}/${name}\`` (same as URL under `/registry/`).
  */
 export interface RegistryPreviewItem {
-  style: string;
-  group: string;
-  name: string;
-  title: string;
   description: string;
-  state: RegistryPreviewState;
-  type: "registry:preview";
-  registryDependencies: string[];
   files: RegistryFile[];
+  group: string;
   /** Single implementation (most entries). */
   load?: RegistryPreviewLoader;
+  name: string;
+  registryDependencies: string[];
+  state: RegistryPreviewState;
+  style: string;
+  title: string;
+  type: "registry:preview";
   /**
    * Multiple implementations; workspace shows a variant menu when length > 1.
    * Order oldest → newest; the **last** entry is the default selection.
@@ -168,6 +168,33 @@ export const Index: RegistryIndex = {
     ],
     load: () =>
       import("@registry/linear/components/log-viewer/log-viewer-preview"),
+  },
+
+  "linear/components/container-node": {
+    style: "linear",
+    group: "components",
+    name: "container-node",
+    title: "Container Node",
+    description:
+      "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
+    state: "designing",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "dropdown-menu"],
+    files: [
+      {
+        path: "registry/linear/components/container-node/container-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/container-node/container-node.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/container-node/container-node-preview"),
   },
 
   "shadcn/components/accordion": {
