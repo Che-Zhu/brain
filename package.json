@@ -9,7 +9,8 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "check": "ultracite check",
-    "fix": "ultracite fix"
+    "fix": "ultracite fix",
+    "cd": "./cd.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",

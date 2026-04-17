@@ -1,17 +1,27 @@
 "use client";
 
-import { Button } from "@shadcn/ui/button";
+import {
+  type CrossplaneServiceStatusPhase,
+  getStatusIndicatorClass,
+  getStatusTextClass,
+} from "@workspace/crossplane/lib/status";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
+import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shadcn/ui/dropdown-menu";
-import {
-  type CrossplaneServiceStatusPhase,
-  STATUS_PHASE_INDICATORS,
-  STATUS_PHASES,
-} from "@workspace/crossplane/schemas";
+} from "@workspace/ui/components/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { Cpu, Layers, MemoryStick, MoreHorizontal } from "lucide-react";
@@ -21,6 +31,7 @@ import {
   type ReactNode,
   useContext,
   useMemo,
+  useState,
 } from "react";
 
 const ContainerNodeContext = createContext<ContainerNodeValue | null>(null);
@@ -30,6 +41,8 @@ export type ContainerNodeStatusTone = CrossplaneServiceStatusPhase;
 
 /** Display state for a container node (passed into Root as `states`). */
 export interface ContainerNodeStates {
+  /** When true, only header + footer show; image section and resource metrics are hidden. */
+  collapsed?: boolean;
   cpuPercent: number;
   image: string;
   kind?: string;
@@ -192,17 +205,24 @@ function ContainerNodeStatus({
   }
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
-      <span
-        aria-hidden
-        className={cn(
-          "size-2 shrink-0 rounded-[2px]",
-          STATUS_PHASE_INDICATORS[tone]
-        )}
-      />
+      <span aria-hidden className="relative flex size-2 shrink-0">
+        <span
+          className={cn(
+            "absolute inset-0 inline-flex animate-ping rounded-[2px] opacity-75",
+            getStatusIndicatorClass(tone)
+          )}
+        />
+        <span
+          className={cn(
+            "relative inline-flex size-2 shrink-0 rounded-[2px]",
+            getStatusIndicatorClass(tone)
+          )}
+        />
+      </span>
       <span
         className={cn(
           "truncate whitespace-nowrap font-medium text-xs",
-          STATUS_PHASES[tone]
+          getStatusTextClass(tone)
         )}
       >
         {label}
@@ -296,47 +316,105 @@ function ContainerNodeImage({
 }
 
 function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
-  const { actions } = useContainerNode();
+  const { actions, states } = useContainerNode();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  if (menu != null) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              aria-label="Open menu"
+              className="size-7 shrink-0"
+              size="icon"
+              variant="ghost"
+            />
+          }
+        >
+          <MoreHorizontal className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="rounded-xl">
+          {menu}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label="Open menu"
-            className="size-7 shrink-0"
-            size="icon"
-            variant="ghost"
-          />
-        }
-      >
-        <MoreHorizontal className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="rounded-xl">
-        {menu ?? (
-          <>
-            <DropdownMenuItem className="text-xs" onClick={actions.onScale}>
-              Scale
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs" onClick={actions.onRestart}>
-              Restart
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs" onClick={actions.onViewLogs}>
-              View logs
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs" onClick={actions.onOpenShell}>
-              Open shell
-            </DropdownMenuItem>
-            <DropdownMenuItem
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              aria-label="Open menu"
+              className="size-7 shrink-0"
+              size="icon"
+              variant="ghost"
+            />
+          }
+        >
+          <MoreHorizontal className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="rounded-xl">
+          <DropdownMenuItem
+            className="rounded-xl text-xs"
+            onClick={actions.onScale}
+          >
+            Scale
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="rounded-xl text-xs"
+            onClick={actions.onRestart}
+          >
+            Restart
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="rounded-xl text-xs"
+            onClick={actions.onViewLogs}
+          >
+            View logs
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="rounded-xl text-xs"
+            onClick={actions.onOpenShell}
+          >
+            Open shell
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="rounded-xl text-xs"
+            onClick={() => setDeleteDialogOpen(true)}
+            variant="destructive"
+          >
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete container?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete &quot;{states.name}&quot;. This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogAction
               className="text-xs"
-              onClick={actions.onDelete}
+              onClick={() => {
+                actions.onDelete?.();
+                setDeleteDialogOpen(false);
+              }}
               variant="destructive"
             >
               Delete
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -345,6 +423,8 @@ function ContainerNodeVariant0({
   className,
 }: ComponentProps<typeof ContainerNodeShell>) {
   const { states } = useContainerNode();
+  const collapsed = states.collapsed === true;
+
   return (
     <ContainerNodeShell className={className}>
       <ContainerNodeHeader>
@@ -357,19 +437,23 @@ function ContainerNodeVariant0({
         </div>
         <ContainerNodeHeaderMenu />
       </ContainerNodeHeader>
-      <ContainerNodeContent>
-        <ContainerNodeImage />
-      </ContainerNodeContent>
+      {!collapsed && (
+        <ContainerNodeContent>
+          <ContainerNodeImage />
+        </ContainerNodeContent>
+      )}
       <ContainerNodeFooter>
         <ContainerNodeStatus />
-        <ContainerNodeResourceGroup>
-          <ContainerNodeResource icon={Cpu} percent={states.cpuPercent} />
-          <ContainerNodeResource
-            icon={MemoryStick}
-            percent={states.memoryPercent}
-          />
-          <ContainerNodeReplicas />
-        </ContainerNodeResourceGroup>
+        {!collapsed && (
+          <ContainerNodeResourceGroup>
+            <ContainerNodeResource icon={Cpu} percent={states.cpuPercent} />
+            <ContainerNodeResource
+              icon={MemoryStick}
+              percent={states.memoryPercent}
+            />
+            <ContainerNodeReplicas />
+          </ContainerNodeResourceGroup>
+        )}
       </ContainerNodeFooter>
     </ContainerNodeShell>
   );

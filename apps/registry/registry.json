@@ -60,6 +60,35 @@
           "target": "lib/log-viewer-utils.ts"
         }
       ]
+    },
+    {
+      "name": "container-node",
+      "type": "registry:ui",
+      "title": "Container Node",
+      "description": "Composable container node with Crossplane-style status, header actions, and collapsible layout",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "button",
+        "dropdown-menu",
+        "alert-dialog"
+      ],
+      "files": [
+        {
+          "path": "registry/linear/components/container-node/container-node.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.tsx"
+        },
+        {
+          "path": "../../packages/crossplane/src/lib/status.ts",
+          "type": "registry:lib",
+          "target": "lib/crossplane/status.ts"
+        },
+        {
+          "path": "../../packages/crossplane/src/schemas/crossplane-status-schema.ts",
+          "type": "registry:lib",
+          "target": "lib/schemas/crossplane-status-schema.ts"
+        }
+      ]
     }
   ]
 }

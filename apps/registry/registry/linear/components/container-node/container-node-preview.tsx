@@ -1,7 +1,7 @@
 "use client";
 
-import { Preview, PreviewWrapper } from "@shadcn/ui/preview";
-import type { CrossplaneServiceStatusPhase } from "@workspace/crossplane/schemas";
+import type { CrossplaneServiceStatusPhase } from "@workspace/crossplane/lib/status";
+import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { ContainerNode } from "./container-node";
 
 const baseStates = {
@@ -40,6 +40,17 @@ export default function ContainerNodePreview() {
           </ContainerNode.Root>
         </Preview>
       ))}
+      <Preview title="Collapsed">
+        <ContainerNode.Root
+          states={{
+            ...baseStates,
+            collapsed: true,
+            status: { label: "Running", tone: "running" },
+          }}
+        >
+          <ContainerNode.Variant0 className="max-w-60" />
+        </ContainerNode.Root>
+      </Preview>
     </PreviewWrapper>
   );
 }

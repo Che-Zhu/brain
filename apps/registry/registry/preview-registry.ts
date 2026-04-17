@@ -179,7 +179,7 @@ export const Index: RegistryIndex = {
       "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
     state: "designing",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "dropdown-menu"],
+    registryDependencies: ["preview", "button", "dropdown-menu", "alert-dialog"],
     files: [
       {
         path: "registry/linear/components/container-node/container-node-preview.tsx",
