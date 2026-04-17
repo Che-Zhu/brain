@@ -17,11 +17,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@shadcn/ui/collapsible";
-import { ChevronRight } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { StyleSwitcher } from "@/components/style-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -33,13 +28,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@workspace/ui/components/sidebar";
+import { cn } from "@workspace/ui/lib/utils";
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { StyleSwitcher } from "@/components/style-switcher";
 import { useRegistryStyle } from "@/context/registry-style-context";
-import { cn } from "@/lib/utils";
 
 interface StyleTreeNode {
-  style: string;
   sections: RegistrySidebarSection[];
+  style: string;
 }
 
 function buildStyleTree(sections: RegistrySidebarSection[]): StyleTreeNode[] {
@@ -109,14 +109,6 @@ const REGISTRY_STATE_COLOR_CLASS: Record<RegistryPreviewState, string> = {
   done: "text-registry-done",
 };
 
-/** Registry nav: non-selected = transparent bg, hover only brightness; selected = bg-background-selected (same on hover). State icon uses registry-*; title text uses sidebar grays. */
-const registryNavButtonClassName = cn(
-  "bg-transparent text-sidebar-foreground/50 transition-[filter,color] duration-100 ease-out",
-  "hover:bg-transparent hover:text-sidebar-foreground hover:brightness-110 active:bg-transparent",
-  "data-active:bg-background-selected data-active:font-normal data-active:text-sidebar-foreground data-active:brightness-100",
-  "data-active:hover:bg-background-selected data-active:hover:text-sidebar-foreground data-active:hover:brightness-110"
-);
-
 export default function AppSidebar({
   registrySections = [],
 }: {
@@ -166,10 +158,7 @@ export default function AppSidebar({
       <SidebarMenuItem key={href}>
         <SidebarMenuButton
           className={cn(
-            registryNavButtonClassName,
-            "h-8 max-h-8 min-h-8 shrink-0 gap-2 px-2 py-0 text-xs leading-none",
-            active &&
-              "bg-background-selected text-sidebar-foreground hover:bg-background-selected hover:text-sidebar-foreground hover:brightness-110 active:bg-background-selected"
+            "hoverable h-8 max-h-8 min-h-8 shrink-0 cursor-pointer gap-2 rounded-xl px-2 py-0 text-xs leading-none"
           )}
           isActive={active}
           render={
@@ -223,62 +212,64 @@ export default function AppSidebar({
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-sidebar-border bg-background p-1 pb-0 group-data-[collapsible=icon]:hidden">
-        <StyleSwitcher />
-      </SidebarHeader>
-      <SidebarContent className="bg-background-secondary pt-0">
-        <div className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroup className="pt-0">
-            <SidebarGroupContent className="min-w-0 px-0">
-              {sectionsForSelectedStyle.map(({ group, items }) => {
-                const gkey = `${selectedStyle}/${group}`;
-                const isOpen = groupOpen[gkey] !== false;
-                return (
-                  <Collapsible
-                    className="relative min-w-0 pb-0.5"
-                    key={gkey}
-                    onOpenChange={(open) => {
-                      setGroupOpenKey(gkey, open);
-                    }}
-                    open={isOpen}
-                  >
-                    <CollapsibleTrigger
-                      className={cn(
-                        "flex h-8 w-full min-w-0 items-center gap-2 rounded-md bg-transparent py-0 text-left font-medium text-sidebar-foreground/80 text-xs outline-hidden ring-sidebar-ring transition-[filter,color]",
-                        "hover:bg-transparent hover:text-sidebar-foreground hover:brightness-110 focus-visible:ring-2 active:bg-transparent"
-                      )}
-                      type="button"
+    <div className="[--sidebar-width:14rem]">
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="flex flex-col gap-1 bg-background p-2 pb-0 group-data-[collapsible=icon]:hidden">
+          <StyleSwitcher />
+        </SidebarHeader>
+        <SidebarContent className="bg-background pt-0">
+          <div className="group-data-[collapsible=icon]:hidden">
+            <SidebarGroup className="pt-0">
+              <SidebarGroupContent className="min-w-0 px-0">
+                {sectionsForSelectedStyle.map(({ group, items }) => {
+                  const gkey = `${selectedStyle}/${group}`;
+                  const isOpen = groupOpen[gkey] !== false;
+                  return (
+                    <Collapsible
+                      className="relative min-w-0 pb-0.5"
+                      key={gkey}
+                      onOpenChange={(open) => {
+                        setGroupOpenKey(gkey, open);
+                      }}
+                      open={isOpen}
                     >
-                      <ChevronRight
+                      <CollapsibleTrigger
                         className={cn(
-                          "size-3.5 shrink-0 text-sidebar-foreground/60 transition-transform duration-100",
-                          isOpen && "rotate-90"
+                          "hoverable flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl py-0 text-left font-medium text-xs outline-hidden ring-sidebar-ring",
+                          "focus-visible:ring-2"
                         )}
-                      />
-                      <span className="truncate">{group}</span>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="data-closed:fade-out-0 data-open:fade-in-0 pl-1.5 data-closed:animate-out data-open:animate-in">
-                      <SidebarMenu className="min-w-0 border-sidebar-border border-l pl-2">
-                        {items.map((item) => linkButton(item))}
-                      </SidebarMenu>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
+                        type="button"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "size-3.5 shrink-0 text-muted-foreground transition-transform duration-100",
+                            isOpen && "rotate-90"
+                          )}
+                        />
+                        <span className="truncate">{group}</span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="data-closed:fade-out-0 data-open:fade-in-0 pl-1.5 data-closed:animate-out data-open:animate-in">
+                        <SidebarMenu className="min-w-0 border-sidebar-border border-l pl-2">
+                          {items.map((item) => linkButton(item))}
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </div>
+
+          <SidebarGroup className="hidden group-data-[collapsible=icon]:block">
+            <SidebarGroupContent>
+              <SidebarMenu className="min-w-0">
+                {flatItems.map((item) => linkButton(item))}
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        </div>
-
-        <SidebarGroup className="hidden group-data-[collapsible=icon]:block">
-          <SidebarGroupContent>
-            <SidebarMenu className="min-w-0">
-              {flatItems.map((item) => linkButton(item))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarRail />
-    </Sidebar>
+        </SidebarContent>
+        <SidebarRail className="opacity-100 transition-opacity duration-200 ease-out group-data-[side=left]:right-0 group-data-[side=left]:translate-x-0 group-data-[side=left]:after:right-0 group-data-[side=left]:after:left-auto" />
+      </Sidebar>
+    </div>
   );
 }

@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 10000",
+    "registry:build": "shadcn build registry.json -o public/r",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@workspace/ui": "workspace:*",
     "@base-ui/react": "^1.1.0",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",

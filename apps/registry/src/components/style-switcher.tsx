@@ -10,18 +10,18 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@workspace/ui/components/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@workspace/ui/components/sidebar";
 import {
   registryStyleBrandUrl,
   useRegistryStyle,
 } from "@/context/registry-style-context";
-import { cn } from "@/lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 
 /** Same frame in the sidebar trigger and in each dropdown row: bordered tile + 16px glyph */
 function StyleBrandIcon({

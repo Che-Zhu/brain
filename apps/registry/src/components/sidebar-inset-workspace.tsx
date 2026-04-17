@@ -2,11 +2,9 @@
 
 import { ChevronsUpDown } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { type ReactNode, useMemo } from "react";
 
-import { RegistryBlueprintPanel } from "@/components/blueprint/registry-blueprint-panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,21 +13,13 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@workspace/ui/components/dropdown-menu";
+import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { useRegistryPreviewVariant } from "@/hooks/use-registry-preview-variant";
 import { parseRegistryPathname } from "@/lib/parse-registry-pathname";
-import { cn } from "@/lib/utils";
-
-const workspaceViews = ["blueprint", "preview"] as const;
-
-export const workspaceViewParser =
-  parseAsStringLiteral(workspaceViews).withDefault("preview");
-
-export type WorkspaceView = (typeof workspaceViews)[number];
 
 export function SidebarInsetWorkspace({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [view, setView] = useQueryState("view", workspaceViewParser);
 
   const registryRoute = parseRegistryPathname(pathname);
   const previewKey = registryRoute
@@ -44,11 +34,12 @@ export function SidebarInsetWorkspace({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-      <header
-        className="flex shrink-0 items-center gap-1 border-border border-b bg-background p-1 px-2"
-        data-slot="sidebar-inset-workspace-header"
-      >
-        {showVariantSwitcher ? (
+      {showVariantSwitcher ? (
+        <header
+          className="flex shrink-0 items-center gap-1 border-border border-b bg-background p-1 px-2"
+          data-slot="sidebar-inset-workspace-header"
+        >
+          <SidebarTrigger className="shrink-0 md:hidden" />
           <div className="mr-1 border-border border-r pr-1">
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -89,41 +80,10 @@ export function SidebarInsetWorkspace({ children }: { children: ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        ) : null}
-        <Button
-          className="h-6 px-2 text-xs"
-          onClick={() => {
-            setView("blueprint");
-          }}
-          size="xs"
-          type="button"
-          variant={view === "blueprint" ? "secondary" : "ghost"}
-        >
-          Blueprint
-        </Button>
-        <Button
-          className="h-6 px-2 text-xs"
-          onClick={() => {
-            setView("preview");
-          }}
-          size="xs"
-          type="button"
-          variant={view === "preview" ? "secondary" : "ghost"}
-        >
-          Preview
-        </Button>
-      </header>
-      <div
-        className={cn(
-          "flex min-h-0 flex-1 items-center justify-center overflow-y-auto",
-          view === "blueprint" && "flex flex-col"
-        )}
-      >
-        {view === "preview" ? (
-          children
-        ) : (
-          <RegistryBlueprintPanel className="flex flex-1 flex-col" />
-        )}
+        </header>
+      ) : null}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto">
+        {children}
       </div>
     </div>
   );

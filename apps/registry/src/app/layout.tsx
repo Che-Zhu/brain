@@ -6,9 +6,9 @@ import { getRegistrySidebarSections } from "@registry/lib";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { Toaster } from "@workspace/ui/components/sonner";
+import { TooltipProvider } from "@workspace/ui/components/tooltip";
+import { cn } from "@workspace/ui/lib/utils";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 

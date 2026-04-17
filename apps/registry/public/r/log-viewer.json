@@ -1,0 +1,70 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "log-viewer",
+  "title": "Log viewer (Linear)",
+  "description": "Virtualized log list with filters, time range, and chart",
+  "dependencies": [
+    "react-window",
+    "recharts",
+    "lucide-react"
+  ],
+  "registryDependencies": [
+    "button",
+    "badge",
+    "calendar",
+    "chart",
+    "command",
+    "preview",
+    "input-group",
+    "popover",
+    "tooltip",
+    "faceted",
+    "refresh-controls",
+    "time-range-selector"
+  ],
+  "files": [
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-context.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer-context\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer-context.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-list.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer-list\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer-list.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-toolbar.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer-toolbar\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer-toolbar.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-count-chart.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer-count-chart\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer-count-chart.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-highlight.tsx",
+      "content": "\"use client\";\n\nexport * from \"@workspace/ui/components/log-viewer/log-viewer-highlight\";\n",
+      "type": "registry:component",
+      "target": "components/log-viewer/log-viewer-highlight.tsx"
+    },
+    {
+      "path": "registry/linear/components/log-viewer/log-viewer-utils.ts",
+      "content": "export * from \"@workspace/ui/components/log-viewer/log-viewer-utils\";\n",
+      "type": "registry:lib",
+      "target": "lib/log-viewer-utils.ts"
+    }
+  ],
+  "type": "registry:ui"
+}

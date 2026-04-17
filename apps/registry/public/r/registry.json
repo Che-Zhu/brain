@@ -1,0 +1,65 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "sealai",
+  "homepage": "https://github.com/sealai/brain",
+  "items": [
+    {
+      "name": "log-viewer",
+      "type": "registry:ui",
+      "title": "Log viewer (Linear)",
+      "description": "Virtualized log list with filters, time range, and chart",
+      "dependencies": ["react-window", "recharts", "lucide-react"],
+      "registryDependencies": [
+        "button",
+        "badge",
+        "calendar",
+        "chart",
+        "command",
+        "preview",
+        "input-group",
+        "popover",
+        "tooltip",
+        "faceted",
+        "refresh-controls",
+        "time-range-selector"
+      ],
+      "files": [
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-context.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer-context.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-list.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer-list.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-toolbar.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer-toolbar.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-count-chart.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer-count-chart.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-highlight.tsx",
+          "type": "registry:component",
+          "target": "components/log-viewer/log-viewer-highlight.tsx"
+        },
+        {
+          "path": "registry/linear/components/log-viewer/log-viewer-utils.ts",
+          "type": "registry:lib",
+          "target": "lib/log-viewer-utils.ts"
+        }
+      ]
+    }
+  ]
+}

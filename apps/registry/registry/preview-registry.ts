@@ -4,8 +4,8 @@ import type { RegistryPreviewState } from "./nav-types";
 
 export interface RegistryFile {
   path: string;
-  type: string;
   target: string;
+  type: string;
 }
 
 export type RegistryPreviewLoader = () => Promise<{ default: ComponentType }>;
@@ -13,8 +13,8 @@ export type RegistryPreviewLoader = () => Promise<{ default: ComponentType }>;
 /** One implementation of a preview (e.g. `v0` / `v1` folders). */
 export interface RegistryPreviewVariant {
   id: string;
-  title: string;
   load: RegistryPreviewLoader;
+  title: string;
 }
 
 /**
@@ -44,8 +44,8 @@ export type RegistryIndex = Record<string, RegistryPreviewItem>;
 
 const previewUiFile: RegistryFile = {
   path: "registry/shadcn/components/ui/preview.tsx",
-  type: "registry:ui",
   target: "",
+  type: "registry:ui",
 };
 
 function getPreviewVariantsForItem(
@@ -55,7 +55,7 @@ function getPreviewVariantsForItem(
     return item.variants;
   }
   if (item.load) {
-    return [{ id: "default", title: "Default", load: item.load }];
+    return [{ id: "default", load: item.load, title: "Default" }];
   }
   throw new Error(
     `Registry preview ${item.style}/${item.group}/${item.name} has neither load nor variants`
@@ -129,6 +129,41 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-context.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-list.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-toolbar.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-count-chart.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-highlight.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-utils.ts",
+        type: "registry:preview",
+        target: "",
+      },
       previewUiFile,
     ],
     load: () =>
@@ -179,19 +214,19 @@ export const Index: RegistryIndex = {
     variants: [
       {
         id: "v0",
-        title: "v0",
         load: () =>
           import(
             "@registry/shadcn/components/alert-dialog-example/v0/alert-dialog-example-v0"
           ),
+        title: "v0",
       },
       {
         id: "v1",
-        title: "v1",
         load: () =>
           import(
             "@registry/shadcn/components/alert-dialog-example/v1/alert-dialog-example-v1"
           ),
+        title: "v1",
       },
     ],
   },

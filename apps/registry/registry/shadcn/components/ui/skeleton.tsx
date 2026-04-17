@@ -1,13 +1,3 @@
-import { cn } from "@/lib/utils"
+"use client";
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="skeleton"
-      className={cn("bg-muted rounded-md animate-pulse", className)}
-      {...props}
-    />
-  )
-}
-
-export { Skeleton }
+export * from "@workspace/ui/components/skeleton";
