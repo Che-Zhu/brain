@@ -1,0 +1,477 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aps-deployment-ingress-go-templating
+  annotations:
+    meta.crossplane.io/display-name: app
+    meta.crossplane.io/description: Generic app with Deployment, Service, and Ingress
+    # Lucide rocket as data URI; used when icon-url is omitted (frontend prefers icon-url, then icon-data).
+    meta.crossplane.io/icon-data: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXJvY2tldC1pY29uIGx1Y2lkZS1yb2NrZXQiPjxwYXRoIGQ9Ik0xMiAxNXY1czMuMDMtLjU1IDQtMmMxLjA4LTEuNjIgMC01IDAtNSIvPjxwYXRoIGQ9Ik00LjUgMTYuNWMtMS41IDEuMjYtMiA1LTIgNXMzLjc0LS41IDUtMmMuNzEtLjg0LjctMi4xMy0uMDktMi45MWEyLjE4IDIuMTggMCAwIDAtMi45MS0uMDkiLz48cGF0aCBkPSJNOSAxMmEyMiAyMiAwIDAgMSAyLTMuOTVBMTIuODggMTIuODggMCAwIDEgMjIgMmMwIDIuNzItLjc4IDcuNS02IDExYTIyLjQgMjIuNCAwIDAgMS00IDJ6Ii8+PHBhdGggZD0iTTkgMTJINHMuNTUtMy4wMyAyLTRjMS42Mi0xLjA4IDUgLjA1IDUgLjA1Ii8+PC9zdmc+"
+    meta.crossplane.io/template: |
+      apiVersion: example.crossplane.io/v1
+      kind: AP
+      metadata:
+        name: {{ name }}
+        labels:
+          region: 192.168.12.53.nip.io
+      spec:
+        crossplane:
+          compositionRef:
+            name: aps-deployment-ingress-go-templating
+        image: {{ image }}
+        replicas: 1
+        endpoints:
+          - port: 80
+            host: placeholder.example.com
+        cpuRequest: 200m
+        memoryRequest: 204Mi
+        cpuLimit: 2000m
+        memoryLimit: 2048Mi
+spec:
+  compositeTypeRef:
+    apiVersion: example.crossplane.io/v1
+    kind: AP
+  mode: Pipeline
+  pipeline:
+    - step: render-deployment-service-ingress
+      functionRef:
+        name: crossplane-contrib-function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $name := .observed.composite.resource.metadata.name }}
+            {{- $ns := .observed.composite.resource.metadata.namespace }}
+            {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $region := "" }}
+            {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+            {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
+            {{- end }}
+            {{- $slug := (sha256sum (printf "%s|%s|%s" $name $ns (default "" $apUid))) | trunc 6 }}
+            {{- $computedHost := "" }}
+            {{- if ne $region "" }}
+            {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
+            {{- end }}
+            {{- $endpoints := list }}
+            {{- if hasKey $spec "endpoints" }}
+            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- else if and $spec.port $spec.host }}
+            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- end }}
+            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
+            {{- $epMut := list }}
+            {{- range $endpoints }}
+            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- end }}
+            {{- $endpoints = $epMut }}
+            {{- end }}
+            {{- /* Build an effective spec snapshot with defaults resolved so rollback is self-contained */}}
+            {{- $effective := dict
+                  "name" $name
+                  "namespace" $ns
+                  "image" $spec.image
+                  "replicas" ($spec.replicas | default 1)
+                  "endpoints" $endpoints
+                  "cpuRequest" ($spec.cpuRequest | default "200m")
+                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
+                  "cpuLimit" ($spec.cpuLimit | default "2000m")
+                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
+                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
+                  "env" ($spec.env | default (list))
+                  "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
+                  "probes" ($spec.probes | default (dict))
+            }}
+            {{- $effectiveYaml := $effective | toYaml }}
+            {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
+            {{- $managedConfigMapName := printf "%s-config-backup" $name }}
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ $managedConfigMapName }}
+              namespace: {{ $ns }}
+              ownerReferences: []
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-config-backup
+                gotemplating.fn.crossplane.io/ready: "True"
+                app.sealos.io/config-snapshot: "true"
+                app.sealos.io/config-version-hash: {{ $versionHash }}
+              labels:
+                app.sealos.io/ap-uid: {{ $apUid }}
+                app.sealos.io/backup: "true"
+            data:
+              config.yaml: |
+                {{ $effectiveYaml | nindent 4 }}
+            ---
+
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-deployment
+                gotemplating.fn.crossplane.io/ready: "True"
+              labels:
+                crossplane.io/composite: {{ $name }}
+            spec:
+              replicas: {{ $spec.replicas | default 1 }}
+              revisionHistoryLimit: 1
+              selector:
+                matchLabels:
+                  app: {{ $name }}
+              strategy:
+                type: RollingUpdate
+                rollingUpdate:
+                  maxUnavailable: 0
+                  maxSurge: 1
+              template:
+                metadata:
+                  labels:
+                    app: {{ $name }}
+                spec:
+                  imagePullSecrets:
+                  - name: ghcr-cred
+                  automountServiceAccountToken: false
+                  containers:
+                  - name: {{ $name }}
+                    image: {{ $spec.image }}
+                    {{- if $endpoints }}
+                    ports:
+                    {{- $containerPortsSeen := dict }}
+                    {{- range $endpoints }}
+                    {{- $portKey := printf "p%d" .port }}
+                    {{- if not (index $containerPortsSeen $portKey) }}
+                    {{- $_ := set $containerPortsSeen $portKey 1 }}
+                    - containerPort: {{ .port }}
+                      name: http-{{ .port }}
+                    {{- end }}
+                    {{- end }}
+                    {{- end }}
+                    {{- if $spec.env }}
+                    env:
+                    {{- range $spec.env }}
+                    - name: {{ .name }}
+                      {{- if .valueFrom }}
+                      valueFrom:
+            {{ .valueFrom | toYaml | nindent 12 }}
+                      {{- else }}
+                      value: {{ .value | quote }}
+                      {{- end }}
+                    {{- end }}
+                    {{- end }}
+                    resources:
+                      requests:
+                        cpu: {{ $spec.cpuRequest | default "200m" }}
+                        memory: {{ $spec.memoryRequest | default "204Mi" }}
+                      limits:
+                        cpu: {{ $spec.cpuLimit | default "2000m" }}
+                        memory: {{ $spec.memoryLimit | default "2048Mi" }}
+                    imagePullPolicy: {{ $spec.imagePullPolicy | default "Always" }}
+                    {{- if $spec.probes }}
+                    {{- if $spec.probes.startup }}
+                    startupProbe:
+            {{ $spec.probes.startup | toYaml | nindent 22 }}
+                    {{- end }}
+                    {{- if $spec.probes.liveness }}
+                    livenessProbe:
+            {{ $spec.probes.liveness | toYaml | nindent 22 }}
+                    {{- end }}
+                    {{- if $spec.probes.readiness }}
+                    readinessProbe:
+            {{ $spec.probes.readiness | toYaml | nindent 22 }}
+                    {{- end }}
+                    {{- end }}
+
+            {{- $portsSeen := dict }}
+            {{- range $endpoints }}
+            {{- $portKey := printf "p%d" .port }}
+            {{- if not (index $portsSeen $portKey) }}
+            {{- $_ := set $portsSeen $portKey 1 }}
+            ---
+
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: {{ printf "%s-service-port-%d" $name .port }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-service-port-{{ .port }}
+              labels:
+                crossplane.io/composite: {{ $name }}
+            spec:
+              selector:
+                app: {{ $name }}
+              ports:
+              - name: http-{{ .port }}
+                port: {{ .port }}
+                targetPort: http-{{ .port }}
+                protocol: TCP
+            {{- end }}
+            {{- end }}
+            {{- if $endpoints }}
+
+            ---
+
+            apiVersion: networking.k8s.io/v1
+            kind: Ingress
+            metadata:
+              name: {{ printf "%s-ingress" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-ingress
+                nginx.ingress.kubernetes.io/proxy-body-size: 32m
+                nginx.ingress.kubernetes.io/ssl-redirect: 'false'
+                nginx.ingress.kubernetes.io/backend-protocol: HTTP
+                nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
+                nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
+                nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
+                nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
+                nginx.ingress.kubernetes.io/server-snippet: |
+                  client_header_buffer_size 64k;
+                  large_client_header_buffers 4 128k;
+              {{- if $spec.ingressAnnotations }}
+              {{- range $k, $v := $spec.ingressAnnotations }}
+                {{ $k }}: {{ $v | quote }}
+              {{- end }}
+              {{- end }}
+            spec:
+              ingressClassName: nginx
+              rules:
+              {{- range $endpoints }}
+              - host: {{ .host }}
+                http:
+                  paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                      service:
+                        name: {{ printf "%s-service-port-%d" $name .port }}
+                        port:
+                          number: {{ .port }}
+              {{- end }}
+              tls:
+              - hosts:
+                {{- range $endpoints }}
+                - {{ .host }}
+                {{- end }}
+                secretName: wildcard-cert
+            {{- end }}
+
+            ---
+
+            apiVersion: example.crossplane.io/v1
+            kind: AP
+            metadata:
+              name: {{ $name }}
+              namespace: {{ $ns }}
+            status:
+              phase: Ready
+              configVersionHash: {{ $versionHash }}
+    - step: create-orphaned-config-snapshot-rbac
+      functionRef:
+        name: crossplane-contrib-function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $name := .observed.composite.resource.metadata.name }}
+            {{- $ns := .observed.composite.resource.metadata.namespace }}
+            {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $region := "" }}
+            {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+            {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
+            {{- end }}
+            {{- $slug := (sha256sum (printf "%s|%s|%s" $name $ns (default "" $apUid))) | trunc 6 }}
+            {{- $computedHost := "" }}
+            {{- if ne $region "" }}
+            {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
+            {{- end }}
+            {{- $endpoints := list }}
+            {{- if hasKey $spec "endpoints" }}
+            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- else if and $spec.port $spec.host }}
+            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- end }}
+            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
+            {{- $epMut := list }}
+            {{- range $endpoints }}
+            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- end }}
+            {{- $endpoints = $epMut }}
+            {{- end }}
+            {{- $effective := dict
+                  "name" $name
+                  "namespace" $ns
+                  "image" $spec.image
+                  "replicas" ($spec.replicas | default 1)
+                  "endpoints" $endpoints
+                  "cpuRequest" ($spec.cpuRequest | default "200m")
+                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
+                  "cpuLimit" ($spec.cpuLimit | default "2000m")
+                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
+                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
+                  "env" ($spec.env | default (list))
+                  "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
+                  "probes" ($spec.probes | default (dict))
+            }}
+            {{- $effectiveYaml := $effective | toYaml }}
+            {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
+            {{- $managedCM := printf "%s-config-backup" $name }}
+            {{- $orphanCM := printf "%s-config-snapshot-%s" $name $versionHash }}
+            {{- $jobName := printf "%s-config-snapshot-%s" $name $versionHash }}
+            ---
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: {{ $jobName }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-sa-{{ $versionHash }}
+                gotemplating.fn.crossplane.io/ready: "True"
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: {{ $jobName }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-role-{{ $versionHash }}
+                gotemplating.fn.crossplane.io/ready: "True"
+            rules:
+            - apiGroups: [""]
+              resources: ["configmaps"]
+              verbs: ["get", "create", "patch"]
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: {{ $jobName }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-rb-{{ $versionHash }}
+                gotemplating.fn.crossplane.io/ready: "True"
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: Role
+              name: {{ $jobName }}
+            subjects:
+            - kind: ServiceAccount
+              name: {{ $jobName }}
+              namespace: {{ $ns }}
+    - step: create-orphaned-config-snapshot-job
+      functionRef:
+        name: crossplane-contrib-function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $name := .observed.composite.resource.metadata.name }}
+            {{- $ns := .observed.composite.resource.metadata.namespace }}
+            {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $region := "" }}
+            {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+            {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
+            {{- end }}
+            {{- $slug := (sha256sum (printf "%s|%s|%s" $name $ns (default "" $apUid))) | trunc 6 }}
+            {{- $computedHost := "" }}
+            {{- if ne $region "" }}
+            {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
+            {{- end }}
+            {{- $endpoints := list }}
+            {{- if hasKey $spec "endpoints" }}
+            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- else if and $spec.port $spec.host }}
+            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- end }}
+            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
+            {{- $epMut := list }}
+            {{- range $endpoints }}
+            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- end }}
+            {{- $endpoints = $epMut }}
+            {{- end }}
+            {{- $effective := dict
+                  "name" $name
+                  "namespace" $ns
+                  "image" $spec.image
+                  "replicas" ($spec.replicas | default 1)
+                  "endpoints" $endpoints
+                  "cpuRequest" ($spec.cpuRequest | default "200m")
+                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
+                  "cpuLimit" ($spec.cpuLimit | default "2000m")
+                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
+                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
+                  "env" ($spec.env | default (list))
+                  "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
+                  "probes" ($spec.probes | default (dict))
+            }}
+            {{- $effectiveYaml := $effective | toYaml }}
+            {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
+            {{- $managedCM := printf "%s-config-backup" $name }}
+            {{- $orphanCM := printf "%s-config-snapshot-%s" $name $versionHash }}
+            {{- $jobName := printf "%s-config-snapshot-%s" $name $versionHash }}
+            ---
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: {{ $jobName }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-job-{{ $versionHash }}
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              ttlSecondsAfterFinished: 300
+              backoffLimit: 2
+              template:
+                spec:
+                  serviceAccountName: {{ $jobName }}
+                  restartPolicy: OnFailure
+                  containers:
+                  - name: snapshot
+                    image: bitnami/kubectl:latest
+                    command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      set -euo pipefail
+                      SOURCE_CM="{{ $managedCM }}"
+                      ORPHAN_CM="{{ $orphanCM }}"
+                      NS="{{ $ns }}"
+                      AP_UID="{{ $apUid }}"
+                      HASH="{{ $versionHash }}"
+
+                      echo "Copying $SOURCE_CM to orphaned $ORPHAN_CM in namespace $NS"
+                      if kubectl get configmap -n "$NS" "$ORPHAN_CM" 2>/dev/null; then
+                        echo "Orphaned snapshot $ORPHAN_CM already exists, skipping"
+                        exit 0
+                      fi
+                      kubectl get configmap -n "$NS" "$SOURCE_CM" -o jsonpath='{.data.config\.yaml}' > /tmp/config.yaml
+                      cat <<-MANIFEST | sed 's/^                      //' > /tmp/orphan-cm.yaml
+                      apiVersion: v1
+                      kind: ConfigMap
+                      metadata:
+                        name: $ORPHAN_CM
+                        namespace: $NS
+                        labels:
+                          app.sealos.io/ap-uid: $AP_UID
+                          app.sealos.io/backup: "true"
+                        annotations:
+                          app.sealos.io/config-snapshot: "true"
+                          app.sealos.io/config-version-hash: $HASH
+                      immutable: true
+                      data:
+                        config.yaml: |
+                      	MANIFEST
+                      sed 's/^/    /' /tmp/config.yaml >> /tmp/orphan-cm.yaml
+                      kubectl apply -f /tmp/orphan-cm.yaml
+                      echo "Created orphaned snapshot $ORPHAN_CM"

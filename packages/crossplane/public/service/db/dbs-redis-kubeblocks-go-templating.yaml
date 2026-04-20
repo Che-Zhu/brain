@@ -1,0 +1,373 @@
+# Quota (DB.spec.quota): preset xs|s|m|l maps to CPU/memory/storage and limits for the redis
+# component in the Go template pipeline below. Omitted spec.cpuRequest, spec.memoryRequest,
+# spec.cpuLimit, spec.memoryLimit, and spec.storageSize are taken from the chosen quota; any of
+# those fields set on the DB claim override only that value. XRD default is quota xs. For quota xs
+# the preset main data volume is 3Gi and the redis-sentinel volume is 1Gi (larger quotas use 2Gi
+# for sentinel). See packages/crossplane/service/db/db.yaml for the API schema.
+# exposeNodePort: when DB.spec.exposeNodePort is true, composes Service {name}-export (NodePort;
+# nodePort omitted so the apiserver allocates a free port).
+# KubeBlocks Redis topology: {name}-redis-redis (primary), {name}-redis-headless, redis-sentinel
+# {name}-redis-sentinel-redis-sentinel, {name}-redis-sentinel-headless. Account Secret:
+# {name}-redis-account-default (username/password; port 6379 on primary Service). Export: component redis, role primary.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: dbs-redis-kubeblocks-go-templating
+  labels:
+    engine: redis
+  annotations:
+    meta.crossplane.io/display-name: redis
+    meta.crossplane.io/icon-url: https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg
+    meta.crossplane.io/description: Redis in-memory data store via KubeBlocks
+    meta.crossplane.io/template: |
+      apiVersion: example.crossplane.io/v1
+      kind: DB
+      metadata:
+        name: {{ name }}
+        namespace: default
+        labels:
+          region: 192.168.12.53.nip.io
+      spec:
+        crossplane:
+          compositionRef:
+            name: dbs-redis-kubeblocks-go-templating
+        engine: redis
+        quota: xs
+spec:
+  compositeTypeRef:
+    apiVersion: example.crossplane.io/v1
+    kind: DB
+  mode: Pipeline
+  pipeline:
+    - step: render-kubeblocks-redis
+      functionRef:
+        name: crossplane-contrib-function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $ns := .observed.composite.resource.metadata.namespace }}
+            {{- $name := .observed.composite.resource.metadata.name }}
+            {{- $kbCluster := getComposedResource . "kubeblocks-cluster" }}
+            {{- $redisConnCredentialObject := getComposedResource . "redis-conn-credential-object" }}
+            {{- $exportSvc := getComposedResource . "db-nodeport-export" }}
+            {{- $quota := .observed.composite.resource.spec.quota | default "xs" | lower }}
+            {{- $cpu := "100m" }}{{- $mem := "512Mi" }}{{- $cpuLim := "500m" }}{{- $memLim := "768Mi" }}{{- $stor := "3Gi" }}
+            {{- $sentinelStor := "2Gi" }}
+            {{- if eq $quota "xs" }}{{- $sentinelStor = "1Gi" }}{{- end }}
+            {{- if eq $quota "s" }}{{- $cpu = "250m" }}{{- $mem = "1Gi" }}{{- $cpuLim = "1000m" }}{{- $memLim = "1536Mi" }}{{- $stor = "4Gi" }}{{- $sentinelStor = "2Gi" }}
+            {{- else if eq $quota "m" }}{{- $cpu = "500m" }}{{- $mem = "2Gi" }}{{- $cpuLim = "2000m" }}{{- $memLim = "3Gi" }}{{- $stor = "10Gi" }}{{- $sentinelStor = "2Gi" }}
+            {{- else if eq $quota "l" }}{{- $cpu = "1000m" }}{{- $mem = "4Gi" }}{{- $cpuLim = "4000m" }}{{- $memLim = "6Gi" }}{{- $stor = "20Gi" }}{{- $sentinelStor = "2Gi" }}
+            {{- end }}
+            {{- if .observed.composite.resource.spec.cpuRequest }}{{- $cpu = .observed.composite.resource.spec.cpuRequest }}{{- end }}
+            {{- if .observed.composite.resource.spec.memoryRequest }}{{- $mem = .observed.composite.resource.spec.memoryRequest }}{{- end }}
+            {{- if .observed.composite.resource.spec.cpuLimit }}{{- $cpuLim = .observed.composite.resource.spec.cpuLimit }}{{- end }}
+            {{- if .observed.composite.resource.spec.memoryLimit }}{{- $memLim = .observed.composite.resource.spec.memoryLimit }}{{- end }}
+            {{- if .observed.composite.resource.spec.storageSize }}{{- $stor = .observed.composite.resource.spec.storageSize }}{{- end }}
+            {{- $exposeNodePort := false }}
+            {{- if hasKey .observed.composite.resource.spec "exposeNodePort" }}{{- $exposeNodePort = .observed.composite.resource.spec.exposeNodePort }}{{- end }}
+            {{- $scheduledBackup := index .observed.composite.resource.spec "scheduledBackup" }}
+            {{- if not $scheduledBackup }}{{- $scheduledBackup = index .observed.composite.resource.spec "backup" }}{{- end }}
+            {{- $restore := index .observed.composite.resource.spec "restoreFromBackup" }}
+            ---
+
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: {{ printf "%s-sa" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-serviceaccount
+
+            ---
+
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: {{ printf "%s-sa" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-role
+            rules:
+            - apiGroups:
+              - '*'
+              resources:
+              - '*'
+              verbs:
+              - '*'
+
+            ---
+
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: {{ printf "%s-sa" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-rolebinding
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: Role
+              name: {{ printf "%s-sa" $name }}
+            subjects:
+            - kind: ServiceAccount
+              name: {{ printf "%s-sa" $name }}
+              namespace: {{ $ns }}
+
+            {{- if .observed.composite.resource.spec.secretData }}
+            ---
+
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ .observed.composite.resource.spec.connectionSecretName | default (printf "%s-connection" $name) }}
+              namespace: {{ $ns }}
+              labels:
+                app.kubernetes.io/instance: {{ $name }}
+                app.kubernetes.io/managed-by: crossplane
+                app.kubernetes.io/name: redis
+                crossplane.io/composite: {{ $name }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-connection-secret
+            type: Opaque
+            data:
+              {{- range $k, $v := .observed.composite.resource.spec.secretData }}
+              {{ $k }}: {{ $v | b64enc }}
+              {{- end }}
+            {{- end }}
+
+            ---
+
+            apiVersion: apps.kubeblocks.io/v1alpha1
+            kind: Cluster
+
+            {{- $redisVersion := .observed.composite.resource.spec.engine | default "redis-7.2.7" }}
+            {{- if eq $redisVersion "redis" }}{{ $redisVersion = "redis-7.2.7" }}{{ end }}
+
+            metadata:
+              namespace: {{ $ns }}
+              name: {{ $name }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kubeblocks-cluster
+                {{- if and $restore (index $restore "backupName") }}
+                {{- $backupName := index $restore "backupName" }}
+                {{- $restoreNS := $ns }}{{- if index $restore "namespace" }}{{- $restoreNS = index $restore "namespace" }}{{- end }}
+                {{- $vrp := "Parallel" }}{{- if index $restore "volumeRestorePolicy" }}{{- $vrp = index $restore "volumeRestorePolicy" }}{{- end }}
+                kubeblocks.io/restore-from-backup: {{ printf "{\"redis\":{\"name\":\"%s\",\"namespace\":\"%s\",\"volumeRestorePolicy\":\"%s\"}}" $backupName $restoreNS $vrp | quote }}
+                {{- end }}
+                {{- if $kbCluster }}
+                {{- if eq $kbCluster.status.phase "Running" }}
+                gotemplating.fn.crossplane.io/ready: "True"
+                {{- end }}
+                {{- end }}
+              labels:
+                kb.io/database: {{ $redisVersion }}
+                clusterdefinition.kubeblocks.io/name: redis
+                clusterversion.kubeblocks.io/name: {{ $redisVersion }}
+                crossplane.io/composite: {{ $name }}
+
+            spec:
+              affinity:
+                podAntiAffinity: Preferred
+                tenancy: SharedNode
+                topologyKeys:
+                - kubernetes.io/hostname
+
+              clusterDefinitionRef: redis
+
+              backup:
+                cronExpression: {{ if $scheduledBackup }}{{ (index $scheduledBackup "cronExpression") | default "02 08 * * *" | quote }}{{ else }}"02 08 * * *"{{ end }}
+                enabled: {{ if $scheduledBackup }}{{ index $scheduledBackup "enabled" | default true }}{{ else }}true{{ end }}
+                incrementalBackupEnabled: false
+                method: datafile
+                pitrEnabled: false
+                repoName: {{ if $scheduledBackup }}{{ (index $scheduledBackup "repoName") | default "backuprepo-minio" | quote }}{{ else }}"backuprepo-minio"{{ end }}
+                retentionPeriod: {{ if $scheduledBackup }}{{ (index $scheduledBackup "retentionPeriod") | default "14d" | quote }}{{ else }}"14d"{{ end }}
+
+              componentSpecs:
+              - componentDef: redis-7
+                name: redis
+                replicas: {{ .observed.composite.resource.spec.replicas | default 1 }}
+                enabledLogs:
+                - running
+                env:
+                - name: CUSTOM_SENTINEL_MASTER_NAME
+                  value: {{ $name | quote }}
+                resources:
+                  limits:
+                    cpu: {{ $cpuLim }}
+                    memory: {{ $memLim }}
+                  requests:
+                    cpu: {{ $cpu }}
+                    memory: {{ $mem }}
+                serviceAccountName: {{ printf "%s-sa" $name }}
+                serviceVersion: "7.2.7"
+                switchPolicy:
+                  type: Noop
+                volumeClaimTemplates:
+                - name: data
+                  spec:
+                    accessModes:
+                    - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: {{ $stor }}
+                    {{- if .observed.composite.resource.spec.storageClassName }}
+                    storageClassName: {{ .observed.composite.resource.spec.storageClassName }}
+                    {{- end }}
+
+              - componentDef: redis-sentinel-7
+                name: redis-sentinel
+                replicas: 1
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 100Mi
+                  requests:
+                    cpu: 10m
+                    memory: 10Mi
+                serviceAccountName: {{ printf "%s-sa" $name }}
+                serviceVersion: "7.2.7"
+                volumeClaimTemplates:
+                - name: data
+                  spec:
+                    accessModes:
+                    - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: {{ $sentinelStor }}
+                    {{- if .observed.composite.resource.spec.storageClassName }}
+                    storageClassName: {{ .observed.composite.resource.spec.storageClassName }}
+                    {{- end }}
+
+              terminationPolicy: {{ .observed.composite.resource.spec.terminationPolicy | default "Delete" | replace "Wipeout" "WipeOut" }}
+              topology: replication
+
+            {{- $lastTransition := now | date "2006-01-02T15:04:05Z07:00" }}
+            {{- if and $kbCluster $kbCluster.status.conditions }}
+              {{- range $kbCluster.status.conditions }}
+                {{- if and (eq .type "Ready") .lastTransitionTime }}
+                  {{- $lastTransition = .lastTransitionTime }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+
+            {{- if $exposeNodePort }}
+            ---
+
+            apiVersion: v1
+            kind: Service
+            metadata:
+              namespace: {{ $ns }}
+              name: {{ printf "%s-export" $name }}
+              labels:
+                app.kubernetes.io/instance: {{ $name }}
+                apps.kubeblocks.io/component-name: redis
+                kubeblocks.io/role: primary
+                app.kubernetes.io/managed-by: crossplane
+                crossplane.io/composite: {{ $name }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: db-nodeport-export
+            spec:
+              type: NodePort
+              ports:
+              - name: tcp
+                port: 6379
+                targetPort: 6379
+                protocol: TCP
+              selector:
+                app.kubernetes.io/instance: {{ $name }}
+                kubeblocks.io/role: primary
+            {{- end }}
+
+            ---
+
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-conn-credential-observe" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-conn-credential-object
+            spec:
+              managementPolicies:
+                - Observe
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Secret
+                  metadata:
+                    name: {{ printf "%s-redis-account-default" $name }}
+                    namespace: {{ $ns }}
+
+            ---
+            {{- $connPriv := "" }}
+            {{- $connPub := "" }}
+            {{- if and $redisConnCredentialObject $redisConnCredentialObject.status $redisConnCredentialObject.status.atProvider $redisConnCredentialObject.status.atProvider.manifest }}
+            {{- $d := $redisConnCredentialObject.status.atProvider.manifest.data }}
+            {{- if and $d (index $d "username") (index $d "password") }}
+            {{- $u := index $d "username" | b64dec }}
+            {{- $pw := index $d "password" | b64dec }}
+            {{- $ue := $u | urlquery }}
+            {{- $pwe := $pw | urlquery }}
+            {{- $svcHost := printf "%s-redis-redis" $name }}
+            {{- $connPriv = printf "redis://%s:%s@%s.%s.svc:6379" $ue $pwe $svcHost $ns }}
+            {{- $regionLabel := "" }}
+            {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+            {{- $regionLabel = index .observed.composite.resource.metadata.labels "region" }}
+            {{- end }}
+            {{- $np := "" }}
+            {{- if and $exportSvc $exportSvc.spec $exportSvc.spec.ports (gt (len $exportSvc.spec.ports) 0) }}
+            {{- $p0 := index $exportSvc.spec.ports 0 }}
+            {{- if and $p0 (index $p0 "nodePort") }}{{ $np = printf "%v" (index $p0 "nodePort") }}{{ end }}
+            {{- end }}
+            {{- if and $regionLabel (ne $np "") }}
+            {{- $connPub = printf "redis://%s:%s@dbconn.%s:%s" $ue $pwe $regionLabel $np }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            apiVersion: example.crossplane.io/v1
+            kind: DB
+            metadata:
+              name: {{ $name }}
+              namespace: {{ $ns }}
+            status:
+              phase: {{ $kbCluster.status.phase | default "Unknown" }}
+              observedReplicas: {{ $kbCluster.status.observedReplicas | default 0 }}
+              availableReplicas: {{ $kbCluster.status.availableReplicas | default 0 }}
+              kubeblocksServices:
+                - name: {{ printf "%s-redis-redis" $name | quote }}
+                  type: ClusterIP
+                  purpose: primary-redis
+                - name: {{ printf "%s-redis-headless" $name | quote }}
+                  type: ClusterIP
+                  purpose: headless-redis-instances
+                - name: {{ printf "%s-redis-sentinel-redis-sentinel" $name | quote }}
+                  type: ClusterIP
+                  purpose: sentinel
+                - name: {{ printf "%s-redis-sentinel-headless" $name | quote }}
+                  type: ClusterIP
+                  purpose: headless-sentinel-instances
+                {{- if $exposeNodePort }}
+                - name: {{ printf "%s-export" $name | quote }}
+                  type: NodePort
+                  purpose: primary-tcp-external
+                {{- end }}
+              {{- if ne $connPriv "" }}
+              connectionStringPrivate: {{ $connPriv | quote }}
+              {{- end }}
+              {{- if ne $connPub "" }}
+              connectionStringPublic: {{ $connPub | quote }}
+              {{- end }}
+              conditions:
+                - type: Ready
+                  status: {{ if eq $kbCluster.status.phase "Running" -}} "True" {{- else -}} "False" {{- end }}
+                  reason: {{ $kbCluster.status.phase | default "Waiting" }}
+                  message: 'KubeBlocks Cluster phase is {{ $kbCluster.status.phase | default "Unknown" }}'
+                  lastTransitionTime: {{ $lastTransition }}

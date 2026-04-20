@@ -1,0 +1,21 @@
+apiVersion: example.crossplane.io/v1
+kind: AP
+metadata:
+  name: ap-nginx
+  namespace: sponge-bob
+spec:
+  crossplane:
+    compositionRef:
+      name: aps-deployment-ingress-go-templating
+  image: nginx:latest
+  replicas: 1
+  # Multiple services and ingress - one per endpoint (legacy port/host still supported)
+  endpoints:
+    - port: 8082
+      host: dddc.192.168.12.53.nip.io
+  cpuRequest: 200m
+  memoryRequest: 204Mi
+  cpuLimit: 2000m
+  memoryLimit: 2048Mi
+
+

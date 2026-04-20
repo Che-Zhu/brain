@@ -1,0 +1,121 @@
+# Notif — user-facing notification record (no default composition).
+# Use as a standalone XR/claim for title, body, severity, links, and arbitrary payload.
+# Optional crossplane.compositionRef if you add a delivery composition later.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: notifs.example.crossplane.io
+spec:
+  scope: Namespaced
+  group: example.crossplane.io
+  names:
+    kind: Notif
+    plural: notifs
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              crossplane:
+                type: object
+                description: Optional — select a Composition if you add one later
+                properties:
+                  compositionRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                  compositionSelector:
+                    type: object
+                    properties:
+                      matchLabels:
+                        type: object
+                        additionalProperties:
+                          type: string
+              title:
+                type: string
+                description: Short headline shown in the inbox or toast
+              content:
+                type: string
+                description: Full message body (plain text or markdown, app-defined)
+              severity:
+                type: string
+                description: Visual priority / tone
+                enum:
+                - info
+                - success
+                - warning
+                - error
+                default: info
+              category:
+                type: string
+                description: Free-form bucket for filtering (e.g. deploy, billing, system)
+              link:
+                type: string
+                description: URL to open when the user follows the notification
+              read:
+                type: boolean
+                description: Whether the recipient has acknowledged / read the notification
+                default: false
+              archived:
+                type: boolean
+                description: Hide from default lists without deleting
+                default: false
+              dedupeKey:
+                type: string
+                description: Idempotency key to collapse duplicate events from producers
+              expiresAt:
+                type: string
+                format: date-time
+                description: After this time UIs may hide or garbage-collect the record
+              sourceRef:
+                type: object
+                description: Related Kubernetes or platform object (task, AP, etc.)
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  uid:
+                    type: string
+              data:
+                type: object
+                description: Arbitrary structured payload for clients (counts, IDs, etc.)
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: Optional delivery lifecycle (e.g. pending, delivered) if a pipeline sets it
+              observedGeneration:
+                type: integer
+                format: int64
+              lastTransitionTime:
+                type: string
+                format: date-time
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string

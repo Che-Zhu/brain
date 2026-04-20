@@ -1,0 +1,12 @@
+# Grant Crossplane permission to create and manage composed resources.
+# Uses aggregation - Crossplane automatically picks up ClusterRoles with the label below.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-db-composition
+  labels:
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
