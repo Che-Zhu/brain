@@ -1,10 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
-import { ChevronDown, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { DateRange } from "react-day-picker";
-import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
 import {
@@ -12,6 +7,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover";
+import { cn } from "@workspace/ui/lib/utils";
+import { format } from "date-fns";
+import { ChevronDown, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { DateRange } from "react-day-picker";
 
 export type TimeRange =
   | { mode: "quick"; ms: number }
@@ -27,9 +27,9 @@ export const QUICK_RANGES = [
 ];
 
 interface TimeRangeSelectorProps {
-  value: TimeRange;
-  onChange: (range: TimeRange) => void;
   className?: string;
+  onChange: (range: TimeRange) => void;
+  value: TimeRange;
 }
 
 export function TimeRangeSelector({

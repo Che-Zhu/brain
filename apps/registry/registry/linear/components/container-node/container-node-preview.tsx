@@ -1,8 +1,8 @@
 "use client";
 
 import type { CrossplaneServiceStatusPhase } from "@workspace/crossplane/lib/status";
+import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
-import { ContainerNode } from "./container-node";
 
 const baseStates = {
   cpuPercent: 42,

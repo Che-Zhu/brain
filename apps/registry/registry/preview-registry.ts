@@ -177,7 +177,7 @@ export const Index: RegistryIndex = {
     title: "Container Node",
     description:
       "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
-    state: "designing",
+    state: "coding",
     type: "registry:preview",
     registryDependencies: [
       "preview",
@@ -202,6 +202,68 @@ export const Index: RegistryIndex = {
       import(
         "@registry/linear/components/container-node/container-node-preview"
       ),
+  },
+
+  "linear/components/project-explorer": {
+    style: "linear",
+    group: "components",
+    name: "project-explorer",
+    title: "Project Explorer",
+    description:
+      "Projects sidebar-style list: header and rows with name and created date",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview"],
+    files: [
+      {
+        path: "registry/linear/components/project-explorer/project-explorer-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/project-explorer/project-explorer.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/project-explorer/project-explorer-preview"
+      ),
+  },
+
+  "linear/components/project-flow": {
+    style: "linear",
+    group: "components",
+    name: "project-flow",
+    title: "Project Flow",
+    description:
+      "React Flow diagram: draggable nodes, edges, new connections, fit view",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "container-node",
+      "button",
+      "dropdown-menu",
+      "alert-dialog",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/project-flow/project-flow-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/project-flow/project-flow.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/project-flow/project-flow-preview"),
   },
 
   "shadcn/components/accordion": {

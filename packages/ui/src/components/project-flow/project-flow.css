@@ -1,0 +1,8 @@
+/* Scoped to ProjectFlow shell — keeps handles functional but invisible. */
+[data-slot="project-flow"] .react-flow__handle {
+  top: auto;
+  bottom: auto;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}

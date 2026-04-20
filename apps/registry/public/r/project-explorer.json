@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "project-explorer",
+  "title": "Project Explorer",
+  "description": "Projects list with header and rows showing name and created date",
+  "dependencies": [],
+  "registryDependencies": [],
+  "files": [
+    {
+      "path": "registry/linear/components/project-explorer/project-explorer.tsx",
+      "content": "\"use client\";\n\n// biome-ignore lint/performance/noBarrelFile: registry source path mirrors @workspace/ui for shadcn build\nexport * from \"@workspace/ui/components/project-explorer/project-explorer\";\n",
+      "type": "registry:component",
+      "target": "components/project-explorer/project-explorer.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

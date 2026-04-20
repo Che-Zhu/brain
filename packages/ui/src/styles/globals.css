@@ -157,7 +157,10 @@
  */
 @layer utilities {
   .hoverable {
-    @apply border-transparent bg-transparent text-muted-foreground transition-colors;
+    @apply cursor-pointer border-transparent bg-transparent text-muted-foreground transition-colors;
+  }
+  .hoverable:disabled {
+    @apply cursor-not-allowed;
   }
   .hoverable:hover:not(:disabled) {
     @apply text-foreground !bg-background-selected/80;

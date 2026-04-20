@@ -85,6 +85,36 @@
           "target": "lib/schemas/crossplane-status-schema.ts"
         }
       ]
+    },
+    {
+      "name": "project-explorer",
+      "type": "registry:ui",
+      "title": "Project Explorer",
+      "description": "Projects list with header and rows showing name and created date",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "registry/linear/components/project-explorer/project-explorer.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "project-flow",
+      "type": "registry:ui",
+      "title": "Project Flow",
+      "description": "React Flow canvas with nodes, edges, and connect handler",
+      "dependencies": ["@xyflow/react"],
+      "registryDependencies": ["container-node"],
+      "files": [
+        {
+          "path": "registry/linear/components/project-flow/project-flow.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.tsx"
+        }
+      ]
     }
   ]
 }
