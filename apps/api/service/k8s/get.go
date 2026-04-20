@@ -429,7 +429,11 @@ func resolveResource(d discovery.DiscoveryInterface, resource string) (schema.Gr
 		return schema.GroupVersionResource{}, false, fmt.Errorf("resource cannot be empty")
 	}
 	lists, err := discovery.ServerPreferredResources(d)
-	if err != nil {
+	if err != nil && !discovery.IsGroupDiscoveryFailedError(err) {
+		return schema.GroupVersionResource{}, false, err
+	}
+	// Partial discovery is OK (e.g. stale metrics.k8s.io); preferred lists still include CRDs like aps.
+	if len(lists) == 0 {
 		return schema.GroupVersionResource{}, false, err
 	}
 	for _, list := range lists {

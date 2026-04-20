@@ -1,28 +1,29 @@
 {
-  "name": "@workspace/crossplane",
+  "name": "@workspace/api",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "devDependencies": {
     "@types/node": "^25.1.0",
+    "@types/react": "19.2.14",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
+    "react": "19.2.5",
     "typescript": "^5.9.3"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./lib/status": "./src/lib/status.ts",
-    "./lib/*": "./src/lib/*.ts",
-    "./schemas": "./src/schemas/crossplane-status-schema.ts",
-    "./schemas/crossplane-status-schema": "./src/schemas/crossplane-status-schema.ts",
-    "./schemas/*": "./src/schemas/*"
+    "./api.actions": "./src/api.actions.ts",
+    "./hooks/use-k8s-get": "./src/hooks/use-k8s-get.ts"
   },
   "dependencies": {
-    "zod": "^4.3.6"
+    "swr": "^2.4.1"
   }
 }

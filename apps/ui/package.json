@@ -11,8 +11,10 @@
     "fix": "npx ultracite fix"
   },
   "dependencies": {
+    "@workspace/api": "workspace:*",
     "@workspace/crossplane": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "jotai": "^2.19.1",
     "lucide-react": "^1.8.0",
     "next": "16.2.3",
     "next-themes": "^0.4.6",

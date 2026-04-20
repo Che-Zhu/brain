@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import "@workspace/ui/globals.css";
 import { cn } from "@workspace/ui/lib/utils";
+import { JotaiProvider } from "@/components/jotai-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -28,7 +29,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <JotaiProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </JotaiProvider>
       </body>
     </html>
   );
