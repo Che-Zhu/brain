@@ -36,3 +36,6 @@ npm-debug.log*
 *.pem
 
 tmp/
+
+# Local Claude docs (personal, not shared)
+CLAUDE.local.md
