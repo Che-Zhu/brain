@@ -1,5 +1,7 @@
 "use client";
 
+import { ThreeDViewIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   type CrossplaneServiceStatusPhase,
   getStatusIndicatorClass,
@@ -43,13 +45,13 @@ export type ContainerNodeStatusTone = CrossplaneServiceStatusPhase;
 export interface ContainerNodeStates {
   /** When true, only header + footer show; image section and resource metrics are hidden. */
   collapsed?: boolean;
-  cpuPercent: number;
+  cpuPercent?: number;
   image: string;
   kind?: string;
-  memoryPercent: number;
+  memoryPercent?: number;
   name: string;
-  replicas: number;
-  status: {
+  replicas?: number;
+  status?: {
     label: string;
     tone: ContainerNodeStatusTone;
   };
@@ -198,11 +200,24 @@ function ContainerNodeStatus({
   tone?: ContainerNodeStatusTone;
 }) {
   const ctx = useContext(ContainerNodeContext);
-  const label = labelProp ?? ctx?.states.status.label;
-  const tone = toneProp ?? ctx?.states.status.tone;
-  if (label == null || tone == null) {
-    return null;
+  const label = labelProp ?? ctx?.states.status?.label ?? "unknown";
+  const tone = toneProp ?? ctx?.states.status?.tone;
+
+  if (tone == null) {
+    return (
+      <div
+        className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}
+      >
+        <span aria-hidden className="relative flex size-2 shrink-0">
+          <span className="relative inline-flex size-2 shrink-0 rounded-[2px] bg-muted" />
+        </span>
+        <span className="truncate whitespace-nowrap font-medium text-muted-foreground text-xs">
+          {label}
+        </span>
+      </div>
+    );
   }
+
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <span aria-hidden className="relative flex size-2 shrink-0">
@@ -238,12 +253,14 @@ function ContainerNodeResource({
 }: {
   className?: string;
   icon: LucideIcon;
-  percent: number;
+  percent?: number;
 }) {
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
       <Icon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-      <span className="whitespace-nowrap tabular-nums">{percent}%</span>
+      <span className="whitespace-nowrap tabular-nums">
+        {percent == null ? "..." : `${percent}%`}
+      </span>
     </div>
   );
 }
@@ -256,7 +273,9 @@ function ContainerNodeReplicas({ className }: { className?: string }) {
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
       <Layers aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-      <span className="whitespace-nowrap text-xs tabular-nums">{replicas}</span>
+      <span className="whitespace-nowrap text-xs tabular-nums">
+        {replicas == null ? "..." : replicas}
+      </span>
     </div>
   );
 }
@@ -268,11 +287,19 @@ function ContainerNodeIconPlaceholder({
   return (
     <div
       className={cn(
-        "size-7 shrink-0 rounded bg-muted ring-1 ring-foreground/10",
+        "flex size-7 shrink-0 items-center justify-center rounded bg-muted ring-1 ring-foreground/10",
         className
       )}
       {...props}
-    />
+    >
+      <HugeiconsIcon
+        aria-hidden
+        className="text-muted-foreground"
+        icon={ThreeDViewIcon}
+        size={24}
+        strokeWidth={2}
+      />
+    </div>
   );
 }
 

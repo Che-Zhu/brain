@@ -175,6 +175,6 @@
 @layer utilities {
   .selected,
   .selected:hover:not(:disabled) {
-    @apply !bg-background-selected !text-foreground;
+    /* @apply !bg-background-selected !text-foreground; */
   }
 }

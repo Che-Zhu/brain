@@ -1,10 +1,8 @@
 "use client";
 
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
-import {
-  PROJECT_FLOW_NODE_TYPE_CONTAINER,
-  ProjectFlow,
-} from "@workspace/ui/components/project-flow/project-flow";
+import { ProjectFlow } from "@workspace/ui/components/project-flow/project-flow";
+import { PROJECT_FLOW_NODE_TYPE_CONTAINER } from "@workspace/ui/components/project-flow/project-flow-nodes";
 
 const workloadStates = {
   cpuPercent: 42,

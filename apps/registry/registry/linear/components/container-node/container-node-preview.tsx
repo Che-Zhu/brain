@@ -51,6 +51,17 @@ export default function ContainerNodePreview() {
           <ContainerNode.Variant0 className="max-w-60" />
         </ContainerNode.Root>
       </Preview>
+      <Preview title="Unknown metrics / status">
+        <ContainerNode.Root
+          states={{
+            image: "registry.example.io/demo:v2",
+            kind: "Container",
+            name: "workload-metrics-pending",
+          }}
+        >
+          <ContainerNode.Variant0 className="min-h-40 max-w-60" />
+        </ContainerNode.Root>
+      </Preview>
     </PreviewWrapper>
   );
 }

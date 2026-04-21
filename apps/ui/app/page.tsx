@@ -31,18 +31,20 @@ export default function Page() {
     [namespace]
   );
 
-  const { data: projects } = useSWR(API_ROUTES.k8s.get, () =>
-    fetcher<ProjectExplorerProject[]>({
-      base: ApiUrl(),
-      path: API_ROUTES.k8s.get,
-      query: { ...getParams },
-      header: {
-        Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
-      },
-      method: "GET",
-      select: (raw) =>
-        projectsListToExplorerProjects(k8sGetResponseSchema.parse(raw)),
-    })
+  const { data: projects } = useSWR(
+    [API_ROUTES.k8s.get, getParams] as const,
+    () =>
+      fetcher<ProjectExplorerProject[]>({
+        base: ApiUrl(),
+        path: API_ROUTES.k8s.get,
+        query: { ...getParams },
+        header: {
+          Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+        },
+        method: "GET",
+        select: (raw) =>
+          projectsListToExplorerProjects(k8sGetResponseSchema.parse(raw)),
+      })
   );
 
   return (

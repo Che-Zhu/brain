@@ -3,25 +3,19 @@
 import "@xyflow/react/dist/style.css";
 import "./project-flow.css";
 
-import type {
-  ContainerNodeActions,
-  ContainerNodeStates,
-} from "@workspace/ui/components/container-node/container-node";
-import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  Background,
+  BackgroundVariant,
   type Connection,
   type Edge,
   type EdgeChange,
-  Handle,
   type Node,
   type NodeChange,
-  type NodeProps,
   type NodeTypes,
-  Position,
   ReactFlow,
 } from "@xyflow/react";
 import {
@@ -33,41 +27,12 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  PROJECT_FLOW_DEFAULT_NODE_TYPES,
+  ProjectFlowContainerNode,
+} from "./project-flow-nodes";
 
 const ProjectFlowContext = createContext<ProjectFlowValue | null>(null);
-
-/** Register on nodes as `type: PROJECT_FLOW_NODE_TYPE_CONTAINER`. */
-export const PROJECT_FLOW_NODE_TYPE_CONTAINER = "containerNode" as const;
-
-export interface ProjectFlowContainerNodeData extends Record<string, unknown> {
-  actions?: ContainerNodeActions;
-  states: ContainerNodeStates;
-}
-
-export type ProjectFlowContainerRfNode = Node<
-  ProjectFlowContainerNodeData,
-  typeof PROJECT_FLOW_NODE_TYPE_CONTAINER
->;
-
-function ProjectFlowContainerNode({
-  data,
-}: NodeProps<ProjectFlowContainerRfNode>) {
-  const { actions = {}, states } = data;
-  return (
-    <div className="nodrag nopan [&_button]:nodrag [&_[role=menuitem]]:nodrag">
-      <Handle className="bg-border!" position={Position.Top} type="target" />
-      <ContainerNode.Root actions={actions} states={states}>
-        <ContainerNode.Variant0 className="max-w-60" />
-      </ContainerNode.Root>
-      <Handle className="bg-border!" position={Position.Bottom} type="source" />
-    </div>
-  );
-}
-
-/** Default React Flow `nodeTypes` including the container workload card. */
-export const PROJECT_FLOW_DEFAULT_NODE_TYPES = {
-  [PROJECT_FLOW_NODE_TYPE_CONTAINER]: ProjectFlowContainerNode,
-} as const satisfies NodeTypes;
 
 export interface ProjectFlowStates {
   initialEdges: Edge[];
@@ -146,10 +111,10 @@ function ProjectFlowVariant0({
   );
 
   return (
-    <ProjectFlowShell className={className}>
-      <div className="h-72 min-h-[200px] w-full min-w-0 flex-1">
+    <ProjectFlowShell className={cn("flex min-h-0 flex-1 flex-col", className)}>
+      <div className="relative flex h-full w-full min-w-0 flex-1 flex-col">
         <ReactFlow
-          className={flowClassName}
+          className={cn("h-full min-h-0 w-full", flowClassName)}
           edges={edges}
           fitView
           maxZoom={1.3}
@@ -158,8 +123,19 @@ function ProjectFlowVariant0({
           onConnect={onConnect}
           onEdgesChange={onEdgesChange}
           onNodesChange={onNodesChange}
+          panOnDrag
+          panOnScroll
           proOptions={{ hideAttribution: true }}
-        />
+          snapGrid={[20, 20]}
+          snapToGrid
+        >
+          <Background
+            color="#999"
+            gap={40}
+            size={0.7}
+            variant={BackgroundVariant.Dots}
+          />
+        </ReactFlow>
       </div>
     </ProjectFlowShell>
   );
@@ -198,4 +174,3 @@ export const ProjectFlow = Object.assign(ProjectFlowShell, {
 ProjectFlowRoot.displayName = "ProjectFlow.Root";
 ProjectFlowVariant0.displayName = "ProjectFlow.Variant0";
 ProjectFlowShell.displayName = "ProjectFlow.Shell";
-ProjectFlowContainerNode.displayName = "ProjectFlow.ContainerNode";

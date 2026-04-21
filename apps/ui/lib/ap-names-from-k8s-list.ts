@@ -1,9 +1,11 @@
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 
 /**
- * Extracts `metadata.name` from each item in a k8s list JSON (or `{ data: { items } }` wrapper).
+ * Raw list items from a k8s get response (`items` or nested `data.items`).
  */
-export function apNamesFromList(data: K8sGetResponse | undefined): string[] {
+export function apItemsFromList(
+  data: K8sGetResponse | undefined
+): unknown[] {
   if (data == null || typeof data !== "object") {
     return [];
   }
@@ -17,9 +19,14 @@ export function apNamesFromList(data: K8sGetResponse | undefined): string[] {
       items = nested;
     }
   }
-  if (!items) {
-    return [];
-  }
+  return items ?? [];
+}
+
+/**
+ * Extracts `metadata.name` from each item in a k8s list JSON (or `{ data: { items } }` wrapper).
+ */
+export function apNamesFromList(data: K8sGetResponse | undefined): string[] {
+  const items = apItemsFromList(data);
   return items.map((item, i) => {
     if (item == null || typeof item !== "object") {
       return `ap-${i}`;
