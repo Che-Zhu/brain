@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Button } from "@workspace/ui/components/button";
+import { FlashNumber } from "@workspace/ui/components/flash-number/flash-number";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -255,13 +256,21 @@ function ContainerNodeResource({
   icon: LucideIcon;
   percent?: number;
 }) {
+  if (percent == null || !Number.isFinite(percent)) {
+    return (
+      <div className={cn("flex shrink-0 items-center gap-1", className)}>
+        <Icon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+        <span className="whitespace-nowrap tabular-nums">...</span>
+      </div>
+    );
+  }
   return (
-    <div className={cn("flex shrink-0 items-center gap-1", className)}>
-      <Icon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-      <span className="whitespace-nowrap tabular-nums">
-        {percent == null ? "..." : `${percent}%`}
-      </span>
-    </div>
+    <FlashNumber
+      className={cn("text-xs", className)}
+      icon={Icon}
+      maxDecimals={1}
+      value={percent}
+    />
   );
 }
 

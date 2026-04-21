@@ -266,6 +266,33 @@ export const Index: RegistryIndex = {
       import("@registry/linear/components/project-flow/project-flow-preview"),
   },
 
+  "linear/components/flash-number": {
+    style: "linear",
+    group: "components",
+    name: "flash-number",
+    title: "Flash number",
+    description:
+      "NumberFlow + Motion: muted resource icon + percent digits colored by usage (<75% green, 75–90% yellow, >90% red); no background.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button"],
+    files: [
+      {
+        path: "registry/linear/components/flash-number/flash-number-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/flash-number/flash-number.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/flash-number/flash-number-preview"),
+  },
+
   "shadcn/components/accordion": {
     style: "shadcn",
     group: "components",
