@@ -401,6 +401,38 @@ spec:
                       uid: {{ $projectUid }}
             {{ end }}
 
+            {{- /* Deployment-derived AP status.phase (mirrors kubectl-style rollout semantics). */}}
+            {{- $dep := getComposedResource . "app-deployment" }}
+            {{- $phase := "Unknown" }}
+            {{- if $dep }}
+            {{-   $paused := false }}
+            {{-   if and $dep.spec (hasKey $dep.spec "paused") }}
+            {{-     $paused = index $dep.spec "paused" }}
+            {{-   end }}
+            {{-   if $paused }}
+            {{-     $phase = "Paused" }}
+            {{-   else }}
+            {{-     $avail := "" }}
+            {{-     $prog := "" }}
+            {{-     $progReason := "" }}
+            {{-     if and $dep.status $dep.status.conditions }}
+            {{-       range $c := $dep.status.conditions }}
+            {{-         if eq $c.type "Available" }}{{ $avail = $c.status }}{{ end }}
+            {{-         if eq $c.type "Progressing" }}{{ $prog = $c.status }}{{ $progReason = default "" $c.reason }}{{ end }}
+            {{-       end }}
+            {{-     end }}
+            {{-     if and (eq $avail "True") (eq $prog "True") (eq $progReason "NewReplicaSetAvailable") }}
+            {{-       $phase = "Running" }}
+            {{-     else if and (eq $prog "False") (eq $progReason "ProgressDeadlineExceeded") }}
+            {{-       $phase = "Failed" }}
+            {{-     else if eq $prog "True" }}
+            {{-       $phase = "Progressing" }}
+            {{-     else if eq $avail "False" }}
+            {{-       $phase = "Degraded" }}
+            {{-     end }}
+            {{-   end }}
+            {{- end }}
+
             ---
 
             apiVersion: example.crossplane.io/v1
@@ -409,7 +441,7 @@ spec:
               name: {{ $name }}
               namespace: {{ $ns }}
             status:
-              phase: Ready
+              phase: {{ $phase }}
               configVersionHash: {{ $versionHash }}
               {{ if ne $projectName "" }}
               projectName: {{ $projectName | quote }}

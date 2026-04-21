@@ -11,11 +11,13 @@
     "zod": "^3.25.76"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "swr": "^2.4.0"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
     "@types/react": "19.2.14",
+    "swr": "^2.4.1",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
@@ -26,6 +28,8 @@
     "./api.actions": "./src/api.actions.ts",
     "./constants": "./src/constants.ts",
     "./fetch": "./src/fetch.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./lib/ap-list": "./src/lib/ap-list.ts",
     "./utils": "./src/utils.ts",
     "./schemas/k8s-get": "./src/schemas/k8s-get.ts"
   }

@@ -212,6 +212,10 @@ spec:
             properties:
               phase:
                 type: string
+                description: >
+                  For aps-deployment-ingress-go-templating: derived from the composed Deployment
+                  (spec.paused, status.conditions Available/Progressing). Typical values: Running,
+                  Progressing, Failed, Degraded, Paused, Unknown.
               configVersionHash:
                 type: string
                 description: Hash of current effective config; use to match and display the corresponding ConfigMap

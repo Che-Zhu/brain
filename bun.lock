@@ -109,10 +109,12 @@
         "@workspace/typescript-config": "workspace:*",
         "eslint": "^9.39.2",
         "react": "19.2.5",
+        "swr": "^2.4.1",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
         "react": "^19.0.0",
+        "swr": "^2.4.0",
       },
     },
     "packages/crossplane": {

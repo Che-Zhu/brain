@@ -1,11 +1,9 @@
-import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
+import type { K8sGetResponse } from "../schemas/k8s-get";
 
 /**
  * Raw list items from a k8s get response (`items` or nested `data.items`).
  */
-export function apItemsFromList(
-  data: K8sGetResponse | undefined
-): unknown[] {
+export function apItemsFromList(data: K8sGetResponse | undefined): unknown[] {
   if (data == null || typeof data !== "object") {
     return [];
   }
@@ -37,4 +35,28 @@ export function apNamesFromList(data: K8sGetResponse | undefined): string[] {
     const name = meta?.name;
     return typeof name === "string" ? name : `ap-${i}`;
   });
+}
+
+/** Namespace + name per AP list item for `GET /api/telemetry/v1alpha1/metrics`. */
+export function apNamespaceNameTargetsFromList(
+  data: K8sGetResponse | undefined,
+  fallbackNamespace?: string
+): { name: string; namespace: string }[] {
+  const items = apItemsFromList(data);
+  const out: { name: string; namespace: string }[] = [];
+  for (const item of items) {
+    if (item == null || typeof item !== "object") {
+      continue;
+    }
+    const meta = (item as Record<string, unknown>).metadata as
+      | Record<string, unknown>
+      | undefined;
+    const name = meta?.name;
+    const ns =
+      typeof meta?.namespace === "string" ? meta.namespace : fallbackNamespace;
+    if (typeof name === "string" && ns != null && ns !== "") {
+      out.push({ name, namespace: ns });
+    }
+  }
+  return out;
 }

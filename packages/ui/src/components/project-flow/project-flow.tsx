@@ -24,6 +24,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -61,10 +62,7 @@ export function useProjectFlow(): ProjectFlowValue {
 function ProjectFlowShell({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border",
-        className
-      )}
+      className={cn("flex min-h-0 min-w-0 flex-col overflow-hidden", className)}
       data-slot="project-flow"
       {...props}
     />
@@ -83,6 +81,35 @@ function ProjectFlowVariant0({
   const { actions, states } = useProjectFlow();
   const [nodes, setNodes] = useState<Node[]>(() => [...states.initialNodes]);
   const [edges, setEdges] = useState<Edge[]>(() => [...states.initialEdges]);
+
+  /** Keep flow in sync when `initialNodes` / `initialEdges` change (e.g. SWR fills metrics after mount). */
+  useEffect(() => {
+    setNodes((prev) => {
+      const incoming = states.initialNodes;
+      if (incoming.length === 0) {
+        return prev;
+      }
+      if (prev.length === 0) {
+        return [...incoming];
+      }
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      return incoming.map((inc) => {
+        const old = prevById.get(inc.id);
+        if (old == null) {
+          return inc;
+        }
+        return {
+          ...old,
+          data: inc.data,
+          type: inc.type,
+        };
+      });
+    });
+  }, [states.initialNodes]);
+
+  useEffect(() => {
+    setEdges([...states.initialEdges]);
+  }, [states.initialEdges]);
 
   const nodeTypes = useMemo(
     (): NodeTypes => ({
