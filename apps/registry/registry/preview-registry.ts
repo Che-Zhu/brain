@@ -177,7 +177,7 @@ export const Index: RegistryIndex = {
     title: "Container Node",
     description:
       "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
-    state: "coding",
+    state: "done",
     type: "registry:preview",
     registryDependencies: [
       "preview",
@@ -272,8 +272,8 @@ export const Index: RegistryIndex = {
     name: "flash-number",
     title: "Flash number",
     description:
-      "NumberFlow + Motion: muted resource icon + percent digits colored by usage (<75% green, 75–90% yellow, >90% red); no background.",
-    state: "coding",
+      "NumberFlow + Motion: resource icon and percent digits share usage tone (<75% green, 75–90% yellow, >90% red); brief flash tint on change.",
+    state: "done",
     type: "registry:preview",
     registryDependencies: ["preview", "button"],
     files: [

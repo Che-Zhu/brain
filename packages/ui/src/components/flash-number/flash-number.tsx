@@ -44,7 +44,7 @@ export function usagePercentFlashBgClass(value: number): string {
 
 export interface FlashNumberProps {
   className?: string;
-  /** Resource icon (e.g. `Cpu`, `MemoryStick`, `HardDrive`); neutral, not usage-colored. */
+  /** Resource icon (e.g. `Cpu`, `MemoryStick`, `HardDrive`); tinted with the same usage tone as digits. */
   icon: LucideIcon;
   /** Maximum fractional digits (e.g. 1 → one decimal in the percent). */
   maxDecimals?: number;
@@ -55,7 +55,7 @@ export interface FlashNumberProps {
 /**
  * Animated percentage readout with [NumberFlow](https://number-flow.barvian.me) +
  * [Motion](https://motion.dev) layout. Digits use usage tone (**&lt; 75%** green, **75–90%** yellow,
- * **&gt; 90%** red); icon stays muted like `ContainerNode.Resource`.
+ * **&gt; 90%** red); icon uses the same theme tone.
  * On value change, a tinted highlight (**theme-green/yellow/red** at `/50`, same bands as digits)
  * behind the numbers fades out quickly.
  */
@@ -101,7 +101,10 @@ export function FlashNumber({
       >
         <MotionIcon
           aria-hidden
-          className="size-3 shrink-0 text-muted-foreground"
+          className={cn(
+            "size-3 shrink-0 transition-colors duration-200",
+            toneClass
+          )}
           layout
           strokeWidth={2}
         />
