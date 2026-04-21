@@ -56,7 +56,7 @@ export default function ProjectUidPage() {
   );
 
   return (
-    <div className="flex h-svh min-h-0">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
       {kubeconfig !== "" &&
         !isLoading &&
         error == null &&

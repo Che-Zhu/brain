@@ -1,23 +1,23 @@
 apiVersion: example.crossplane.io/v1
 kind: AP
 metadata:
-  name: ap-nginx
-  namespace: ns-admin
+  name: sealai-registry
+  namespace: brain-system
 spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: nginx:latest
+  image: puddlecat/sealai-registry:latest
   # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
-  projectName: demo-project
+  # projectName: demo-project
   replicas: 1
   # Multiple services and ingress - one per endpoint (legacy port/host still supported)
   endpoints:
-    - port: 8082
-      host: dddc.192.168.12.53.nip.io
-  cpuRequest: 200m
-  memoryRequest: 204Mi
-  cpuLimit: 2000m
-  memoryLimit: 2048Mi
+    - port: 10000
+      host: sealai-registry.192.168.12.53.nip.io
+  cpuRequest: 500m
+  memoryRequest: 1024Mi
+  cpuLimit: 1500m
+  memoryLimit: 1536Mi
 
 

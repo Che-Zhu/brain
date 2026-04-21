@@ -1,16 +1,10 @@
 "use client";
 
-import NumberFlow, { useCanAnimate } from "@number-flow/react";
+import NumberFlow from "@number-flow/react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { MotionConfig, motion } from "motion/react";
-import {
-  type CSSProperties,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { motion } from "motion/react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 const MotionNumberFlow = motion.create(NumberFlow);
 
@@ -54,8 +48,10 @@ export interface FlashNumberProps {
 
 /**
  * Animated percentage readout with [NumberFlow](https://number-flow.barvian.me) +
- * [Motion](https://motion.dev) layout. Digits use usage tone (**&lt; 75%** green, **75–90%** yellow,
- * **&gt; 90%** red); icon uses the same theme tone.
+ * [Motion](https://motion.dev) for the flash tint only. Digits use usage tone (**&lt; 75%** green,
+ * **75–90%** yellow, **&gt; 90%** red); icon uses the same theme tone.
+ * Icon and wrapper are static (no Motion `layout`) so first paint does not run layout FLIP from a
+ * wrong box when fonts or NumberFlow width settle.
  * On value change, a tinted highlight (**theme-green/yellow/red** at `/50`, same bands as digits)
  * behind the numbers fades out quickly.
  */
@@ -65,9 +61,6 @@ export function FlashNumber({
   className,
   icon: Icon,
 }: FlashNumberProps) {
-  const canAnimate = useCanAnimate();
-  const MotionIcon = useMemo(() => motion.create(Icon), [Icon]);
-
   const [flashKey, setFlashKey] = useState(0);
   const prevValue = useRef<number | null>(null);
 
@@ -88,60 +81,46 @@ export function FlashNumber({
   const flashBgClass = usagePercentFlashBgClass(value);
 
   return (
-    <MotionConfig
-      transition={{
-        layout: canAnimate
-          ? { bounce: 0, duration: 0.9, type: "spring" }
-          : { duration: 0 },
-      }}
-    >
-      <motion.span
-        className={cn("inline-flex items-center gap-1", className)}
-        layout
-      >
-        <MotionIcon
-          aria-hidden
+    <span className={cn("inline-flex items-center gap-1", className)}>
+      <Icon
+        aria-hidden
+        className={cn(
+          "size-3 shrink-0 transition-colors duration-200",
+          toneClass
+        )}
+        strokeWidth={2}
+      />
+      <span className="relative inline-grid min-w-0">
+        {flashKey > 0 ? (
+          <motion.span
+            animate={{ opacity: 0 }}
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 rounded-sm",
+              flashBgClass
+            )}
+            initial={{ opacity: 1 }}
+            key={flashKey}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+          />
+        ) : null}
+        <MotionNumberFlow
           className={cn(
-            "size-3 shrink-0 transition-colors duration-200",
+            "relative z-1 font-mono tabular-nums transition-colors duration-200",
             toneClass
           )}
-          layout
-          strokeWidth={2}
+          format={{
+            maximumFractionDigits: maxDecimals,
+            style: "percent",
+          }}
+          style={
+            {
+              "--number-flow-mask-height": "0.3em",
+            } as CSSProperties
+          }
+          value={ratio}
         />
-        <span className="relative inline-grid min-w-0">
-          {flashKey > 0 ? (
-            <motion.span
-              animate={{ opacity: 0 }}
-              aria-hidden
-              className={cn(
-                "pointer-events-none absolute inset-0 rounded-sm",
-                flashBgClass
-              )}
-              initial={{ opacity: 1 }}
-              key={flashKey}
-              transition={{ duration: 0.45, ease: "easeOut" }}
-            />
-          ) : null}
-          <MotionNumberFlow
-            className={cn(
-              "relative z-1 font-mono tabular-nums transition-colors duration-200",
-              toneClass
-            )}
-            format={{
-              maximumFractionDigits: maxDecimals,
-              style: "percent",
-            }}
-            layout
-            layoutRoot
-            style={
-              {
-                "--number-flow-mask-height": "0.3em",
-              } as CSSProperties
-            }
-            value={ratio}
-          />
-        </span>
-      </motion.span>
-    </MotionConfig>
+      </span>
+    </span>
   );
 }
