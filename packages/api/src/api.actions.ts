@@ -1,59 +1,18 @@
 "use server";
 
+import { API_ROUTES, type ApiRoute } from "./constants";
+import { fetcher } from "./fetch";
+
 const baseUrl = () =>
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000";
-const k8sBase = () => `${baseUrl()}/api/k8s/v1alpha1`;
-const telemetryBase = () => `${baseUrl()}/api/telemetry/v1alpha1`;
 
-async function fetchK8s<T>(
-  path: string,
-  init: RequestInit & { kc: string; params?: Record<string, string> }
-): Promise<T> {
-  const { kc, params, ...opts } = init;
-  const url = new URL(path);
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v != null && v !== "") {
-        url.searchParams.set(k, v);
-      }
-    }
-  }
-  const res = await fetch(url.toString(), {
-    ...opts,
-    headers: {
-      Authorization: `Bearer ${encodeURIComponent(kc)}`,
-      ...opts.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API ${res.status}: ${err}`);
-  }
-  const ct = res.headers.get("content-type");
-  if (ct?.includes("application/json")) {
-    return res.json() as Promise<T>;
-  }
-  return res.text() as Promise<T>;
-}
+const apiAbs = (path: ApiRoute) => `${baseUrl()}${path}`;
+
+const authHeader = (kc: string) => ({
+  Authorization: `Bearer ${encodeURIComponent(kc)}`,
+});
 
 // Query
-export async function k8sGet(
-  kc: string,
-  params: {
-    kind: string;
-    name?: string;
-    namespace?: string;
-    "label-selector"?: string;
-    "field-selector"?: string;
-    "all-namespaces"?: string;
-  }
-) {
-  return await fetchK8s<unknown>(`${k8sBase()}/get`, {
-    kc,
-    params,
-    method: "GET",
-  });
-}
 
 export async function k8sDescribe(
   kc: string,
@@ -66,9 +25,11 @@ export async function k8sDescribe(
     "all-namespaces"?: string;
   }
 ) {
-  return await fetchK8s<unknown>(`${k8sBase()}/describe`, {
-    kc,
-    params,
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.describe),
+    query: params,
+    header: authHeader(kc),
     method: "GET",
   });
 }
@@ -85,9 +46,11 @@ export async function k8sLogs(
     previous?: string;
   }
 ) {
-  return await fetchK8s<string>(`${k8sBase()}/logs`, {
-    kc,
-    params,
+  return await fetcher<string>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.logs),
+    query: params,
+    header: authHeader(kc),
     method: "GET",
   });
 }
@@ -102,9 +65,11 @@ export async function k8sTop(
     containers?: string;
   }
 ) {
-  return await fetchK8s<unknown>(`${k8sBase()}/top`, {
-    kc,
-    params: params ?? {},
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.top),
+    query: params ?? {},
+    header: authHeader(kc),
     method: "GET",
   });
 }
@@ -112,17 +77,16 @@ export async function k8sTop(
 // Mutation
 export async function k8sApply(kc: string, body: string | Blob): Promise<void> {
   const yaml = typeof body === "string" ? body : await (body as Blob).text();
-  const res = await fetch(`${k8sBase()}/apply`, {
+  await fetcher({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.apply),
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${encodeURIComponent(kc)}`,
+    header: {
+      ...authHeader(kc),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ yaml }),
+    body: { yaml },
   });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
-  }
 }
 
 export async function k8sDelete(
@@ -136,9 +100,11 @@ export async function k8sDelete(
     all?: string;
   }
 ) {
-  return await fetchK8s<unknown>(`${k8sBase()}/delete`, {
-    kc,
-    params,
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.delete),
+    query: params,
+    header: authHeader(kc),
     method: "DELETE",
   });
 }
@@ -154,9 +120,10 @@ export async function k8sPatch(
   },
   body: object
 ) {
-  return await fetchK8s<unknown>(`${k8sBase()}/patch`, {
-    kc,
-    params: {
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.patch),
+    query: {
       kind: params.kind,
       name: params.name,
       ...(params.namespace != null && params.namespace !== ""
@@ -165,8 +132,11 @@ export async function k8sPatch(
       ...(params.type ? { type: params.type } : {}),
     },
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    header: {
+      ...authHeader(kc),
+      "Content-Type": "application/json",
+    },
+    body,
   });
 }
 
@@ -191,9 +161,11 @@ export async function k8sScale(
   if (params["current-replicas"] != null) {
     p["current-replicas"] = String(params["current-replicas"]);
   }
-  return await fetchK8s<unknown>(`${k8sBase()}/scale`, {
-    kc,
-    params: p,
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.scale),
+    query: p,
+    header: authHeader(kc),
     method: "PUT",
   });
 }
@@ -223,9 +195,11 @@ export async function k8sAutoscale(
   if (params["cpu-percent"] != null) {
     p["cpu-percent"] = String(params["cpu-percent"]);
   }
-  return await fetchK8s<unknown>(`${k8sBase()}/autoscale`, {
-    kc,
-    params: p,
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.autoscale),
+    query: p,
+    header: authHeader(kc),
     method: "PUT",
   });
 }
@@ -239,9 +213,11 @@ export async function k8sRollout(
     action?: "restart" | "status";
   }
 ) {
-  return await fetchK8s<unknown>(`${k8sBase()}/rollout`, {
-    kc,
-    params: params as Record<string, string>,
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.rollout),
+    query: params as Record<string, string>,
+    header: authHeader(kc),
     method: "POST",
   });
 }
@@ -253,19 +229,21 @@ export async function k8sNsconfig(
     permission?: "full" | "edit";
   }
 ) {
-  return await fetchK8s<string>(`${k8sBase()}/nsconfig`, {
-    kc,
-    params: params as Record<string, string>,
+  return await fetcher<string>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.nsconfig),
+    query: params as Record<string, string>,
+    header: authHeader(kc),
     method: "GET",
   });
 }
 
 export async function k8sHealth() {
-  const res = await fetch(`${k8sBase()}/health`, { method: "GET" });
-  if (!res.ok) {
-    throw new Error(`Health check failed: ${res.status}`);
-  }
-  return res.json();
+  return await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.health),
+    method: "GET",
+  });
 }
 
 /** Fetch telemetry metrics for a resource (db or ap). Returns flattened time series. */
@@ -277,14 +255,13 @@ export async function telemetryMetrics(
     kind: "db" | "ap";
   }
 ): Promise<Record<string, number | string>[]> {
-  return await fetchK8s<Record<string, number | string>[]>(
-    `${telemetryBase()}/metrics`,
-    {
-      kc,
-      params: params as Record<string, string>,
-      method: "GET",
-    }
-  );
+  return await fetcher<Record<string, number | string>[]>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.telemetry.metrics),
+    query: params as Record<string, string>,
+    header: authHeader(kc),
+    method: "GET",
+  });
 }
 
 export interface TelemetryLogEntry {
@@ -331,14 +308,13 @@ export async function telemetryLogs(
     p.search = params.search;
   }
   try {
-    return await fetchK8s<Record<string, TelemetryLogEntry[]>>(
-      `${telemetryBase()}/logs`,
-      {
-        kc,
-        params: p,
-        method: "GET",
-      }
-    );
+    return await fetcher<Record<string, TelemetryLogEntry[]>>({
+    base: baseUrl(),
+      path: apiAbs(API_ROUTES.telemetry.logs),
+      query: p,
+      header: authHeader(kc),
+      method: "GET",
+    });
   } catch (err) {
     if (err instanceof Error && err.message.includes("API 404")) {
       return {};
@@ -356,10 +332,18 @@ export async function resolveSecretValue(
     namespace?: string;
   }
 ): Promise<string | null> {
-  const raw = await k8sGet(kc, {
-    kind: "secrets",
-    name: params.secretName,
-    namespace: params.namespace,
+  const raw = await fetcher<unknown>({
+    base: baseUrl(),
+    path: apiAbs(API_ROUTES.k8s.get),
+    query: {
+      kind: "secrets",
+      name: params.secretName,
+      ...(params.namespace != null && params.namespace !== ""
+        ? { namespace: params.namespace }
+        : {}),
+    },
+    header: authHeader(kc),
+    method: "GET",
   });
   const secret = raw as { data?: Record<string, string> };
   const b64 = secret?.data?.[params.secretKey];

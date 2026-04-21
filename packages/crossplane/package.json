@@ -16,6 +16,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
     "./lib/status": "./src/lib/status.ts",
     "./lib/*": "./src/lib/*.ts",
     "./schemas": "./src/schemas/crossplane-status-schema.ts",

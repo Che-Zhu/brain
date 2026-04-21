@@ -2,12 +2,14 @@ apiVersion: example.crossplane.io/v1
 kind: AP
 metadata:
   name: ap-nginx
-  namespace: sponge-bob
+  namespace: ns-admin
 spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
   image: nginx:latest
+  # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
+  projectName: demo-project
   replicas: 1
   # Multiple services and ingress - one per endpoint (legacy port/host still supported)
   endpoints:

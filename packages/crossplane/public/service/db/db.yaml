@@ -124,6 +124,13 @@ spec:
                     repoName:
                       type: string
                       description: KubeBlocks BackupRepo resource name (e.g. backuprepo-minio, backuprepo-s3).
+                projectName:
+                  type: string
+                  description: >
+                    When set, the active composition observes the Project claim with this name in the
+                    same namespace, adds labels crossplane.io/project-name and crossplane.io/project-uid
+                    to composed resources, sets ownerReferences to that Project, SSA-patches the DB
+                    composite with the same labels, and echoes status.projectName / status.projectUid.
                 restoreFromBackup:
                   type: object
                   description: >
@@ -187,6 +194,12 @@ spec:
                   URI via dbconn.{metadata.labels.region}:allocated NodePort on {name}-export when
                   spec.exposeNodePort is true and metadata.labels.region is set. MongoDB and
                   PostgreSQL append ?directConnection=true; MySQL and Redis use no query string.
+              projectName:
+                type: string
+                description: Observed Project claim name when spec.projectName is set.
+              projectUid:
+                type: string
+                description: Observed Project UID when the Project is resolved.
               conditions:
                 type: array
                 items:

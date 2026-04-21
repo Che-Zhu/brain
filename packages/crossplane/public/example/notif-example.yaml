@@ -1,5 +1,5 @@
-# Standalone Notif example — no Composition required.
-# Requires: Notif XRD (apps/hub/public/crossplane/service/notif/notif.yaml)
+# Notif example — default composition notifs-project-go-templating (optional spec.projectName).
+# Requires: Notif XRD + Composition (packages/crossplane/public/service/notif/)
 apiVersion: example.crossplane.io/v1
 kind: Notif
 metadata:

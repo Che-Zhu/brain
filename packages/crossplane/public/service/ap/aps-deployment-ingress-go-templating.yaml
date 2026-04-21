@@ -4,7 +4,13 @@ metadata:
   name: aps-deployment-ingress-go-templating
   annotations:
     meta.crossplane.io/display-name: app
-    meta.crossplane.io/description: Generic app with Deployment, Service, and Ingress
+    meta.crossplane.io/description: >
+      Generic app with Deployment, Service, and Ingress. Optional spec.projectName observes a
+      Project claim in the same namespace (kubernetes.m Object Observe), adds labels
+      crossplane.io/project-name and crossplane.io/project-uid and ownerReferences on composed workloads, echoes
+      status.projectName / status.projectUid on the AP, and SSA-patches the AP itself with
+      the same label and ownerReferences via a composed kubernetes.m Object (Crossplane
+      does not merge composite metadata from composition output).
     # Lucide rocket as data URI; used when icon-url is omitted (frontend prefers icon-url, then icon-data).
     meta.crossplane.io/icon-data: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXJvY2tldC1pY29uIGx1Y2lkZS1yb2NrZXQiPjxwYXRoIGQ9Ik0xMiAxNXY1czMuMDMtLjU1IDQtMmMxLjA4LTEuNjIgMC01IDAtNSIvPjxwYXRoIGQ9Ik00LjUgMTYuNWMtMS41IDEuMjYtMiA1LTIgNXMzLjc0LS41IDUtMmMuNzEtLjg0LjctMi4xMy0uMDktMi45MWEyLjE4IDIuMTggMCAwIDAtMi45MS0uMDkiLz48cGF0aCBkPSJNOSAxMmEyMiAyMiAwIDAgMSAyLTMuOTVBMTIuODggMTIuODggMCAwIDEgMjIgMmMwIDIuNzItLjc4IDcuNS02IDExYTIyLjQgMjIuNCAwIDAgMS00IDJ6Ii8+PHBhdGggZD0iTTkgMTJINHMuNTUtMy4wMyAyLTRjMS42Mi0xLjA4IDUgLjA1IDUgLjA1Ii8+PC9zdmc+"
     meta.crossplane.io/template: |
@@ -19,6 +25,8 @@ metadata:
           compositionRef:
             name: aps-deployment-ingress-go-templating
         image: {{ image }}
+        # Optional: Project claim name (same namespace) for crossplane.io/project-name and owner refs
+        # projectName: my-project
         replicas: 1
         endpoints:
           - port: 80
@@ -46,6 +54,18 @@ spec:
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $projectName := "" }}
+            {{- if hasKey $spec "projectName" }}{{ $projectName = trim (toString $spec.projectName) }}{{ end }}
+            {{- $projectObs := getComposedResource . "project-observe" }}
+            {{- $projectUid := "" }}
+            {{- if and $projectObs $projectObs.status $projectObs.status.atProvider $projectObs.status.atProvider.manifest }}
+            {{- $m := $projectObs.status.atProvider.manifest }}
+            {{- $meta := index $m "metadata" }}
+            {{- if $meta }}
+            {{- $uidVal := index $meta "uid" }}
+            {{- if $uidVal }}{{ $projectUid = toString $uidVal }}{{ end }}
+            {{- end }}
+            {{- end }}
             {{- $region := "" }}
             {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
             {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
@@ -83,17 +103,50 @@ spec:
                   "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
                   "probes" ($spec.probes | default (dict))
+                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
             {{- $managedConfigMapName := printf "%s-config-backup" $name }}
+            {{- if ne $projectName "" }}
+            ---
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-project-observe" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: project-observe
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: example.crossplane.io/v1
+                  kind: Project
+                  metadata:
+                    name: {{ $projectName }}
+                    namespace: {{ $ns }}
+            {{- end }}
             ---
             apiVersion: v1
             kind: ConfigMap
             metadata:
               name: {{ $managedConfigMapName }}
               namespace: {{ $ns }}
+            {{ if and (ne $projectName "") (ne $projectUid "") }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: Project
+                name: {{ $projectName }}
+                uid: {{ $projectUid }}
+            {{ else }}
               ownerReferences: []
+            {{ end }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-backup
                 gotemplating.fn.crossplane.io/ready: "True"
@@ -102,6 +155,12 @@ spec:
               labels:
                 app.sealos.io/ap-uid: {{ $apUid }}
                 app.sealos.io/backup: "true"
+                {{ if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ end }}
+                {{ if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
             data:
               config.yaml: |
                 {{ $effectiveYaml | nindent 4 }}
@@ -117,6 +176,19 @@ spec:
                 gotemplating.fn.crossplane.io/ready: "True"
               labels:
                 crossplane.io/composite: {{ $name }}
+                {{ if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ end }}
+                {{ if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ if and (ne $projectName "") (ne $projectUid "") }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: Project
+                name: {{ $projectName }}
+                uid: {{ $projectUid }}
+              {{ end }}
             spec:
               replicas: {{ $spec.replicas | default 1 }}
               revisionHistoryLimit: 1
@@ -202,6 +274,19 @@ spec:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-service-port-{{ .port }}
               labels:
                 crossplane.io/composite: {{ $name }}
+                {{ if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ end }}
+                {{ if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ if and (ne $projectName "") (ne $projectUid "") }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: Project
+                name: {{ $projectName }}
+                uid: {{ $projectUid }}
+              {{ end }}
             spec:
               selector:
                 app: {{ $name }}
@@ -238,6 +323,21 @@ spec:
                 {{ $k }}: {{ $v | quote }}
               {{- end }}
               {{- end }}
+              {{ if ne $projectName "" }}
+              labels:
+                crossplane.io/composite: {{ $name }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ if ne $projectUid "" }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ end }}
+              {{ if and (ne $projectName "") (ne $projectUid "") }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: Project
+                name: {{ $projectName }}
+                uid: {{ $projectUid }}
+              {{ end }}
             spec:
               ingressClassName: nginx
               rules:
@@ -261,6 +361,46 @@ spec:
                 secretName: wildcard-cert
             {{- end }}
 
+            {{ if and (ne $projectName "") (ne $projectUid "") }}
+            ---
+            # Patch the AP claim itself with project affiliation. Crossplane does not merge
+            # metadata.labels / metadata.ownerReferences from the composed `kind: AP` output
+            # back onto the composite — only status is merged. So a provider-kubernetes Object
+            # SSA-patches the AP. Requires RBAC on aps.example.crossplane.io (see
+            # packages/crossplane/public/provider-kubernetes-example-rbac.yaml).
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-ap-project-patch" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ap-project-patch
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+                - Create
+                - Update
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: example.crossplane.io/v1
+                  kind: AP
+                  metadata:
+                    name: {{ $name }}
+                    namespace: {{ $ns }}
+                    labels:
+                      crossplane.io/project-name: {{ $projectName | quote }}
+                      crossplane.io/project-uid: {{ $projectUid | quote }}
+                    ownerReferences:
+                    - apiVersion: example.crossplane.io/v1
+                      kind: Project
+                      name: {{ $projectName }}
+                      uid: {{ $projectUid }}
+            {{ end }}
+
             ---
 
             apiVersion: example.crossplane.io/v1
@@ -271,6 +411,12 @@ spec:
             status:
               phase: Ready
               configVersionHash: {{ $versionHash }}
+              {{ if ne $projectName "" }}
+              projectName: {{ $projectName | quote }}
+              {{ end }}
+              {{ if ne $projectUid "" }}
+              projectUid: {{ $projectUid | quote }}
+              {{ end }}
     - step: create-orphaned-config-snapshot-rbac
       functionRef:
         name: crossplane-contrib-function-go-templating
@@ -284,6 +430,18 @@ spec:
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $projectName := "" }}
+            {{- if hasKey $spec "projectName" }}{{ $projectName = trim (toString $spec.projectName) }}{{ end }}
+            {{- $projectObs := getComposedResource . "project-observe" }}
+            {{- $projectUid := "" }}
+            {{- if and $projectObs $projectObs.status $projectObs.status.atProvider $projectObs.status.atProvider.manifest }}
+            {{- $m := $projectObs.status.atProvider.manifest }}
+            {{- $meta := index $m "metadata" }}
+            {{- if $meta }}
+            {{- $uidVal := index $meta "uid" }}
+            {{- if $uidVal }}{{ $projectUid = toString $uidVal }}{{ end }}
+            {{- end }}
+            {{- end }}
             {{- $region := "" }}
             {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
             {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
@@ -320,6 +478,7 @@ spec:
                   "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
                   "probes" ($spec.probes | default (dict))
+                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
@@ -335,6 +494,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-sa-{{ $versionHash }}
                 gotemplating.fn.crossplane.io/ready: "True"
+              {{ if ne $projectName "" }}
+              labels:
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ if ne $projectUid "" }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ end }}
             ---
             apiVersion: rbac.authorization.k8s.io/v1
             kind: Role
@@ -344,6 +510,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-role-{{ $versionHash }}
                 gotemplating.fn.crossplane.io/ready: "True"
+              {{ if ne $projectName "" }}
+              labels:
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ if ne $projectUid "" }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ end }}
             rules:
             - apiGroups: [""]
               resources: ["configmaps"]
@@ -357,6 +530,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-rb-{{ $versionHash }}
                 gotemplating.fn.crossplane.io/ready: "True"
+              {{ if ne $projectName "" }}
+              labels:
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ if ne $projectUid "" }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ end }}
             roleRef:
               apiGroup: rbac.authorization.k8s.io
               kind: Role
@@ -378,6 +558,18 @@ spec:
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
+            {{- $projectName := "" }}
+            {{- if hasKey $spec "projectName" }}{{ $projectName = trim (toString $spec.projectName) }}{{ end }}
+            {{- $projectObs := getComposedResource . "project-observe" }}
+            {{- $projectUid := "" }}
+            {{- if and $projectObs $projectObs.status $projectObs.status.atProvider $projectObs.status.atProvider.manifest }}
+            {{- $m := $projectObs.status.atProvider.manifest }}
+            {{- $meta := index $m "metadata" }}
+            {{- if $meta }}
+            {{- $uidVal := index $meta "uid" }}
+            {{- if $uidVal }}{{ $projectUid = toString $uidVal }}{{ end }}
+            {{- end }}
+            {{- end }}
             {{- $region := "" }}
             {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
             {{- $region = trim (toString (index .observed.composite.resource.metadata.labels "region")) }}
@@ -414,6 +606,7 @@ spec:
                   "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
                   "probes" ($spec.probes | default (dict))
+                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
@@ -429,6 +622,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-snapshot-job-{{ $versionHash }}
                 gotemplating.fn.crossplane.io/ready: "True"
+              {{ if ne $projectName "" }}
+              labels:
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ if ne $projectUid "" }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              {{ end }}
             spec:
               ttlSecondsAfterFinished: 300
               backoffLimit: 2

@@ -61,6 +61,13 @@ spec:
               name:
                 type: string
                 description: Instance name used for all composed resource naming
+              projectName:
+                type: string
+                description: >
+                  When set, aps-deployment-ingress-go-templating observes the Project claim with this
+                  name in the same namespace as the AP (example.crossplane.io/v1), adds labels
+                  crossplane.io/project-name and crossplane.io/project-uid to composed resources, and
+                  sets ownerReferences to that Project once its UID is observed.
               image:
                 type: string
                 description: Container image (e.g. puddlecat/sealos-brain-ai:0.20.67)
@@ -208,6 +215,15 @@ spec:
               configVersionHash:
                 type: string
                 description: Hash of current effective config; use to match and display the corresponding ConfigMap
+              projectName:
+                type: string
+                description: >
+                  When spec.projectName is set, the composition echoes it here (Crossplane typically does not
+                  merge metadata.labels on the composite from composed output; use this field for affiliation).
+              projectUid:
+                type: string
+                description: >
+                  UID of the observed Project claim when spec.projectName is set and project-observe has synced.
               conditions:
                 type: array
                 items:

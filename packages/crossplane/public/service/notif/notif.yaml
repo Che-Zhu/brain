@@ -1,6 +1,5 @@
-# Notif — user-facing notification record (no default composition).
-# Use as a standalone XR/claim for title, body, severity, links, and arbitrary payload.
-# Optional crossplane.compositionRef if you add a delivery composition later.
+# Notif — user-facing notification record. Default composition adds optional Project affiliation
+# (observe Project, labels, owner refs, SSA patch, status.projectName / status.projectUid).
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
@@ -11,6 +10,8 @@ spec:
   names:
     kind: Notif
     plural: notifs
+  defaultCompositionRef:
+    name: notifs-project-go-templating
   versions:
   - name: v1
     served: true
@@ -38,6 +39,13 @@ spec:
                         type: object
                         additionalProperties:
                           type: string
+              projectName:
+                type: string
+                description: >
+                  When set, notifs-project-go-templating observes the Project claim with this name
+                  in the same namespace, adds labels crossplane.io/project-name and
+                  crossplane.io/project-uid to the Notif via SSA patch, sets ownerReferences, and
+                  echoes status.projectName / status.projectUid.
               title:
                 type: string
                 description: Short headline shown in the inbox or toast
@@ -104,6 +112,12 @@ spec:
               lastTransitionTime:
                 type: string
                 format: date-time
+              projectName:
+                type: string
+                description: Observed Project claim name when spec.projectName is set.
+              projectUid:
+                type: string
+                description: Observed Project UID when the Project is resolved.
               conditions:
                 type: array
                 items:
