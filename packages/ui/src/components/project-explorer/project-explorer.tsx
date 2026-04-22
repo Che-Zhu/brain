@@ -130,12 +130,11 @@ function ProjectExplorerList({ className }: { className?: string }) {
               data-slot="project-explorer-item"
               key={project.id}
             >
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="hoverable flex min-w-0 items-center gap-3 rounded-xl p-3">
                 <div
                   className={cn(
                     "flex min-w-0 flex-1 flex-row items-baseline justify-between gap-3 text-start",
-                    interactive &&
-                      "hoverable -mx-2 -my-0.5 cursor-pointer rounded-lg px-2 py-0.5"
+                    interactive && "cursor-pointer"
                   )}
                   {...(interactive
                     ? {
@@ -158,30 +157,27 @@ function ProjectExplorerList({ className }: { className?: string }) {
                   </time>
                 </div>
                 {canTogglePublic ? (
-                  <div className="shrink-0">
-                    <Switch
-                      aria-label={
-                        isPublic
-                          ? `${project.name} is public`
-                          : `${project.name} is private`
+                  <Switch
+                    aria-label={
+                      isPublic
+                        ? `${project.name} is public`
+                        : `${project.name} is private`
+                    }
+                    checked={isPublic}
+                    onCheckedChange={(next) => {
+                      const result = actions.onProjectPublicChange?.(
+                        project,
+                        next
+                      );
+                      if (
+                        result &&
+                        typeof (result as Promise<unknown>).then === "function"
+                      ) {
+                        (result as Promise<unknown>).catch(() => undefined);
                       }
-                      checked={isPublic}
-                      onCheckedChange={(next) => {
-                        const result = actions.onProjectPublicChange?.(
-                          project,
-                          next
-                        );
-                        if (
-                          result &&
-                          typeof (result as Promise<unknown>).then ===
-                            "function"
-                        ) {
-                          (result as Promise<unknown>).catch(() => undefined);
-                        }
-                      }}
-                      size="sm"
-                    />
-                  </div>
+                    }}
+                    size="sm"
+                  />
                 ) : null}
               </div>
             </li>

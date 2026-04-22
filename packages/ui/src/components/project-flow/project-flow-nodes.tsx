@@ -18,6 +18,8 @@ export const PROJECT_FLOW_NODE_TYPE_CONTAINER = "containerNode" as const;
 
 export interface ProjectFlowContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  /** Set on node `data` by {@link ProjectFlow.Variant0} when `states.readOnly` is true. */
+  readOnly?: boolean;
   states: ContainerNodeStates;
 }
 
@@ -29,15 +31,19 @@ export type ProjectFlowContainerRfNode = Node<
 function ProjectFlowContainerNode({
   data,
 }: NodeProps<ProjectFlowContainerRfNode>) {
-  const { actions = {}, states } = data;
+  const { actions = {}, readOnly, states } = data;
   return (
-    <>
+    <div
+      className={
+        readOnly ? "pointer-events-none h-full w-full" : "h-full w-full"
+      }
+    >
       <Handle position={Position.Top} type="target" />
       <ContainerNode.Root actions={actions} states={states}>
         <ContainerNode.Variant0 className="h-40 w-60" />
       </ContainerNode.Root>
       <Handle position={Position.Bottom} type="source" />
-    </>
+    </div>
   );
 }
 

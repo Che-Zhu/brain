@@ -78,6 +78,7 @@ export default function PreviewProjectPage() {
         states={{
           initialEdges: projectFlowState.initialEdges,
           initialNodes: projectFlowState.initialNodes,
+          readOnly: true,
         }}
       >
         <ProjectFlow.Variant0 className="min-h-0 flex-1" />

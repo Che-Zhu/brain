@@ -38,6 +38,11 @@ const ProjectFlowContext = createContext<ProjectFlowValue | null>(null);
 export interface ProjectFlowStates {
   initialEdges: Edge[];
   initialNodes: Node[];
+  /**
+   * When true (e.g. public preview): pan the canvas only; no node drag, selection,
+   * connections, zoom, or pointer interaction on node chrome.
+   */
+  readOnly?: boolean;
 }
 
 export interface ProjectFlowActions {
@@ -128,6 +133,7 @@ function ProjectFlowVariant0({
   }, []);
 
   const { onConnect: onConnectAction } = actions;
+  const isReadOnly = states.readOnly === true;
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -137,24 +143,57 @@ function ProjectFlowVariant0({
     [onConnectAction]
   );
 
+  /** Merge read-only into node `data` so container nodes can drop pointer events. */
+  const nodesForView = useMemo((): Node[] => {
+    if (!isReadOnly) {
+      return nodes;
+    }
+    return nodes.map((n) => {
+      if (n.data == null || typeof n.data !== "object") {
+        return n;
+      }
+      return {
+        ...n,
+        data: { ...n.data, readOnly: true as const },
+      };
+    });
+  }, [isReadOnly, nodes]);
+
   return (
     <ProjectFlowShell className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <div className="relative flex h-full w-full min-w-0 flex-1 flex-col">
+      <div
+        className={cn(
+          "relative flex h-full w-full min-w-0 flex-1 flex-col",
+          isReadOnly && "[&_.react-flow__node]:select-none"
+        )}
+      >
         <ReactFlow
           className={cn("h-full min-h-0 w-full", flowClassName)}
+          deleteKeyCode={isReadOnly ? null : undefined}
           edges={edges}
+          elementsSelectable={!isReadOnly}
           fitView
           maxZoom={1.3}
-          nodes={nodes}
+          minZoom={0.2}
+          multiSelectionKeyCode={isReadOnly ? null : undefined}
+          nodes={nodesForView}
+          nodesConnectable={!isReadOnly}
+          nodesDraggable={!isReadOnly}
           nodeTypes={nodeTypes}
-          onConnect={onConnect}
+          onConnect={isReadOnly ? undefined : onConnect}
           onEdgesChange={onEdgesChange}
           onNodesChange={onNodesChange}
           panOnDrag
           panOnScroll
           proOptions={{ hideAttribution: true }}
+          selectionKeyCode={isReadOnly ? null : undefined}
+          selectionOnDrag={!isReadOnly}
+          selectNodesOnDrag={!isReadOnly}
           snapGrid={[20, 20]}
-          snapToGrid
+          snapToGrid={!isReadOnly}
+          zoomOnDoubleClick={!isReadOnly}
+          zoomOnPinch={!isReadOnly}
+          zoomOnScroll={!isReadOnly}
         >
           <Background
             color="#999"
