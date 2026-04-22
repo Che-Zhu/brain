@@ -1,5 +1,6 @@
 "use client";
 
+import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   type ComponentProps,
@@ -17,6 +18,8 @@ export interface ProjectExplorerProject {
   id: string;
   /** Display name shown in the list. */
   name: string;
+  /** `spec.public` on the Project claim when known. */
+  public?: boolean;
 }
 
 /** Display state for the explorer (passed into Root as `states`). */
@@ -27,6 +30,14 @@ export interface ProjectExplorerStates {
 /** Optional handlers for project rows. */
 export interface ProjectExplorerActions {
   onProjectClick?: (project: ProjectExplorerProject) => void;
+  /**
+   * When set, a public/private switch is shown at the end of each row.
+   * Use to PATCH `spec.public` (or your backend); called with the desired next value.
+   */
+  onProjectPublicChange?: (
+    project: ProjectExplorerProject,
+    isPublic: boolean
+  ) => void | Promise<void>;
 }
 
 export interface ProjectExplorerValue {
@@ -88,13 +99,14 @@ function ProjectExplorerList({ className }: { className?: string }) {
   const { actions, states } = useProjectExplorer();
   const { projects } = states;
   const interactive = actions.onProjectClick != null;
+  const canTogglePublic = actions.onProjectPublicChange != null;
 
   function handleRowActivate(project: ProjectExplorerProject) {
     actions.onProjectClick?.(project);
   }
 
   function handleRowKeyDown(
-    event: KeyboardEvent<HTMLLIElement>,
+    event: KeyboardEvent<HTMLDivElement>,
     project: ProjectExplorerProject
   ) {
     if (event.key === "Enter" || event.key === " ") {
@@ -111,30 +123,66 @@ function ProjectExplorerList({ className }: { className?: string }) {
           const iso = Number.isNaN(created.getTime())
             ? undefined
             : created.toISOString();
+          const isPublic = project.public === true;
           return (
             <li
-              className={cn("rounded-xl px-4 py-3", interactive && "hoverable")}
+              className="rounded-xl px-4 py-3"
+              data-slot="project-explorer-item"
               key={project.id}
-              {...(interactive
-                ? {
-                    role: "button" as const,
-                    tabIndex: 0,
-                    onClick: () => handleRowActivate(project),
-                    onKeyDown: (e: KeyboardEvent<HTMLLIElement>) =>
-                      handleRowKeyDown(e, project),
-                  }
-                : {})}
             >
-              <div className="flex min-w-0 flex-row items-baseline justify-between gap-3 text-start">
-                <span className="min-w-0 truncate font-medium text-foreground text-sm">
-                  {project.name}
-                </span>
-                <time
-                  className="shrink-0 text-muted-foreground text-xs tabular-nums"
-                  dateTime={iso}
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className={cn(
+                    "flex min-w-0 flex-1 flex-row items-baseline justify-between gap-3 text-start",
+                    interactive &&
+                      "hoverable -mx-2 -my-0.5 cursor-pointer rounded-lg px-2 py-0.5"
+                  )}
+                  {...(interactive
+                    ? {
+                        role: "button" as const,
+                        tabIndex: 0,
+                        onClick: () => handleRowActivate(project),
+                        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) =>
+                          handleRowKeyDown(e, project),
+                      }
+                    : {})}
                 >
-                  {formatCreatedAt(project.createdAt)}
-                </time>
+                  <span className="min-w-0 truncate font-medium text-foreground text-sm">
+                    {project.name}
+                  </span>
+                  <time
+                    className="shrink-0 text-muted-foreground text-xs tabular-nums"
+                    dateTime={iso}
+                  >
+                    {formatCreatedAt(project.createdAt)}
+                  </time>
+                </div>
+                {canTogglePublic ? (
+                  <div className="shrink-0">
+                    <Switch
+                      aria-label={
+                        isPublic
+                          ? `${project.name} is public`
+                          : `${project.name} is private`
+                      }
+                      checked={isPublic}
+                      onCheckedChange={(next) => {
+                        const result = actions.onProjectPublicChange?.(
+                          project,
+                          next
+                        );
+                        if (
+                          result &&
+                          typeof (result as Promise<unknown>).then ===
+                            "function"
+                        ) {
+                          (result as Promise<unknown>).catch(() => undefined);
+                        }
+                      }}
+                      size="sm"
+                    />
+                  </div>
+                ) : null}
               </div>
             </li>
           );

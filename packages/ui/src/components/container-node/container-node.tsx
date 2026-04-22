@@ -18,13 +18,13 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Button } from "@workspace/ui/components/button";
-import { FlashNumber } from "@workspace/ui/components/flash-number/flash-number";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import { FlashNumber } from "@workspace/ui/components/flash-number/flash-number";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { Cpu, Layers, MemoryStick, MoreHorizontal } from "lucide-react";

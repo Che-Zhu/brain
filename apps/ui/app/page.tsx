@@ -14,8 +14,15 @@ import {
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { toast } from "sonner";
 import useSWR from "swr";
 import { devEncodedKubeconfigAtom, devNamespaceAtom } from "@/atom/auth-atom";
+import { toastCopyableProjectShareLink } from "@/components/sonner";
+import {
+  buildPreviewProjectShareUrl,
+  projectShareResponseFromJson,
+  readNamespaceFromProjectShareJwt,
+} from "@/lib/project-share";
 import { projectsListToExplorerProjects } from "@/lib/projects-to-explorer-projects";
 
 export default function Page() {
@@ -31,7 +38,7 @@ export default function Page() {
     [namespace]
   );
 
-  const { data: projects } = useSWR(
+  const { data: projects, mutate } = useSWR(
     [API_ROUTES.k8s.get, getParams] as const,
     () =>
       fetcher<ProjectExplorerProject[]>({
@@ -53,6 +60,70 @@ export default function Page() {
         actions={{
           onProjectClick: (p) =>
             router.push(`/project/${encodeURIComponent(p.id)}`),
+          onProjectPublicChange: async (p, isPublic) => {
+            await fetcher({
+              base: ApiUrl(),
+              path: API_ROUTES.k8s.patch,
+              query: {
+                kind: "projects",
+                name: p.name,
+                type: "merge",
+                ...(namespace != null && namespace !== "" ? { namespace } : {}),
+              },
+              method: "PATCH",
+              body: { spec: { public: isPublic } },
+              header: {
+                Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+              },
+            });
+            await mutate();
+            if (!isPublic) {
+              toast.info(
+                `"${p.name}" has been set as private. Shared preview links for this project no longer work.`
+              );
+              return;
+            }
+            const loading = toast.loading("Preparing share link…");
+            try {
+              const raw = await fetcher<unknown>({
+                base: ApiUrl(),
+                path: API_ROUTES.projects.share,
+                method: "POST",
+                body: {
+                  projectName: p.name,
+                  projectUid: p.id,
+                  permission: "view",
+                  ...(namespace != null && namespace !== ""
+                    ? { ns: namespace }
+                    : {}),
+                },
+                header: {
+                  Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+                },
+              });
+              const { token } = projectShareResponseFromJson(raw);
+              const fromJwt = readNamespaceFromProjectShareJwt(token);
+              const ns = fromJwt ?? namespace?.trim() ?? "";
+              if (ns === "") {
+                throw new Error(
+                  "Could not determine namespace for preview link. Set a namespace, then make the project public again."
+                );
+              }
+              const origin = window.location.origin;
+              const shareUrl = buildPreviewProjectShareUrl({
+                origin,
+                projectUid: p.id,
+                namespace: ns,
+                shareToken: token,
+              });
+              toast.dismiss(loading);
+              toastCopyableProjectShareLink(shareUrl, { projectName: p.name });
+            } catch (e) {
+              toast.dismiss(loading);
+              const msg = e instanceof Error ? e.message : "Share link failed";
+              toast.error(msg);
+            }
+          },
         }}
         states={{ projects: projects ?? [] }}
       >

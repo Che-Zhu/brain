@@ -1,9 +1,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "@workspace/ui/globals.css";
+import { Toaster } from "@workspace/ui/components/sonner";
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
-import { AppShell } from "@/components/app-shell";
 import { JotaiProvider } from "@/components/jotai-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -34,7 +34,8 @@ export default function RootLayout({
         <JotaiProvider>
           <ThemeProvider>
             <TooltipProvider>
-              <AppShell>{children}</AppShell>
+              <Toaster />
+              {children}
             </TooltipProvider>
           </ThemeProvider>
         </JotaiProvider>

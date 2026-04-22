@@ -18,6 +18,7 @@ import (
 	"sealos/api/route/db"
 	"sealos/api/route/health"
 	"sealos/api/route/k8s"
+	"sealos/api/route/project"
 	"sealos/api/route/task"
 	"sealos/api/route/telemetry"
 )
@@ -33,7 +34,7 @@ func main() {
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Share-Token"},
 		AllowCredentials: false,
 		MaxAge:           86400,
 	}))
@@ -66,6 +67,7 @@ func main() {
 	// Register API routes (with OpenAPI docs)
 	k8s.Register(api)
 	ap.Register(api)
+	project.Register(api)
 	db.Register(api)
 	task.Register(api)
 	telemetry.Register(api)

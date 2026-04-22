@@ -12,16 +12,23 @@ import {
 import { ApiUrl } from "../utils";
 
 export function useApsK8sList(options: {
-  kubeconfig: string;
+  /** User kubeconfig (URL-encoded in Authorization). Omit when using `shareToken`. */
+  kubeconfig?: string;
   labelSelector: string;
   namespace?: string;
+  /** When set, calls k8s get with share token + admin kubeconfig on the server (no user kubeconfig). */
+  shareToken?: string;
 }) {
-  const { kubeconfig, labelSelector, namespace } = options;
+  const { labelSelector, namespace, shareToken } = options;
+  const kubeconfig = options.kubeconfig ?? "";
 
-  const authHeader = useMemo(
-    () => ({ Authorization: `Bearer ${encodeURIComponent(kubeconfig)}` }),
-    [kubeconfig]
-  );
+  const authHeader = useMemo((): Record<string, string> => {
+    const st = shareToken?.trim() ?? "";
+    if (st !== "") {
+      return { "X-Share-Token": st };
+    }
+    return { Authorization: `Bearer ${encodeURIComponent(kubeconfig)}` };
+  }, [kubeconfig, shareToken]);
 
   const getParams = useMemo(
     () =>
@@ -33,16 +40,30 @@ export function useApsK8sList(options: {
     [labelSelector, namespace]
   );
 
-  return useSWR(
-    kubeconfig === "" ? null : ([API_ROUTES.k8s.get, getParams] as const),
-    () =>
-      fetcher<K8sGetResponse>({
-        base: ApiUrl(),
-        path: API_ROUTES.k8s.get,
-        query: { ...getParams },
-        header: authHeader,
-        method: "GET",
-        select: (raw) => k8sGetResponseSchema.parse(raw),
-      })
+  const hasShare = shareToken != null && shareToken.trim() !== "";
+  const hasKubeconfig = kubeconfig.trim() !== "";
+
+  const swrKey = hasShare
+    ? namespace != null && namespace !== ""
+      ? ([API_ROUTES.k8s.get, "share", shareToken, getParams] as const)
+      : null
+    : hasKubeconfig
+      ? ([API_ROUTES.k8s.get, getParams] as const)
+      : null;
+
+  return useSWR(swrKey, () =>
+    fetcher<K8sGetResponse>({
+      base: ApiUrl(),
+      path: API_ROUTES.k8s.get,
+      query: {
+        ...getParams,
+        ...(shareToken != null && shareToken.trim() !== ""
+          ? { shareToken: shareToken.trim() }
+          : {}),
+      },
+      header: authHeader,
+      method: "GET",
+      select: (raw) => k8sGetResponseSchema.parse(raw),
+    })
   );
 }

@@ -59,6 +59,11 @@ export function projectsListToExplorerProjects(
       item.spec?.title ??
       (typeof id === "string" ? id : "Untitled");
     const createdAt = meta.creationTimestamp ?? "";
-    return { id, name, createdAt };
+    const specPublic = item.spec?.public;
+    const base: ProjectExplorerProject = { id, name, createdAt };
+    if (specPublic === null || specPublic === undefined) {
+      return base;
+    }
+    return { ...base, public: specPublic };
   });
 }

@@ -16,22 +16,33 @@ export interface ApTelemetryMetricsRow extends ApTelemetryTarget {
 }
 
 export function useApTelemetryMetricsBatch(options: {
-  kubeconfig: string;
+  /** User kubeconfig. Omit when using `shareToken`. */
+  kubeconfig?: string;
   targets: ApTelemetryTarget[];
   /** @default 5000 */
   refreshInterval?: number;
+  /** When set, metrics requests use share token auth (kind=ap only on server). */
+  shareToken?: string;
 }) {
-  const { kubeconfig, targets, refreshInterval = 5000 } = options;
+  const { targets, refreshInterval = 5000, shareToken } = options;
+  const kubeconfig = options.kubeconfig ?? "";
 
-  const authHeader = useMemo(
-    () => ({ Authorization: `Bearer ${encodeURIComponent(kubeconfig)}` }),
-    [kubeconfig]
-  );
+  const authHeader = useMemo((): Record<string, string> => {
+    const st = shareToken?.trim() ?? "";
+    if (st !== "") {
+      return { "X-Share-Token": st };
+    }
+    return { Authorization: `Bearer ${encodeURIComponent(kubeconfig)}` };
+  }, [kubeconfig, shareToken]);
+
+  const st = shareToken?.trim() ?? "";
+  const useShare = st !== "";
+  const hasKubeconfig = kubeconfig.trim() !== "";
 
   return useSWR(
-    kubeconfig === "" || targets.length === 0
-      ? null
-      : ([API_ROUTES.telemetry.metrics, targets] as const),
+    (useShare || hasKubeconfig) && targets.length > 0
+      ? ([API_ROUTES.telemetry.metrics, useShare ? "share" : "kc", st, targets] as const)
+      : null,
     () =>
       Promise.all(
         targets.map((target) =>
@@ -42,6 +53,7 @@ export function useApTelemetryMetricsBatch(options: {
               namespace: target.namespace,
               name: target.name,
               kind: "ap",
+              ...(useShare ? { shareToken: st } : {}),
             },
             header: authHeader,
             method: "GET",

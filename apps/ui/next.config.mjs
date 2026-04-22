@@ -5,6 +5,10 @@ const nextConfig = {
   logging: {
     serverFunctions: false,
   },
+  experimental: {
+    /** Enables `unauthorized()` from `next/navigation` (e.g. preview share token checks). */
+    authInterrupts: true,
+  },
 };
 
 export default nextConfig;
