@@ -1,0 +1,6 @@
+/* Override xyflow's default pane cursor — keep panning but drop the grab/grabbing
+   hand cursor that reads awkwardly on an empty canvas. */
+.react-flow__pane.draggable,
+.react-flow__pane.dragging {
+  cursor: default;
+}
