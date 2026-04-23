@@ -25,6 +25,18 @@ const (
 	httpTimeout      = 45 * time.Second
 )
 
+// unescapeKubeconfigLiterals turns literal backslash escape sequences into runes.
+// The desktop ingress sometimes returns YAML where newlines were serialized as the
+// two characters '\' and 'n' inside the JSON string (after json.Unmarshal, that is
+// still not a newline). Real newlines are unchanged.
+func unescapeKubeconfigLiterals(s string) string {
+	return strings.NewReplacer(
+		`\n`, "\n",
+		`\r`, "\r",
+		`\t`, "\t",
+	).Replace(s)
+}
+
 // UpstreamResponse matches the JSON returned by the Sealos desktop /api/auth/regionToken route.
 type UpstreamResponse struct {
 	Code    int    `json:"code"`
@@ -133,7 +145,7 @@ func Exchange(ctx context.Context, baseURL, regionToken string) (*ExchangeResult
 	if parsed.Code != 200 {
 		return nil, fmt.Errorf("upstream error: code=%d message=%s", parsed.Code, parsed.Message)
 	}
-	kc := strings.TrimSpace(parsed.Data.Kubeconfig)
+	kc := strings.TrimSpace(unescapeKubeconfigLiterals(parsed.Data.Kubeconfig))
 	if kc == "" {
 		return nil, fmt.Errorf("upstream response: empty data.kubeconfig")
 	}

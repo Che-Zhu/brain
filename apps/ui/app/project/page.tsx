@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
-import { devEncodedKubeconfigAtom, devNamespaceAtom } from "@/atom/auth-atom";
+import { encodedKubeconfigAtom, namespaceAtom } from "@/atom/auth-atom";
 import { toastCopyableProjectShareLink } from "@/components/sonner";
 import {
   buildPreviewProjectShareUrl,
@@ -27,8 +27,8 @@ import { projectsListToExplorerProjects } from "@/lib/projects-to-explorer-proje
 
 export default function ProjectIndexPage() {
   const router = useRouter();
-  const kubeconfig = useAtomValue(devEncodedKubeconfigAtom);
-  const namespace = useAtomValue(devNamespaceAtom);
+  const kubeconfig = useAtomValue(encodedKubeconfigAtom);
+  const namespace = useAtomValue(namespaceAtom);
   const getParams = useMemo(
     () =>
       k8sGetQuerySchema.parse({

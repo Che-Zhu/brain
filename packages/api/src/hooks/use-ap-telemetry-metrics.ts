@@ -41,7 +41,12 @@ export function useApTelemetryMetricsBatch(options: {
 
   return useSWR(
     (useShare || hasKubeconfig) && targets.length > 0
-      ? ([API_ROUTES.telemetry.metrics, useShare ? "share" : "kc", st, targets] as const)
+      ? ([
+          API_ROUTES.telemetry.metrics,
+          useShare ? "share" : "kc",
+          st,
+          targets,
+        ] as const)
       : null,
     () =>
       Promise.all(

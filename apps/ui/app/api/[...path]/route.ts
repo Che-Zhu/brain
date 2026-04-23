@@ -40,7 +40,6 @@ async function proxy(
 
   const headers = new Headers(request.headers);
   headers.delete("host");
-
   const body =
     request.method === "GET" || request.method === "HEAD"
       ? undefined

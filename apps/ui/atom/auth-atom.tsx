@@ -12,3 +12,9 @@ export const devEncodedKubeconfigAtom = atom(
  * Dev Kubernetes namespace, from `NEXT_PUBLIC_DEV_NS`.
  */
 export const devNamespaceAtom = atom(process.env.NEXT_PUBLIC_DEV_NS ?? "");
+
+export const encodedKubeconfigAtom = atom(
+  decodeURIComponent(process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG ?? "")
+);
+
+export const namespaceAtom = atom(process.env.NEXT_PUBLIC_DEV_NS ?? "");

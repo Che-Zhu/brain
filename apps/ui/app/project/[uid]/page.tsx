@@ -10,7 +10,7 @@ import { ProjectFlow } from "@workspace/ui/components/project-flow/project-flow"
 import { useAtomValue } from "jotai";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
-import { devEncodedKubeconfigAtom, devNamespaceAtom } from "@/atom/auth-atom";
+import { encodedKubeconfigAtom, namespaceAtom } from "@/atom/auth-atom";
 import {
   apMetricsLookupFromResults,
   apsToProjectFlowState,
@@ -19,8 +19,8 @@ import {
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
   const uid = decodeURIComponent(params.uid ?? "");
-  const kubeconfig = useAtomValue(devEncodedKubeconfigAtom);
-  const namespace = useAtomValue(devNamespaceAtom);
+  const kubeconfig = useAtomValue(encodedKubeconfigAtom);
+  const namespace = useAtomValue(namespaceAtom);
 
   const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
 

@@ -22,12 +22,12 @@ import { useAtomValue } from "jotai";
 import { Boxes, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { devNamespaceAtom } from "@/atom/auth-atom";
+import { namespaceAtom } from "@/atom/auth-atom";
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isMobile } = useSidebar();
-  const namespace = useAtomValue(devNamespaceAtom).trim();
+  const namespace = useAtomValue(namespaceAtom).trim();
   const namespaceDisplay = namespace === "" ? "—" : namespace;
 
   const projectsHref = "/project";
