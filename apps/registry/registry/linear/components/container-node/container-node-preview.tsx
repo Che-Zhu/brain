@@ -1,10 +1,9 @@
 "use client";
 
-import type { CrossplaneServiceStatusPhase } from "@workspace/crossplane/lib/status";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const staticBase = {
   image: "registry.example.io/demo:v2",
@@ -41,64 +40,66 @@ function RunningWorkloadPreview({ className }: { className?: string }) {
   );
 }
 
-/** Non-running phases: no CPU/memory (workload not live / no meaningful usage). */
-const statusDemos: {
-  label: string;
-  title: string;
-  tone: CrossplaneServiceStatusPhase;
-  replicas: number;
-}[] = [
-  {
-    title: "Yellow — pending (no usage yet)",
-    label: "Pending",
-    tone: "pending",
-    replicas: 1,
-  },
-  {
-    title: "Purple — stopped (paused)",
-    label: "Stopped",
-    tone: "stopped",
-    replicas: 0,
-  },
-  {
-    title: "Red — failed (errored)",
-    label: "Failed",
-    tone: "failed",
-    replicas: 0,
-  },
-];
+function DeleteDialogPreview() {
+  return (
+    <div className="flex min-h-48 items-center justify-center p-4">
+      <ContainerNode.DeleteDialogPanel
+        name="workload-demo-001"
+        onCancel={() => undefined}
+        onConfirmDelete={() => undefined}
+      />
+    </div>
+  );
+}
+
+function ScaleDialogPreview() {
+  const [replicas, setReplicas] = useState(3);
+  const [draft, setDraft] = useState(replicas);
+  const max = useMemo(
+    () => Math.max(20, replicas, draft, 1),
+    [draft, replicas]
+  );
+
+  useEffect(() => {
+    setDraft(replicas);
+  }, [replicas]);
+
+  return (
+    <div className="flex min-h-48 items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-xl bg-background ring-1 ring-foreground/10">
+        <ContainerNode.ScaleDialogPanel
+          draft={draft}
+          max={max}
+          onDraftChange={setDraft}
+          onScale={(n) => setReplicas(n)}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function ContainerNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
+      <Preview title="Delete dialog">
+        <DeleteDialogPreview />
+      </Preview>
+      <Preview title="Scale dialog">
+        <ScaleDialogPreview />
+      </Preview>
       <Preview title="Green — running (live usage, shifts every 2s)">
         <RunningWorkloadPreview className="min-h-40 max-w-60" />
       </Preview>
-      {statusDemos.map((item) => (
-        <Preview key={item.tone} title={item.title}>
-          <ContainerNode.Root
-            states={{
-              ...staticBase,
-              name: `${staticBase.name}-${item.tone}`,
-              replicas: item.replicas,
-              status: { label: item.label, tone: item.tone },
-            }}
-          >
-            <ContainerNode.Variant0 className="min-h-40 max-w-60" />
-          </ContainerNode.Root>
-        </Preview>
-      ))}
-      <Preview title="Collapsed (running)">
+      <Preview title="Red — failed (errored)">
         <ContainerNode.Root
           states={{
             ...staticBase,
-            collapsed: true,
-            cpuPercent: 42,
-            memoryPercent: 55,
-            status: { label: "Running", tone: "running" },
+            name: `${staticBase.name}-failed`,
+            replicas: 0,
+            status: { label: "Failed", tone: "failed" },
           }}
         >
-          <ContainerNode.Variant0 className="max-w-60" />
+          <ContainerNode.Variant0 className="min-h-40 max-w-60" />
         </ContainerNode.Root>
       </Preview>
       <Preview title="Unknown metrics / status">

@@ -7,16 +7,6 @@ import {
   getStatusIndicatorClass,
   getStatusTextClass,
 } from "@workspace/crossplane/lib/status";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@workspace/ui/components/alert-dialog";
 import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
@@ -37,6 +27,15 @@ import {
   useState,
 } from "react";
 
+import {
+  ContainerNodeDeleteDialog,
+  ContainerNodeDeleteDialogPanel,
+} from "./container-node-delete-dialog";
+import {
+  ContainerNodeScaleDialog,
+  ContainerNodeScaleDialogPanel,
+} from "./container-node-scale-dialog";
+
 const ContainerNodeContext = createContext<ContainerNodeValue | null>(null);
 
 /** Service phase; aligns with Crossplane/Kubernetes-style statuses and theme tones. */
@@ -44,8 +43,6 @@ export type ContainerNodeStatusTone = CrossplaneServiceStatusPhase;
 
 /** Display state for a container node (passed into Root as `states`). */
 export interface ContainerNodeStates {
-  /** When true, only header + footer show; image section and resource metrics are hidden. */
-  collapsed?: boolean;
   cpuPercent?: number;
   image: string;
   kind?: string;
@@ -63,7 +60,8 @@ export interface ContainerNodeActions {
   onDelete?: () => void;
   onOpenShell?: () => void;
   onRestart?: () => void;
-  onScale?: () => void;
+  /** Fired from the Scale dialog when the user commits a replica count (pointer release). */
+  onScale?: (nextReplicas: number) => void;
   onViewLogs?: () => void;
 }
 
@@ -354,6 +352,7 @@ function ContainerNodeImage({
 function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
   const { actions, states } = useContainerNode();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scaleDialogOpen, setScaleDialogOpen] = useState(false);
 
   if (menu != null) {
     return (
@@ -395,7 +394,7 @@ function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
         <DropdownMenuContent align="start" className="rounded-xl">
           <DropdownMenuItem
             className="rounded-xl text-xs"
-            onClick={actions.onScale}
+            onClick={() => setScaleDialogOpen(true)}
           >
             Scale
           </DropdownMenuItem>
@@ -426,30 +425,18 @@ function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete container?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete &quot;{states.name}&quot;. This
-              action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="text-xs"
-              onClick={() => {
-                actions.onDelete?.();
-                setDeleteDialogOpen(false);
-              }}
-              variant="destructive"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ContainerNodeScaleDialog
+        onOpenChange={setScaleDialogOpen}
+        onScale={actions.onScale}
+        open={scaleDialogOpen}
+        replicas={states.replicas ?? 0}
+      />
+      <ContainerNodeDeleteDialog
+        name={states.name}
+        onConfirmDelete={actions.onDelete}
+        onOpenChange={setDeleteDialogOpen}
+        open={deleteDialogOpen}
+      />
     </>
   );
 }
@@ -459,7 +446,6 @@ function ContainerNodeVariant0({
   className,
 }: ComponentProps<typeof ContainerNodeShell>) {
   const { states } = useContainerNode();
-  const collapsed = states.collapsed === true;
 
   return (
     <ContainerNodeShell className={className}>
@@ -473,23 +459,19 @@ function ContainerNodeVariant0({
         </div>
         <ContainerNodeHeaderMenu />
       </ContainerNodeHeader>
-      {!collapsed && (
-        <ContainerNodeContent>
-          <ContainerNodeImage />
-        </ContainerNodeContent>
-      )}
+      <ContainerNodeContent>
+        <ContainerNodeImage />
+      </ContainerNodeContent>
       <ContainerNodeFooter>
         <ContainerNodeStatus />
-        {!collapsed && (
-          <ContainerNodeResourceGroup>
-            <ContainerNodeResource icon={Cpu} percent={states.cpuPercent} />
-            <ContainerNodeResource
-              icon={MemoryStick}
-              percent={states.memoryPercent}
-            />
-            <ContainerNodeReplicas />
-          </ContainerNodeResourceGroup>
-        )}
+        <ContainerNodeResourceGroup>
+          <ContainerNodeResource icon={Cpu} percent={states.cpuPercent} />
+          <ContainerNodeResource
+            icon={MemoryStick}
+            percent={states.memoryPercent}
+          />
+          <ContainerNodeReplicas />
+        </ContainerNodeResourceGroup>
       </ContainerNodeFooter>
     </ContainerNodeShell>
   );
@@ -519,6 +501,8 @@ function ContainerNodeRoot({
 export const ContainerNode = Object.assign(ContainerNodeShell, {
   Content: ContainerNodeContent,
   Context: ContainerNodeContext,
+  DeleteDialog: ContainerNodeDeleteDialog,
+  DeleteDialogPanel: ContainerNodeDeleteDialogPanel,
   Footer: ContainerNodeFooter,
   Header: ContainerNodeHeader,
   ResourceGroup: ContainerNodeResourceGroup,
@@ -529,6 +513,8 @@ export const ContainerNode = Object.assign(ContainerNodeShell, {
   Replicas: ContainerNodeReplicas,
   Resource: ContainerNodeResource,
   Root: ContainerNodeRoot,
+  ScaleDialog: ContainerNodeScaleDialog,
+  ScaleDialogPanel: ContainerNodeScaleDialogPanel,
   Shell: ContainerNodeShell,
   Status: ContainerNodeStatus,
   Title: ContainerNodeTitle,
@@ -544,3 +530,12 @@ ContainerNodeContent.displayName = "ContainerNode.Content";
 ContainerNodeFooter.displayName = "ContainerNode.Footer";
 ContainerNodeResourceGroup.displayName = "ContainerNode.ResourceGroup";
 ContainerNodeReplicas.displayName = "ContainerNode.Replicas";
+
+export type {
+  ContainerNodeDeleteDialogPanelProps,
+  ContainerNodeDeleteDialogProps,
+} from "./container-node-delete-dialog";
+export type {
+  ContainerNodeScaleDialogPanelProps,
+  ContainerNodeScaleDialogProps,
+} from "./container-node-scale-dialog";

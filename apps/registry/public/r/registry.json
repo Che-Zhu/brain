@@ -75,6 +75,16 @@
           "target": "components/container-node/container-node.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/container-node/container-node-delete-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node-delete-dialog.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node-scale-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node-scale-dialog.tsx"
+        },
+        {
           "path": "../../packages/crossplane/src/lib/status.ts",
           "type": "registry:lib",
           "target": "lib/crossplane/status.ts"
