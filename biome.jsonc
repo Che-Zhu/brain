@@ -1,6 +1,30 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": [
-    "ultracite/biome/core"
+  "extends": ["ultracite/biome/core"],
+  "overrides": [
+    {
+      // Compound-component dot-notation per apps/ui frontend architecture §4.1.
+      "includes": [
+        "apps/ui/src/features/**/*.tsx",
+        "apps/ui/src/app/**/*.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": { "useFilenamingConvention": "off" }
+        }
+      }
+    },
+    {
+      // Feature / shared barrels per apps/ui frontend architecture §4.1.
+      "includes": [
+        "apps/ui/src/features/*/index.ts",
+        "apps/ui/src/shared/*/index.ts"
+      ],
+      "linter": {
+        "rules": {
+          "performance": { "noBarrelFile": "off" }
+        }
+      }
+    }
   ]
 }

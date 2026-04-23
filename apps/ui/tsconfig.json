@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@workspace/crossplane/*": ["../../packages/crossplane/src/*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"]
     },
