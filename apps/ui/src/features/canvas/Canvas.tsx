@@ -19,9 +19,14 @@ export function Canvas({ projectId }: { projectId: string }) {
       <ReactFlowProvider>
         <CanvasProvider projectId={projectId}>
           <div className="canvas-surface">
-            <ReactFlow edges={[]} fitView nodes={[]}>
+            <ReactFlow
+              edges={[]}
+              fitView
+              nodes={[]}
+              proOptions={{ hideAttribution: true }}
+            >
               <Background
-                color="#52525b"
+                color="var(--color-zinc-600)"
                 gap={[32, 41]}
                 size={1}
                 variant={BackgroundVariant.Dots}

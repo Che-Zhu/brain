@@ -3,11 +3,11 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background-color: #0a0a0a;
+  background-color: var(--color-neutral-950);
   background-image: radial-gradient(
     ellipse 83.7% 93.3% at 33% 53%,
-    rgba(29, 78, 216, 0.2) 0%,
-    rgba(29, 78, 216, 0) 70%
+    color-mix(in oklab, var(--color-blue-700) 20%, transparent) 0%,
+    transparent 70%
   );
 }
 
