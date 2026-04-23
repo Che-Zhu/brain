@@ -1,5 +1,6 @@
 /**
- * HTTP pathnames served by `apps/api` (same origin as `NEXT_PUBLIC_API_URL`, default :9000).
+ * HTTP pathnames served by `apps/api`, typically reached through the UI app's
+ * same-origin `/api/...` proxy in the browser.
  * Use with your API origin, e.g. `new URL(path, baseUrl)` or SWR keys: `['get', API_ROUTES.k8s.get, queryKey]`.
  */
 export const API_ROUTES = {
@@ -37,6 +38,8 @@ export const API_ROUTES = {
     base: "/api/ap/v1alpha1",
     /** GET list/get, PUT create, PATCH update, DELETE — group root path. */
     root: "/api/ap/v1alpha1",
+    /** Rollout-restart the composed Deployment (same name as the AP). */
+    restart: "/api/ap/v1alpha1/restart",
   },
 
   db: {
@@ -56,6 +59,14 @@ export const API_ROUTES = {
     logs: "/api/telemetry/v1alpha1/logs",
     metricsHealth: "/api/telemetry/v1alpha1/metrics/health",
     metrics: "/api/telemetry/v1alpha1/metrics",
+  },
+
+  /**
+   * Region JWT → encoded kubeconfig via cluster Ingress `sealos-desktop` (`/api/auth/v1alpha1` in `apps/api/route/auth`).
+   */
+  auth: {
+    base: "/api/auth/v1alpha1",
+    regionToken: "/api/auth/v1alpha1/regionToken",
   },
 } as const;
 

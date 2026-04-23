@@ -15,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"sealos/api/route/ap"
+	"sealos/api/route/auth"
 	"sealos/api/route/db"
 	"sealos/api/route/health"
 	"sealos/api/route/k8s"
@@ -67,6 +68,7 @@ func main() {
 	// Register API routes (with OpenAPI docs)
 	k8s.Register(api)
 	ap.Register(api)
+	auth.Register(api)
 	project.Register(api)
 	db.Register(api)
 	task.Register(api)

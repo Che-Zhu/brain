@@ -3,8 +3,7 @@
 import { API_ROUTES, type ApiRoute } from "./constants";
 import { fetcher } from "./fetch";
 
-const baseUrl = () =>
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000";
+const baseUrl = () => process.env.API_URL || "http://localhost:9000";
 
 const apiAbs = (path: ApiRoute) => `${baseUrl()}${path}`;
 
@@ -309,7 +308,7 @@ export async function telemetryLogs(
   }
   try {
     return await fetcher<Record<string, TelemetryLogEntry[]>>({
-    base: baseUrl(),
+      base: baseUrl(),
       path: apiAbs(API_ROUTES.telemetry.logs),
       query: p,
       header: authHeader(kc),

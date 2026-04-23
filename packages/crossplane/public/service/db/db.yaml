@@ -129,8 +129,9 @@ spec:
                   description: >
                     When set, the active composition observes the Project claim with this name in the
                     same namespace, adds labels crossplane.io/project-name and crossplane.io/project-uid
-                    to composed resources, sets ownerReferences to that Project, SSA-patches the DB
-                    composite with the same labels, and echoes status.projectName / status.projectUid.
+                    to composed resources. Composed workloads ownerReference the DB claim; only the
+                    DB composite is SSA-patched to add Project ownerReferences/labels. Echoes
+                    status.projectName / status.projectUid.
                 restoreFromBackup:
                   type: object
                   description: >

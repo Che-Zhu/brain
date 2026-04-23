@@ -7,10 +7,11 @@ metadata:
     meta.crossplane.io/description: >
       Generic app with Deployment, Service, and Ingress. Optional spec.projectName observes a
       Project claim in the same namespace (kubernetes.m Object Observe), adds labels
-      crossplane.io/project-name and crossplane.io/project-uid and ownerReferences on composed workloads, echoes
-      status.projectName / status.projectUid on the AP, and SSA-patches the AP itself with
-      the same label and ownerReferences via a composed kubernetes.m Object (Crossplane
-      does not merge composite metadata from composition output).
+      crossplane.io/project-name and crossplane.io/project-uid. Composed workloads
+      (Deployment, Services, Ingress, ConfigMap, etc.) ownerReference the AP claim only; only the
+      AP composite is SSA-patched to add Project ownerReferences/labels. Echoes
+      status.projectName / status.projectUid (Crossplane does not merge composite metadata from
+      composition output for most fields).
     # Lucide rocket as data URI; used when icon-url is omitted (frontend prefers icon-url, then icon-data).
     meta.crossplane.io/icon-data: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXJvY2tldC1pY29uIGx1Y2lkZS1yb2NrZXQiPjxwYXRoIGQ9Ik0xMiAxNXY1czMuMDMtLjU1IDQtMmMxLjA4LTEuNjIgMC01IDAtNSIvPjxwYXRoIGQ9Ik00LjUgMTYuNWMtMS41IDEuMjYtMiA1LTIgNXMzLjc0LS41IDUtMmMuNzEtLjg0LjctMi4xMy0uMDktMi45MWEyLjE4IDIuMTggMCAwIDAtMi45MS0uMDkiLz48cGF0aCBkPSJNOSAxMmEyMiAyMiAwIDAgMSAyLTMuOTVBMTIuODggMTIuODggMCAwIDEgMjIgMmMwIDIuNzItLjc4IDcuNS02IDExYTIyLjQgMjIuNCAwIDAgMS00IDJ6Ii8+PHBhdGggZD0iTTkgMTJINHMuNTUtMy4wMyAyLTRjMS42Mi0xLjA4IDUgLjA1IDUgLjA1Ii8+PC9zdmc+"
     meta.crossplane.io/template: |
@@ -138,15 +139,11 @@ spec:
             metadata:
               name: {{ $managedConfigMapName }}
               namespace: {{ $ns }}
-            {{ if and (ne $projectName "") (ne $projectUid "") }}
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
-                kind: Project
-                name: {{ $projectName }}
-                uid: {{ $projectUid }}
-            {{ else }}
-              ownerReferences: []
-            {{ end }}
+                kind: AP
+                name: {{ $name }}
+                uid: {{ $apUid }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-config-backup
                 gotemplating.fn.crossplane.io/ready: "True"
@@ -182,13 +179,11 @@ spec:
                 {{ if and (ne $projectName "") (ne $projectUid "") }}
                 crossplane.io/project-uid: {{ $projectUid | quote }}
                 {{ end }}
-              {{ if and (ne $projectName "") (ne $projectUid "") }}
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
-                kind: Project
-                name: {{ $projectName }}
-                uid: {{ $projectUid }}
-              {{ end }}
+                kind: AP
+                name: {{ $name }}
+                uid: {{ $apUid }}
             spec:
               replicas: {{ $spec.replicas | default 1 }}
               revisionHistoryLimit: 1
@@ -280,13 +275,11 @@ spec:
                 {{ if and (ne $projectName "") (ne $projectUid "") }}
                 crossplane.io/project-uid: {{ $projectUid | quote }}
                 {{ end }}
-              {{ if and (ne $projectName "") (ne $projectUid "") }}
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
-                kind: Project
-                name: {{ $projectName }}
-                uid: {{ $projectUid }}
-              {{ end }}
+                kind: AP
+                name: {{ $name }}
+                uid: {{ $apUid }}
             spec:
               selector:
                 app: {{ $name }}
@@ -331,13 +324,11 @@ spec:
                 crossplane.io/project-uid: {{ $projectUid | quote }}
                 {{ end }}
               {{ end }}
-              {{ if and (ne $projectName "") (ne $projectUid "") }}
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
-                kind: Project
-                name: {{ $projectName }}
-                uid: {{ $projectUid }}
-              {{ end }}
+                kind: AP
+                name: {{ $name }}
+                uid: {{ $apUid }}
             spec:
               ingressClassName: nginx
               rules:

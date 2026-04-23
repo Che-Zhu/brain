@@ -7,7 +7,7 @@ import { PREVIEW_QUERY_HEADER } from "@/lib/preview-search-header";
  * Forward the current query so the preview segment layout can run `assertPreviewShareAuthorized`
  * on the same values the client will use.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith("/preview/project/")) {
     return NextResponse.next();
   }

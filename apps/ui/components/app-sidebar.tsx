@@ -30,9 +30,9 @@ export default function AppSidebar() {
   const namespace = useAtomValue(devNamespaceAtom).trim();
   const namespaceDisplay = namespace === "" ? "—" : namespace;
 
-  const projectsHref = "/";
+  const projectsHref = "/project";
   const projectsActive =
-    pathname === "/" || pathname === "" || pathname.startsWith("/project");
+    pathname === "/project" || pathname.startsWith("/project/");
 
   return (
     <div className="[--sidebar-width:14rem]">

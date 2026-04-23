@@ -3,11 +3,15 @@ import type { ApiRoute } from "./constants";
 const DEFAULT_ORIGIN = "http://localhost:9000";
 
 /**
- * With no `route`: API origin from `NEXT_PUBLIC_API_URL` (or {@link DEFAULT_ORIGIN}).
- * With `route`: absolute URL for that path under the same origin.
+ * Resolves API requests against the current browser origin in client code, so the
+ * UI can always call its own `/api/...` proxy at runtime. On the server, falls
+ * back to `API_URL` (or {@link DEFAULT_ORIGIN}) for direct upstream access.
  */
 export function ApiUrl(route?: ApiRoute): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || DEFAULT_ORIGIN;
+  const base =
+    typeof window === "undefined"
+      ? process.env.API_URL || DEFAULT_ORIGIN
+      : window.location.origin;
   if (route === undefined) {
     return base;
   }

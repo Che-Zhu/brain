@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -245,5 +246,66 @@ func registerDelete(grp huma.API) {
 				Status: "deleted",
 			},
 		}, nil
+	})
+}
+
+// Composed Deployment name matches the AP (metadata.name); see
+// aps-deployment-ingress-go-templating (Deployment metadata.name: {{ $name }}).
+
+func registerRestart(grp huma.API) {
+	type restartBody struct {
+		Name      string `json:"name" required:"true" doc:"AP claim metadata.name; the composed Deployment uses the same name in the same namespace."`
+		Namespace string `json:"namespace" doc:"Namespace of the AP (default from kubeconfig; admin can override)."`
+	}
+	type restartInput struct {
+		middleware.AuthInput
+		Body restartBody
+	}
+	type restartOutput struct {
+		Body json.RawMessage
+	}
+
+	huma.Register(grp, huma.Operation{
+		OperationID: "ap-restart",
+		Method:      http.MethodPost,
+		Path:        "/restart",
+		Summary:     "Restart AP workload (rollout restart Deployment)",
+		Description: "Rollout-restarts the underlying Deployment for an AP (e.g. composition `aps-deployment-ingress-go-templating`): " +
+			"the Deployment is named like the AP (`metadata.name`) in the same namespace. " +
+			"Equivalent to `kubectl rollout restart deployment/<name>`.",
+		Tags: []string{"AP"},
+	}, func(ctx context.Context, input *restartInput) (*restartOutput, error) {
+		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
+		}
+		name := strings.TrimSpace(input.Body.Name)
+		if name == "" {
+			return nil, huma.Error400BadRequest("name is required", nil)
+		}
+
+		gvr := middleware.PodsGVR()
+		resolved, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        input.Body.Namespace,
+			AllNamespaces:    false,
+			DefaultNamespace: "",
+			AdminCheckGVR:    &gvr,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to resolve request context", err)
+		}
+
+		jsonBytes, err := k8ssvc.RolloutRestart(cfg, k8ssvc.RolloutOptions{
+			Resource:  "deployment",
+			Name:      name,
+			Namespace: resolved.Namespace,
+		})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, huma.Error404NotFound("deployment for AP not found in namespace (expected same name as the AP claim)", err)
+			}
+			return nil, huma.Error500InternalServerError("failed to restart deployment", err)
+		}
+		return &restartOutput{Body: json.RawMessage(jsonBytes)}, nil
 	})
 }
