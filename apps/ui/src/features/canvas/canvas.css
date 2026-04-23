@@ -1,5 +1,22 @@
-/* Override xyflow's default pane cursor — keep panning but drop the grab/grabbing
-   hand cursor that reads awkwardly on an empty canvas. */
+/* Dark workspace surface + soft blue ellipse glow (Figma node 1:5955). */
+.canvas-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: #0a0a0a;
+  background-image: radial-gradient(
+    ellipse 83.7% 93.3% at 33% 53%,
+    rgba(29, 78, 216, 0.2) 0%,
+    rgba(29, 78, 216, 0) 70%
+  );
+}
+
+/* Let the surface's color / glow show through ReactFlow's root. */
+.canvas-surface > .react-flow {
+  background: transparent;
+}
+
+/* Keep the neutral cursor on the pan surface. */
 .react-flow__pane.draggable,
 .react-flow__pane.dragging {
   cursor: default;
