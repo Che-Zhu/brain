@@ -27,8 +27,9 @@ import { projectsListToExplorerProjects } from "@/lib/projects-to-explorer-proje
 
 export default function ProjectIndexPage() {
   const router = useRouter();
-  const kubeconfig = useAtomValue(encodedKubeconfigAtom);
+  const kubeconfig = useAtomValue(encodedKubeconfigAtom).trim();
   const namespace = useAtomValue(namespaceAtom);
+  const hasKubeconfig = kubeconfig !== "";
   const getParams = useMemo(
     () =>
       k8sGetQuerySchema.parse({
@@ -39,7 +40,7 @@ export default function ProjectIndexPage() {
   );
 
   const { data: projects, mutate } = useSWR(
-    [API_ROUTES.k8s.get, getParams] as const,
+    hasKubeconfig ? ([API_ROUTES.k8s.get, getParams] as const) : null,
     () =>
       fetcher<ProjectExplorerProject[]>({
         base: ApiUrl(),
@@ -61,6 +62,10 @@ export default function ProjectIndexPage() {
           onProjectClick: (p) =>
             router.push(`/project/${encodeURIComponent(p.id)}`),
           onProjectPublicChange: async (p, isPublic) => {
+            if (!hasKubeconfig) {
+              toast.error("Credentials are not ready yet.");
+              return;
+            }
             await fetcher({
               base: ApiUrl(),
               path: API_ROUTES.k8s.patch,

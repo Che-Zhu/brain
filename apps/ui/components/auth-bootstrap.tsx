@@ -1,7 +1,7 @@
 "use client";
 
-import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect } from "react";
+import { useAtomValue } from "jotai";
+import { useHydrateAtoms } from "jotai/utils";
 import {
   devEncodedKubeconfigAtom,
   devNamespaceAtom,
@@ -12,7 +12,7 @@ import {
 interface AuthBootstrapProps {
   serverEncodedKubeconfig: string;
   serverNamespace: string;
-};
+}
 
 function safeDecode(value: string): string {
   try {
@@ -28,35 +28,21 @@ export default function AuthBootstrap({
 }: AuthBootstrapProps) {
   const devEncodedKubeconfig = useAtomValue(devEncodedKubeconfigAtom).trim();
   const devNamespace = useAtomValue(devNamespaceAtom).trim();
-  const setEncodedKubeconfig = useSetAtom(encodedKubeconfigAtom);
-  const setNamespace = useSetAtom(namespaceAtom);
+  const fallbackKubeconfig = safeDecode(serverEncodedKubeconfig).trim();
+  const fallbackNamespace = serverNamespace.trim();
 
-  useEffect(() => {
-    if (devEncodedKubeconfig !== "" || devNamespace !== "") {
-      if (devEncodedKubeconfig !== "") {
-        setEncodedKubeconfig(devEncodedKubeconfig);
-      }
-      if (devNamespace !== "") {
-        setNamespace(devNamespace);
-      }
-      return;
-    }
+  // Dev env is an all-or-nothing override vs server: if any dev field is set,
+  // never mix in server kubeconfig/namespace (no dev kubeconfig + server ns).
+  const hasDevOverride =
+    devEncodedKubeconfig !== "" || devNamespace !== "";
+  const kubeconfig = hasDevOverride
+    ? devEncodedKubeconfig
+    : fallbackKubeconfig;
+  const namespace = hasDevOverride ? devNamespace : fallbackNamespace;
 
-    const decoded = safeDecode(serverEncodedKubeconfig).trim();
-    const ns = serverNamespace.trim();
-    if (decoded !== "") {
-      setEncodedKubeconfig(decoded);
-    }
-    if (ns !== "") {
-      setNamespace(ns);
-    }
-  }, [
-    devEncodedKubeconfig,
-    devNamespace,
-    serverEncodedKubeconfig,
-    serverNamespace,
-    setEncodedKubeconfig,
-    setNamespace,
+  useHydrateAtoms([
+    [encodedKubeconfigAtom, kubeconfig],
+    [namespaceAtom, namespace],
   ]);
 
   return null;
