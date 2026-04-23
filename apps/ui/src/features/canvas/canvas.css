@@ -1,0 +1,23 @@
+/* Dark workspace surface + soft blue ellipse glow (Figma node 1:5955). */
+.canvas-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--color-neutral-950);
+  background-image: radial-gradient(
+    ellipse 83.7% 93.3% at 33% 53%,
+    color-mix(in oklab, var(--color-blue-700) 20%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+/* Let the surface's color / glow show through ReactFlow's root. */
+.canvas-surface > .react-flow {
+  background: transparent;
+}
+
+/* Keep the neutral cursor on the pan surface. */
+.react-flow__pane.draggable,
+.react-flow__pane.dragging {
+  cursor: default;
+}
