@@ -1,13 +1,7 @@
 "use client";
 
-import { useAtomValue } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
-import {
-  devEncodedKubeconfigAtom,
-  devNamespaceAtom,
-  encodedKubeconfigAtom,
-  namespaceAtom,
-} from "@/store/auth-store";
+import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 interface AuthBootstrapProps {
   serverEncodedKubeconfig: string;
@@ -26,8 +20,10 @@ export default function AuthBootstrap({
   serverEncodedKubeconfig,
   serverNamespace,
 }: AuthBootstrapProps) {
-  const devEncodedKubeconfig = useAtomValue(devEncodedKubeconfigAtom).trim();
-  const devNamespace = useAtomValue(devNamespaceAtom).trim();
+  const devEncodedKubeconfig = safeDecode(
+    process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG ?? ""
+  ).trim();
+  const devNamespace = (process.env.NEXT_PUBLIC_DEV_NS ?? "").trim();
   const fallbackKubeconfig = safeDecode(serverEncodedKubeconfig).trim();
   const fallbackNamespace = serverNamespace.trim();
 
