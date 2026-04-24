@@ -1,10 +1,11 @@
 import type { ApTelemetryMetricsRow } from "@workspace/api/hooks";
-import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
+import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
-import { PROJECT_FLOW_NODE_TYPE_CONTAINER } from "@workspace/ui/components/project-flow/project-flow.nodes";
 import type { Edge, Node } from "@xyflow/react";
+
+import { CANVAS_CONTAINER_NODE_TYPE } from "@/store/canvas-store";
 
 const COL = 280;
 const ROW = 220;
@@ -122,7 +123,7 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   };
 }
 
-export interface ApsToProjectFlowOptions {
+export interface ApsToCanvasStateOptions {
   /** Key `${namespace}:${name}` → latest CPU/memory % from telemetry series. */
   metricsLookup?: Map<string, CpuMemoryPercents>;
   /** Used when an AP list item has no `metadata.namespace` (same as k8s list query). */
@@ -130,14 +131,14 @@ export interface ApsToProjectFlowOptions {
 }
 
 /**
- * Builds React Flow `initialNodes` / `initialEdges` for the project AP list.
+ * Builds React Flow `nodes` / `edges` for the project AP list (canvas state).
  */
-export function apsToProjectFlowState(
+export function apsToCanvasState(
   data: K8sGetResponse | undefined,
-  options?: ApsToProjectFlowOptions
-): { initialEdges: Edge[]; initialNodes: Node[] } {
+  options?: ApsToCanvasStateOptions
+): { edges: Edge[]; nodes: Node[] } {
   const items = apItemsFromList(data);
-  const initialNodes: Node[] = items.map((item, i) => {
+  const nodes: Node[] = items.map((item, i) => {
     const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
     const meta = asRecord(asRecord(item)?.metadata) ?? {};
     const ns =
@@ -161,10 +162,10 @@ export function apsToProjectFlowState(
     };
     return {
       id: `ap-${String(stable).replace(/\s+/g, "-")}`,
-      type: PROJECT_FLOW_NODE_TYPE_CONTAINER,
+      type: CANVAS_CONTAINER_NODE_TYPE,
       position: { x: (i % 3) * COL, y: Math.floor(i / 3) * ROW },
       data: { states },
     };
   });
-  return { initialNodes, initialEdges: [] };
+  return { nodes, edges: [] };
 }

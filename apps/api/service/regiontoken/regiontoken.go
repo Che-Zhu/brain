@@ -80,6 +80,7 @@ func SealosDesktopBaseURL(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("admin kubeconfig: %w", err)
 	}
+	middleware.SuppressK8sRESTWarnings(restCfg)
 	clientset, err := kubernetes.NewForConfig(restCfg)
 	if err != nil {
 		return "", err

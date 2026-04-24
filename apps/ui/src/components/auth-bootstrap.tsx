@@ -7,7 +7,7 @@ import {
   devNamespaceAtom,
   encodedKubeconfigAtom,
   namespaceAtom,
-} from "@/atom/auth-atom";
+} from "@/store/auth-store";
 
 interface AuthBootstrapProps {
   serverEncodedKubeconfig: string;

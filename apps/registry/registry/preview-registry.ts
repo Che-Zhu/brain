@@ -189,34 +189,6 @@ export const Index: RegistryIndex = {
       ),
   },
 
-  "linear/components/project-flow": {
-    style: "linear",
-    group: "components",
-    name: "project-flow",
-    title: "Project Flow",
-    description:
-      "React Flow diagram: draggable nodes, edges, new connections, fit view",
-    state: "coding",
-    type: "registry:preview",
-    registryDependencies: [
-      "preview",
-      "container-node",
-      "button",
-      "dropdown-menu",
-      "alert-dialog",
-    ],
-    files: [
-      {
-        path: "registry/linear/components/project-flow/project-flow-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      previewUiFile,
-    ],
-    load: () =>
-      import("@registry/linear/components/project-flow/project-flow-preview"),
-  },
-
   "linear/components/scale-slider": {
     style: "linear",
     group: "components",
@@ -245,10 +217,10 @@ export const Index: RegistryIndex = {
     name: "canvas",
     title: "Canvas",
     description:
-      "React Flow workspace surface (dots, glow), Jotai + viewport atoms, provider context, route error fallback",
+      "React Flow workspace surface (dots, glow), Jotai, provider context",
     state: "coding",
     type: "registry:preview",
-    registryDependencies: ["preview", "button"],
+    registryDependencies: ["preview", "button", "container-node"],
     files: [
       {
         path: "registry/linear/components/canvas/canvas-preview.tsx",

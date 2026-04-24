@@ -6,7 +6,7 @@ import { CanvasContext } from "./canvas.context";
 export function useCanvas() {
   const ctx = use(CanvasContext);
   if (!ctx) {
-    throw new Error("useCanvas must be used inside CanvasProvider");
+    throw new Error("useCanvas must be used inside Canvas.Root");
   }
   return ctx;
 }

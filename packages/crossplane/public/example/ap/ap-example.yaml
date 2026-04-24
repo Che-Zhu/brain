@@ -9,7 +9,7 @@ spec:
       name: aps-deployment-ingress-go-templating
   image: nginx:latest
   # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
-  # projectName: demo-project
+  projectName: demo-project
   replicas: 1
   # Multiple services and ingress - one per endpoint (legacy port/host still supported)
   endpoints:

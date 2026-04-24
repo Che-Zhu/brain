@@ -62,7 +62,6 @@
     "./components/container-node/*": "./src/components/container-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
     "./components/project-explorer/*": "./src/components/project-explorer/*",
-    "./components/project-flow/*": "./src/components/project-flow/*",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts"
   }

@@ -16,7 +16,10 @@ import AppSidebar from "@/components/app-sidebar";
  */
 export function AppShellChrome({ children }: { children: ReactNode }) {
   return (
-    <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
+    <SidebarProvider
+      className="h-svh max-h-svh min-h-0 overflow-hidden"
+      defaultOpen={false}
+    >
       {children}
     </SidebarProvider>
   );

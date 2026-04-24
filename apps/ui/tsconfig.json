@@ -3,9 +3,6 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/components/*": ["./components/*"],
-      "@/atom/*": ["./atom/*"],
-      "@/lib/*": ["./lib/*"],
       "@/*": ["./src/*"],
       "@workspace/crossplane/*": ["../../packages/crossplane/src/*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"]
@@ -19,7 +16,7 @@
   },
   "include": [
     "next-env.d.ts",
-    "next.config.ts",
+    "next.config.mjs",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"

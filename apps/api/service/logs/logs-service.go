@@ -18,6 +18,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
+
+	"sealos/api/middleware"
 )
 
 var (
@@ -112,6 +114,7 @@ func getVmauthCredentials(ctx context.Context) (string, string, error) {
 			cachedCredsErr = fmt.Errorf("failed to get in-cluster config: %w", err)
 			return
 		}
+		middleware.SuppressK8sRESTWarnings(config)
 
 		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {

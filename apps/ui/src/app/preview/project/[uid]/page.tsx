@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  useApsK8sList,
-  useApTelemetryMetricsBatch,
-} from "@workspace/api/hooks";
-import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
-import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
-import { ProjectFlow } from "@workspace/ui/components/project-flow/project-flow";
+import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import { useAtomValue } from "jotai";
 import { useParams, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
-import {
-  apMetricsLookupFromResults,
-  apsToProjectFlowState,
-} from "@/lib/ap-to-project-flow";
+
+import { useProjectServices } from "@/hooks/use-project-services";
+import { canvasMetaAtom } from "@/store/canvas-store";
 
 /**
  * Client-only: fetches AP list + metrics. Share access is checked in `layout.tsx`.
@@ -24,43 +17,18 @@ export default function PreviewProjectPage() {
   const ns = (searchParams.get("ns") ?? "").trim();
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 
-  const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
+  const canvasMeta = useAtomValue(canvasMetaAtom);
 
-  const { data, error, isLoading } = useApsK8sList({
-    labelSelector,
+  const { canvasState, error, isLoading } = useProjectServices({
+    auth: { shareToken, type: "share" },
     namespace: ns,
-    shareToken: shareToken === "" ? undefined : shareToken,
+    uid,
   });
-
-  const apMetricsTargets = useMemo(
-    () => apNamespaceNameTargetsFromList(data, ns),
-    [data, ns]
-  );
-
-  const { data: apMetrics } = useApTelemetryMetricsBatch({
-    targets: apMetricsTargets,
-    refreshInterval: 5000,
-    shareToken: shareToken === "" ? undefined : shareToken,
-  });
-
-  const metricsLookup = useMemo(
-    () => apMetricsLookupFromResults(apMetrics),
-    [apMetrics]
-  );
-
-  const projectFlowState = useMemo(
-    () =>
-      apsToProjectFlowState(data, {
-        namespaceFallback: ns,
-        metricsLookup,
-      }),
-    [data, ns, metricsLookup]
-  );
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
-  const hasNodes = projectFlowState.initialNodes.length > 0;
-  const showFlow = !blocked && hasNodes;
+  const hasNodes = canvasState.nodes.length > 0;
+  const showCanvas = !blocked && hasNodes;
 
   if (missingParams) {
     return (
@@ -72,17 +40,13 @@ export default function PreviewProjectPage() {
     );
   }
 
-  if (showFlow) {
+  if (showCanvas) {
     return (
-      <ProjectFlow.Root
-        states={{
-          initialEdges: projectFlowState.initialEdges,
-          initialNodes: projectFlowState.initialNodes,
-          readOnly: true,
-        }}
-      >
-        <ProjectFlow.Variant0 className="min-h-0 flex-1" />
-      </ProjectFlow.Root>
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        <Canvas.Root meta={canvasMeta} state={canvasState}>
+          <Canvas.Flow />
+        </Canvas.Root>
+      </div>
     );
   }
 

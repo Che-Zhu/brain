@@ -22,7 +22,7 @@ import { useAtomValue } from "jotai";
 import { Boxes, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { namespaceAtom } from "@/atom/auth-atom";
+import { namespaceAtom } from "@/store/auth-store";
 
 export default function AppSidebar() {
   const pathname = usePathname();

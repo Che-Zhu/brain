@@ -2,7 +2,7 @@
   "$schema": "https://ui.shadcn.com/schema/registry-item.json",
   "name": "canvas",
   "title": "Canvas",
-  "description": "React Flow workspace surface with Jotai, viewport atoms, and error fallback",
+  "description": "React Flow workspace surface with Jotai, provider context, and error fallback",
   "dependencies": [
     "@xyflow/react",
     "jotai"
@@ -14,7 +14,7 @@
   "files": [
     {
       "path": "../../packages/ui/src/components/canvas/canvas.types.ts",
-      "content": "export interface CanvasState {\n  projectId: string;\n}\n\nexport interface CanvasActions {\n  fitView: () => void;\n}\n\nexport type CanvasMeta = Record<string, never>;\n\nexport interface CanvasContextValue {\n  actions: CanvasActions;\n  meta: CanvasMeta;\n  state: CanvasState;\n}\n",
+      "content": "import type {\n  Edge,\n  EdgeTypes,\n  Node,\n  NodeTypes,\n  ReactFlowProps,\n} from \"@xyflow/react\";\n\n/** Props forwarded to `<ReactFlow />`; canvas owns nodes/edges/types/change handlers. */\nexport type CanvasReactFlowProps = Omit<\n  ReactFlowProps<Node, Edge>,\n  | \"children\"\n  | \"defaultEdges\"\n  | \"defaultNodes\"\n  | \"edgeTypes\"\n  | \"edges\"\n  | \"nodeTypes\"\n  | \"nodes\"\n  | \"onEdgesChange\"\n  | \"onNodesChange\"\n>;\n\nexport interface CanvasState {\n  edges: Edge[];\n  nodes: Node[];\n}\n\nexport interface CanvasActions {\n  fitView: () => void;\n}\n\nexport interface CanvasMeta {\n  edgeTypes?: EdgeTypes;\n  nodeTypes?: NodeTypes;\n  reactFlowProps?: CanvasReactFlowProps;\n}\n\nexport interface CanvasContextValue {\n  actions: CanvasActions;\n  meta: CanvasMeta;\n  state: CanvasState;\n}\n",
       "type": "registry:lib",
       "target": "components/canvas/canvas.types.ts"
     },
@@ -25,20 +25,14 @@
       "target": "components/canvas/canvas.context.ts"
     },
     {
-      "path": "../../packages/ui/src/components/canvas/canvas.store.ts",
-      "content": "import { atom } from \"jotai\";\nimport { atomFamily } from \"jotai/utils\";\n\ntype ResourceId = string & { readonly __brand: \"ResourceId\" };\ntype EdgeId = string & { readonly __brand: \"EdgeId\" };\ntype JobId = string & { readonly __brand: \"JobId\" };\ntype NodeType = \"container\" | \"database\" | \"devEnv\" | \"entry\";\n\nexport interface ViewportState {\n  x: number;\n  y: number;\n  zoom: number;\n}\n\nexport const viewportAtom = atom<ViewportState>({ x: 0, y: 0, zoom: 1 });\n\nexport const expandedNodesAtomFamily = atomFamily((_id: ResourceId) =>\n  atom(false)\n);\n\nexport const activeEdgeAtom = atom<EdgeId | null>(null);\n\nexport interface GhostNode {\n  id: `ghost:${JobId}`;\n  jobId: JobId;\n  position: { x: number; y: number };\n  type: NodeType;\n}\n\nexport const ghostNodesAtomFamily = atomFamily((_projectId: string) =>\n  atom<GhostNode[]>([])\n);\n\nexport const focusedNodeAtom = atom<{\n  id: ResourceId;\n  expand?: boolean;\n} | null>(null);\n",
-      "type": "registry:lib",
-      "target": "components/canvas/canvas.store.ts"
-    },
-    {
       "path": "../../packages/ui/src/components/canvas/canvas.use.ts",
-      "content": "\"use client\";\n\nimport { use } from \"react\";\nimport { CanvasContext } from \"./canvas.context\";\n\nexport function useCanvas() {\n  const ctx = use(CanvasContext);\n  if (!ctx) {\n    throw new Error(\"useCanvas must be used inside CanvasProvider\");\n  }\n  return ctx;\n}\n",
+      "content": "\"use client\";\n\nimport { use } from \"react\";\nimport { CanvasContext } from \"./canvas.context\";\n\nexport function useCanvas() {\n  const ctx = use(CanvasContext);\n  if (!ctx) {\n    throw new Error(\"useCanvas must be used inside Canvas.Root\");\n  }\n  return ctx;\n}\n",
       "type": "registry:lib",
       "target": "components/canvas/canvas.use.ts"
     },
     {
       "path": "../../packages/ui/src/components/canvas/canvas.provider.tsx",
-      "content": "\"use client\";\n\nimport { useReactFlow } from \"@xyflow/react\";\nimport { type ReactNode, useCallback, useMemo } from \"react\";\nimport { CanvasContext } from \"./canvas.context\";\nimport type { CanvasContextValue } from \"./canvas.types\";\n\nexport function CanvasProvider({\n  children,\n  projectId,\n}: {\n  children: ReactNode;\n  projectId: string;\n}) {\n  const { fitView } = useReactFlow();\n\n  const fitViewAction = useCallback(() => {\n    fitView();\n  }, [fitView]);\n\n  const value = useMemo<CanvasContextValue>(\n    () => ({\n      state: { projectId },\n      actions: { fitView: fitViewAction },\n      meta: {},\n    }),\n    [projectId, fitViewAction]\n  );\n\n  return <CanvasContext value={value}>{children}</CanvasContext>;\n}\n",
+      "content": "\"use client\";\n\nimport type { ReactNode } from \"react\";\nimport { useMemo } from \"react\";\nimport { CanvasContext } from \"./canvas.context\";\nimport type {\n  CanvasActions,\n  CanvasContextValue,\n  CanvasMeta,\n  CanvasState,\n} from \"./canvas.types\";\n\nexport function CanvasProvider({\n  actions,\n  children,\n  meta,\n  state,\n}: {\n  actions?: Partial<CanvasActions>;\n  children: ReactNode;\n  meta?: CanvasMeta;\n  state: CanvasState;\n}) {\n  const value = useMemo<CanvasContextValue>(\n    () => ({\n      actions: {\n        fitView: actions?.fitView ?? (() => undefined),\n      },\n      meta: meta ?? {},\n      state,\n    }),\n    [actions?.fitView, meta, state]\n  );\n\n  return <CanvasContext value={value}>{children}</CanvasContext>;\n}\n",
       "type": "registry:component",
       "target": "components/canvas/canvas.provider.tsx"
     },
@@ -50,13 +44,13 @@
     },
     {
       "path": "../../packages/ui/src/components/canvas/canvas.css",
-      "content": ".canvas-surface {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background-color: var(--color-canvas-surface);\n  background-image: radial-gradient(\n    ellipse 83.7% 93.3% at 50% 50%,\n    color-mix(in oklab, var(--color-canvas-glow) 22%, transparent) 0%,\n    transparent 70%\n  );\n}\n\n.canvas-surface > .react-flow {\n  width: 100%;\n  height: 100%;\n  background: transparent;\n}\n\n.react-flow__pane.draggable,\n.react-flow__pane.dragging {\n  cursor: default;\n}\n",
+      "content": ".canvas-surface {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background-color: var(--color-canvas-surface);\n  background-image: radial-gradient(\n    ellipse 83.7% 93.3% at 50% 50%,\n    color-mix(in oklab, var(--color-canvas-glow) 22%, transparent) 0%,\n    transparent 70%\n  );\n}\n\n.canvas-surface > .react-flow {\n  width: 100%;\n  height: 100%;\n  background: transparent;\n}\n\n.react-flow__pane.draggable,\n.react-flow__pane.dragging {\n  cursor: default;\n}\n\n/* Keeps handles functional but invisible on the canvas surface. */\n.canvas-surface .react-flow__handle {\n  top: auto;\n  bottom: auto;\n  width: 0;\n  height: 0;\n  opacity: 0;\n}\n",
       "type": "registry:component",
       "target": "components/canvas/canvas.css"
     },
     {
       "path": "../../packages/ui/src/components/canvas/canvas.tsx",
-      "content": "\"use client\";\n\nimport \"@xyflow/react/dist/base.css\";\nimport \"@xyflow/react/dist/style.css\";\nimport \"./canvas.css\";\n\nimport {\n  Background,\n  BackgroundVariant,\n  ReactFlow,\n  ReactFlowProvider,\n} from \"@xyflow/react\";\nimport { Provider as JotaiProvider } from \"jotai\";\nimport { CanvasProvider } from \"./canvas.provider\";\n\nexport function Canvas({ projectId }: { projectId: string }) {\n  return (\n    <div className=\"h-full min-h-0 w-full min-w-0\">\n      <JotaiProvider>\n        <ReactFlowProvider>\n          <CanvasProvider projectId={projectId}>\n            <div className=\"relative h-full min-h-0 w-full min-w-0\">\n              <div className=\"canvas-surface\">\n                <ReactFlow\n                  edges={[]}\n                  fitView\n                  nodes={[]}\n                  proOptions={{ hideAttribution: true }}\n                >\n                  <Background\n                    color=\"var(--color-canvas-dot)\"\n                    gap={[32, 41]}\n                    size={1}\n                    variant={BackgroundVariant.Dots}\n                  />\n                </ReactFlow>\n              </div>\n            </div>\n          </CanvasProvider>\n        </ReactFlowProvider>\n      </JotaiProvider>\n    </div>\n  );\n}\n",
+      "content": "\"use client\";\n\nimport \"@xyflow/react/dist/base.css\";\nimport \"@xyflow/react/dist/style.css\";\nimport \"./canvas.css\";\n\nimport {\n  Background,\n  BackgroundVariant,\n  ReactFlow,\n  ReactFlowProvider,\n  useEdgesState,\n  useNodesState,\n} from \"@xyflow/react\";\nimport { Provider as JotaiProvider } from \"jotai\";\nimport type { ReactNode } from \"react\";\nimport { useEffect } from \"react\";\nimport { CanvasProvider } from \"./canvas.provider\";\nimport type { CanvasReactFlowProps } from \"./canvas.types\";\nimport { useCanvas } from \"./canvas.use\";\n\nexport interface CanvasFlowProps {\n  children?: ReactNode;\n}\n\nexport interface CanvasRootProps {\n  children?: ReactNode;\n  meta?: Parameters<typeof CanvasProvider>[0][\"meta\"];\n  state: Parameters<typeof CanvasProvider>[0][\"state\"];\n}\n\nfunction CanvasFlow({ children }: CanvasFlowProps) {\n  const { meta, state } = useCanvas();\n  const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);\n  const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);\n\n  useEffect(() => {\n    setNodes(state.nodes);\n  }, [setNodes, state.nodes]);\n\n  useEffect(() => {\n    setEdges(state.edges);\n  }, [setEdges, state.edges]);\n\n  const passThrough: CanvasReactFlowProps = {\n    fitView: true,\n    maxZoom: 1.2,\n    minZoom: 0.2,\n    panOnDrag: true,\n    panOnScroll: true,\n    proOptions: { hideAttribution: true },\n    snapGrid: [20, 20],\n    snapToGrid: true,\n    ...meta.reactFlowProps,\n  };\n\n  return (\n    <div className=\"relative h-full min-h-0 w-full min-w-0\">\n      <div className=\"canvas-surface\">\n        <ReactFlow\n          {...passThrough}\n          edges={edges}\n          edgeTypes={meta.edgeTypes}\n          nodes={nodes}\n          nodeTypes={meta.nodeTypes}\n          onEdgesChange={onEdgesChange}\n          onNodesChange={onNodesChange}\n        >\n          <Background\n            color=\"var(--color-canvas-dot)\"\n            gap={[32, 41]}\n            size={1}\n            variant={BackgroundVariant.Dots}\n          />\n          {children}\n        </ReactFlow>\n      </div>\n    </div>\n  );\n}\n\nfunction CanvasRoot({ children, meta, state }: CanvasRootProps) {\n  return (\n    <CanvasProvider meta={meta} state={state}>\n      {children}\n    </CanvasProvider>\n  );\n}\n\nfunction CanvasSurface({ children }: CanvasFlowProps) {\n  return (\n    <div className=\"h-full min-h-0 w-full min-w-0\">\n      <JotaiProvider>\n        <ReactFlowProvider>\n          <CanvasFlow>{children}</CanvasFlow>\n        </ReactFlowProvider>\n      </JotaiProvider>\n    </div>\n  );\n}\n\nexport const Canvas = Object.assign(CanvasSurface, {\n  Flow: CanvasSurface,\n  Root: CanvasRoot,\n});\n\nexport type CanvasProps = CanvasRootProps;\n",
       "type": "registry:component",
       "target": "components/canvas/canvas.tsx"
     }

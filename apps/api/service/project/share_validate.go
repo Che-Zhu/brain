@@ -15,6 +15,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"sealos/api/middleware"
 )
 
 // ProjectUIDLabel matches composed resources (AP, etc.); same as crossplane constants in TS.
@@ -70,6 +72,7 @@ func ValidateShareAccess(ctx context.Context, adminCfg *clientcmdapi.Config, raw
 	if err != nil {
 		return nil, err
 	}
+	middleware.SuppressK8sRESTWarnings(restCfg)
 	dyn, err := dynamic.NewForConfig(restCfg)
 	if err != nil {
 		return nil, err
@@ -132,6 +135,7 @@ func VerifyAPInShareProject(ctx context.Context, adminCfg *clientcmdapi.Config, 
 	if err != nil {
 		return err
 	}
+	middleware.SuppressK8sRESTWarnings(restCfg)
 	dyn, err := dynamic.NewForConfig(restCfg)
 	if err != nil {
 		return err

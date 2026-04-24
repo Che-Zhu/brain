@@ -19,6 +19,16 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+// SuppressK8sRESTWarnings discards Kubernetes API Warning headers for this client.
+// The apiserver emits notices (for example about legacy service account secret tokens)
+// as Warning headers; the default client-go handler logs each one via klog.
+func SuppressK8sRESTWarnings(c *rest.Config) {
+	if c == nil {
+		return
+	}
+	c.WarningHandlerWithContext = rest.NoWarnings{}
+}
+
 // SECURITY: Admin config for query-only. Must NEVER be used in mutation operations.
 const CrossplaneSystemNS = "crossplane-system"
 
@@ -94,6 +104,7 @@ func ResolveContext(cfg *clientcmdapi.Config, opts ResolveOptions) (*ResolvedCon
 	if err != nil {
 		return nil, err
 	}
+	SuppressK8sRESTWarnings(restConfig)
 
 	userNS := ""
 	server := ""
@@ -169,6 +180,7 @@ func RestConfigFromAuth(auth string) (*rest.Config, *clientcmdapi.Config, error)
 	if err != nil {
 		return nil, nil, err
 	}
+	SuppressK8sRESTWarnings(restConfig)
 	return restConfig, cfg, nil
 }
 

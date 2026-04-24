@@ -1,10 +1,10 @@
 "use client";
 
+import { LogViewer } from "@workspace/ui/components/log-viewer/log-viewer";
+import type { LogsData } from "@workspace/ui/components/log-viewer/log-viewer.context";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { TimeRange } from "@workspace/ui/components/time-range-selector";
 import { useState } from "react";
-import { LogViewer } from "@workspace/ui/components/log-viewer/log-viewer";
-import type { LogsData } from "@workspace/ui/components/log-viewer/log-viewer.context";
 
 /** Wider than default 5m so demo rows stay visible as wall time passes. */
 const PREVIEW_QUICK_RANGE_MS = 24 * 60 * 60_000;

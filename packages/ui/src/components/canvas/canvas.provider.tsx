@@ -1,30 +1,35 @@
 "use client";
 
-import { useReactFlow } from "@xyflow/react";
-import { type ReactNode, useCallback, useMemo } from "react";
+import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { CanvasContext } from "./canvas.context";
-import type { CanvasContextValue } from "./canvas.types";
+import type {
+  CanvasActions,
+  CanvasContextValue,
+  CanvasMeta,
+  CanvasState,
+} from "./canvas.types";
 
 export function CanvasProvider({
+  actions,
   children,
-  projectId,
+  meta,
+  state,
 }: {
+  actions?: Partial<CanvasActions>;
   children: ReactNode;
-  projectId: string;
+  meta?: CanvasMeta;
+  state: CanvasState;
 }) {
-  const { fitView } = useReactFlow();
-
-  const fitViewAction = useCallback(() => {
-    fitView();
-  }, [fitView]);
-
   const value = useMemo<CanvasContextValue>(
     () => ({
-      state: { projectId },
-      actions: { fitView: fitViewAction },
-      meta: {},
+      actions: {
+        fitView: actions?.fitView ?? (() => undefined),
+      },
+      meta: meta ?? {},
+      state,
     }),
-    [projectId, fitViewAction]
+    [actions?.fitView, meta, state]
   );
 
   return <CanvasContext value={value}>{children}</CanvasContext>;
