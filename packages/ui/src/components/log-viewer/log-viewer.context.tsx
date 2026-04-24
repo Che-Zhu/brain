@@ -11,12 +11,12 @@ import {
 } from "react";
 
 export interface LogEntry {
-  time: string;
-  message: string;
-  pod: string;
   container: string;
-  stream: string;
+  message: string;
   node: string;
+  pod: string;
+  stream: string;
+  time: string;
 }
 
 export type LogsData = LogEntry[];
@@ -24,19 +24,19 @@ export type LogsData = LogEntry[];
 interface LogViewerContextValue {
   entries: LogEntry[];
   filteredEntries: LogEntry[];
-  selectedPods: string[];
-  setSelectedPods: (pods: string[]) => void;
-  uniquePods: string[];
-  selectedContainers: string[];
-  setSelectedContainers: (containers: string[]) => void;
-  uniqueContainers: string[];
-  searchQuery: string;
-  setSearchQuery: (q: string) => void;
-  timeRange: TimeRange;
-  setTimeRange: (range: TimeRange) => void;
   isLive: boolean;
-  setIsLive: (v: boolean) => void;
   onRefresh?: () => void;
+  searchQuery: string;
+  selectedContainers: string[];
+  selectedPods: string[];
+  setIsLive: (v: boolean) => void;
+  setSearchQuery: (q: string) => void;
+  setSelectedContainers: (containers: string[]) => void;
+  setSelectedPods: (pods: string[]) => void;
+  setTimeRange: (range: TimeRange) => void;
+  timeRange: TimeRange;
+  uniqueContainers: string[];
+  uniquePods: string[];
 }
 
 const LogViewerContext = createContext<LogViewerContextValue | null>(null);
@@ -79,9 +79,9 @@ export function LogViewerProvider({
 
   // Controlled-or-uncontrolled pattern
   const searchQuery =
-    externalSearchQuery !== undefined
-      ? externalSearchQuery
-      : internalSearchQuery;
+    externalSearchQuery === undefined
+      ? internalSearchQuery
+      : externalSearchQuery;
   const setSearchQuery = onSearchQueryChange ?? setInternalSearchQuery;
   const timeRange = externalTimeRange ?? internalTimeRange;
   const setTimeRange = onTimeRangeChange ?? setInternalTimeRange;

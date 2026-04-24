@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
-import { CanvasErrorFallback } from "@workspace/ui/components/canvas/canvas-error-fallback";
+import { CanvasErrorFallback } from "@workspace/ui/components/canvas/canvas.error-fallback";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 
 export default function CanvasPreview() {

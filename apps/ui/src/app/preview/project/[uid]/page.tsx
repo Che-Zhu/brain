@@ -18,9 +18,9 @@ import {
  * Client-only: fetches AP list + metrics. Share access is checked in `layout.tsx`.
  */
 export default function PreviewProjectPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ uid: string }>();
   const searchParams = useSearchParams();
-  const uid = decodeURIComponent(params.id ?? "");
+  const uid = decodeURIComponent(params.uid ?? "");
   const ns = (searchParams.get("ns") ?? "").trim();
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 

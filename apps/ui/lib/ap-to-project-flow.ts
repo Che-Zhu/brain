@@ -3,7 +3,7 @@ import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
-import { PROJECT_FLOW_NODE_TYPE_CONTAINER } from "@workspace/ui/components/project-flow/project-flow-nodes";
+import { PROJECT_FLOW_NODE_TYPE_CONTAINER } from "@workspace/ui/components/project-flow/project-flow.nodes";
 import type { Edge, Node } from "@xyflow/react";
 
 const COL = 280;

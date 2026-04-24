@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { CanvasContext } from "./canvas-context";
+import { CanvasContext } from "./canvas.context";
 
 export function useCanvas() {
   const ctx = use(CanvasContext);

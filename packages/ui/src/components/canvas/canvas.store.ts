@@ -1,6 +1,10 @@
 import { atom } from "jotai";
 import { atomFamily } from "jotai/utils";
-import type { EdgeId, JobId, NodeType, ResourceId } from "./resource-types";
+
+type ResourceId = string & { readonly __brand: "ResourceId" };
+type EdgeId = string & { readonly __brand: "EdgeId" };
+type JobId = string & { readonly __brand: "JobId" };
+type NodeType = "container" | "database" | "devEnv" | "entry";
 
 export interface ViewportState {
   x: number;

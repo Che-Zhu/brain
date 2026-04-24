@@ -8,8 +8,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@workspace/ui/components/chart";
-import { useLogViewerContext } from "./log-viewer-context";
-import { formatLogTime } from "./log-viewer-utils";
+import { useLogViewerContext } from "./log-viewer.context";
+import { formatLogTime } from "./log-viewer.utils";
 
 const chartConfig = {
   count: {

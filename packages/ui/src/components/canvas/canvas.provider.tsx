@@ -2,8 +2,8 @@
 
 import { useReactFlow } from "@xyflow/react";
 import { type ReactNode, useCallback, useMemo } from "react";
-import { CanvasContext } from "./canvas-context";
-import type { CanvasContextValue } from "./types";
+import { CanvasContext } from "./canvas.context";
+import type { CanvasContextValue } from "./canvas.types";
 
 export function CanvasProvider({
   children,

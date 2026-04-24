@@ -168,18 +168,18 @@ export default function AppSidebar({
               className="flex min-h-0 min-w-0 flex-1 items-center gap-2 overflow-hidden group-data-[collapsible=icon]:justify-center"
               href={href}
             >
-              <span className="min-w-0 flex-1 truncate group-data-[collapsible=icon]:hidden">
-                {item.title}
-              </span>
               <span
                 aria-hidden
                 className={cn(
-                  "ml-auto inline-flex shrink-0 items-center justify-center group-data-[collapsible=icon]:ml-0 [&_svg]:size-4",
+                  "inline-flex shrink-0 items-center justify-center [&_svg]:size-4",
                   stateColorClass,
                   "[&_svg]:text-current"
                 )}
               >
                 <HugeiconsIcon icon={stateIcon} strokeWidth={2} />
+              </span>
+              <span className="min-w-0 flex-1 truncate group-data-[collapsible=icon]:hidden">
+                {item.title}
               </span>
             </Link>
           }

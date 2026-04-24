@@ -13,7 +13,7 @@ import { TimeRangeSelector } from "@workspace/ui/components/time-range-selector"
 import {
   type LogEntry,
   useLogViewerContext,
-} from "./log-viewer-context";
+} from "./log-viewer.context";
 
 export function LogViewerToolbar() {
   const {

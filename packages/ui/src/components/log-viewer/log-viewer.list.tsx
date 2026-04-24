@@ -7,9 +7,9 @@ import {
   type RowComponentProps,
   useDynamicRowHeight,
 } from "react-window";
-import { type LogEntry, useLogViewerContext } from "./log-viewer-context";
-import { highlightLogMessage } from "./log-viewer-highlight";
-import { formatLogTime } from "./log-viewer-utils";
+import { type LogEntry, useLogViewerContext } from "./log-viewer.context";
+import { highlightLogMessage } from "./log-viewer.highlight";
+import { formatLogTime } from "./log-viewer.utils";
 
 const LOG_GRID_TEMPLATE = "150px 1fr 80px 80px";
 

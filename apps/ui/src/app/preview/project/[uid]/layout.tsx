@@ -1,6 +1,6 @@
-import { AppShellSolo } from "@/components/app-shell";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import { AppShellSolo } from "@/components/app-shell";
 import { PREVIEW_QUERY_HEADER } from "@/lib/preview-search-header";
 import { assertPreviewShareAuthorized } from "@/lib/validate-preview-share";
 
@@ -26,10 +26,10 @@ export default async function PreviewProjectLayout({
   params,
 }: {
   children: ReactNode;
-  params: Promise<{ id: string }>;
+  params: Promise<{ uid: string }>;
 }) {
-  const { id } = await params;
-  const uid = decodeURIComponent(id ?? "");
+  const { uid: rawUid } = await params;
+  const uid = decodeURIComponent(rawUid ?? "");
   const h = await headers();
   const search = h.get(PREVIEW_QUERY_HEADER) ?? "";
   const { namespace, shareToken } = searchFromHeader(search);

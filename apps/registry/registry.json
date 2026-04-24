@@ -25,39 +25,39 @@
       ],
       "files": [
         {
-          "path": "registry/linear/components/log-viewer/log-viewer.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.tsx",
           "type": "registry:component",
           "target": "components/log-viewer/log-viewer.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-context.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.context.tsx",
           "type": "registry:component",
-          "target": "components/log-viewer/log-viewer-context.tsx"
+          "target": "components/log-viewer/log-viewer.context.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-list.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.list.tsx",
           "type": "registry:component",
-          "target": "components/log-viewer/log-viewer-list.tsx"
+          "target": "components/log-viewer/log-viewer.list.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-toolbar.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.toolbar.tsx",
           "type": "registry:component",
-          "target": "components/log-viewer/log-viewer-toolbar.tsx"
+          "target": "components/log-viewer/log-viewer.toolbar.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-count-chart.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.count-chart.tsx",
           "type": "registry:component",
-          "target": "components/log-viewer/log-viewer-count-chart.tsx"
+          "target": "components/log-viewer/log-viewer.count-chart.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-highlight.tsx",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.highlight.tsx",
           "type": "registry:component",
-          "target": "components/log-viewer/log-viewer-highlight.tsx"
+          "target": "components/log-viewer/log-viewer.highlight.tsx"
         },
         {
-          "path": "registry/linear/components/log-viewer/log-viewer-utils.ts",
+          "path": "../../packages/ui/src/components/log-viewer/log-viewer.utils.ts",
           "type": "registry:lib",
-          "target": "lib/log-viewer-utils.ts"
+          "target": "components/log-viewer/log-viewer.utils.ts"
         }
       ]
     },
@@ -70,19 +70,49 @@
       "registryDependencies": ["button", "dropdown-menu", "alert-dialog"],
       "files": [
         {
+          "path": "../../packages/ui/src/components/container-node/container-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/container-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.context.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.context.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.layout.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.layout.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.primitives.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.primitives.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.header-menu.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.header-menu.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.variant0.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.variant0.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/container-node/container-node.tsx",
           "type": "registry:component",
           "target": "components/container-node/container-node.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/container-node/container-node-delete-dialog.tsx",
+          "path": "../../packages/ui/src/components/container-node/container-node.delete-dialog.tsx",
           "type": "registry:component",
-          "target": "components/container-node/container-node-delete-dialog.tsx"
+          "target": "components/container-node/container-node.delete-dialog.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/container-node/container-node-scale-dialog.tsx",
+          "path": "../../packages/ui/src/components/container-node/container-node.scale-dialog.tsx",
           "type": "registry:component",
-          "target": "components/container-node/container-node-scale-dialog.tsx"
+          "target": "components/container-node/container-node.scale-dialog.tsx"
         },
         {
           "path": "../../packages/crossplane/src/lib/status.ts",
@@ -105,6 +135,36 @@
       "registryDependencies": [],
       "files": [
         {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.types.ts",
+          "type": "registry:lib",
+          "target": "components/project-explorer/project-explorer.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.utils.ts",
+          "type": "registry:lib",
+          "target": "components/project-explorer/project-explorer.utils.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.context.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.context.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.layout.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.layout.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.list.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.list.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.variant0.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.variant0.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/project-explorer/project-explorer.tsx",
           "type": "registry:component",
           "target": "components/project-explorer/project-explorer.tsx"
@@ -120,14 +180,34 @@
       "registryDependencies": ["container-node"],
       "files": [
         {
+          "path": "../../packages/ui/src/components/project-flow/project-flow.types.ts",
+          "type": "registry:lib",
+          "target": "components/project-flow/project-flow.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-flow/project-flow.context.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.context.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-flow/project-flow.shell.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.shell.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-flow/project-flow.variant0.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.variant0.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/project-flow/project-flow.tsx",
           "type": "registry:component",
           "target": "components/project-flow/project-flow.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/project-flow/project-flow-nodes.tsx",
+          "path": "../../packages/ui/src/components/project-flow/project-flow.nodes.tsx",
           "type": "registry:component",
-          "target": "components/project-flow/project-flow-nodes.tsx"
+          "target": "components/project-flow/project-flow.nodes.tsx"
         },
         {
           "path": "../../packages/ui/src/components/project-flow/project-flow.css",
@@ -145,44 +225,34 @@
       "registryDependencies": ["preview", "button"],
       "files": [
         {
-          "path": "../../packages/ui/src/components/canvas/resource-types.ts",
+          "path": "../../packages/ui/src/components/canvas/canvas.types.ts",
           "type": "registry:lib",
-          "target": "components/canvas/resource-types.ts"
+          "target": "components/canvas/canvas.types.ts"
         },
         {
-          "path": "../../packages/ui/src/components/canvas/types.ts",
+          "path": "../../packages/ui/src/components/canvas/canvas.context.ts",
           "type": "registry:lib",
-          "target": "components/canvas/types.ts"
+          "target": "components/canvas/canvas.context.ts"
         },
         {
-          "path": "../../packages/ui/src/components/canvas/guards.ts",
+          "path": "../../packages/ui/src/components/canvas/canvas.store.ts",
           "type": "registry:lib",
-          "target": "components/canvas/guards.ts"
+          "target": "components/canvas/canvas.store.ts"
         },
         {
-          "path": "../../packages/ui/src/components/canvas/canvas-context.ts",
+          "path": "../../packages/ui/src/components/canvas/canvas.use.ts",
           "type": "registry:lib",
-          "target": "components/canvas/canvas-context.ts"
+          "target": "components/canvas/canvas.use.ts"
         },
         {
-          "path": "../../packages/ui/src/components/canvas/canvas-store.ts",
-          "type": "registry:lib",
-          "target": "components/canvas/canvas-store.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas/use-canvas.ts",
-          "type": "registry:lib",
-          "target": "components/canvas/use-canvas.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas/canvas-provider.tsx",
+          "path": "../../packages/ui/src/components/canvas/canvas.provider.tsx",
           "type": "registry:component",
-          "target": "components/canvas/canvas-provider.tsx"
+          "target": "components/canvas/canvas.provider.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/canvas/canvas-error-fallback.tsx",
+          "path": "../../packages/ui/src/components/canvas/canvas.error-fallback.tsx",
           "type": "registry:component",
-          "target": "components/canvas/canvas-error-fallback.tsx"
+          "target": "components/canvas/canvas.error-fallback.tsx"
         },
         {
           "path": "../../packages/ui/src/components/canvas/canvas.css",

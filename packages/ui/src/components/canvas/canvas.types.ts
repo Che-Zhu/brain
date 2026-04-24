@@ -1,12 +1,3 @@
-import type { EdgeRef, JobId, NodeRef } from "./resource-types";
-
-export interface CanvasNode extends NodeRef {
-  ghostJobId?: JobId;
-  isGhost?: boolean;
-}
-
-export type CanvasEdge = EdgeRef;
-
 export interface CanvasState {
   projectId: string;
 }

@@ -11,7 +11,7 @@ import {
   ReactFlowProvider,
 } from "@xyflow/react";
 import { Provider as JotaiProvider } from "jotai";
-import { CanvasProvider } from "./canvas-provider";
+import { CanvasProvider } from "./canvas.provider";
 
 export function Canvas({ projectId }: { projectId: string }) {
   return (

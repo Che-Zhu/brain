@@ -129,41 +129,6 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-context.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-list.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-toolbar.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-count-chart.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-highlight.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/log-viewer/log-viewer-utils.ts",
-        type: "registry:preview",
-        target: "",
-      },
       previewUiFile,
     ],
     load: () =>

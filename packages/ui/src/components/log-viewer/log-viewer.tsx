@@ -6,13 +6,13 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   type LogsData,
   LogViewerProvider,
-} from "./log-viewer-context";
-import { LogViewerCountChart } from "./log-viewer-count-chart";
+} from "./log-viewer.context";
+import { LogViewerCountChart } from "./log-viewer.count-chart";
 import {
   LogViewerListContent,
   LogViewerListHeader,
-} from "./log-viewer-list";
-import { LogViewerToolbar } from "./log-viewer-toolbar";
+} from "./log-viewer.list";
+import { LogViewerToolbar } from "./log-viewer.toolbar";
 
 function LogViewerRoot({
   className,
