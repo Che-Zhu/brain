@@ -176,14 +176,15 @@ export const Index: RegistryIndex = {
     name: "container-node",
     title: "Container Node",
     description:
-      "Container node: Root (states/actions context) + Variant0 composed UI, or custom variants",
-    state: "designing",
+      "Container node: Variant0 + standalone DeleteDialog / ScaleDialog previews; Root uses states/actions context.",
+    state: "done",
     type: "registry:preview",
     registryDependencies: [
       "preview",
       "button",
       "dropdown-menu",
       "alert-dialog",
+      "scale-slider",
     ],
     files: [
       {
@@ -202,6 +203,95 @@ export const Index: RegistryIndex = {
       import(
         "@registry/linear/components/container-node/container-node-preview"
       ),
+  },
+
+  "linear/components/project-explorer": {
+    style: "linear",
+    group: "components",
+    name: "project-explorer",
+    title: "Project Explorer",
+    description:
+      "Projects sidebar-style list: header and rows with name and created date",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview"],
+    files: [
+      {
+        path: "registry/linear/components/project-explorer/project-explorer-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/project-explorer/project-explorer.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/project-explorer/project-explorer-preview"
+      ),
+  },
+
+  "linear/components/project-flow": {
+    style: "linear",
+    group: "components",
+    name: "project-flow",
+    title: "Project Flow",
+    description:
+      "React Flow diagram: draggable nodes, edges, new connections, fit view",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "container-node",
+      "button",
+      "dropdown-menu",
+      "alert-dialog",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/project-flow/project-flow-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/project-flow/project-flow.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/project-flow/project-flow-preview"),
+  },
+
+  "linear/components/scale-slider": {
+    style: "linear",
+    group: "components",
+    name: "scale-slider",
+    title: "Scale slider",
+    description:
+      "Stack + Header (Label + fixed NumberFlow) above Control; thumb has no label. Optional valueDisplay number (replicas) or percent.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview"],
+    files: [
+      {
+        path: "registry/linear/components/scale-slider/scale-slider-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/scale-slider/scale-slider.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/scale-slider/scale-slider-preview"),
   },
 
   "shadcn/components/accordion": {

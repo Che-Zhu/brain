@@ -3,6 +3,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@/components/*": ["./components/*"],
+      "@/atom/*": ["./atom/*"],
+      "@/lib/*": ["./lib/*"],
       "@/*": ["./src/*"],
       "@workspace/crossplane/*": ["../../packages/crossplane/src/*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"]
@@ -21,5 +24,5 @@
     "**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", ".next"]
 }

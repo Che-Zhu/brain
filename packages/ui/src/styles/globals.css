@@ -4,9 +4,8 @@
 @source "../../../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
-@source "../../../apps/**/*.{ts,tsx}";
-@source "../../../components/**/*.{ts,tsx}";
-@source "../**/*.{ts,tsx}";
+/* `../**` only scans `packages/ui/src`. From this file, `../../../../` is repo root; `{apps,packages}` covers the rest of the monorepo (node_modules still excluded). */
+@source "../../../../{apps,packages}/**/*.{ts,tsx}";
 
 @theme {
   --color-theme-blue: #1c86fb;
@@ -157,7 +156,10 @@
  */
 @layer utilities {
   .hoverable {
-    @apply border-transparent bg-transparent text-muted-foreground transition-colors;
+    @apply cursor-pointer border-transparent bg-transparent text-muted-foreground transition-colors;
+  }
+  .hoverable:disabled {
+    @apply cursor-not-allowed;
   }
   .hoverable:hover:not(:disabled) {
     @apply text-foreground !bg-background-selected/80;
@@ -172,6 +174,6 @@
 @layer utilities {
   .selected,
   .selected:hover:not(:disabled) {
-    @apply !bg-background-selected !text-foreground;
+    /* @apply !bg-background-selected !text-foreground; */
   }
 }

@@ -1,0 +1,23 @@
+apiVersion: example.crossplane.io/v1
+kind: AP
+metadata:
+  name: nginx
+  namespace: ns-admin
+spec:
+  crossplane:
+    compositionRef:
+      name: aps-deployment-ingress-go-templating
+  image: nginx:latest
+  # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
+  # projectName: demo-project
+  replicas: 1
+  # Multiple services and ingress - one per endpoint (legacy port/host still supported)
+  endpoints:
+    - port: 80
+      host: nginx-axas.192.168.12.53.nip.io
+  cpuRequest: 250m
+  memoryRequest: 512Mi
+  cpuLimit: 500m
+  memoryLimit: 1024Mi
+
+

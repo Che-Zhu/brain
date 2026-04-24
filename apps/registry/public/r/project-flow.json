@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "project-flow",
+  "title": "Project Flow",
+  "description": "React Flow canvas with nodes, edges, and connect handler",
+  "dependencies": [
+    "@xyflow/react"
+  ],
+  "registryDependencies": [
+    "container-node"
+  ],
+  "files": [
+    {
+      "path": "registry/linear/components/project-flow/project-flow.tsx",
+      "content": "\"use client\";\n\n// biome-ignore lint/performance/noBarrelFile: registry source path mirrors @workspace/ui for shadcn build\nexport * from \"@workspace/ui/components/project-flow/project-flow\";\nexport * from \"@workspace/ui/components/project-flow/project-flow-nodes\";\n",
+      "type": "registry:component",
+      "target": "components/project-flow/project-flow.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

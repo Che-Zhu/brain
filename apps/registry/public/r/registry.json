@@ -75,6 +75,16 @@
           "target": "components/container-node/container-node.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/container-node/container-node-delete-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node-delete-dialog.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node-scale-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node-scale-dialog.tsx"
+        },
+        {
           "path": "../../packages/crossplane/src/lib/status.ts",
           "type": "registry:lib",
           "target": "lib/crossplane/status.ts"
@@ -83,6 +93,36 @@
           "path": "../../packages/crossplane/src/schemas/crossplane-status-schema.ts",
           "type": "registry:lib",
           "target": "lib/schemas/crossplane-status-schema.ts"
+        }
+      ]
+    },
+    {
+      "name": "project-explorer",
+      "type": "registry:ui",
+      "title": "Project Explorer",
+      "description": "Projects list with header and rows showing name and created date",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "registry/linear/components/project-explorer/project-explorer.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "project-flow",
+      "type": "registry:ui",
+      "title": "Project Flow",
+      "description": "React Flow canvas with nodes, edges, and connect handler",
+      "dependencies": ["@xyflow/react"],
+      "registryDependencies": ["container-node"],
+      "files": [
+        {
+          "path": "registry/linear/components/project-flow/project-flow.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.tsx"
         }
       ]
     }

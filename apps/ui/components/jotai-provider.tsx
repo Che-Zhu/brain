@@ -1,0 +1,9 @@
+"use client";
+
+import "@/atom/auth-atom";
+import { Provider } from "jotai";
+import type { ReactNode } from "react";
+
+export function JotaiProvider({ children }: { children: ReactNode }) {
+  return <Provider>{children}</Provider>;
+}

@@ -11,12 +11,15 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 
 	"sealos/api/route/ap"
+	"sealos/api/route/auth"
 	"sealos/api/route/db"
 	"sealos/api/route/health"
 	"sealos/api/route/k8s"
+	"sealos/api/route/project"
 	"sealos/api/route/task"
 	"sealos/api/route/telemetry"
 )
@@ -29,6 +32,14 @@ func main() {
 		_ = godotenv.Load(filepath.Join("apps", "api", ".env"))
 	}
 	router := chi.NewMux()
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Share-Token"},
+		AllowCredentials: false,
+		MaxAge:           86400,
+	}))
+
 	config := huma.DefaultConfig("Sealos API", "1.0.0")
 	config.OpenAPI.Servers = []*huma.Server{
 		{URL: "http://localhost:9000", Description: "Test server"},
@@ -57,6 +68,8 @@ func main() {
 	// Register API routes (with OpenAPI docs)
 	k8s.Register(api)
 	ap.Register(api)
+	auth.Register(api)
+	project.Register(api)
 	db.Register(api)
 	task.Register(api)
 	telemetry.Register(api)
@@ -198,9 +211,9 @@ func addLogsQueryExamples(_ *huma.OpenAPI, op *huma.Operation) {
 			}
 		case "container":
 			p.Examples = map[string]*huma.Example{
-				"all":       {Summary: "All containers (10 each)", Value: ""},
+				"all":        {Summary: "All containers (10 each)", Value: ""},
 				"postgresql": {Summary: "PostgreSQL container", Value: "postgresql"},
-				"my-app":    {Summary: "App container", Value: "my-app"},
+				"my-app":     {Summary: "App container", Value: "my-app"},
 			}
 		}
 	}

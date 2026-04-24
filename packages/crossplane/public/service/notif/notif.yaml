@@ -1,0 +1,135 @@
+# Notif — user-facing notification record. Default composition adds optional Project affiliation
+# (observe Project, labels, owner refs, SSA patch, status.projectName / status.projectUid).
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: notifs.example.crossplane.io
+spec:
+  scope: Namespaced
+  group: example.crossplane.io
+  names:
+    kind: Notif
+    plural: notifs
+  defaultCompositionRef:
+    name: notifs-project-go-templating
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              crossplane:
+                type: object
+                description: Optional — select a Composition if you add one later
+                properties:
+                  compositionRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                  compositionSelector:
+                    type: object
+                    properties:
+                      matchLabels:
+                        type: object
+                        additionalProperties:
+                          type: string
+              projectName:
+                type: string
+                description: >
+                  When set, notifs-project-go-templating observes the Project claim with this name
+                  in the same namespace, adds labels crossplane.io/project-name and
+                  crossplane.io/project-uid to the Notif via SSA patch, sets ownerReferences, and
+                  echoes status.projectName / status.projectUid.
+              title:
+                type: string
+                description: Short headline shown in the inbox or toast
+              content:
+                type: string
+                description: Full message body (plain text or markdown, app-defined)
+              severity:
+                type: string
+                description: Visual priority / tone
+                enum:
+                - info
+                - success
+                - warning
+                - error
+                default: info
+              category:
+                type: string
+                description: Free-form bucket for filtering (e.g. deploy, billing, system)
+              link:
+                type: string
+                description: URL to open when the user follows the notification
+              read:
+                type: boolean
+                description: Whether the recipient has acknowledged / read the notification
+                default: false
+              archived:
+                type: boolean
+                description: Hide from default lists without deleting
+                default: false
+              dedupeKey:
+                type: string
+                description: Idempotency key to collapse duplicate events from producers
+              expiresAt:
+                type: string
+                format: date-time
+                description: After this time UIs may hide or garbage-collect the record
+              sourceRef:
+                type: object
+                description: Related Kubernetes or platform object (task, AP, etc.)
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  uid:
+                    type: string
+              data:
+                type: object
+                description: Arbitrary structured payload for clients (counts, IDs, etc.)
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: Optional delivery lifecycle (e.g. pending, delivered) if a pipeline sets it
+              observedGeneration:
+                type: integer
+                format: int64
+              lastTransitionTime:
+                type: string
+                format: date-time
+              projectName:
+                type: string
+                description: Observed Project claim name when spec.projectName is set.
+              projectUid:
+                type: string
+                description: Observed Project UID when the Project is resolved.
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string

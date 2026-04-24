@@ -14,6 +14,8 @@ export const STATUS_PHASES = {
   pending: "text-theme-yellow",
   creating: "text-theme-yellow",
   binding: "text-theme-yellow",
+  progressing: "text-theme-yellow",
+  unknown: "text-theme-yellow",
   // Stopped / paused
   stopped: "text-theme-purple",
   paused: "text-theme-purple",
@@ -23,6 +25,7 @@ export const STATUS_PHASES = {
   error: "text-theme-red",
   deleting: "text-theme-red",
   unavailable: "text-theme-red",
+  degraded: "text-theme-red",
 } as const;
 
 export type CrossplaneServiceStatusPhase = keyof typeof STATUS_PHASES;
@@ -38,6 +41,8 @@ export const STATUS_PHASE_INDICATORS = {
   pending: "bg-theme-yellow",
   creating: "bg-theme-yellow",
   binding: "bg-theme-yellow",
+  progressing: "bg-theme-yellow",
+  unknown: "bg-theme-yellow",
   stopped: "bg-theme-purple",
   paused: "bg-theme-purple",
   shutdown: "bg-theme-purple",
@@ -45,4 +50,5 @@ export const STATUS_PHASE_INDICATORS = {
   error: "bg-theme-red",
   deleting: "bg-theme-red",
   unavailable: "bg-theme-red",
+  degraded: "bg-theme-red",
 } as const satisfies Record<CrossplaneServiceStatusPhase, string>;

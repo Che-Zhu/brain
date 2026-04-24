@@ -1,0 +1,240 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: aps.example.crossplane.io
+spec:
+  scope: Namespaced
+  group: example.crossplane.io
+  names:
+    kind: AP
+    plural: aps
+  defaultCompositionRef:
+    name: aps-deployment-ingress-go-templating
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        x-kubernetes-preserve-unknown-fields: true
+        properties:
+          metadata:
+            type: object
+            description: >
+              Claim metadata. Set metadata.labels.region to a DNS base (e.g. 192.168.12.53.nip.io).
+              When set, aps-deployment-ingress-go-templating replaces each endpoint host with
+              {metadata.name}-{slug}.{region} (slug is a short hash of name, namespace, and uid).
+            properties:
+              labels:
+                type: object
+                additionalProperties:
+                  type: string
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+            additionalProperties: true
+            properties:
+              compositionRef:
+                type: object
+                properties:
+                  name:
+                    type: string
+              compositionSelector:
+                type: object
+                properties:
+                  matchLabels:
+                    type: object
+                    additionalProperties:
+                      type: string
+              crossplane:
+                type: object
+                properties:
+                  compositionRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+              template:
+                type: string
+                description: Template type for composition selection (e.g. perplexica)
+              name:
+                type: string
+                description: Instance name used for all composed resource naming
+              projectName:
+                type: string
+                description: >
+                  When set, aps-deployment-ingress-go-templating observes the Project claim with this
+                  name in the same namespace as the AP (example.crossplane.io/v1), adds labels
+                  crossplane.io/project-name and crossplane.io/project-uid to composed resources, and
+                  sets ownerReferences to that Project once its UID is observed.
+              image:
+                type: string
+                description: Container image (e.g. puddlecat/sealos-brain-ai:0.20.67)
+              type:
+                type: string
+                description: >
+                  Optional workflow hint for clients. Value `prelude` marks an AP applied before the
+                  image is guaranteed pullable (e.g. with S2I); UIs may show building or not-ready
+                  treatment. Omit the field for standard deployments.
+                enum:
+                  - prelude
+              replicas:
+                type: integer
+                default: 1
+              port:
+                type: integer
+                description: >
+                  (Legacy) Single container/service port; use with host when spec.endpoints is omitted.
+                  If spec.endpoints is set (including empty []), port/host are ignored. No default port:
+                  omit endpoints and port/host to run without exposed ports, Services, or Ingress rules.
+              host:
+                type: string
+                description: >
+                  (Legacy) Ingress host paired with port when spec.endpoints is omitted; both must be set.
+              endpoints:
+                type: array
+                description: >
+                  Port/host pairs for Services and Ingress (one per entry). Empty array means no exposed
+                  ports. When the field is omitted, legacy spec.port + spec.host may define one endpoint.
+                  If metadata.labels.region is set, the composition overwrites each endpoint host with
+                  {metadata.name}-{slug}.{region} for Ingress (spec values may still supply port).
+                items:
+                  type: object
+                  required: [port, host]
+                  properties:
+                    port:
+                      type: integer
+                      description: Container port and service port
+                    host:
+                      type: string
+                      description: >
+                        Ingress host (e.g. ai.example.com). When metadata.labels.region is set, this value
+                        is replaced by the composition with {name}-{slug}.{region}.
+              cpuRequest:
+                type: string
+                default: "200m"
+              memoryRequest:
+                type: string
+                default: "204Mi"
+              cpuLimit:
+                type: string
+                default: "2000m"
+              memoryLimit:
+                type: string
+                default: "2048Mi"
+              imagePullPolicy:
+                type: string
+                default: "Always"
+              env:
+                type: array
+                items:
+                  type: object
+                  required: [name]
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+                    valueFrom:
+                      type: object
+                      description: Kubernetes EnvVarSource (e.g. secretKeyRef, configMapKeyRef)
+                      properties:
+                        secretKeyRef:
+                          type: object
+                          properties:
+                            name: { type: string }
+                            key: { type: string }
+                            optional: { type: boolean }
+                        configMapKeyRef:
+                          type: object
+                          properties:
+                            name: { type: string }
+                            key: { type: string }
+                            optional: { type: boolean }
+              ingressAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
+                description: Additional ingress annotations
+              probes:
+                type: object
+                description: |
+                  Health probes for the Deployment container. No defaults are applied;
+                  configure startup, liveness, and readiness explicitly for production safety.
+                  Each probe supports httpGet, tcpSocket, exec, or grpc (Kubernetes Probe format).
+                properties:
+                  startup:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: Startup probe; container is not considered ready until this succeeds
+                  liveness:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: Liveness probe; failed probe restarts the container
+                  readiness:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: Readiness probe; failed probe removes pod from Service endpoints
+              hooksYamlTmpl:
+                type: string
+                description: >
+                  For composition aps-webhook-go-templating only: full hooks file body in adnanh
+                  hooks.yaml.tmpl form (e.g. getenv WEBHOOK_SECRET with js filter for GitHub HMAC).
+              webhookSecret:
+                type: string
+                description: >
+                  For aps-webhook-go-templating: if set, creates Secret <metadata.name>-webhook-secret
+                  with key WEBHOOK_SECRET and injects it into the pod. The plaintext is stored on the
+                  AP resource (etcd); for GitOps prefer omitting this field and using spec.env with
+                  valueFrom.secretKeyRef instead. Must match GitHub's webhook secret when using HMAC rules.
+              webhookListenPort:
+                type: integer
+                description: >
+                  For aps-webhook-go-templating: adnanh -port value. Defaults to the first
+                  endpoint port, or 9000 when endpoints are empty.
+              webhookExtraArgs:
+                type: array
+                description: Extra CLI arguments appended after default adnanh args.
+                items:
+                  type: string
+              imagePullSecrets:
+                type: array
+                description: Optional imagePullSecrets for the webhook Deployment (defaults to none).
+                items:
+                  type: object
+                  required: [name]
+                  properties:
+                    name:
+                      type: string
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: >
+                  For aps-deployment-ingress-go-templating: derived from the composed Deployment
+                  (spec.paused, status.conditions Available/Progressing). Typical values: Running,
+                  Progressing, Failed, Degraded, Paused, Unknown.
+              configVersionHash:
+                type: string
+                description: Hash of current effective config; use to match and display the corresponding ConfigMap
+              projectName:
+                type: string
+                description: >
+                  When spec.projectName is set, the composition echoes it here (Crossplane typically does not
+                  merge metadata.labels on the composite from composed output; use this field for affiliation).
+              projectUid:
+                type: string
+                description: >
+                  UID of the observed Project claim when spec.projectName is set and project-observe has synced.
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type: { type: string }
+                    status: { type: string }
+                    reason: { type: string }
+                    message: { type: string }
+                    lastTransitionTime: { type: string }
