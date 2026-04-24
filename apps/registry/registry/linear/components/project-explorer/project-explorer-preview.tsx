@@ -27,7 +27,7 @@ export default function ProjectExplorerPreview() {
 
   return (
     <PreviewWrapper className="lg:grid-cols-1">
-      <Preview title="Project Explorer">
+      <Preview title="With projects">
         <div className="flex flex-col gap-2">
           <ProjectExplorer.Root
             actions={{
@@ -44,6 +44,20 @@ export default function ProjectExplorerPreview() {
             </p>
           ) : null}
         </div>
+      </Preview>
+      <Preview showReset={false} title="Empty state">
+        <ProjectExplorer.Root
+          states={{
+            projects: [],
+            empty: {
+              title: "No projects",
+              description:
+                "You have not created a project in this namespace yet.",
+            },
+          }}
+        >
+          <ProjectExplorer.Variant0 />
+        </ProjectExplorer.Root>
       </Preview>
     </PreviewWrapper>
   );

@@ -22,9 +22,21 @@ export interface ProjectExplorerProject {
   public?: boolean;
 }
 
+/** Copy shown when `projects` is empty (list uses defaults when fields are omitted). */
+export interface ProjectExplorerEmptyState {
+  title?: string;
+  /** Set to `""` to hide the secondary line. */
+  description?: string;
+}
+
 /** Display state for the explorer (passed into Root as `states`). */
 export interface ProjectExplorerStates {
   projects: ProjectExplorerProject[];
+  /**
+   * When `projects` has no items, the list shows an empty state.
+   * Set `title` / `description` to customize; strings default when omitted.
+   */
+  empty?: ProjectExplorerEmptyState;
 }
 
 /** Optional handlers for project rows. */
@@ -95,11 +107,38 @@ function ProjectExplorerHeader({
   );
 }
 
+const DEFAULT_EMPTY_TITLE = "No projects yet";
+const DEFAULT_EMPTY_DESCRIPTION = "Create a project to see it here.";
+
 function ProjectExplorerList({ className }: { className?: string }) {
   const { actions, states } = useProjectExplorer();
-  const { projects } = states;
+  const { projects, empty } = states;
   const interactive = actions.onProjectClick != null;
   const canTogglePublic = actions.onProjectPublicChange != null;
+
+  if (projects.length === 0) {
+    const title = empty?.title?.trim() || DEFAULT_EMPTY_TITLE;
+    const description =
+      empty?.description === undefined
+        ? DEFAULT_EMPTY_DESCRIPTION
+        : empty.description.trim() || null;
+
+    return (
+      <div className={cn(className)} data-slot="project-explorer-list">
+        <div
+          className="flex flex-col items-center justify-center rounded-xl px-4 py-10 text-center"
+          data-slot="project-explorer-empty"
+        >
+          <p className="font-medium text-foreground text-sm">{title}</p>
+          {description ? (
+            <p className="mt-1.5 max-w-sm text-balance text-muted-foreground text-xs leading-relaxed">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   function handleRowActivate(project: ProjectExplorerProject) {
     actions.onProjectClick?.(project);
