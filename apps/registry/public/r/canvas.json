@@ -1,0 +1,77 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "canvas",
+  "title": "Canvas",
+  "description": "React Flow workspace surface with Jotai, viewport atoms, and error fallback",
+  "dependencies": [
+    "@xyflow/react",
+    "jotai"
+  ],
+  "registryDependencies": [
+    "preview",
+    "button"
+  ],
+  "files": [
+    {
+      "path": "../../packages/ui/src/components/canvas/resource-types.ts",
+      "content": "export type ResourceId = string & { readonly __brand: \"ResourceId\" };\nexport type EdgeId = string & { readonly __brand: \"EdgeId\" };\nexport type JobId = string & { readonly __brand: \"JobId\" };\n\nexport type NodeType = \"container\" | \"database\" | \"devEnv\" | \"entry\";\nexport type EdgeKind = \"depends-on\" | \"connects-to\" | \"routes-to\";\n\nexport interface NodeRef {\n  id: ResourceId;\n  position: { x: number; y: number };\n  type: NodeType;\n}\n\nexport interface EdgeRef {\n  id: EdgeId;\n  kind: EdgeKind;\n  source: ResourceId;\n  target: ResourceId;\n}\n",
+      "type": "registry:lib",
+      "target": "components/canvas/resource-types.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/types.ts",
+      "content": "import type { EdgeRef, JobId, NodeRef } from \"./resource-types\";\n\nexport interface CanvasNode extends NodeRef {\n  ghostJobId?: JobId;\n  isGhost?: boolean;\n}\n\nexport type CanvasEdge = EdgeRef;\n\nexport interface CanvasState {\n  projectId: string;\n}\n\nexport interface CanvasActions {\n  fitView: () => void;\n}\n\nexport type CanvasMeta = Record<string, never>;\n\nexport interface CanvasContextValue {\n  actions: CanvasActions;\n  meta: CanvasMeta;\n  state: CanvasState;\n}\n",
+      "type": "registry:lib",
+      "target": "components/canvas/types.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/guards.ts",
+      "content": "import type { CanvasNode } from \"./types\";\n\nexport function isContainerNode(node: CanvasNode) {\n  return node.type === \"container\";\n}\n\nexport function isDatabaseNode(node: CanvasNode) {\n  return node.type === \"database\";\n}\n\nexport function isDevEnvNode(node: CanvasNode) {\n  return node.type === \"devEnv\";\n}\n\nexport function isEntryNode(node: CanvasNode) {\n  return node.type === \"entry\";\n}\n\nexport function isGhostNode(node: CanvasNode) {\n  return node.isGhost === true;\n}\n",
+      "type": "registry:lib",
+      "target": "components/canvas/guards.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas-context.ts",
+      "content": "import { createContext } from \"react\";\nimport type { CanvasContextValue } from \"./types\";\n\nexport const CanvasContext = createContext<CanvasContextValue | null>(null);\n",
+      "type": "registry:lib",
+      "target": "components/canvas/canvas-context.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas-store.ts",
+      "content": "import { atom } from \"jotai\";\nimport { atomFamily } from \"jotai/utils\";\nimport type { EdgeId, JobId, NodeType, ResourceId } from \"./resource-types\";\n\nexport interface ViewportState {\n  x: number;\n  y: number;\n  zoom: number;\n}\n\nexport const viewportAtom = atom<ViewportState>({ x: 0, y: 0, zoom: 1 });\n\nexport const expandedNodesAtomFamily = atomFamily((_id: ResourceId) =>\n  atom(false)\n);\n\nexport const activeEdgeAtom = atom<EdgeId | null>(null);\n\nexport interface GhostNode {\n  id: `ghost:${JobId}`;\n  jobId: JobId;\n  position: { x: number; y: number };\n  type: NodeType;\n}\n\nexport const ghostNodesAtomFamily = atomFamily((_projectId: string) =>\n  atom<GhostNode[]>([])\n);\n\nexport const focusedNodeAtom = atom<{\n  id: ResourceId;\n  expand?: boolean;\n} | null>(null);\n",
+      "type": "registry:lib",
+      "target": "components/canvas/canvas-store.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/use-canvas.ts",
+      "content": "\"use client\";\n\nimport { use } from \"react\";\nimport { CanvasContext } from \"./canvas-context\";\n\nexport function useCanvas() {\n  const ctx = use(CanvasContext);\n  if (!ctx) {\n    throw new Error(\"useCanvas must be used inside CanvasProvider\");\n  }\n  return ctx;\n}\n",
+      "type": "registry:lib",
+      "target": "components/canvas/use-canvas.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas-provider.tsx",
+      "content": "\"use client\";\n\nimport { useReactFlow } from \"@xyflow/react\";\nimport { type ReactNode, useCallback, useMemo } from \"react\";\nimport { CanvasContext } from \"./canvas-context\";\nimport type { CanvasContextValue } from \"./types\";\n\nexport function CanvasProvider({\n  children,\n  projectId,\n}: {\n  children: ReactNode;\n  projectId: string;\n}) {\n  const { fitView } = useReactFlow();\n\n  const fitViewAction = useCallback(() => {\n    fitView();\n  }, [fitView]);\n\n  const value = useMemo<CanvasContextValue>(\n    () => ({\n      state: { projectId },\n      actions: { fitView: fitViewAction },\n      meta: {},\n    }),\n    [projectId, fitViewAction]\n  );\n\n  return <CanvasContext value={value}>{children}</CanvasContext>;\n}\n",
+      "type": "registry:component",
+      "target": "components/canvas/canvas-provider.tsx"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas-error-fallback.tsx",
+      "content": "\"use client\";\n\nimport { cn } from \"@workspace/ui/lib/utils\";\nimport { Button } from \"../button\";\n\nexport function CanvasErrorFallback({\n  error,\n  reset,\n  className,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n  /** Merged with default layout; omit for full-viewport route errors. */\n  className?: string;\n}) {\n  return (\n    <div\n      className={cn(\n        \"flex flex-col items-center justify-center gap-4 p-6 text-center\",\n        className ?? \"h-dvh\"\n      )}\n    >\n      <h1 className=\"font-medium text-lg\">Canvas failed to load</h1>\n      <p className=\"max-w-md text-muted-foreground text-sm\">{error.message}</p>\n      <Button onClick={reset}>Try again</Button>\n    </div>\n  );\n}\n",
+      "type": "registry:component",
+      "target": "components/canvas/canvas-error-fallback.tsx"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas.css",
+      "content": ".canvas-surface {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background-color: var(--color-canvas-surface);\n  background-image: radial-gradient(\n    ellipse 83.7% 93.3% at 33% 53%,\n    color-mix(in oklab, var(--color-canvas-glow) 22%, transparent) 0%,\n    transparent 70%\n  );\n}\n\n.canvas-surface > .react-flow {\n  width: 100%;\n  height: 100%;\n  background: transparent;\n}\n\n.react-flow__pane.draggable,\n.react-flow__pane.dragging {\n  cursor: default;\n}\n",
+      "type": "registry:component",
+      "target": "components/canvas/canvas.css"
+    },
+    {
+      "path": "../../packages/ui/src/components/canvas/canvas.tsx",
+      "content": "\"use client\";\n\nimport \"@xyflow/react/dist/base.css\";\nimport \"@xyflow/react/dist/style.css\";\nimport \"./canvas.css\";\n\nimport {\n  Background,\n  BackgroundVariant,\n  ReactFlow,\n  ReactFlowProvider,\n} from \"@xyflow/react\";\nimport { Provider as JotaiProvider } from \"jotai\";\nimport { CanvasProvider } from \"./canvas-provider\";\n\nexport function Canvas({ projectId }: { projectId: string }) {\n  return (\n    <div className=\"h-full min-h-0 w-full min-w-0\">\n      <JotaiProvider>\n        <ReactFlowProvider>\n          <CanvasProvider projectId={projectId}>\n            <div className=\"relative h-full min-h-0 w-full min-w-0\">\n              <div className=\"canvas-surface\">\n                <ReactFlow\n                  edges={[]}\n                  fitView\n                  nodes={[]}\n                  proOptions={{ hideAttribution: true }}\n                >\n                  <Background\n                    color=\"var(--color-canvas-dot)\"\n                    gap={[32, 41]}\n                    size={1}\n                    variant={BackgroundVariant.Dots}\n                  />\n                </ReactFlow>\n              </div>\n            </div>\n          </CanvasProvider>\n        </ReactFlowProvider>\n      </JotaiProvider>\n    </div>\n  );\n}\n",
+      "type": "registry:component",
+      "target": "components/canvas/canvas.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

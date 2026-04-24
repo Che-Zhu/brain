@@ -70,7 +70,7 @@
       "registryDependencies": ["button", "dropdown-menu", "alert-dialog"],
       "files": [
         {
-          "path": "registry/linear/components/container-node/container-node.tsx",
+          "path": "../../packages/ui/src/components/container-node/container-node.tsx",
           "type": "registry:component",
           "target": "components/container-node/container-node.tsx"
         },
@@ -105,7 +105,7 @@
       "registryDependencies": [],
       "files": [
         {
-          "path": "registry/linear/components/project-explorer/project-explorer.tsx",
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.tsx",
           "type": "registry:component",
           "target": "components/project-explorer/project-explorer.tsx"
         }
@@ -120,9 +120,79 @@
       "registryDependencies": ["container-node"],
       "files": [
         {
-          "path": "registry/linear/components/project-flow/project-flow.tsx",
+          "path": "../../packages/ui/src/components/project-flow/project-flow.tsx",
           "type": "registry:component",
           "target": "components/project-flow/project-flow.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-flow/project-flow-nodes.tsx",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow-nodes.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-flow/project-flow.css",
+          "type": "registry:component",
+          "target": "components/project-flow/project-flow.css"
+        }
+      ]
+    },
+    {
+      "name": "canvas",
+      "type": "registry:ui",
+      "title": "Canvas",
+      "description": "React Flow workspace surface with Jotai, viewport atoms, and error fallback",
+      "dependencies": ["@xyflow/react", "jotai"],
+      "registryDependencies": ["preview", "button"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/canvas/resource-types.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/resource-types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/types.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/guards.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/guards.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas-context.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/canvas-context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas-store.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/canvas-store.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/use-canvas.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/use-canvas.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas-provider.tsx",
+          "type": "registry:component",
+          "target": "components/canvas/canvas-provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas-error-fallback.tsx",
+          "type": "registry:component",
+          "target": "components/canvas/canvas-error-fallback.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas.css",
+          "type": "registry:component",
+          "target": "components/canvas/canvas.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas.tsx",
+          "type": "registry:component",
+          "target": "components/canvas/canvas.tsx"
         }
       ]
     }

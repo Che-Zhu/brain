@@ -1,8 +1,11 @@
 "use client";
 
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
+import {
+  ProjectExplorer,
+  type ProjectExplorerProject,
+} from "@workspace/ui/components/project-explorer/project-explorer";
 import { useState } from "react";
-import { ProjectExplorer } from "./project-explorer";
 
 const sampleProjects = [
   {
@@ -31,7 +34,7 @@ export default function ProjectExplorerPreview() {
         <div className="flex flex-col gap-2">
           <ProjectExplorer.Root
             actions={{
-              onProjectClick: (p) => setLastId(p.id),
+              onProjectClick: (p: ProjectExplorerProject) => setLastId(p.id),
             }}
             states={{ projects: [...sampleProjects] }}
           >

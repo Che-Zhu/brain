@@ -192,11 +192,6 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
-      {
-        path: "registry/linear/components/container-node/container-node.tsx",
-        type: "registry:preview",
-        target: "",
-      },
       previewUiFile,
     ],
     load: () =>
@@ -218,11 +213,6 @@ export const Index: RegistryIndex = {
     files: [
       {
         path: "registry/linear/components/project-explorer/project-explorer-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      {
-        path: "registry/linear/components/project-explorer/project-explorer.tsx",
         type: "registry:preview",
         target: "",
       },
@@ -256,11 +246,6 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
-      {
-        path: "registry/linear/components/project-flow/project-flow.tsx",
-        type: "registry:preview",
-        target: "",
-      },
       previewUiFile,
     ],
     load: () =>
@@ -283,15 +268,31 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/scale-slider/scale-slider-preview"),
+  },
+
+  "linear/components/canvas": {
+    style: "linear",
+    group: "components",
+    name: "canvas",
+    title: "Canvas",
+    description:
+      "React Flow workspace surface (dots, glow), Jotai + viewport atoms, provider context, route error fallback",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button"],
+    files: [
       {
-        path: "registry/linear/components/scale-slider/scale-slider.tsx",
+        path: "registry/linear/components/canvas/canvas-preview.tsx",
         type: "registry:preview",
         target: "",
       },
       previewUiFile,
     ],
-    load: () =>
-      import("@registry/linear/components/scale-slider/scale-slider-preview"),
+    load: () => import("@registry/linear/components/canvas/canvas-preview"),
   },
 
   "shadcn/components/accordion": {

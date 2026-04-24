@@ -15,6 +15,14 @@
   --color-theme-purple: #a78afa;
   --color-theme-gray: #a1a1aa;
   --color-theme-darkblue: #3c5f89;
+  /** Workspace canvas (packages/ui canvas) — explicit tokens; avoid `blue-700` / `neutral-950` utilities that may not emit `--color-*` in all builds. */
+  --color-canvas-surface: oklch(0.09 0.006 264);
+  --color-canvas-glow: var(--color-theme-blue);
+  --color-canvas-dot: color-mix(
+    in oklab,
+    var(--color-theme-gray) 55%,
+    transparent
+  );
 }
 
 @theme inline {
