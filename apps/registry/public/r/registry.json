@@ -130,7 +130,7 @@
       "name": "entry-node",
       "type": "registry:ui",
       "title": "Entry Node",
-      "description": "Collapsed entry node status badge with local status colours and expand affordance",
+      "description": "Collapsed entry node status badge with local status colours",
       "dependencies": ["lucide-react"],
       "registryDependencies": [],
       "files": [
@@ -148,6 +148,11 @@
           "path": "../../packages/ui/src/components/entry-node/entry-node.primitives.tsx",
           "type": "registry:component",
           "target": "components/entry-node/entry-node.primitives.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.css",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.css"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.tsx",

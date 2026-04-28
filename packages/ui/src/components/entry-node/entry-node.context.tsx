@@ -2,11 +2,7 @@
 
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
-import type {
-  EntryNodeActions,
-  EntryNodeStates,
-  EntryNodeValue,
-} from "./entry-node.types";
+import type { EntryNodeStates, EntryNodeValue } from "./entry-node.types";
 
 export const EntryNodeContext = createContext<EntryNodeValue | null>(null);
 
@@ -21,18 +17,13 @@ export function useEntryNode(): EntryNodeValue {
 }
 
 export function EntryNodeRoot({
-  actions = {},
   children,
   states,
 }: {
-  actions?: EntryNodeActions;
   children?: ReactNode;
   states: EntryNodeStates;
 }) {
-  const value = useMemo(
-    (): EntryNodeValue => ({ actions, states }),
-    [actions, states]
-  );
+  const value = useMemo((): EntryNodeValue => ({ states }), [states]);
 
   return (
     <EntryNodeContext.Provider value={value}>

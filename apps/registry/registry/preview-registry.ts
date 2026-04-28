@@ -170,8 +170,7 @@ export const Index: RegistryIndex = {
     group: "components",
     name: "entry-node",
     title: "Entry Node",
-    description:
-      "Collapsed entry node status badge with local status colours and expand affordance.",
+    description: "Collapsed entry node status badge with local status colours.",
     state: "done",
     type: "registry:preview",
     registryDependencies: ["preview"],
@@ -185,6 +184,29 @@ export const Index: RegistryIndex = {
     ],
     load: () =>
       import("@registry/linear/components/entry-node/entry-node-preview"),
+  },
+
+  "linear/components/entry-node-canvas": {
+    style: "linear",
+    group: "components",
+    name: "entry-node-canvas",
+    title: "Entry Node Canvas",
+    description: "Dedicated React Flow canvas preview for the entry node.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "canvas", "entry-node"],
+    files: [
+      {
+        path: "registry/linear/components/entry-node-canvas/entry-node-canvas-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/entry-node-canvas/entry-node-canvas-preview"
+      ),
   },
 
   "linear/components/project-explorer": {
@@ -242,7 +264,7 @@ export const Index: RegistryIndex = {
       "React Flow workspace surface (dots, glow), Jotai, provider context",
     state: "coding",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "container-node", "entry-node"],
+    registryDependencies: ["preview", "button", "container-node"],
     files: [
       {
         path: "registry/linear/components/canvas/canvas-preview.tsx",

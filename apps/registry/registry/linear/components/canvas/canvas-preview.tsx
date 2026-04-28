@@ -5,8 +5,6 @@ import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
-import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-node";
-import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { cn } from "@workspace/ui/lib/utils";
 import {

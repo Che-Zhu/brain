@@ -4,7 +4,6 @@ import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
-import { useState } from "react";
 
 const unhealthy: EntryNodeStates = {
   name: "Placeholder",
@@ -55,31 +54,12 @@ function BadgeRow({ states }: { states: EntryNodeStates }) {
 }
 
 export default function EntryNodePreview() {
-  const [expanded, setExpanded] = useState(false);
-
   return (
     <PreviewWrapper className="lg:grid-cols-2">
       <Preview title="Default unhealthy">
         <PreviewSurface>
           <BadgeRow states={unhealthy} />
         </PreviewSurface>
-      </Preview>
-      <Preview title="Hover with expand">
-        <PreviewSurface>
-          <EntryNode.Root
-            actions={{ onExpand: () => setExpanded(true) }}
-            states={unhealthy}
-          >
-            <div className="flex items-start gap-1.5">
-              <EntryNode.CollapsedBadge />
-              <EntryNode.ExpandButton />
-            </div>
-          </EntryNode.Root>
-        </PreviewSurface>
-        <p className="text-muted-foreground text-xs">
-          Expanded:{" "}
-          <span className="font-mono text-foreground">{String(expanded)}</span>
-        </p>
       </Preview>
       <Preview title="When drag">
         <PreviewSurface>

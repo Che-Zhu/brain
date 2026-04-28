@@ -1,0 +1,26 @@
+.entry-node-hover-surface {
+  --entry-node-hover-overlay: rgb(255 255 255 / 4.5%);
+  --entry-node-hover-base: #040816;
+}
+
+.entry-node-hover-surface:hover {
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-hover-overlay) 0%,
+      var(--entry-node-hover-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-hover-overlay) 0%,
+      var(--entry-node-hover-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-hover-base) 0%,
+      var(--entry-node-hover-base) 100%
+    );
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 10%),
+    0 1px 2px 0 rgb(0 0 0 / 6%);
+}

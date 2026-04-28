@@ -23,7 +23,6 @@
     var(--color-theme-gray) 55%,
     transparent
   );
-  --border-width-hairline: 0.5px;
 }
 
 @theme inline {
@@ -164,10 +163,6 @@
  * Use `className="hoverable"` alone (e.g. `SidebarMenuButton`, `AvatarSwitcher`, chat header icons).
  */
 @layer utilities {
-  .border-hairline {
-    border-width: var(--border-width-hairline);
-  }
-
   .hoverable {
     @apply cursor-pointer border-transparent bg-transparent text-muted-foreground transition-colors;
   }

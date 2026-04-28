@@ -1,7 +1,9 @@
 "use client";
 
+import "./entry-node.css";
+
 import { cn } from "@workspace/ui/lib/utils";
-import { Brain, PanelRightOpen } from "lucide-react";
+import { Brain } from "lucide-react";
 
 import { useEntryNode } from "./entry-node.context";
 import type { EntryNodeStatusTone } from "./entry-node.types";
@@ -127,15 +129,12 @@ function EntryNodeStatusDot({
   return (
     <span
       aria-hidden
-      className={cn(
-        "relative flex size-3.5 shrink-0 items-center justify-center rounded-full",
-        visual.haloClassName
-      )}
+      className="relative flex size-3.5 shrink-0 items-center justify-center rounded-full"
     >
       {visual.breathing && visual.haloClassName ? (
         <span
           className={cn(
-            "absolute inset-0 animate-ping rounded-full",
+            "absolute size-2 animate-ping rounded-full",
             visual.haloClassName
           )}
         />
@@ -157,7 +156,7 @@ function EntryNodeCollapsedBadgeInner({ className }: { className?: string }) {
     <div
       aria-label={`${name} status: ${statusLabel}`}
       className={cn(
-        "flex h-10 w-40 min-w-0 items-center gap-2 overflow-hidden rounded-lg border-hairline border-white/10 bg-slate-950 p-2.5 text-zinc-50 backdrop-blur-sm transition-colors hover:bg-slate-900",
+        "entry-node-hover-surface flex h-10 w-40 min-w-0 items-center gap-2 overflow-hidden rounded-lg border-[0.5px] border-white/10 bg-white/5 p-2.5 text-zinc-50 backdrop-blur-sm transition-[background,box-shadow]",
         className
       )}
       data-slot="entry-node-collapsed-badge"
@@ -183,7 +182,7 @@ export function EntryNodeCollapsedBadge({
   if (dragging) {
     return (
       <div
-        className="inline-flex rounded-md border border-white p-1"
+        className="relative inline-flex rounded-md p-1 before:pointer-events-none before:absolute before:inset-0 before:rounded-md before:border before:border-white before:content-['']"
         data-slot="entry-node-drag-frame"
       >
         <EntryNodeCollapsedBadgeInner className={className} />
@@ -192,22 +191,4 @@ export function EntryNodeCollapsedBadge({
   }
 
   return <EntryNodeCollapsedBadgeInner className={className} />;
-}
-
-export function EntryNodeExpandButton({ className }: { className?: string }) {
-  const { actions } = useEntryNode();
-
-  return (
-    <button
-      aria-label="Expand entry node"
-      className={cn(
-        "nodrag inline-flex size-9 shrink-0 items-center justify-center rounded-lg border-hairline border-white/10 bg-slate-950 text-zinc-50 shadow-sm transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
-        className
-      )}
-      onClick={actions.onExpand}
-      type="button"
-    >
-      <PanelRightOpen aria-hidden className="size-4" />
-    </button>
-  );
 }

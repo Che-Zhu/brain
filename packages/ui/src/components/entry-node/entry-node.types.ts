@@ -31,11 +31,6 @@ export interface EntryNodeStates {
   status?: EntryNodeStatus;
 }
 
-export interface EntryNodeActions {
-  onExpand?: () => void;
-}
-
 export interface EntryNodeValue {
-  actions: EntryNodeActions;
   states: EntryNodeStates;
 }

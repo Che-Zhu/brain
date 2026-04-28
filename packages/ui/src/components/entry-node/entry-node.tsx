@@ -5,15 +5,11 @@ import {
   EntryNodeRoot,
   useEntryNode as useEntryNodeBound,
 } from "./entry-node.context";
-import {
-  EntryNodeCollapsedBadge,
-  EntryNodeExpandButton,
-} from "./entry-node.primitives";
+import { EntryNodeCollapsedBadge } from "./entry-node.primitives";
 
 // biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useEntryNode }`
 export { useEntryNode } from "./entry-node.context";
 export type {
-  EntryNodeActions,
   EntryNodeStates,
   EntryNodeStatus,
   EntryNodeStatusTone,
@@ -23,7 +19,6 @@ export type {
 export const EntryNode = Object.assign(EntryNodeCollapsedBadge, {
   CollapsedBadge: EntryNodeCollapsedBadge,
   Context: EntryNodeContext,
-  ExpandButton: EntryNodeExpandButton,
   Root: EntryNodeRoot,
   useEntryNode: useEntryNodeBound,
 });
@@ -33,4 +28,3 @@ const dn = (c: object, name: string) => {
 };
 dn(EntryNodeRoot, "EntryNode.Root");
 dn(EntryNodeCollapsedBadge, "EntryNode.CollapsedBadge");
-dn(EntryNodeExpandButton, "EntryNode.ExpandButton");
