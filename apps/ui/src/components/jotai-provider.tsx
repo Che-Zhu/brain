@@ -1,9 +1,10 @@
 "use client";
 
 import "@/store/auth-store";
-import { Provider } from "jotai";
+import { getDefaultStore, Provider } from "jotai";
 import type { ReactNode } from "react";
 
+/** Use the default store so impure updates (e.g. `getDefaultStore().set` from event handlers) match `useAtom` in this tree. */
 export function JotaiProvider({ children }: { children: ReactNode }) {
-  return <Provider>{children}</Provider>;
+  return <Provider store={getDefaultStore()}>{children}</Provider>;
 }

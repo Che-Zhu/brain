@@ -21,6 +21,10 @@
   cursor: default;
 }
 
+.canvas-panel {
+  border-left: 1px solid var(--color-border);
+}
+
 /* Keeps handles functional but invisible on the canvas surface. */
 .canvas-surface .react-flow__handle {
   top: auto;

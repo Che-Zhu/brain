@@ -5,7 +5,12 @@ import { useAtomValue } from "jotai";
 import { useParams, useSearchParams } from "next/navigation";
 
 import { useProjectServices } from "@/hooks/use-project-services";
-import { canvasMetaAtom } from "@/store/canvas-store";
+import {
+  canvasMetaAtom,
+  closeCanvasSelection,
+  selectedEdgeAtom,
+  selectedNodeAtom,
+} from "@/store/canvas-store";
 
 /**
  * Client-only: fetches AP list + metrics. Share access is checked in `layout.tsx`.
@@ -18,6 +23,8 @@ export default function PreviewProjectPage() {
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 
   const canvasMeta = useAtomValue(canvasMetaAtom);
+  const selectedEdge = useAtomValue(selectedEdgeAtom);
+  const selectedNode = useAtomValue(selectedNodeAtom);
 
   const { canvasState, error, isLoading } = useProjectServices({
     auth: { shareToken, type: "share" },
@@ -43,8 +50,14 @@ export default function PreviewProjectPage() {
   if (showCanvas) {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        <Canvas.Root meta={canvasMeta} state={canvasState}>
-          <Canvas.Flow />
+        <Canvas.Root
+          actions={{ onPanelClose: closeCanvasSelection }}
+          meta={canvasMeta}
+          state={{ ...canvasState, selectedEdge, selectedNode }}
+        >
+          <Canvas.Flow>
+            <Canvas.Panel />
+          </Canvas.Flow>
         </Canvas.Root>
       </div>
     );
