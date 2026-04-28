@@ -1,0 +1,31 @@
+.canvas-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--color-canvas-surface);
+  background-image: radial-gradient(
+    ellipse 83.7% 93.3% at 50% 50%,
+    color-mix(in oklab, var(--color-canvas-glow) 22%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+.canvas-surface > .react-flow {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.react-flow__pane.draggable,
+.react-flow__pane.dragging {
+  cursor: default;
+}
+
+/* Keeps handles functional but invisible on the canvas surface. */
+.canvas-surface .react-flow__handle {
+  top: auto;
+  bottom: auto;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}

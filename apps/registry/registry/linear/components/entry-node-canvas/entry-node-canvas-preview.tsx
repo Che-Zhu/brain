@@ -1,7 +1,7 @@
 "use client";
 
-import { Canvas } from "@workspace/ui/components/canvas/canvas";
-import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
+import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
+import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
 import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
@@ -60,8 +60,6 @@ export default function EntryNodeCanvasPreview() {
     () => ({
       edges: ENTRY_NODE_CANVAS_EDGES,
       nodes: ENTRY_NODE_CANVAS_NODES,
-      selectedEdge: null,
-      selectedNode: null,
     }),
     []
   );

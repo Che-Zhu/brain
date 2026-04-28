@@ -59,6 +59,7 @@
     "./lib/*": "./src/lib/*.ts",
     "./components/log-viewer/*": "./src/components/log-viewer/*",
     "./components/canvas/*": "./src/components/canvas/*",
+    "./components/canvas-alter/*": "./src/components/canvas-alter/*",
     "./components/container-node/*": "./src/components/container-node/*",
     "./components/entry-node/*": "./src/components/entry-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
