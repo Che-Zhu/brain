@@ -7,16 +7,17 @@ import "./canvas.css";
 import {
   Background,
   BackgroundVariant,
+  type Edge,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import { Provider as JotaiProvider } from "jotai";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
-import type { CanvasReactFlowProps } from "./canvas.types";
+import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
 import { useCanvas } from "./canvas.use";
 
 export interface CanvasFlowProps {
@@ -24,6 +25,7 @@ export interface CanvasFlowProps {
 }
 
 export interface CanvasRootProps {
+  actions?: Partial<CanvasActions>;
   children?: ReactNode;
   meta?: Parameters<typeof CanvasProvider>[0]["meta"];
   state: Parameters<typeof CanvasProvider>[0]["state"];
@@ -42,6 +44,27 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     setEdges(state.edges);
   }, [setEdges, state.edges]);
 
+  const edgesWithSelectionStyle = useMemo((): Edge[] => {
+    const selected = state.selectedEdge;
+    if (selected == null) {
+      return edges;
+    }
+    return edges.map((edge) => {
+      if (edge.id !== selected.id) {
+        return edge;
+      }
+      const prev =
+        edge.style && typeof edge.style === "object" ? edge.style : {};
+      return {
+        ...edge,
+        style: {
+          ...prev,
+          stroke: "var(--color-theme-blue)",
+        },
+      };
+    });
+  }, [edges, state.selectedEdge]);
+
   const passThrough: CanvasReactFlowProps = {
     fitView: true,
     maxZoom: 1.2,
@@ -59,7 +82,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       <div className="canvas-surface">
         <ReactFlow
           {...passThrough}
-          edges={edges}
+          edges={edgesWithSelectionStyle}
           edgeTypes={meta.edgeTypes}
           nodes={nodes}
           nodeTypes={meta.nodeTypes}
@@ -72,16 +95,16 @@ function CanvasFlow({ children }: CanvasFlowProps) {
             size={1}
             variant={BackgroundVariant.Dots}
           />
-          {children}
         </ReactFlow>
       </div>
+      {children}
     </div>
   );
 }
 
-function CanvasRoot({ children, meta, state }: CanvasRootProps) {
+function CanvasRoot({ actions, children, meta, state }: CanvasRootProps) {
   return (
-    <CanvasProvider meta={meta} state={state}>
+    <CanvasProvider actions={actions} meta={meta} state={state}>
       {children}
     </CanvasProvider>
   );
@@ -90,17 +113,16 @@ function CanvasRoot({ children, meta, state }: CanvasRootProps) {
 function CanvasSurface({ children }: CanvasFlowProps) {
   return (
     <div className="h-full min-h-0 w-full min-w-0">
-      <JotaiProvider>
-        <ReactFlowProvider>
-          <CanvasFlow>{children}</CanvasFlow>
-        </ReactFlowProvider>
-      </JotaiProvider>
+      <ReactFlowProvider>
+        <CanvasFlow>{children}</CanvasFlow>
+      </ReactFlowProvider>
     </div>
   );
 }
 
 export const Canvas = Object.assign(CanvasSurface, {
   Flow: CanvasSurface,
+  Panel: CanvasPanel,
   Root: CanvasRoot,
 });
 

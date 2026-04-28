@@ -82,7 +82,7 @@ export function useProjectServices(options: {
       metricsLookup,
       namespaceFallback: namespace,
     });
-    return { edges, nodes };
+    return { edges, nodes, selectedEdge: null, selectedNode: null };
   }, [data, namespace, metricsLookup]);
 
   return { canvasState, error, isLoading };

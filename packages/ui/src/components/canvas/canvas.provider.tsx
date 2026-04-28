@@ -25,11 +25,12 @@ export function CanvasProvider({
     () => ({
       actions: {
         fitView: actions?.fitView ?? (() => undefined),
+        onPanelClose: actions?.onPanelClose ?? (() => undefined),
       },
       meta: meta ?? {},
       state,
     }),
-    [actions?.fitView, meta, state]
+    [actions?.fitView, actions?.onPanelClose, meta, state]
   );
 
   return <CanvasContext value={value}>{children}</CanvasContext>;

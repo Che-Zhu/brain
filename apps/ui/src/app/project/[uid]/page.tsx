@@ -6,7 +6,12 @@ import { useParams } from "next/navigation";
 
 import { useProjectServices } from "@/hooks/use-project-services";
 import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
-import { canvasMetaAtom } from "@/store/canvas-store";
+import {
+  canvasMetaAtom,
+  closeCanvasSelection,
+  selectedEdgeAtom,
+  selectedNodeAtom,
+} from "@/store/canvas-store";
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -14,6 +19,8 @@ export default function ProjectUidPage() {
   const kubeconfig = useAtomValue(encodedKubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
   const canvasMeta = useAtomValue(canvasMetaAtom);
+  const selectedEdge = useAtomValue(selectedEdgeAtom);
+  const selectedNode = useAtomValue(selectedNodeAtom);
 
   const { canvasState, error, isLoading } = useProjectServices({
     auth: { kubeconfig, type: "kubeconfig" },
@@ -28,8 +35,14 @@ export default function ProjectUidPage() {
         error == null &&
         canvasState.nodes.length > 0 && (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <Canvas.Root meta={canvasMeta} state={canvasState}>
-              <Canvas.Flow />
+            <Canvas.Root
+              actions={{ onPanelClose: closeCanvasSelection }}
+              meta={canvasMeta}
+              state={{ ...canvasState, selectedEdge, selectedNode }}
+            >
+              <Canvas.Flow>
+                <Canvas.Panel />
+              </Canvas.Flow>
             </Canvas.Root>
           </div>
         )}
