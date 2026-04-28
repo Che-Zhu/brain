@@ -215,6 +215,51 @@
           "target": "components/canvas/canvas.tsx"
         }
       ]
+    },
+    {
+      "name": "metrics-chart",
+      "type": "registry:ui",
+      "title": "Metrics chart",
+      "description": "Multi-series metrics area chart: compound MetricsChart.Root + Area / Variant0 / Variant1, provider + context (mirrors Canvas layout)",
+      "dependencies": ["recharts"],
+      "registryDependencies": ["chart"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.defaults.ts",
+          "type": "registry:lib",
+          "target": "components/metrics-chart/metrics-chart.defaults.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.types.ts",
+          "type": "registry:lib",
+          "target": "components/metrics-chart/metrics-chart.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.context.ts",
+          "type": "registry:lib",
+          "target": "components/metrics-chart/metrics-chart.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.use.ts",
+          "type": "registry:lib",
+          "target": "components/metrics-chart/metrics-chart.use.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.provider.tsx",
+          "type": "registry:component",
+          "target": "components/metrics-chart/metrics-chart.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.area.tsx",
+          "type": "registry:component",
+          "target": "components/metrics-chart/metrics-chart.area.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.tsx",
+          "type": "registry:component",
+          "target": "components/metrics-chart/metrics-chart.tsx"
+        }
+      ]
     }
   ]
 }

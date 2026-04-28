@@ -1,0 +1,57 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "metrics-chart",
+  "title": "Metrics chart",
+  "description": "Multi-series metrics area chart: compound MetricsChart.Root + Area / Variant0 / Variant1, provider + context (mirrors Canvas layout)",
+  "dependencies": [
+    "recharts"
+  ],
+  "registryDependencies": [
+    "chart"
+  ],
+  "files": [
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.defaults.ts",
+      "content": "/** Default ChartContainer (`className`) — must override `@workspace/ui` chart `aspect-video` so Recharts `<ResponsiveContainer />` receives a definite height (avoids collapsed / invisible plots). */\nexport const METRICS_CHART_SURFACE_CLASS_DEFAULT =\n  \"aspect-auto flex h-56 min-h-56 w-full flex-col [&_.recharts-responsive-container]:min-h-[12rem]\";\n",
+      "type": "registry:lib",
+      "target": "components/metrics-chart/metrics-chart.defaults.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.types.ts",
+      "content": "import type { ReactNode } from \"react\";\n\nexport interface MetricDataPoint {\n  timestamp: number;\n  value: number;\n}\n\nexport type MetricsData = Record<string, MetricDataPoint[]>;\n\nexport interface MetricsChartContextValue {\n  chartClassName: string;\n  data: MetricsData;\n  dataKey?: string;\n}\n\nexport interface MetricsChartRootProps {\n  chartClassName?: string;\n  children: ReactNode;\n  data: MetricsData;\n  dataKey?: string;\n}\n",
+      "type": "registry:lib",
+      "target": "components/metrics-chart/metrics-chart.types.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.context.ts",
+      "content": "import { createContext } from \"react\";\n\nimport type { MetricsChartContextValue } from \"./metrics-chart.types\";\n\nexport const MetricsChartContext =\n  createContext<MetricsChartContextValue | null>(null);\n",
+      "type": "registry:lib",
+      "target": "components/metrics-chart/metrics-chart.context.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.use.ts",
+      "content": "\"use client\";\n\nimport { use } from \"react\";\n\nimport { MetricsChartContext } from \"./metrics-chart.context\";\n\nexport function useMetricsChart() {\n  const ctx = use(MetricsChartContext);\n  if (!ctx) {\n    throw new Error(\n      \"useMetricsChart must be used within MetricsChart.Root (or MetricsChartProvider).\"\n    );\n  }\n  return ctx;\n}\n",
+      "type": "registry:lib",
+      "target": "components/metrics-chart/metrics-chart.use.ts"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.provider.tsx",
+      "content": "\"use client\";\n\nimport type { ReactNode } from \"react\";\nimport { useMemo } from \"react\";\nimport { MetricsChartContext } from \"./metrics-chart.context\";\nimport { METRICS_CHART_SURFACE_CLASS_DEFAULT } from \"./metrics-chart.defaults\";\nimport type { MetricsChartContextValue } from \"./metrics-chart.types\";\n\nexport function MetricsChartProvider({\n  children,\n  chartClassName,\n  data,\n  dataKey,\n}: {\n  children: ReactNode;\n  chartClassName?: string;\n  data: MetricsChartContextValue[\"data\"];\n  dataKey?: string;\n}) {\n  const value = useMemo<MetricsChartContextValue>(\n    () => ({\n      chartClassName: chartClassName ?? METRICS_CHART_SURFACE_CLASS_DEFAULT,\n      data,\n      dataKey,\n    }),\n    [chartClassName, data, dataKey]\n  );\n\n  return <MetricsChartContext value={value}>{children}</MetricsChartContext>;\n}\n",
+      "type": "registry:component",
+      "target": "components/metrics-chart/metrics-chart.provider.tsx"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.area.tsx",
+      "content": "\"use client\";\n\nimport {\n  type ChartConfig,\n  ChartContainer,\n  ChartLegend,\n  ChartLegendContent,\n  ChartTooltip,\n  ChartTooltipContent,\n} from \"@workspace/ui/components/chart\";\nimport { useMemo } from \"react\";\nimport { Area, AreaChart, CartesianGrid, XAxis, YAxis } from \"recharts\";\n\nimport { METRICS_CHART_SURFACE_CLASS_DEFAULT } from \"./metrics-chart.defaults\";\nimport type { MetricsData } from \"./metrics-chart.types\";\nimport { useMetricsChart } from \"./metrics-chart.use\";\n\nconst CHART_PALETTE = [\n  \"chart-1\",\n  \"chart-2\",\n  \"chart-3\",\n  \"chart-4\",\n  \"chart-5\",\n] as const;\n\nconst METRIC_KEYS_FOR_COLOR = [\n  \"cpu\",\n  \"memory\",\n  \"disk\",\n  \"storage\",\n  \"uptime\",\n] as const;\n\nfunction formatTimestamp(timestamp: number): string {\n  const d = new Date(timestamp * 1000);\n  const h = d.getHours();\n  const m = d.getMinutes();\n  return `${String(h).padStart(2, \"0\")}:${String(m).padStart(2, \"0\")}`;\n}\n\nfunction capitalizeLabel(key: string): string {\n  return key.charAt(0).toUpperCase() + key.slice(1);\n}\n\nfunction getColorForMetricKey(key: string): string {\n  const lower = key.toLowerCase();\n  const idx = (METRIC_KEYS_FOR_COLOR as readonly string[]).indexOf(lower);\n  const paletteKey = CHART_PALETTE[idx >= 0 ? idx % CHART_PALETTE.length : 0];\n  return `var(--${paletteKey})`;\n}\n\nfunction mergeMetricsByTimestamp(\n  data: MetricsData\n): Record<string, number | string>[] {\n  const allTimestamps = new Set<number>();\n  for (const series of Object.values(data)) {\n    for (const point of series) {\n      allTimestamps.add(point.timestamp);\n    }\n  }\n  const sorted = Array.from(allTimestamps).sort((a, b) => a - b);\n  return sorted.map((timestamp) => {\n    const point: Record<string, number | string> = {\n      timestamp,\n      readableTime: formatTimestamp(timestamp),\n    };\n    for (const [key, series] of Object.entries(data)) {\n      const found = series.find((d) => d.timestamp === timestamp);\n      if (found != null) {\n        point[key] = found.value;\n      }\n    }\n    return point;\n  });\n}\n\nexport function MetricsChartArea() {\n  const { data, dataKey, chartClassName } = useMetricsChart();\n\n  const keys = useMemo(\n    () => (dataKey == null ? Object.keys(data) : [dataKey]),\n    [data, dataKey]\n  );\n\n  const chartData = useMemo(() => {\n    if (dataKey != null) {\n      const series = data[dataKey];\n      if (!series) {\n        return [];\n      }\n      return series.map(({ timestamp, value }) => ({\n        timestamp,\n        value,\n        readableTime: formatTimestamp(timestamp),\n      }));\n    }\n    return mergeMetricsByTimestamp(data);\n  }, [data, dataKey]);\n\n  const config = useMemo<ChartConfig>(() => {\n    const cfg: ChartConfig = {};\n    const configKeys = dataKey == null ? keys : [\"value\"];\n    for (const key of configKeys) {\n      const labelKey = dataKey ?? key;\n      cfg[key] = {\n        color: getColorForMetricKey(labelKey),\n        label: capitalizeLabel(labelKey),\n      };\n    }\n    return cfg;\n  }, [keys, dataKey]);\n\n  const hasData = chartData.length > 0 && keys.length > 0;\n  if (!hasData) {\n    return null;\n  }\n\n  const areas = dataKey == null ? keys : [\"value\"];\n\n  const gradientIdFor = (seriesKey: string) => `fill-${dataKey ?? seriesKey}`;\n\n  return (\n    <ChartContainer\n      className={chartClassName || METRICS_CHART_SURFACE_CLASS_DEFAULT}\n      config={config}\n    >\n      <AreaChart\n        data={chartData}\n        margin={{ top: 8, right: 8, bottom: 4, left: -30 }}\n      >\n        <defs>\n          {areas.map((seriesKey) => {\n            const id = gradientIdFor(seriesKey);\n            return (\n              <linearGradient id={id} key={id} x1=\"0\" x2=\"0\" y1=\"0\" y2=\"1\">\n                <stop\n                  offset=\"5%\"\n                  stopColor={`var(--color-${seriesKey})`}\n                  stopOpacity={0.8}\n                />\n                <stop\n                  offset=\"95%\"\n                  stopColor={`var(--color-${seriesKey})`}\n                  stopOpacity={0.1}\n                />\n              </linearGradient>\n            );\n          })}\n        </defs>\n        <CartesianGrid vertical={false} />\n        <XAxis\n          axisLine={false}\n          dataKey=\"readableTime\"\n          tickFormatter={(v) =>\n            typeof v === \"string\" ? (v.split(\" \").at(-1) ?? v) : String(v)\n          }\n          tickLine={false}\n          tickMargin={4}\n        />\n        <YAxis\n          axisLine={false}\n          domain={[0, 100]}\n          tickLine={false}\n          tickMargin={4}\n          ticks={[50, 100]}\n        />\n        <ChartTooltip\n          content={\n            <ChartTooltipContent\n              valueFormatter={(v) => `${Number(v).toFixed(1)}%`}\n            />\n          }\n          trigger=\"hover\"\n        />\n        <ChartLegend content={<ChartLegendContent />} verticalAlign=\"bottom\" />\n        {areas.map((seriesKey) => (\n          <Area\n            dataKey={seriesKey}\n            fill={`url(#${gradientIdFor(seriesKey)})`}\n            isAnimationActive={false}\n            key={seriesKey}\n            stroke={`var(--color-${seriesKey})`}\n            type=\"monotone\"\n          />\n        ))}\n      </AreaChart>\n    </ChartContainer>\n  );\n}\n",
+      "type": "registry:component",
+      "target": "components/metrics-chart/metrics-chart.area.tsx"
+    },
+    {
+      "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.tsx",
+      "content": "\"use client\";\n\nimport { MetricsChartArea } from \"./metrics-chart.area\";\nimport { MetricsChartProvider } from \"./metrics-chart.provider\";\nimport type { MetricsChartRootProps } from \"./metrics-chart.types\";\n\nexport function MetricsChartRoot({\n  chartClassName,\n  children,\n  data,\n  dataKey,\n}: MetricsChartRootProps) {\n  return (\n    <MetricsChartProvider\n      chartClassName={chartClassName}\n      data={data}\n      dataKey={dataKey}\n    >\n      {children}\n    </MetricsChartProvider>\n  );\n}\n\nexport function MetricsChartVariant0({\n  chartClassName,\n  data,\n  dataKey,\n}: Omit<MetricsChartRootProps, \"children\"> & {\n  dataKey: string;\n}) {\n  return (\n    <MetricsChartRoot\n      chartClassName={chartClassName}\n      data={data}\n      dataKey={dataKey}\n    >\n      <MetricsChartArea />\n    </MetricsChartRoot>\n  );\n}\n\nexport function MetricsChartVariant1({\n  chartClassName,\n  data,\n}: Omit<MetricsChartRootProps, \"children\">) {\n  return (\n    <MetricsChartRoot chartClassName={chartClassName} data={data}>\n      <MetricsChartArea />\n    </MetricsChartRoot>\n  );\n}\n\nexport const MetricsChart = {\n  Area: MetricsChartArea,\n  Root: MetricsChartRoot,\n  Variant0: MetricsChartVariant0,\n  Variant1: MetricsChartVariant1,\n};\n\nexport type {\n  MetricDataPoint,\n  MetricsChartContextValue,\n  MetricsChartRootProps,\n  MetricsData,\n} from \"./metrics-chart.types\";\n\n// biome-ignore lint/performance/noBarrelFile: re-export for `import { useMetricsChart } from …/metrics-chart`\nexport { useMetricsChart } from \"./metrics-chart.use\";\n",
+      "type": "registry:component",
+      "target": "components/metrics-chart/metrics-chart.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}
