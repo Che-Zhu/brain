@@ -127,6 +127,36 @@
       ]
     },
     {
+      "name": "entry-node",
+      "type": "registry:ui",
+      "title": "Entry Node",
+      "description": "Collapsed entry node status badge with local status colours and expand affordance",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/entry-node/entry-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.context.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.context.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.primitives.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.primitives.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.tsx"
+        }
+      ]
+    },
+    {
       "name": "project-explorer",
       "type": "registry:ui",
       "title": "Project Explorer",
@@ -177,7 +207,7 @@
       "title": "Canvas",
       "description": "React Flow workspace surface with Jotai, provider context, and error fallback",
       "dependencies": ["@xyflow/react", "jotai"],
-      "registryDependencies": ["preview", "button"],
+      "registryDependencies": ["preview", "button", "entry-node"],
       "files": [
         {
           "path": "../../packages/ui/src/components/canvas/canvas.types.ts",

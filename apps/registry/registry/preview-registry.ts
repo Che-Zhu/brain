@@ -165,6 +165,28 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/entry-node": {
+    style: "linear",
+    group: "components",
+    name: "entry-node",
+    title: "Entry Node",
+    description:
+      "Collapsed entry node status badge with local status colours and expand affordance.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview"],
+    files: [
+      {
+        path: "registry/linear/components/entry-node/entry-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/entry-node/entry-node-preview"),
+  },
+
   "linear/components/project-explorer": {
     style: "linear",
     group: "components",
@@ -220,7 +242,7 @@ export const Index: RegistryIndex = {
       "React Flow workspace surface (dots, glow), Jotai, provider context",
     state: "coding",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "container-node"],
+    registryDependencies: ["preview", "button", "container-node", "entry-node"],
     files: [
       {
         path: "registry/linear/components/canvas/canvas-preview.tsx",

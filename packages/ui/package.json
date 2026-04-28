@@ -60,6 +60,7 @@
     "./components/log-viewer/*": "./src/components/log-viewer/*",
     "./components/canvas/*": "./src/components/canvas/*",
     "./components/container-node/*": "./src/components/container-node/*",
+    "./components/entry-node/*": "./src/components/entry-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
     "./components/project-explorer/*": "./src/components/project-explorer/*",
     "./components/*": "./src/components/*.tsx",
