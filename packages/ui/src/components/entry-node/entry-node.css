@@ -3,7 +3,8 @@
   --entry-node-hover-base: #040816;
 }
 
-.entry-node-hover-surface:hover {
+.entry-node-hover-surface:hover,
+.entry-node-hover-surface[data-dragging="true"] {
   background:
     linear-gradient(
       90deg,

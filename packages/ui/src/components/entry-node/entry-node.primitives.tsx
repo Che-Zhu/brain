@@ -10,28 +10,23 @@ import type { EntryNodeStatusTone } from "./entry-node.types";
 
 interface StatusVisual {
   breathing: boolean;
-  haloClassName?: string;
   innerClassName: string;
 }
 
 const GREEN: StatusVisual = {
   breathing: true,
-  haloClassName: "bg-green-500/30",
   innerClassName: "bg-green-500",
 };
 const BLUE: StatusVisual = {
   breathing: true,
-  haloClassName: "bg-blue-500/30",
   innerClassName: "bg-blue-500",
 };
 const YELLOW: StatusVisual = {
   breathing: true,
-  haloClassName: "bg-yellow-500/30",
   innerClassName: "bg-yellow-500",
 };
 const GRAY_BREATHING: StatusVisual = {
   breathing: true,
-  haloClassName: "bg-neutral-500/30",
   innerClassName: "bg-neutral-500",
 };
 const GRAY_STATIC: StatusVisual = {
@@ -40,7 +35,6 @@ const GRAY_STATIC: StatusVisual = {
 };
 const RED: StatusVisual = {
   breathing: true,
-  haloClassName: "bg-red-500/30",
   innerClassName: "bg-red-500",
 };
 
@@ -131,11 +125,11 @@ function EntryNodeStatusDot({
       aria-hidden
       className="relative flex size-3.5 shrink-0 items-center justify-center rounded-full"
     >
-      {visual.breathing && visual.haloClassName ? (
+      {visual.breathing ? (
         <span
           className={cn(
-            "absolute size-2 animate-ping rounded-full",
-            visual.haloClassName
+            "absolute size-2 animate-ping rounded-full opacity-75",
+            visual.innerClassName
           )}
         />
       ) : null}
@@ -146,7 +140,13 @@ function EntryNodeStatusDot({
   );
 }
 
-function EntryNodeCollapsedBadgeInner({ className }: { className?: string }) {
+function EntryNodeCollapsedBadgeInner({
+  className,
+  dragging = false,
+}: {
+  className?: string;
+  dragging?: boolean;
+}) {
   const {
     states: { name, status },
   } = useEntryNode();
@@ -159,6 +159,7 @@ function EntryNodeCollapsedBadgeInner({ className }: { className?: string }) {
         "entry-node-hover-surface flex h-10 w-40 min-w-0 items-center gap-2 overflow-hidden rounded-lg border-[0.5px] border-white/10 bg-white/5 p-2.5 text-zinc-50 backdrop-blur-sm transition-[background,box-shadow]",
         className
       )}
+      data-dragging={dragging ? "true" : undefined}
       data-slot="entry-node-collapsed-badge"
       role="status"
       title={name}
@@ -172,20 +173,22 @@ function EntryNodeCollapsedBadgeInner({ className }: { className?: string }) {
   );
 }
 
+interface EntryNodeCollapsedBadgeProps {
+  className?: string;
+  dragging?: boolean;
+}
+
 export function EntryNodeCollapsedBadge({
   className,
   dragging = false,
-}: {
-  className?: string;
-  dragging?: boolean;
-}) {
+}: EntryNodeCollapsedBadgeProps) {
   if (dragging) {
     return (
       <div
-        className="relative inline-flex rounded-md p-1 before:pointer-events-none before:absolute before:inset-0 before:rounded-md before:border before:border-white before:content-['']"
+        className="entry-node-drag-frame inline-flex rounded-md border border-white p-1"
         data-slot="entry-node-drag-frame"
       >
-        <EntryNodeCollapsedBadgeInner className={className} />
+        <EntryNodeCollapsedBadgeInner className={className} dragging />
       </div>
     );
   }
