@@ -1,0 +1,99 @@
+# Notif claim that produces a reusable Grafana alert system through:
+#   spec.crossplane.compositionRef.name: notifs-grafana-alert-system-go-templating
+#
+# The four Grafana resource names derive from spec.grafana.name unless individual metadataName
+# overrides are added:
+# - GrafanaFolder: webhook-test-folder
+# - GrafanaContactPoint: webhook-test-contact-point, spec.name receiver webhook-test
+# - GrafanaNotificationPolicy: webhook-test-policy
+# - GrafanaAlertRuleGroup: webhook-test-alert-rule-group
+apiVersion: example.crossplane.io/v1
+kind: Notif
+metadata:
+  name: webhook-test-grafana-alert-system
+  namespace: vm
+spec:
+  crossplane:
+    compositionRef:
+      name: notifs-grafana-alert-system-go-templating
+  grafana:
+    name: webhook-test
+    namespace: vm
+    matchLabels:
+      dashboards: grafana
+    folder:
+      alert:
+        title: Alerts
+    contactPoint:
+      settings:
+        httpMethod: POST
+        url: >-
+          https://xxx
+        title: '{{ .CommonLabels.alertname }} - {{ .Status | toUpper }}'
+        message: '{"title":"{{ .CommonLabels.alertname }}","summary":"{{ .CommonAnnotations.summary }}","description":"{{ .CommonAnnotations.description }}","severity":"{{ index .CommonLabels "severity" }}","category":"grafana","status":"{{ .Status }}","link":"{{ .GeneratorURL }}","dedupeKey":"{{ .GroupKey }}","alertname":"{{ .CommonLabels.alertname }}","startsAt":"{{ .StartsAt }}"}'
+    notificationPolicy:
+      route:
+        receiver: webhook-test
+        object_matchers:
+          - - contactpoint
+            - =
+            - webhook-test
+    alertRuleGroup:
+      interval: 5m
+      resyncPeriod: 5m0s
+      rules:
+        - uid: ns-admin-all-pods-cpu
+          title: 'All pods CPU usage in ns-admin (per pod)'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: xxx
+              model:
+                editorMode: code
+                expr: |
+                  sum by (pod) (
+                    rate(
+                      container_cpu_usage_seconds_total{
+                        namespace="ns-admin",
+                        container!=""
+                      }[5m]
+                    )
+                  )
+                instant: true
+                intervalMs: 1000
+                legendFormat: "{{ pod }}"
+                maxDataPoints: 43200
+                range: false
+            - refId: C
+              datasourceUid: xxx
+              model:
+                conditions:
+                  - evaluator:
+                      params: [-1]
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: [A]
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                expression: A
+                type: threshold
+          for: 0m
+          keepFiringFor: 0m
+          noDataState: NoData
+          execErrState: KeepLast
+          annotations:
+            description: |
+              Pod {{ $labels.pod }} in ns-admin has average CPU usage of {{ $values.A.Value | printf "%.3f" }} cores (last 5m)
+            summary: 'ns-admin pod CPU report'
+          labels:
+            contactpoint: webhook-test
+            severity: test
+            namespace: ns-admin
+          isPaused: false

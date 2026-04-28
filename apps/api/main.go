@@ -19,6 +19,7 @@ import (
 	"sealos/api/route/db"
 	"sealos/api/route/health"
 	"sealos/api/route/k8s"
+	"sealos/api/route/notif"
 	"sealos/api/route/project"
 	"sealos/api/route/task"
 	"sealos/api/route/telemetry"
@@ -72,6 +73,7 @@ func main() {
 	project.Register(api)
 	db.Register(api)
 	task.Register(api)
+	notif.Register(api)
 	telemetry.Register(api)
 
 	fmt.Println("Server listening on :9000")
