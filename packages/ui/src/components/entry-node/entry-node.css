@@ -10,7 +10,7 @@
 }
 
 .entry-node-hover-surface:hover,
-.entry-node-hover-surface[data-dragging="true"] {
+.entry-node-drag-frame[data-dragging="true"] .entry-node-hover-surface {
   background:
     linear-gradient(
       90deg,
@@ -30,6 +30,198 @@
   box-shadow:
     0 1px 3px 0 rgb(0 0 0 / 10%),
     0 1px 2px 0 rgb(0 0 0 / 6%);
+}
+
+.entry-node-bounds {
+  --entry-node-surface-overlay: rgb(255 255 255 / 4.5%);
+  --entry-node-hover-base: #040816;
+  --entry-node-card-width-collapsed: calc(var(--spacing) * 40);
+  --entry-node-card-height-collapsed: calc(var(--spacing) * 10);
+  --entry-node-card-width-expanded: calc(var(--spacing) * 66.75);
+  --entry-node-card-height-expanded: calc(var(--spacing) * 55);
+  --entry-node-connection-size: calc(var(--spacing) * 5);
+  --entry-node-connection-gap: calc(var(--spacing) * 1.5);
+  --entry-node-bounds-gutter: calc(
+    var(--entry-node-connection-size) +
+    var(--entry-node-connection-gap)
+  );
+  width: calc(
+    var(--entry-node-card-width-collapsed) +
+    var(--entry-node-bounds-gutter) *
+    2
+  );
+  height: calc(
+    var(--entry-node-card-height-collapsed) +
+    var(--entry-node-bounds-gutter) *
+    2
+  );
+  transition:
+    width 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.entry-node-bounds[data-state="expanded"] {
+  width: calc(
+    var(--entry-node-card-width-expanded) +
+    var(--entry-node-bounds-gutter) *
+    2
+  );
+  height: calc(
+    var(--entry-node-card-height-expanded) +
+    var(--entry-node-bounds-gutter) *
+    2
+  );
+}
+
+.entry-node-card {
+  --entry-node-surface-overlay: rgb(255 255 255 / 4.5%);
+  --entry-node-card-width-collapsed: calc(var(--spacing) * 40);
+  --entry-node-card-height-collapsed: calc(var(--spacing) * 10);
+  --entry-node-card-width-expanded: calc(var(--spacing) * 66.75);
+  --entry-node-card-height-expanded: calc(var(--spacing) * 55);
+  width: var(--entry-node-card-width-collapsed);
+  min-height: var(--entry-node-card-height-collapsed);
+  background: rgb(255 255 255 / 5%);
+  transition:
+    width 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    min-height 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card {
+  width: var(--entry-node-card-width-expanded);
+  min-height: var(--entry-node-card-height-expanded);
+}
+
+.entry-node-card-header {
+  min-height: var(--entry-node-card-height-collapsed);
+  padding: calc(var(--spacing) * 2.5);
+}
+
+.entry-node-card-header,
+.entry-node-card-header:hover,
+.entry-node-card-header:focus-visible,
+.entry-node-card-header[aria-expanded="true"] {
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card-header {
+  align-items: flex-start;
+  min-height: calc(var(--spacing) * 11.5);
+}
+
+.entry-node-card-header-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-node-card-access-value {
+  display: none;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card-access-value {
+  display: block;
+}
+
+.entry-node-card-status-pill {
+  display: none;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card-status-pill {
+  display: flex;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card-status-dot {
+  display: none;
+}
+
+.entry-node-card-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 120ms ease;
+}
+
+.entry-node-bounds[data-state="expanded"] .entry-node-card-body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-delay: 40ms;
+}
+
+.entry-node-card-body-clip {
+  min-height: 0;
+  padding: 0 calc(var(--spacing) * 2.5) calc(var(--spacing) * 2.5);
+  overflow: hidden;
+}
+
+.entry-node-domain-copy:hover,
+.entry-node-domain-copy:focus-visible,
+.entry-node-domain-copy[data-copied="true"] {
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(90deg, rgb(9 9 11 / 10%) 0%, rgb(9 9 11 / 10%) 100%);
+  box-shadow:
+    0 1px 1.5px 0 rgb(0 0 0 / 10%),
+    0 1px 1px 0 rgb(0 0 0 / 6%);
+}
+
+.entry-node-connection-button {
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(90deg, rgb(8 10 17) 0%, rgb(8 10 17) 100%);
+}
+
+.entry-node-connection-button:hover,
+.entry-node-connection-button:focus-visible,
+.entry-node-connection-button[data-active="true"] {
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-hover-base) 0%,
+      var(--entry-node-hover-base) 100%
+    );
+}
+
+.entry-node-connection-button[data-side="top"] {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.entry-node-connection-button[data-side="right"] {
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.entry-node-connection-button[data-side="bottom"] {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.entry-node-connection-button[data-side="left"] {
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
 }
 
 .entry-node-drag-frame {

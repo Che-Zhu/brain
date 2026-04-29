@@ -2,13 +2,17 @@
 
 import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
 import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
-import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-node";
+import type {
+  EntryNodeDomains,
+  EntryNodeStates,
+} from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 interface CanvasEntryNodeData extends Record<string, unknown> {
+  domains: EntryNodeDomains;
   states: EntryNodeStates;
 }
 
@@ -66,22 +70,44 @@ const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
   }, [dragging, positionAbsoluteX, positionAbsoluteY]);
 
   return (
-    <EntryNode.Root states={data.states}>
-      <EntryNode.CollapsedBadge dragAngle={dragAngle} dragging={dragging} />
-    </EntryNode.Root>
+    <EntryNode
+      state={{
+        domains: data.domains,
+        interaction: { dragAngle, dragging },
+        states: data.states,
+      }}
+    />
   );
 });
 
 PreviewCanvasEntryNode.displayName = "PreviewCanvasEntryNode";
 
 const entryNodeStates: EntryNodeStates = {
-  name: "orders-public-domain-with-a-very-long-entry-node-name",
-  status: { label: "Unhealthy" },
+  name: "orders.demo.sealos.run",
+  status: { label: "Accessible", tone: "accessible" },
+};
+
+const entryNodeDomains: EntryNodeDomains = {
+  access: {
+    label: "Access domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+  private: {
+    label: "Private domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+  public: {
+    label: "Public domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
 };
 
 const ENTRY_NODE_CANVAS_NODES: Node<CanvasEntryNodeData, "entryNode">[] = [
   {
-    data: { states: entryNodeStates },
+    data: { domains: entryNodeDomains, states: entryNodeStates },
     id: "entry-node-1",
     position: { x: 220, y: 160 },
     type: "entryNode",

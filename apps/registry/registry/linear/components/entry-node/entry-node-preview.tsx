@@ -1,13 +1,17 @@
 "use client";
 
-import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-node";
+import type {
+  EntryNodeDomains,
+  EntryNodeDragAngle,
+  EntryNodeStates,
+} from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
 
-const unhealthy: EntryNodeStates = {
-  name: "Placeholder",
-  status: { label: "Unhealthy" },
+const accessible: EntryNodeStates = {
+  name: "orders.demo.sealos.run",
+  status: { label: "Accessible", tone: "accessible" },
 };
 
 const statusSamples: EntryNodeStates[] = [
@@ -37,6 +41,24 @@ const statusSamples: EntryNodeStates[] = [
   },
 ];
 
+const defaultDomains: EntryNodeDomains = {
+  access: {
+    label: "Access domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+  private: {
+    label: "Private domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+  public: {
+    label: "Public domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+};
+
 function PreviewSurface({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-28 items-center justify-center bg-canvas-surface p-6">
@@ -45,18 +67,33 @@ function PreviewSurface({ children }: { children: ReactNode }) {
   );
 }
 
-function BadgeRow({ states }: { states: EntryNodeStates }) {
+function EntryNodeSample({
+  defaultExpanded = false,
+  dragAngle,
+  dragging,
+  states,
+}: {
+  defaultExpanded?: boolean;
+  dragAngle?: EntryNodeDragAngle;
+  dragging?: boolean;
+  states: EntryNodeStates;
+}) {
   return (
-    <EntryNode.Root states={states}>
-      <EntryNode.CollapsedBadge />
-    </EntryNode.Root>
+    <EntryNode
+      defaultExpanded={defaultExpanded}
+      state={{
+        domains: defaultDomains,
+        interaction: { dragAngle, dragging },
+        states,
+      }}
+    />
   );
 }
 
 function DragSample({ angle, label }: { angle: number; label: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <EntryNode.CollapsedBadge dragAngle={angle} />
+      <EntryNodeSample dragAngle={angle} dragging states={accessible} />
       <span className="text-muted-foreground text-xs">{label}</span>
     </div>
   );
@@ -65,47 +102,41 @@ function DragSample({ angle, label }: { angle: number; label: string }) {
 export default function EntryNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
-      <Preview title="Default unhealthy">
+      <Preview title="Collapsed card">
         <PreviewSurface>
-          <BadgeRow states={unhealthy} />
+          <EntryNodeSample states={accessible} />
         </PreviewSurface>
       </Preview>
-      <Preview title="When drag">
+      <Preview title="Expanded card">
         <PreviewSurface>
-          <EntryNode.Root states={unhealthy}>
-            <EntryNode.CollapsedBadge dragAngle={0} dragging />
-          </EntryNode.Root>
+          <EntryNodeSample defaultExpanded states={accessible} />
         </PreviewSurface>
       </Preview>
       <Preview className="lg:col-span-2" title="Drag direction strokes">
         <PreviewSurface>
-          <EntryNode.Root states={unhealthy}>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <DragSample angle={0} label="right" />
-              <DragSample angle={90} label="down" />
-              <DragSample angle={180} label="left" />
-              <DragSample angle={-90} label="up" />
-            </div>
-          </EntryNode.Root>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <DragSample angle={0} label="right" />
+            <DragSample angle={90} label="down" />
+            <DragSample angle={180} label="left" />
+            <DragSample angle={-90} label="up" />
+          </div>
         </PreviewSurface>
       </Preview>
       <Preview title="Long name truncation">
         <PreviewSurface>
-          <EntryNode.Root
+          <EntryNodeSample
             states={{
               name: "orders-public-domain-with-a-very-long-entry-node-name",
-              status: { label: "Accessible" },
+              status: { label: "Accessible", tone: "accessible" },
             }}
-          >
-            <EntryNode.CollapsedBadge />
-          </EntryNode.Root>
+          />
         </PreviewSurface>
       </Preview>
       <Preview className="lg:col-span-2" title="Status colours">
         <PreviewSurface>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {statusSamples.map((states) => (
-              <BadgeRow key={states.name} states={states} />
+              <EntryNodeSample key={states.name} states={states} />
             ))}
           </div>
         </PreviewSurface>

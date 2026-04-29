@@ -130,9 +130,9 @@
       "name": "entry-node",
       "type": "registry:ui",
       "title": "Entry Node",
-      "description": "Collapsed entry node status badge with local status colours",
+      "description": "Animated entry node card with expanded domain details and connector controls",
       "dependencies": ["lucide-react"],
-      "registryDependencies": [],
+      "registryDependencies": ["button"],
       "files": [
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",
@@ -140,14 +140,84 @@
           "target": "components/entry-node/entry-node.types.ts"
         },
         {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.context.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.context.tsx"
+          "path": "../../packages/ui/src/components/entry-node/entry-node.guards.ts",
+          "type": "registry:lib",
+          "target": "components/entry-node/entry-node.guards.ts"
         },
         {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.primitives.tsx",
+          "path": "../../packages/ui/src/components/entry-node/entry-node.context.ts",
           "type": "registry:component",
-          "target": "components/entry-node/entry-node.primitives.tsx"
+          "target": "components/entry-node/entry-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.default-view.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.default-view.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.status.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.status.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.drag-frame.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.drag-frame.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.connection-button.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.connection-button.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.connection-layer.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.connection-layer.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.header.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.header.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.domain-section.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.domain-section.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.domain-list.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.domain-list.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.body.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.body.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.card.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.card.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.bounds.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.bounds.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/index.ts",
+          "type": "registry:component",
+          "target": "components/entry-node/index.ts"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.css",
