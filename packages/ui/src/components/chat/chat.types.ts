@@ -1,4 +1,8 @@
-import type { ChatStatus, UIMessage } from "ai";
+import type {
+  ChatAddToolApproveResponseFunction,
+  ChatStatus,
+  UIMessage,
+} from "ai";
 import type { ComponentProps, ReactNode, RefObject } from "react";
 
 export type { UIMessage } from "ai";
@@ -81,7 +85,9 @@ export interface ChatInputContextValue extends ChatInputCallbacks {
 }
 
 export interface ChatMessagesStates {
-  /** AI SDK UI messages (newest last). Only `text` parts are rendered. */
+  /** When set (e.g. from `useChat`), tool parts in `approval-requested` can call this to continue the stream. */
+  addToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+  /** AI SDK UI messages (newest last). */
   messages: UIMessage[];
   /** `useChat` / `AbstractChat` status; when `"submitted"`, shows a loading row before tokens arrive. */
   status?: ChatStatus;

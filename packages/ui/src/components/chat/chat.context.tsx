@@ -106,10 +106,11 @@ export function ChatRoot({
       return;
     }
     onSend?.(value);
+    setValue("");
     if (isStreamingProp === undefined) {
       setResponding(true);
     }
-  }, [effectiveResponding, isStreamingProp, onSend, onStop, value]);
+  }, [effectiveResponding, isStreamingProp, onSend, onStop, setValue, value]);
 
   const input = useMemo(
     (): ChatInputContextValue => ({

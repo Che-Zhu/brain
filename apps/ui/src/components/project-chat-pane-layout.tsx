@@ -1,7 +1,10 @@
 "use client";
 
+import { useChat as useAIChat } from "@ai-sdk/react";
 import { Button } from "@workspace/ui/components/button";
-import { Chat, type UIMessage } from "@workspace/ui/components/chat/chat";
+import { Chat } from "@workspace/ui/components/chat/chat";
+import { cn } from "@workspace/ui/lib/utils";
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { useAtomValue } from "jotai";
 import { PanelRightClose } from "lucide-react";
 import type { ReactNode } from "react";
@@ -10,39 +13,47 @@ import {
   toggleRightPaneVisibility,
 } from "@/store/layout-store";
 
-const MOCK_CHAT_MESSAGES: UIMessage[] = [
-  {
-    id: "mock-1",
-    role: "user",
-    parts: [{ type: "text", text: "Example prompt — no backend wired yet." }],
-  },
-  {
-    id: "mock-2",
-    role: "assistant",
-    parts: [
-      {
-        type: "text",
-        text: "Placeholder reply. Hook `onSend` and message state to your chat API when ready.",
-      },
-    ],
-  },
-];
+function ProjectAssistantChatPane({
+  onClosePane,
+}: {
+  onClosePane: () => void;
+}) {
+  const {
+    messages,
+    sendMessage,
+    status,
+    stop,
+    setMessages,
+    addToolApprovalResponse,
+  } = useAIChat({
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+  });
 
-function ProjectRightPaneChat({ onClosePane }: { onClosePane: () => void }) {
+  const busy = status === "submitted" || status === "streaming";
+
   return (
     <Chat.Root
       header={{
         actions: {
           onExport: () => undefined,
-          onNewThread: () => undefined,
+          onNewThread: () => setMessages([]),
         },
         states: {
           threadName: "Assistant",
         },
       }}
+      isStreaming={busy}
       messages={{
-        states: { messages: MOCK_CHAT_MESSAGES, status: undefined },
+        states: {
+          addToolApprovalResponse,
+          messages,
+          status,
+        },
       }}
+      onSend={async (text) => {
+        await sendMessage({ text });
+      }}
+      onStop={stop}
     >
       <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
         <Chat.Header
@@ -69,7 +80,8 @@ function ProjectRightPaneChat({ onClosePane }: { onClosePane: () => void }) {
   );
 }
 
-export default function ProjectLayoutShell({
+/** Main project column + optional right assistant chat pane (uses `POST /api/chat` + AI SDK `useChat`). */
+export default function ProjectChatPaneLayout({
   children,
 }: {
   children: ReactNode;
@@ -79,14 +91,16 @@ export default function ProjectLayoutShell({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
       {children}
-      {rightPaneOpen ? (
-        <aside
-          className="box-border flex min-h-0 w-[35%] min-w-0 shrink-0 flex-col overflow-hidden border-border border-l bg-background"
-          data-slot="project-right-pane"
-        >
-          <ProjectRightPaneChat onClosePane={toggleRightPaneVisibility} />
-        </aside>
-      ) : null}
+      <aside
+        aria-hidden={!rightPaneOpen}
+        className={cn(
+          "box-border flex min-h-0 w-[35%] min-w-0 shrink-0 flex-col overflow-hidden border-border border-l bg-background",
+          !rightPaneOpen && "hidden"
+        )}
+        data-slot="project-right-pane"
+      >
+        <ProjectAssistantChatPane onClosePane={toggleRightPaneVisibility} />
+      </aside>
     </div>
   );
 }

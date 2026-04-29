@@ -303,6 +303,27 @@ export const Index: RegistryIndex = {
       import("@registry/linear/components/metrics-chart/metrics-chart-preview"),
   },
 
+  "linear/components/agui": {
+    style: "linear",
+    group: "components",
+    name: "agui",
+    title: "AGUI",
+    description:
+      "json-render MetricsChart: catalog + registry from @workspace/ui, dummy spec for local preview",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "chart"],
+    files: [
+      {
+        path: "registry/linear/components/agui/agui-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () => import("@registry/linear/components/agui/agui-preview"),
+  },
+
   "shadcn/components/accordion": {
     style: "shadcn",
     group: "components",

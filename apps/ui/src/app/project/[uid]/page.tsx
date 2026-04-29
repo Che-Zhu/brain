@@ -6,7 +6,7 @@ import { useAtomValue } from "jotai";
 import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
-
+import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
 import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import {
@@ -53,23 +53,25 @@ export default function ProjectUidPage() {
   });
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col">
-      {kubeconfig !== "" &&
-        !isLoading &&
-        error == null &&
-        canvasState.nodes.length > 0 && (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <Canvas.Root
-              actions={{ onPanelClose: closeCanvasSelection }}
-              meta={meta}
-              state={{ ...canvasState, selectedEdge, selectedNode }}
-            >
-              <Canvas.Flow>
-                <Canvas.Panel />
-              </Canvas.Flow>
-            </Canvas.Root>
-          </div>
-        )}
-    </div>
+    <ProjectChatPaneLayout>
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        {kubeconfig !== "" &&
+          !isLoading &&
+          error == null &&
+          canvasState.nodes.length > 0 && (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <Canvas.Root
+                actions={{ onPanelClose: closeCanvasSelection }}
+                meta={meta}
+                state={{ ...canvasState, selectedEdge, selectedNode }}
+              >
+                <Canvas.Flow>
+                  <Canvas.Panel />
+                </Canvas.Flow>
+              </Canvas.Root>
+            </div>
+          )}
+      </div>
+    </ProjectChatPaneLayout>
   );
 }
