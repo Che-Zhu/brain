@@ -28,7 +28,7 @@ spec:
       settings:
         httpMethod: POST
         url: >-
-          https://xxx
+          https://webhook.site/6307d9fd-93f2-41b5-90e5-785c90ec3a7b
         title: '{{ .CommonLabels.alertname }} - {{ .Status | toUpper }}'
         message: '{"title":"{{ .CommonLabels.alertname }}","summary":"{{ .CommonAnnotations.summary }}","description":"{{ .CommonAnnotations.description }}","severity":"{{ index .CommonLabels "severity" }}","category":"grafana","status":"{{ .Status }}","link":"{{ .GeneratorURL }}","dedupeKey":"{{ .GroupKey }}","alertname":"{{ .CommonLabels.alertname }}","startsAt":"{{ .StartsAt }}"}'
     notificationPolicy:
@@ -42,37 +42,66 @@ spec:
       interval: 5m
       resyncPeriod: 5m0s
       rules:
-        - uid: ns-admin-all-pods-cpu
-          title: 'All pods CPU usage in ns-admin (per pod)'
+        # refId A: Prometheus PromQL only (use datasource UID below). refId C: threshold uses datasourceUid __expr__.
+        # Percent vs kube Pod limits — omit pods/containers without a positive limit (avoid clamp_min bogus values).
+        - uid: ns-user-pods-cpu-pct-limit
+          title: 'User namespaces — pod CPU vs limit > 80% (ns-*)'
           condition: C
           data:
             - refId: A
               relativeTimeRange:
                 from: 300
                 to: 0
-              datasourceUid: xxx
+              datasourceUid: 145ef98e-a5c6-4abc-a326-43408aab4e8d
               model:
+                datasource:
+                  type: prometheus
+                  uid: 145ef98e-a5c6-4abc-a326-43408aab4e8d
+                refId: A
                 editorMode: code
                 expr: |
-                  sum by (pod) (
-                    rate(
-                      container_cpu_usage_seconds_total{
-                        namespace="ns-admin",
-                        container!=""
-                      }[5m]
-                    )
+                  (
+                    (
+                      sum by (namespace, pod, container) (
+                        rate(
+                          container_cpu_usage_seconds_total{
+                            container!="",
+                            container!="POD",
+                            image!="",
+                            namespace=~"ns-.*"
+                          }[5m]
+                        )
+                      )
+                      /
+                      sum by (namespace, pod, container) (
+                        kube_pod_container_resource_limits{
+                          resource="cpu",
+                          namespace=~"ns-.*"
+                        }
+                      )
+                    ) * 100
+                  )
+                  and on (namespace, pod, container)
+                  (
+                    sum by (namespace, pod, container) (
+                      kube_pod_container_resource_limits{
+                        resource="cpu",
+                        namespace=~"ns-.*"
+                      }
+                    ) > 0
                   )
                 instant: true
                 intervalMs: 1000
-                legendFormat: "{{ pod }}"
+                legendFormat: '{{ namespace }}/{{ pod }}/{{ container }}'
                 maxDataPoints: 43200
                 range: false
             - refId: C
-              datasourceUid: xxx
+              datasourceUid: __expr__
               model:
+                refId: C
                 conditions:
                   - evaluator:
-                      params: [-1]
+                      params: [80]
                       type: gt
                     operator:
                       type: and
@@ -84,16 +113,95 @@ spec:
                     type: query
                 expression: A
                 type: threshold
-          for: 0m
+          for: 5m
           keepFiringFor: 0m
           noDataState: NoData
           execErrState: KeepLast
           annotations:
             description: |
-              Pod {{ $labels.pod }} in ns-admin has average CPU usage of {{ $values.A.Value | printf "%.3f" }} cores (last 5m)
-            summary: 'ns-admin pod CPU report'
+              {{ $labels.namespace }}/pod {{ $labels.pod }}/{{ $labels.container }} CPU ~{{ $values.A.Value | printf "%.1f" }}% of limit (5m avg vs kube limit).
+            summary: 'User ns pod CPU > 80% of limit'
           labels:
             contactpoint: webhook-test
-            severity: test
-            namespace: ns-admin
+            severity: warning
+          isPaused: false
+
+        - uid: ns-user-pods-memory-pct-limit
+          title: 'User namespaces — pod memory vs limit > 80% (ns-*)'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: 145ef98e-a5c6-4abc-a326-43408aab4e8d
+              model:
+                datasource:
+                  type: prometheus
+                  uid: 145ef98e-a5c6-4abc-a326-43408aab4e8d
+                refId: A
+                editorMode: code
+                expr: |
+                  (
+                    (
+                      sum by (namespace, pod, container) (
+                        container_memory_working_set_bytes{
+                          container!="",
+                          container!="POD",
+                          image!="",
+                          namespace=~"ns-.*"
+                        }
+                      )
+                      /
+                      sum by (namespace, pod, container) (
+                        kube_pod_container_resource_limits{
+                          resource="memory",
+                          namespace=~"ns-.*"
+                        }
+                      )
+                    ) * 100
+                  )
+                  and on (namespace, pod, container)
+                  (
+                    sum by (namespace, pod, container) (
+                      kube_pod_container_resource_limits{
+                        resource="memory",
+                        namespace=~"ns-.*"
+                      }
+                    ) > 0
+                  )
+                instant: true
+                intervalMs: 1000
+                legendFormat: '{{ namespace }}/{{ pod }}/{{ container }}'
+                maxDataPoints: 43200
+                range: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                refId: C
+                conditions:
+                  - evaluator:
+                      params: [80]
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: [A]
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                expression: A
+                type: threshold
+          for: 5m
+          keepFiringFor: 0m
+          noDataState: NoData
+          execErrState: KeepLast
+          annotations:
+            description: |
+              {{ $labels.namespace }}/pod {{ $labels.pod }}/{{ $labels.container }} memory ~{{ $values.A.Value | printf "%.1f" }}% of limit (working set vs kube limit).
+            summary: 'User ns pod memory > 80% of limit'
+          labels:
+            contactpoint: webhook-test
+            severity: warning
           isPaused: false

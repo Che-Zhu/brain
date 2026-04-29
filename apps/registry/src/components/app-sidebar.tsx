@@ -233,7 +233,7 @@ export default function AppSidebar({
                     >
                       <CollapsibleTrigger
                         className={cn(
-                          "hoverable flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl py-0 text-left font-medium text-xs outline-hidden ring-sidebar-ring",
+                          "flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl py-0 text-left font-medium text-xs outline-hidden ring-sidebar-ring",
                           "focus-visible:ring-2"
                         )}
                         type="button"

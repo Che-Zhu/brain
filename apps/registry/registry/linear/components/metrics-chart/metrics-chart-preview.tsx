@@ -3,6 +3,7 @@
 import { MetricsChart } from "@workspace/ui/components/metrics-chart/metrics-chart";
 import type { MetricsData } from "@workspace/ui/components/metrics-chart/metrics-chart.types";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
+import type { ReactNode } from "react";
 
 const SAMPLE_BASE_SECONDS = Math.floor(Date.now() / 1000) - 3600;
 
@@ -30,38 +31,50 @@ const SAMPLE_STORAGE_DUMMY: MetricsData = {
   storage: buildSampleSeries(18, 44, 14),
 };
 
+function MetricsPreviewChartSurface({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      {/*
+        Isolate chart box from padded flex parents so Recharts ResponsiveContainer gets a positive
+        width/height on first layout (avoids width(-1)/height(-1) console warnings).
+      */}
+      <div className="h-56 min-h-56 w-full min-w-0">{children}</div>
+    </div>
+  );
+}
+
 export default function MetricsChartPreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
       <Preview
-        className="min-h-[200px]"
+        className="min-h-[280px]"
         showMaximize
         title="MetricsChart — Variant1 (multi-series)"
       >
-        <div className="flex min-h-[220px] w-full flex-col rounded-xl border border-border bg-background p-4">
+        <MetricsPreviewChartSurface>
           <MetricsChart.Variant1 data={SAMPLE_MULTI_SERIES} />
-        </div>
+        </MetricsPreviewChartSurface>
       </Preview>
       <Preview
-        className="min-h-[200px]"
+        className="min-h-[280px]"
         showMaximize
         title="MetricsChart — Variant0 (single series: cpu)"
       >
-        <div className="flex min-h-[220px] w-full flex-col rounded-xl border border-border bg-background p-4">
+        <MetricsPreviewChartSurface>
           <MetricsChart.Variant0 data={SAMPLE_MULTI_SERIES} dataKey="cpu" />
-        </div>
+        </MetricsPreviewChartSurface>
       </Preview>
       <Preview
-        className="min-h-[200px]"
+        className="min-h-[280px]"
         showMaximize
         title="MetricsChart — Variant0 (dummy storage)"
       >
-        <div className="flex min-h-[220px] w-full flex-col rounded-xl border border-border bg-background p-4">
+        <MetricsPreviewChartSurface>
           <MetricsChart.Variant0
             data={SAMPLE_STORAGE_DUMMY}
             dataKey="storage"
           />
-        </div>
+        </MetricsPreviewChartSurface>
       </Preview>
     </PreviewWrapper>
   );
