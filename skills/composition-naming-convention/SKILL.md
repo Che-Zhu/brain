@@ -1,9 +1,9 @@
 ---
-name: compound-ui-splitting
+name: composition-naming-convention
 description: How to split large React feature areas into files, name them, and expose a compound API. Use when refactoring component folders, designing context slices, or extending @workspace/ui feature modules.
 ---
 
-# Compound UI: splitting components
+# Composition and naming conventions
 
 General guidelines for **where to cut files**, **how to name them**, and **how to compose** a clear public API. Aligned with [Vercel composition patterns](https://github.com/vercel/composition-patterns)—compound components, context for shared state, avoid boolean-prop sprawl—not tied to any single domain (chat is one reference implementation under `packages/ui/src/components/chat`).
 
