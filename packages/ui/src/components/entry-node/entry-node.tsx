@@ -10,6 +10,7 @@ import { EntryNodeCollapsedBadge } from "./entry-node.primitives";
 // biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useEntryNode }`
 export { useEntryNode } from "./entry-node.context";
 export type {
+  EntryNodeDragAngle,
   EntryNodeStates,
   EntryNodeStatus,
   EntryNodeStatusTone,

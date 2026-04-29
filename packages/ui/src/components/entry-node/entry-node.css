@@ -1,3 +1,9 @@
+@property --entry-node-drag-gradient-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 99.5deg;
+}
+
 .entry-node-hover-surface {
   --entry-node-hover-overlay: rgb(255 255 255 / 4.5%);
   --entry-node-hover-base: #040816;
@@ -24,4 +30,55 @@
   box-shadow:
     0 1px 3px 0 rgb(0 0 0 / 10%),
     0 1px 2px 0 rgb(0 0 0 / 6%);
+}
+
+.entry-node-drag-frame {
+  /* Figma node 12:549: four 1px inside linear-gradient strokes, painted as an outer effect. */
+  --entry-node-drag-gradient-angle: 99.5deg;
+  --entry-node-drag-stroke: rgb(255 255 255 / 15%);
+  --entry-node-drag-stroke-clear: rgb(255 255 255 / 0%);
+  --entry-node-drag-stroke-stop: 16.72%;
+  position: relative;
+  transition: --entry-node-drag-gradient-angle 180ms
+    cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.entry-node-drag-frame::before {
+  position: absolute;
+  inset: -4px;
+  padding: 1px;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(
+      var(--entry-node-drag-gradient-angle),
+      var(--entry-node-drag-stroke) 0%,
+      var(--entry-node-drag-stroke-clear) var(--entry-node-drag-stroke-stop)
+    ),
+    linear-gradient(
+      var(--entry-node-drag-gradient-angle),
+      var(--entry-node-drag-stroke) 0%,
+      var(--entry-node-drag-stroke-clear) var(--entry-node-drag-stroke-stop)
+    ),
+    linear-gradient(
+      calc(var(--entry-node-drag-gradient-angle) + 180deg),
+      var(--entry-node-drag-stroke) 0%,
+      var(--entry-node-drag-stroke-clear) var(--entry-node-drag-stroke-stop)
+    ),
+    linear-gradient(
+      calc(var(--entry-node-drag-gradient-angle) + 180deg),
+      var(--entry-node-drag-stroke) 0%,
+      var(--entry-node-drag-stroke-clear) var(--entry-node-drag-stroke-stop)
+    );
+  border-radius: inherit;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transition: --entry-node-drag-gradient-angle 180ms
+    cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -53,6 +53,15 @@ function BadgeRow({ states }: { states: EntryNodeStates }) {
   );
 }
 
+function DragSample({ angle, label }: { angle: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <EntryNode.CollapsedBadge dragAngle={angle} />
+      <span className="text-muted-foreground text-xs">{label}</span>
+    </div>
+  );
+}
+
 export default function EntryNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
@@ -64,7 +73,19 @@ export default function EntryNodePreview() {
       <Preview title="When drag">
         <PreviewSurface>
           <EntryNode.Root states={unhealthy}>
-            <EntryNode.CollapsedBadge dragging />
+            <EntryNode.CollapsedBadge dragAngle={0} dragging />
+          </EntryNode.Root>
+        </PreviewSurface>
+      </Preview>
+      <Preview className="lg:col-span-2" title="Drag direction strokes">
+        <PreviewSurface>
+          <EntryNode.Root states={unhealthy}>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <DragSample angle={0} label="right" />
+              <DragSample angle={90} label="down" />
+              <DragSample angle={180} label="left" />
+              <DragSample angle={-90} label="up" />
+            </div>
           </EntryNode.Root>
         </PreviewSurface>
       </Preview>

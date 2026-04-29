@@ -34,3 +34,6 @@ export interface EntryNodeStates {
 export interface EntryNodeValue {
   states: EntryNodeStates;
 }
+
+/** Screen-space drag angle in degrees: 0 = right, 90 = down. */
+export type EntryNodeDragAngle = number;

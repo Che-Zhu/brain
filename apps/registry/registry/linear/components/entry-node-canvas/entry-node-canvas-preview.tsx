@@ -6,19 +6,68 @@ import type { EntryNodeStates } from "@workspace/ui/components/entry-node/entry-
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 interface CanvasEntryNodeData extends Record<string, unknown> {
   states: EntryNodeStates;
 }
 
+function unwrapDragAngle(angle: number, previousAngle: number | undefined) {
+  if (previousAngle === undefined) {
+    return angle;
+  }
+
+  let nextAngle = angle;
+
+  while (nextAngle - previousAngle > 180) {
+    nextAngle -= 360;
+  }
+
+  while (nextAngle - previousAngle < -180) {
+    nextAngle += 360;
+  }
+
+  return nextAngle;
+}
+
 const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
   data,
   dragging,
+  positionAbsoluteX,
+  positionAbsoluteY,
 }: NodeProps<Node<CanvasEntryNodeData, "entryNode">>) {
+  const previousPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const [dragAngle, setDragAngle] = useState<number>();
+
+  useEffect(() => {
+    if (!dragging) {
+      previousPositionRef.current = null;
+      setDragAngle(undefined);
+      return;
+    }
+
+    const currentPosition = { x: positionAbsoluteX, y: positionAbsoluteY };
+    const previousPosition = previousPositionRef.current;
+    previousPositionRef.current = currentPosition;
+
+    if (!previousPosition) {
+      return;
+    }
+
+    const deltaX = currentPosition.x - previousPosition.x;
+    const deltaY = currentPosition.y - previousPosition.y;
+
+    if (Math.hypot(deltaX, deltaY) < 1) {
+      return;
+    }
+
+    const nextAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    setDragAngle((previousAngle) => unwrapDragAngle(nextAngle, previousAngle));
+  }, [dragging, positionAbsoluteX, positionAbsoluteY]);
+
   return (
     <EntryNode.Root states={data.states}>
-      <EntryNode.CollapsedBadge dragging={dragging} />
+      <EntryNode.CollapsedBadge dragAngle={dragAngle} dragging={dragging} />
     </EntryNode.Root>
   );
 });

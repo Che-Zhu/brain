@@ -4,9 +4,13 @@ import "./entry-node.css";
 
 import { cn } from "@workspace/ui/lib/utils";
 import { Brain } from "lucide-react";
+import { type CSSProperties, useEffect, useState } from "react";
 
 import { useEntryNode } from "./entry-node.context";
-import type { EntryNodeStatusTone } from "./entry-node.types";
+import type {
+  EntryNodeDragAngle,
+  EntryNodeStatusTone,
+} from "./entry-node.types";
 
 interface StatusVisual {
   breathing: boolean;
@@ -37,6 +41,71 @@ const RED: StatusVisual = {
   breathing: true,
   innerClassName: "bg-red-500",
 };
+
+interface EntryNodeDragFrameStyle extends CSSProperties {
+  "--entry-node-drag-gradient-angle"?: string;
+}
+
+function getGradientAngle(dragAngle: EntryNodeDragAngle) {
+  return dragAngle - 90;
+}
+
+function getNearestPeriodicGradientAngle(
+  gradientAngle: number,
+  previousGradientAngle: number | undefined
+) {
+  if (previousGradientAngle === undefined) {
+    return gradientAngle;
+  }
+
+  let nextGradientAngle = gradientAngle;
+
+  while (nextGradientAngle - previousGradientAngle > 90) {
+    nextGradientAngle -= 180;
+  }
+
+  while (nextGradientAngle - previousGradientAngle < -90) {
+    nextGradientAngle += 180;
+  }
+
+  return nextGradientAngle;
+}
+
+function useDragGradientAngle(dragAngle: EntryNodeDragAngle | undefined) {
+  const [gradientAngle, setGradientAngle] = useState<number | undefined>(() => {
+    if (dragAngle === undefined || !Number.isFinite(dragAngle)) {
+      return undefined;
+    }
+
+    return getGradientAngle(dragAngle);
+  });
+
+  useEffect(() => {
+    if (dragAngle === undefined || !Number.isFinite(dragAngle)) {
+      setGradientAngle(undefined);
+      return;
+    }
+
+    setGradientAngle((previousGradientAngle) =>
+      getNearestPeriodicGradientAngle(
+        getGradientAngle(dragAngle),
+        previousGradientAngle
+      )
+    );
+  }, [dragAngle]);
+
+  return gradientAngle;
+}
+
+function getDragFrameStyle(
+  gradientAngle: number | undefined
+): EntryNodeDragFrameStyle | undefined {
+  if (gradientAngle === undefined) {
+    return undefined;
+  }
+
+  return { "--entry-node-drag-gradient-angle": `${gradientAngle}deg` };
+}
 
 function normalizeStatus(input: string | undefined): EntryNodeStatusTone {
   const normalized = input
@@ -175,18 +244,23 @@ function EntryNodeCollapsedBadgeInner({
 
 interface EntryNodeCollapsedBadgeProps {
   className?: string;
+  dragAngle?: EntryNodeDragAngle;
   dragging?: boolean;
 }
 
 export function EntryNodeCollapsedBadge({
   className,
+  dragAngle,
   dragging = false,
 }: EntryNodeCollapsedBadgeProps) {
-  if (dragging) {
+  const gradientAngle = useDragGradientAngle(dragAngle);
+
+  if (dragging || dragAngle !== undefined) {
     return (
       <div
-        className="entry-node-drag-frame inline-flex rounded-md border border-white p-1"
+        className="entry-node-drag-frame inline-flex rounded-md"
         data-slot="entry-node-drag-frame"
+        style={getDragFrameStyle(gradientAngle)}
       >
         <EntryNodeCollapsedBadgeInner className={className} dragging />
       </div>
