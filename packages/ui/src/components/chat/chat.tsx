@@ -10,7 +10,7 @@ import {
   useChatInput,
   useChatMessages,
 } from "./chat.context";
-import { ChatBreadcrumb, ChatHeader, ChatHeaderToolbar } from "./chat.header";
+import { ChatHeader, ChatHeaderToolbar, ChatThreadSelect } from "./chat.header";
 import {
   ChatComposer,
   ChatComposerActionMenu,
@@ -68,7 +68,6 @@ function ChatShell({ className, children, ...props }: ComponentProps<"div">) {
 }
 
 export const Chat = Object.assign(ChatShell, {
-  Breadcrumb: ChatBreadcrumb,
   Composer: ChatComposer,
   ComposerActionMenu: ChatComposerActionMenu,
   ComposerFooter: ChatComposerFooter,
@@ -79,6 +78,7 @@ export const Chat = Object.assign(ChatShell, {
   Header: ChatHeader,
   HeaderToolbar: ChatHeaderToolbar,
   Root: ChatRoot,
+  ThreadSelect: ChatThreadSelect,
   Transcript: ChatTranscript,
   useChat,
   useChatHeader,

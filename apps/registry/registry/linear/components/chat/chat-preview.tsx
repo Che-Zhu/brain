@@ -1,12 +1,9 @@
 "use client";
 
-import {
-  Chat,
-  type ChatHeaderStates,
-  type ChatHeaderThreadHistory,
-  type UIMessage,
-} from "@workspace/ui/components/chat/chat";
+import { Button } from "@workspace/ui/components/button";
+import { Chat, type UIMessage } from "@workspace/ui/components/chat/chat";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
+import { PanelRightClose } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 const threadAId = "thread-a";
@@ -15,36 +12,39 @@ const threadBId = "thread-b";
 const seedMessages: Record<string, UIMessage[]> = {
   [threadAId]: [
     {
-      id: "m1",
+      id: "mock-1",
       role: "user",
-      parts: [
-        { type: "text", text: "Summarize what this registry preview shows." },
-      ],
+      parts: [{ type: "text", text: "Example prompt — no backend wired yet." }],
     },
     {
-      id: "m2",
+      id: "mock-2",
       role: "assistant",
       parts: [
         {
           type: "text",
-          text: "It demonstrates **Chat.Root** with shared context: compose **Chat.Header**, **Chat.Transcript**, and **Chat.Composer** (or smaller pieces like **Chat.Breadcrumb**, **Chat.ComposerTextarea**).",
+          text: "Placeholder reply. Hook `onSend` and message state to your chat API when ready.",
         },
       ],
     },
   ],
   [threadBId]: [
     {
-      id: "m3",
+      id: "mock-3",
       role: "user",
-      parts: [{ type: "text", text: "Shorter reply please." }],
+      parts: [
+        {
+          type: "text",
+          text: "Second thread — switch via the title dropdown.",
+        },
+      ],
     },
     {
-      id: "m4",
+      id: "mock-4",
       role: "assistant",
       parts: [
         {
           type: "text",
-          text: "One provider; slice hooks: useChatHeader, useChatMessages, useChatInput.",
+          text: "Same **Chat.ThreadSelect** as production when `threadHistory` is passed.",
         },
       ],
     },
@@ -56,29 +56,8 @@ function ChatWorkspacePreview() {
   const [messagesByThread, setMessagesByThread] = useState(seedMessages);
   const [inputValue, setInputValue] = useState("");
 
+  const threadName = activeThreadId === threadAId ? "Onboarding" : "Quick ask";
   const messages = messagesByThread[activeThreadId] ?? [];
-
-  const headerStates: ChatHeaderStates = useMemo(
-    () => ({
-      breadcrumbParentHref: "#",
-      breadcrumbParentLabel: "Assistants",
-      characterName: "Registry preview",
-      threadName: activeThreadId === threadAId ? "Onboarding" : "Quick ask",
-    }),
-    [activeThreadId]
-  );
-
-  const threadHistory: ChatHeaderThreadHistory = useMemo(
-    () => ({
-      activeThreadId,
-      items: [
-        { id: threadAId, title: "Onboarding", updatedAt: "2h" },
-        { id: threadBId, title: "Quick ask", updatedAt: "Yesterday" },
-      ],
-      onSelect: setActiveThreadId,
-    }),
-    [activeThreadId]
-  );
 
   const appendUserAndStubAssistant = useCallback(
     (text: string) => {
@@ -103,7 +82,7 @@ function ChatWorkspacePreview() {
           parts: [
             {
               type: "text",
-              text: "Stub assistant reply — wire `onSend` to your model stream.",
+              text: "Stub reply — wire `onSend` to your model.",
             },
           ],
         };
@@ -123,20 +102,48 @@ function ChatWorkspacePreview() {
           actions: {
             onExport: () => undefined,
             onNewThread: () => setActiveThreadId(threadAId),
-            onSettings: () => undefined,
-            threadHistory,
+            threadHistory: {
+              activeThreadId,
+              items: [
+                { id: threadAId, title: "Onboarding", updatedAt: "2h" },
+                { id: threadBId, title: "Quick ask", updatedAt: "Yesterday" },
+              ],
+              onSelect: setActiveThreadId,
+            },
           },
-          states: headerStates,
+          states: {
+            threadName,
+          },
         }}
-        messages={{ states: { messages, status: undefined } }}
+        messages={{
+          states: { messages, status: undefined },
+        }}
         onSend={appendUserAndStubAssistant}
         onValueChange={setInputValue}
         value={inputValue}
       >
-        <Chat className="h-full">
-          <Chat.Header className="border-0" />
-          <Chat.Transcript />
-          <div className="shrink-0 p-2">
+        <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
+          <Chat.Header
+            className="shrink-0"
+            trailing={
+              <Button
+                aria-label="Close panel (preview — no action)"
+                className="hoverable rounded-xl"
+                onClick={() => undefined}
+                size="icon-lg"
+                type="button"
+                variant="ghost"
+              >
+                <PanelRightClose
+                  aria-hidden
+                  className="size-4"
+                  strokeWidth={2}
+                />
+              </Button>
+            }
+          />
+          <Chat.Transcript className="min-h-0 flex-1" />
+          <div className="shrink-0 border-border p-2">
             <Chat.Composer placeholder="Message…" />
           </div>
         </Chat>
@@ -161,14 +168,20 @@ function ChatSubmittedRowPreview() {
     <div className="h-56 w-full overflow-hidden rounded-xl border border-border bg-background">
       <Chat.Root
         header={{
+          actions: {
+            onExport: () => undefined,
+            onNewThread: () => undefined,
+          },
           states: {
-            characterName: "Preview",
             threadName: "Submitted",
           },
         }}
         messages={{ states: { messages, status: "submitted" } }}
       >
-        <Chat.Transcript />
+        <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
+          <Chat.Header className="shrink-0" />
+          <Chat.Transcript className="min-h-0 flex-1" />
+        </Chat>
       </Chat.Root>
     </div>
   );
@@ -177,7 +190,7 @@ function ChatSubmittedRowPreview() {
 export default function ChatPreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
-      <Preview title="Workspace — single Root, composed regions">
+      <Preview title="Project pane — thread dropdown + toolbar">
         <ChatWorkspacePreview />
       </Preview>
       <Preview title="Transcript — submitted (loading row)">
