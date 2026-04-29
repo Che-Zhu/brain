@@ -79,6 +79,14 @@ function CanvasFlow({ children }: CanvasFlowProps) {
 
   return (
     <div className="relative h-full min-h-0 w-full min-w-0">
+      {meta.upperRight ? (
+        <div
+          className="pointer-events-auto absolute top-2 right-2 z-10 flex items-center gap-2"
+          data-slot="canvas-upper-right"
+        >
+          {meta.upperRight}
+        </div>
+      ) : null}
       <div className="canvas-surface">
         <ReactFlow
           {...passThrough}

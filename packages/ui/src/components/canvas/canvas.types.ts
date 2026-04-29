@@ -60,6 +60,11 @@ export interface CanvasMeta {
   nodeTypes?: NodeTypes;
   panelTypes?: CanvasPanelTypes;
   reactFlowProps?: CanvasReactFlowProps;
+  /**
+   * Optional UI at the upper-right of the canvas viewport (above the flow), e.g.
+   * a Lucide `PanelRightOpen` control wired to open the app-level right pane.
+   */
+  upperRight?: ReactNode;
 }
 
 export interface CanvasContextValue {

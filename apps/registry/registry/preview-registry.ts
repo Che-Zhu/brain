@@ -165,6 +165,55 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/chat": {
+    style: "linear",
+    group: "components",
+    name: "chat",
+    title: "Chat",
+    description:
+      "Chat workspace: single Chat.Root + shared context; compose Header, Transcript, Composer (or Breadcrumb, ComposerTextarea, etc.); AI SDK message list",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "button",
+      "breadcrumb",
+      "dropdown-menu",
+      "textarea",
+      "spinner",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/chat/chat-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () => import("@registry/linear/components/chat/chat-preview"),
+  },
+
+  "linear/components/mdx": {
+    style: "linear",
+    group: "components",
+    name: "mdx",
+    title: "MDX / Markdown",
+    description:
+      "MessageResponse + shared markdownComponents (Streamdown): typography, lists, tables, Shiki-backed code blocks",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview"],
+    files: [
+      {
+        path: "registry/linear/components/mdx/mdx-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () => import("@registry/linear/components/mdx/mdx-preview"),
+  },
+
   "linear/components/project-explorer": {
     style: "linear",
     group: "components",
@@ -196,7 +245,7 @@ export const Index: RegistryIndex = {
     title: "Scale slider",
     description:
       "Stack + Header (Label + fixed NumberFlow) above Control; thumb has no label. Optional valueDisplay number (replicas) or percent.",
-    state: "coding",
+    state: "done",
     type: "registry:preview",
     registryDependencies: ["preview"],
     files: [
@@ -239,7 +288,7 @@ export const Index: RegistryIndex = {
     title: "Metrics chart",
     description:
       "Multi-series metrics area chart: MetricsChart.Root + Area compound API, MetricsChartProvider, useMetricsChart; Variant0 / Variant1",
-    state: "coding",
+    state: "done",
     type: "registry:preview",
     registryDependencies: ["preview", "chart"],
     files: [
