@@ -14,7 +14,7 @@ export function EntryNodeExpandButton({ className }: { className?: string }) {
     <Button
       aria-label={expanded ? "Collapse" : "Expand"}
       className={cn(
-        "entry-node-expand-button flex items-center justify-center rounded-lg border-[0.5px] border-white/10 p-0 shadow-none",
+        "nodrag nopan entry-node-expand-button flex items-center justify-center rounded-lg border-[0.5px] border-white/10 p-0 shadow-none",
         className
       )}
       data-slot="entry-node-expand-button"

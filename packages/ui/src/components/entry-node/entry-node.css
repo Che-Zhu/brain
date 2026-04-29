@@ -48,32 +48,16 @@
     var(--entry-node-connection-size) +
     var(--entry-node-connection-gap)
   );
-  width: calc(
-    var(--entry-node-card-width-collapsed) +
-    var(--entry-node-bounds-gutter) *
-    2
-  );
-  height: calc(
-    var(--entry-node-card-height-collapsed) +
-    var(--entry-node-bounds-gutter) *
-    2
-  );
+  width: var(--entry-node-card-width-collapsed);
+  height: var(--entry-node-card-height-collapsed);
   transition:
     width 180ms cubic-bezier(0.16, 1, 0.3, 1),
     height 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .entry-node-bounds[data-state="expanded"] {
-  width: calc(
-    var(--entry-node-card-width-expanded) +
-    var(--entry-node-bounds-gutter) *
-    2
-  );
-  height: calc(
-    var(--entry-node-card-height-expanded) +
-    var(--entry-node-bounds-gutter) *
-    2
-  );
+  width: var(--entry-node-card-width-expanded);
+  height: var(--entry-node-card-height-expanded);
 }
 
 .entry-node-card {
@@ -221,26 +205,26 @@
 }
 
 .entry-node-connection-button[data-side="top"] {
-  top: 0;
+  top: calc(-1 * var(--entry-node-bounds-gutter));
   left: 50%;
   transform: translateX(-50%);
 }
 
 .entry-node-connection-button[data-side="right"] {
   top: 50%;
-  right: 0;
+  right: calc(-1 * var(--entry-node-bounds-gutter));
   transform: translateY(-50%);
 }
 
 .entry-node-connection-button[data-side="bottom"] {
-  bottom: 0;
+  bottom: calc(-1 * var(--entry-node-bounds-gutter));
   left: 50%;
   transform: translateX(-50%);
 }
 
 .entry-node-connection-button[data-side="left"] {
   top: 50%;
-  left: 0;
+  left: calc(-1 * var(--entry-node-bounds-gutter));
   transform: translateY(-50%);
 }
 
@@ -248,7 +232,11 @@
   .entry-node-connection-button[data-side="right"] {
   right: calc(
     -1 *
-    (var(--entry-node-expand-size) + var(--entry-node-expand-gap))
+    (
+      var(--entry-node-bounds-gutter) +
+      var(--entry-node-expand-size) +
+      var(--entry-node-expand-gap)
+    )
   );
 }
 
@@ -368,7 +356,7 @@
 }
 
 .entry-node-bounds[data-state="expanded"] .entry-node-expand-button {
-  top: var(--entry-node-bounds-gutter);
+  top: 0;
   left: calc(
     50% +
     var(--entry-node-card-width-expanded) /
