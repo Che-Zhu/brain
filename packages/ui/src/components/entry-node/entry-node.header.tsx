@@ -2,7 +2,7 @@
 
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { Brain, Router } from "lucide-react";
+import { Router } from "lucide-react";
 
 import { useEntryNode } from "./entry-node.context";
 import { EntryNodeStatusDot, EntryNodeStatusPill } from "./entry-node.status";
@@ -29,7 +29,7 @@ export function EntryNodeHeader({ className }: { className?: string }) {
   const accessDomain = getAccessDomain(states.name, domains?.access);
   const status = accessDomain.status ?? states.status;
   const statusLabel = status?.label?.trim() || "Unknown";
-  const Icon = expanded ? Router : Brain;
+  const Icon = Router;
 
   return (
     <Button
@@ -49,15 +49,8 @@ export function EntryNodeHeader({ className }: { className?: string }) {
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-2">
             <Icon aria-hidden className="size-4 shrink-0 text-zinc-50" />
-            <span
-              className={cn(
-                "entry-node-card-title min-w-0 truncate font-normal",
-                expanded
-                  ? "text-muted-foreground text-xs leading-4"
-                  : "text-sm text-zinc-50 leading-5"
-              )}
-            >
-              {expanded ? accessDomain.label : accessDomain.value}
+            <span className="entry-node-card-title min-w-0 truncate font-normal text-sm text-zinc-50 leading-5">
+              {accessDomain.value}
             </span>
           </span>
           <span className="entry-node-card-status min-w-0 shrink-0">
@@ -72,8 +65,8 @@ export function EntryNodeHeader({ className }: { className?: string }) {
             />
           </span>
         </div>
-        <span className="entry-node-card-access-value mt-1 min-w-0 truncate font-normal text-sm text-zinc-50 leading-5">
-          {accessDomain.value}
+        <span className="entry-node-card-access-value mt-1 min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+          {accessDomain.label}
         </span>
       </div>
     </Button>
