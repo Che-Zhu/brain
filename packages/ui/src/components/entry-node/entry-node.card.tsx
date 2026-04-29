@@ -23,7 +23,7 @@ export function EntryNodeCard({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: dblclick to expand is a pointer-only affordance; keyboard equivalent will be added later.
     <article
       className={cn(
-        "entry-node-card entry-node-hover-surface flex min-w-0 flex-col overflow-hidden rounded-lg border-[0.5px] border-white/10 text-zinc-50 backdrop-blur-sm",
+        "entry-node-card entry-node-hover-surface flex min-w-0 flex-col overflow-hidden rounded-lg border-[0.5px] border-white/10 text-zinc-50",
         className
       )}
       data-slot="entry-node-card"

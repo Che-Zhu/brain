@@ -6,7 +6,7 @@
 
 .entry-node-hover-surface {
   --entry-node-hover-overlay: rgb(255 255 255 / 4.5%);
-  --entry-node-hover-base: #040816;
+  --entry-node-surface-base: #040816;
 }
 
 .entry-node-hover-surface:hover,
@@ -27,8 +27,8 @@
     ),
     linear-gradient(
       90deg,
-      var(--entry-node-hover-base) 0%,
-      var(--entry-node-hover-base) 100%
+      var(--entry-node-surface-base) 0%,
+      var(--entry-node-surface-base) 100%
     );
   box-shadow:
     0 1px 3px 0 rgb(0 0 0 / 10%),
@@ -37,7 +37,7 @@
 
 .entry-node-bounds {
   --entry-node-surface-overlay: rgb(255 255 255 / 4.5%);
-  --entry-node-hover-base: #040816;
+  --entry-node-surface-base: #040816;
   --entry-node-card-width-collapsed: calc(var(--spacing) * 40);
   --entry-node-card-height-collapsed: calc(var(--spacing) * 10);
   --entry-node-card-width-expanded: calc(var(--spacing) * 66.75);
@@ -70,11 +70,17 @@
   --entry-node-card-height-expanded: calc(var(--spacing) * 55);
   width: var(--entry-node-card-width-collapsed);
   min-height: var(--entry-node-card-height-collapsed);
-  background: linear-gradient(
-    90deg,
-    var(--entry-node-surface-overlay) 0%,
-    var(--entry-node-surface-overlay) 100%
-  );
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-base) 0%,
+      var(--entry-node-surface-base) 100%
+    );
   transition:
     width 180ms cubic-bezier(0.16, 1, 0.3, 1),
     min-height 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -205,8 +211,8 @@
     ),
     linear-gradient(
       90deg,
-      var(--entry-node-hover-base) 0%,
-      var(--entry-node-hover-base) 100%
+      var(--entry-node-surface-base) 0%,
+      var(--entry-node-surface-base) 100%
     );
 }
 
@@ -319,8 +325,8 @@
     ),
     linear-gradient(
       90deg,
-      var(--entry-node-hover-base) 0%,
-      var(--entry-node-hover-base) 100%
+      var(--entry-node-surface-base) 0%,
+      var(--entry-node-surface-base) 100%
     );
   box-shadow:
     0 1px 3px 0 rgb(0 0 0 / 10%),
@@ -367,8 +373,8 @@
     ),
     linear-gradient(
       90deg,
-      var(--entry-node-hover-base) 0%,
-      var(--entry-node-hover-base) 100%
+      var(--entry-node-surface-base) 0%,
+      var(--entry-node-surface-base) 100%
     );
 }
 
