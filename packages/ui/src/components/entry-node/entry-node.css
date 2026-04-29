@@ -10,6 +10,8 @@
 }
 
 .entry-node-hover-surface:hover,
+.entry-node-bounds:hover .entry-node-hover-surface,
+.entry-node-bounds[data-hover-intent] .entry-node-hover-surface,
 .entry-node-drag-frame[data-dragging="true"] .entry-node-hover-surface,
 .entry-node-bounds[data-selected] .entry-node-hover-surface {
   background:
@@ -68,7 +70,11 @@
   --entry-node-card-height-expanded: calc(var(--spacing) * 55);
   width: var(--entry-node-card-width-collapsed);
   min-height: var(--entry-node-card-height-collapsed);
-  background: rgb(255 255 255 / 5%);
+  background: linear-gradient(
+    90deg,
+    var(--entry-node-surface-overlay) 0%,
+    var(--entry-node-surface-overlay) 100%
+  );
   transition:
     width 180ms cubic-bezier(0.16, 1, 0.3, 1),
     min-height 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -313,11 +319,6 @@
     ),
     linear-gradient(
       90deg,
-      var(--entry-node-surface-overlay) 0%,
-      var(--entry-node-surface-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
       var(--entry-node-hover-base) 0%,
       var(--entry-node-hover-base) 100%
     );
@@ -345,6 +346,7 @@
 }
 
 .entry-node-bounds:hover .entry-node-expand-button,
+.entry-node-bounds[data-hover-intent] .entry-node-expand-button,
 .entry-node-bounds[data-selected] .entry-node-expand-button {
   pointer-events: auto;
   opacity: 1;
@@ -352,7 +354,22 @@
 
 .entry-node-expand-button:hover {
   color: rgb(244 244 245);
-  background: rgb(255 255 255 / 10%);
+  background:
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-surface-overlay) 0%,
+      var(--entry-node-surface-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--entry-node-hover-base) 0%,
+      var(--entry-node-hover-base) 100%
+    );
 }
 
 .entry-node-bounds[data-state="expanded"] .entry-node-expand-button {
