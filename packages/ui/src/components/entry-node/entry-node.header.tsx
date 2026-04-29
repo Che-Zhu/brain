@@ -22,7 +22,6 @@ function getAccessDomain(
 
 export function EntryNodeHeader({ className }: { className?: string }) {
   const {
-    actions,
     meta,
     state: { domains, states },
   } = useEntryNode();
@@ -41,14 +40,6 @@ export function EntryNodeHeader({ className }: { className?: string }) {
         className
       )}
       data-slot="entry-node-header"
-      onClick={() => {
-        if (expanded) {
-          actions.collapse?.();
-          return;
-        }
-
-        actions.expand?.();
-      }}
       size={null}
       title={accessDomain.value}
       type="button"

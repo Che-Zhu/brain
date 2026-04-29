@@ -71,11 +71,13 @@ function EntryNodeSample({
   defaultExpanded = false,
   dragAngle,
   dragging,
+  selected,
   states,
 }: {
   defaultExpanded?: boolean;
   dragAngle?: EntryNodeDragAngle;
   dragging?: boolean;
+  selected?: boolean;
   states: EntryNodeStates;
 }) {
   return (
@@ -83,7 +85,7 @@ function EntryNodeSample({
       defaultExpanded={defaultExpanded}
       state={{
         domains: defaultDomains,
-        interaction: { dragAngle, dragging },
+        interaction: { dragAngle, dragging, selected },
         states,
       }}
     />
@@ -105,6 +107,11 @@ export default function EntryNodePreview() {
       <Preview title="Collapsed card">
         <PreviewSurface>
           <EntryNodeSample states={accessible} />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Selected card">
+        <PreviewSurface>
+          <EntryNodeSample selected states={accessible} />
         </PreviewSurface>
       </Preview>
       <Preview title="Expanded card">

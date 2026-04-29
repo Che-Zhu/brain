@@ -49,6 +49,9 @@ export function EntryNodeDomainSection({
             () => undefined
           );
         }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+        }}
         size={null}
         title={domain.value}
         type="button"

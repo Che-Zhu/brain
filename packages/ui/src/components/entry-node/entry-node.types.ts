@@ -57,6 +57,7 @@ export type EntryNodeConnectionEvent =
 export interface EntryNodeInteractionState {
   dragAngle?: EntryNodeDragAngle;
   dragging?: boolean;
+  selected?: boolean;
 }
 
 export interface EntryNodeState {

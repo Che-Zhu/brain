@@ -20,7 +20,7 @@ export function EntryNodeConnectionButton({
     <Button
       aria-label={`Connect from ${side}`}
       className={cn(
-        "entry-node-connection-button absolute flex size-5 items-center justify-center rounded-full border border-blue-500 bg-transparent p-0 text-blue-500 shadow-none transition-[background,border-color,box-shadow] hover:text-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/60",
+        "entry-node-connection-button absolute flex size-5 items-center justify-center rounded-full border border-blue-500 p-0 text-blue-500 shadow-none hover:text-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/60",
         className
       )}
       data-side={side}

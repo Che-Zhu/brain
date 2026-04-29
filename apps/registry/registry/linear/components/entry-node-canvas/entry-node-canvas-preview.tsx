@@ -39,6 +39,7 @@ const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
   dragging,
   positionAbsoluteX,
   positionAbsoluteY,
+  selected,
 }: NodeProps<Node<CanvasEntryNodeData, "entryNode">>) {
   const previousPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [dragAngle, setDragAngle] = useState<number>();
@@ -73,7 +74,7 @@ const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
     <EntryNode
       state={{
         domains: data.domains,
-        interaction: { dragAngle, dragging },
+        interaction: { dragAngle, dragging, selected },
         states: data.states,
       }}
     />

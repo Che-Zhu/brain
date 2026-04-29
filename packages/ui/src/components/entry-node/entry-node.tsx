@@ -16,6 +16,7 @@ import {
   EntryNodeDragFrame,
   EntryNodeDragStateFrame,
 } from "./entry-node.drag-frame";
+import { EntryNodeExpandButton } from "./entry-node.expand-button";
 import { EntryNodeHeader } from "./entry-node.header";
 import { EntryNodeProvider } from "./entry-node.provider";
 import { EntryNodeRoot } from "./entry-node.root";
@@ -54,6 +55,7 @@ export const EntryNode = Object.assign(EntryNodeRoot, {
   DomainList: EntryNodeDomainList,
   DomainSection: EntryNodeDomainSection,
   DragFrame: EntryNodeDragFrame,
+  ExpandButton: EntryNodeExpandButton,
   DragStateFrame: EntryNodeDragStateFrame,
   Header: EntryNodeHeader,
   Provider: EntryNodeProvider,
@@ -78,6 +80,7 @@ dn(EntryNodeDomainList, "EntryNode.DomainList");
 dn(EntryNodeConnectionButton, "EntryNode.ConnectionButton");
 dn(EntryNodeConnectionLayer, "EntryNode.ConnectionLayer");
 dn(EntryNodeDomainSection, "EntryNode.DomainSection");
+dn(EntryNodeExpandButton, "EntryNode.ExpandButton");
 dn(EntryNodeDragFrame, "EntryNode.DragFrame");
 dn(EntryNodeDragStateFrame, "EntryNode.DragStateFrame");
 dn(EntryNodeDefaultView, "EntryNode.DefaultView");
