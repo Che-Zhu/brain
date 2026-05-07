@@ -10,3 +10,5 @@ export const GITHUB_OAUTH_CALLBACK_PATH = "/api/callback/github" as const;
 export const GITHUB_OAUTH_STATE_COOKIE = "github_oauth_state" as const;
 export const GITHUB_OAUTH_CODE_VERIFIER_COOKIE =
   "github_oauth_code_verifier" as const;
+/** Relative path + search to restore after OAuth (httpOnly, set from `/api/callback/github?next=`). */
+export const GITHUB_OAUTH_RETURN_COOKIE = "github_oauth_return" as const;

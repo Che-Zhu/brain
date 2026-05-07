@@ -3,19 +3,27 @@ import type {
   ChatStatus,
   UIMessage,
 } from "ai";
-import type { ComponentProps, ReactNode, RefObject } from "react";
+import type { ReactNode } from "react";
+
+import type {
+  GithubDeployerActions,
+  GithubDeployerStates,
+} from "../github-deployer/github-deployer.types";
 
 export type { UIMessage } from "ai";
 
-export interface ChatHeaderStates {
-  /** Optional first crumb (e.g. `Characters`) before `characterName`. */
-  breadcrumbParentHref?: string;
-  breadcrumbParentLabel?: string;
-  /** Segment after optional parent (e.g. character name). Omit for title-only breadcrumb. */
-  characterName?: string;
-  /** Last segment (e.g. thread title or `Chat`). */
-  threadName: string;
+/** Pass to `Chat.GithubDeployPopover` (all props explicit; no context). */
+export interface ChatGithubDeployPopoverConfig {
+  actions?: GithubDeployerActions;
+  children?: ReactNode;
+  contentClassName?: string;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
+  states: GithubDeployerStates;
+  triggerClassName?: string;
 }
+
+export type ChatGithubDeployPopoverProps = ChatGithubDeployPopoverConfig;
 
 /** One row in the thread history menu (`title` truncates; `updatedAt` stays visible on the right). */
 export interface ChatHeaderThreadHistoryItem {
@@ -25,104 +33,31 @@ export interface ChatHeaderThreadHistoryItem {
   updatedAt: string;
 }
 
-/** Picker to switch the active `threads` row (character chat). */
 export interface ChatHeaderThreadHistory {
   activeThreadId: string;
-  /**
-   * When `referential` is true, the row is omitted from the history menu (e.g. curated tone examples in DB).
-   */
   items: ChatHeaderThreadHistoryItem[];
   onSelect: (threadId: string) => void;
 }
 
-export interface ChatHeaderActions {
-  onExport?: () => void;
-  /** Start a new thread (e.g. new Instant `threads` row). Omit to disable the control. */
-  onNewThread?: () => void;
-  onSettings?: () => void;
-  /**
-   * Open a menu to pick another thread for this character. Omit to hide the control.
-   * Typically disabled when `items.length` is 0.
-   */
-  threadHistory?: ChatHeaderThreadHistory;
-}
-
-export interface ChatHeaderValue {
-  actions: ChatHeaderActions;
-  states: ChatHeaderStates;
-}
-
-export interface ChatInputState {
-  responding: boolean;
-  value: string;
-}
-
-export interface ChatInputActions {
-  onPrimaryAction: () => void;
-  onSecondaryAction?: (detail: { category: string; item: string }) => void;
-  setValue: (value: string) => void;
-}
-
-export interface ChatInputMeta {
-  textareaRef: RefObject<HTMLTextAreaElement | null>;
-}
-
-export interface ChatInputCallbacks {
-  /** When the assistant is streaming; drives stop control. Overrides internal state when set. */
-  isStreaming?: boolean;
-  onSecondaryAction?: (detail: { category: string; item: string }) => void;
-  onSend?: (message: string) => void;
-  onStop?: () => void;
-  onValueChange?: (value: string) => void;
-  /** Controlled input value; pair with `onValueChange`. */
-  value?: string;
-}
-
-export interface ChatInputContextValue extends ChatInputCallbacks {
-  actions: ChatInputActions;
-  meta: ChatInputMeta;
-  state: ChatInputState;
-}
-
 export interface ChatMessagesStates {
-  /** When set (e.g. from `useChat`), tool parts in `approval-requested` can call this to continue the stream. */
   addToolApprovalResponse?: ChatAddToolApproveResponseFunction;
-  /** AI SDK UI messages (newest last). */
   messages: UIMessage[];
-  /** `useChat` / `AbstractChat` status; when `"submitted"`, shows a loading row before tokens arrive. */
   status?: ChatStatus;
+  transcriptFooter?: ReactNode;
 }
 
-/** Reserved for future handlers (retry, branch, etc.). */
-export type ChatMessagesActions = Record<string, never>;
-
-export interface ChatMessagesValue {
-  actions: ChatMessagesActions;
-  states: ChatMessagesStates;
+export interface ChatTranscriptProps {
+  addToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+  messages: UIMessage[];
+  status?: ChatStatus;
+  transcriptFooter?: ReactNode;
 }
 
-/** Full chat context: header, transcript, and composer slices share one `Chat.Root`. */
-export interface ChatValue {
-  header: ChatHeaderValue;
-  input: ChatInputContextValue;
-  messages: ChatMessagesValue;
-}
-
-export type ChatInputVariant0Props = ComponentProps<"div"> & {
+export interface ChatInputVariant0Props {
   placeholder?: string;
-};
+}
 
-export type ChatComposerProps = ChatInputVariant0Props;
-
-/** Props for `Chat.Root` — supplies all slices; compose with `Chat.Header`, `Chat.Transcript`, `Chat.Composer`, etc. */
-export interface ChatRootProps extends ChatInputCallbacks {
-  children: ReactNode;
-  header: {
-    actions?: ChatHeaderActions;
-    states: ChatHeaderStates;
-  };
-  messages: {
-    actions?: ChatMessagesActions;
-    states: ChatMessagesStates;
-  };
+/** Optional layout shell; forwards `children` only. */
+export interface ChatRootProps {
+  children?: ReactNode;
 }

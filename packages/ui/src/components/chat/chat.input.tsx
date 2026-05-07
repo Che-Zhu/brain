@@ -2,25 +2,100 @@
 
 import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Button } from "@workspace/ui/components/button";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
+import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
-import { FolderOpen, Square } from "lucide-react";
-import { type ComponentProps, useEffect } from "react";
+import { Square } from "lucide-react";
+import { type ComponentProps, useEffect, useLayoutEffect, useRef } from "react";
 
-import { useChatInput } from "./chat.context";
-import type { ChatComposerProps } from "./chat.types";
+import type { ChatGithubDeployPopoverConfig } from "./chat.types";
 
-/** Bordered composer container (inside `Chat.Root`). */
+/** GitHub invertocat path (matches common monochrome mark). */
+export const GITHUB_MARK_PATH =
+  "M12 2c5.5228 0 10 4.47715 10 10 0 4.5716 -3.0686 8.4239 -7.2578 9.6162v-3.0117c0 -0.7275 -0.1595 -1.4465 -0.4678 -2.1055 2.1883 -0.7822 4.2783 -2.4447 4.2783 -4.4355 0 -1.2663 -0.4671 -2.75174 -1.5127 -3.63186V6l-2.9462 0.98828c-0.6589 -0.16036 -1.3628 -0.24706 -2.0938 -0.24707 -0.731 0 -1.4349 0.08673 -2.09375 0.24707L6.95996 6v2.43164c-1.04555 0.88009 -1.51163 2.36566 -1.51172 3.63186 0 1.9907 2.08913 3.6533 4.27735 4.4355 -0.26358 0.5635 -0.41862 1.1711 -0.45801 1.7901 -0.13854 0.0283 -0.25191 0.0415 -0.34473 0.04 -0.20756 -0.0033 -0.36606 -0.06 -0.51953 -0.1562 -1.11532 -0.7 -1.54401 -1.9835 -3.05566 -2.1543 -0.19076 -0.0214 -0.3474 0.1371 -0.34766 0.3291 0 0.1922 0.15921 0.3423 0.34473 0.3925 1.44216 0.39 1.42755 3.2266 3.54785 3.2598 0.11976 0.0019 0.24101 -0.0069 0.36426 -0.0186v1.6348C5.06807 20.4236 2 16.5713 2 12 2 6.47715 6.47715 2 12 2";
+
+export type ChatGithubDeployButtonProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  /** True while the host resolves GitHub credentials (e.g. cluster secret fetch). */
+  authLoading?: boolean;
+  /** True when a PAT/token is available to the host (do not pass the secret itself). */
+  isAuthorized?: boolean;
+  onComposerAction?: () => void;
+};
+
+/** Monochrome GitHub mark (same path as `GITHUB_MARK_PATH`). */
+export function ChatGithubMark({ className, ...props }: ComponentProps<"svg">) {
+  return (
+    <svg
+      aria-hidden
+      className={cn("size-4 shrink-0 text-foreground", className)}
+      height={16}
+      viewBox="0 0 24 24"
+      width={16}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <title>GitHub</title>
+      <path d={GITHUB_MARK_PATH} fill="currentColor" />
+    </svg>
+  );
+}
+
+export type ChatGithubDeployPopoverProps = ChatGithubDeployPopoverConfig;
+
+/** GitHub deployer in a popover; pass full config from the host. */
+export function ChatGithubDeployPopover({
+  actions = {},
+  children,
+  contentClassName,
+  onOpenChange,
+  open,
+  states,
+  triggerClassName,
+}: ChatGithubDeployPopoverProps) {
+  return (
+    <Popover onOpenChange={onOpenChange} open={open}>
+      <PopoverTrigger
+        aria-label="GitHub"
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "icon-lg" }),
+          "hoverable shrink-0 rounded-xl",
+          triggerClassName
+        )}
+        type="button"
+      >
+        <ChatGithubMark className="opacity-90" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className={cn("w-[min(100vw-2rem,22rem)]", contentClassName)}
+        side="top"
+      >
+        <GithubDeployer.Root actions={actions} states={states}>
+          {children ?? (
+            <GithubDeployer.Shell className="gap-3 p-1">
+              <GithubDeployer.Title />
+              <GithubDeployer.Subtitle />
+              <GithubDeployer.AuthButton />
+              <GithubDeployer.RepoSelect />
+              <GithubDeployer.Complete />
+            </GithubDeployer.Shell>
+          )}
+        </GithubDeployer.Root>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Bordered composer container. */
 export function ChatComposerShell({
   className,
   ...props
@@ -37,18 +112,27 @@ export function ChatComposerShell({
   );
 }
 
+export type ChatComposerTextareaProps = Omit<
+  ComponentProps<typeof Textarea>,
+  "onChange" | "ref" | "rows" | "value"
+> & {
+  onPrimaryAction: () => void;
+  onValueChange: (value: string) => void;
+  responding?: boolean;
+  value: string;
+};
+
 export function ChatComposerTextarea({
   className,
   placeholder = "Message…",
-  onChange,
   onKeyDown,
+  onPrimaryAction,
+  onValueChange,
+  responding = false,
+  value,
   ...rest
-}: ComponentProps<typeof Textarea>) {
-  const {
-    actions: { onPrimaryAction, setValue },
-    meta: { textareaRef },
-    state: { responding, value },
-  } = useChatInput();
+}: ChatComposerTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -71,19 +155,32 @@ export function ChatComposerTextarea({
     return () => {
       textarea.removeEventListener("input", adjustHeight);
     };
-  }, [textareaRef]);
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: controlled `value` changes require a remeasure (e.g. clear after send).
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+    textarea.style.height = "auto";
+    const minHeight = 32;
+    const maxHeight = 80;
+    const scrollHeight = textarea.scrollHeight;
+    const nextHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [value]);
 
   return (
     <div className="w-full">
       <Textarea
+        {...rest}
         className={cn(
           "max-h-20 min-h-8 w-full resize-none rounded-xl border-0 bg-transparent! p-2 px-1 text-sm! shadow-none focus-visible:border-0 focus-visible:ring-0",
           className
         )}
-        onChange={(e) => {
-          setValue(e.target.value);
-          onChange?.(e);
-        }}
+        onChange={(e) => onValueChange(e.target.value)}
         onKeyDown={(e) => {
           if (
             e.key === "Enter" &&
@@ -102,7 +199,6 @@ export function ChatComposerTextarea({
         rows={1}
         style={{ minHeight: 32 }}
         value={value}
-        {...rest}
       />
     </div>
   );
@@ -123,64 +219,62 @@ export function ChatComposerFooter({
   );
 }
 
-/** Default “Action” menu inside the composer footer. */
-export function ChatComposerActionMenu() {
-  const {
-    actions: { onSecondaryAction },
-  } = useChatInput();
+/** Icon-only control for GitHub deploy; omitted `onComposerAction` renders nothing. */
+export function ChatGithubDeployButton({
+  className,
+  "aria-label": ariaLabel = "GitHub deploy",
+  authLoading = false,
+  isAuthorized: isAuthorizedProp,
+  onComposerAction,
+  ...props
+}: ChatGithubDeployButtonProps) {
+  if (!onComposerAction) {
+    return null;
+  }
+
+  const isAuthorized = isAuthorizedProp ?? false;
+
+  let title: string;
+  if (authLoading) {
+    title = "Loading GitHub credential…";
+  } else if (isAuthorized) {
+    title = "GitHub import";
+  } else {
+    title = "GitHub import — open to connect or configure secrets";
+  }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            className="w-auto cursor-pointer rounded-xl p-2"
-            type="button"
-            variant="ghost"
-          />
-        }
-      >
-        <span className="truncate">Action</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        alignOffset={-4}
-        className="w-44 rounded-xl"
-        sideOffset={8}
-      >
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FolderOpen className="mr-2 size-4" />
-            Starters
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-44 rounded-xl" sideOffset={8}>
-            <DropdownMenuItem
-              onClick={() =>
-                onSecondaryAction?.({ category: "Starters", item: "Option A" })
-              }
-            >
-              Option A
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                onSecondaryAction?.({ category: "Starters", item: "Option B" })
-              }
-            >
-              Option B
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      aria-busy={authLoading}
+      aria-label={ariaLabel}
+      className={cn("hoverable shrink-0 cursor-pointer rounded-xl", className)}
+      data-github-authorized={isAuthorized || undefined}
+      data-slot="chat-github-deploy-button"
+      onClick={onComposerAction}
+      size="icon-lg"
+      title={title}
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <ChatGithubMark />
+    </Button>
   );
 }
 
-export function ChatComposerSend({ className }: { className?: string }) {
-  const {
-    actions: { onPrimaryAction },
-    state: { responding, value },
-  } = useChatInput();
+export interface ChatComposerSendProps {
+  className?: string;
+  onPrimaryAction: () => void;
+  responding?: boolean;
+  value: string;
+}
 
+export function ChatComposerSend({
+  className,
+  onPrimaryAction,
+  responding = false,
+  value,
+}: ChatComposerSendProps) {
   const sendDisabled = !(responding || value.trim());
 
   return (
@@ -206,18 +300,44 @@ export function ChatComposerSend({ className }: { className?: string }) {
   );
 }
 
+export type ChatComposerProps = ComponentProps<typeof ChatComposerShell> & {
+  onComposerAction?: () => void;
+  onPrimaryAction: () => void;
+  onValueChange: (value: string) => void;
+  placeholder?: string;
+  responding?: boolean;
+  value: string;
+};
+
 /** Shell + textarea + footer row (default composer). */
 export function ChatComposer({
   className,
+  onComposerAction,
+  onPrimaryAction,
+  onValueChange,
   placeholder = "Message…",
-  ...props
+  responding = false,
+  value,
+  ...shellProps
 }: ChatComposerProps) {
   return (
-    <ChatComposerShell className={className} {...props}>
-      <ChatComposerTextarea placeholder={placeholder} />
+    <ChatComposerShell className={className} {...shellProps}>
+      <ChatComposerTextarea
+        onPrimaryAction={onPrimaryAction}
+        onValueChange={onValueChange}
+        placeholder={placeholder}
+        responding={responding}
+        value={value}
+      />
       <ChatComposerFooter>
-        <ChatComposerActionMenu />
-        <ChatComposerSend />
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <ChatGithubDeployButton onComposerAction={onComposerAction} />
+        </div>
+        <ChatComposerSend
+          onPrimaryAction={onPrimaryAction}
+          responding={responding}
+          value={value}
+        />
       </ChatComposerFooter>
     </ChatComposerShell>
   );
@@ -226,6 +346,8 @@ export function ChatComposer({
 ChatComposerShell.displayName = "Chat.ComposerShell";
 ChatComposerTextarea.displayName = "Chat.ComposerTextarea";
 ChatComposerFooter.displayName = "Chat.ComposerFooter";
-ChatComposerActionMenu.displayName = "Chat.ComposerActionMenu";
 ChatComposerSend.displayName = "Chat.ComposerSend";
+ChatGithubMark.displayName = "Chat.GithubMark";
+ChatGithubDeployPopover.displayName = "Chat.GithubDeployPopover";
+ChatGithubDeployButton.displayName = "Chat.GithubDeployButton";
 ChatComposer.displayName = "Chat.Composer";

@@ -1,150 +1,210 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
-import { Chat, type UIMessage } from "@workspace/ui/components/chat/chat";
+import { Chat } from "@workspace/ui/components/chat/chat";
+import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
+import type { GithubDeployerRepo } from "@workspace/ui/components/github-deployer/github-deployer.types";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
-import { PanelRightClose } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import {
+  buildGithubDeployerDeployedAguiExecuteInput,
+  githubDeployerDeployedAguiSpec,
+} from "@workspace/ui/lib/agui/github-deployer-spec";
+import type { UIMessage } from "ai";
+import { useCallback, useState } from "react";
 
-const threadAId = "thread-a";
-const threadBId = "thread-b";
+import {
+  chatPreviewDemoRepos,
+  chatPreviewMessageSeed,
+  chatPreviewStubAssistantReply,
+  chatPreviewThreadAId,
+  chatPreviewThreadBId,
+} from "./chat-preview.data";
 
-const seedMessages: Record<string, UIMessage[]> = {
-  [threadAId]: [
-    {
-      id: "mock-1",
-      role: "user",
-      parts: [{ type: "text", text: "Example prompt — no backend wired yet." }],
-    },
-    {
-      id: "mock-2",
-      role: "assistant",
-      parts: [
-        {
-          type: "text",
-          text: "Placeholder reply. Hook `onSend` and message state to your chat API when ready.",
-        },
-      ],
-    },
-  ],
-  [threadBId]: [
-    {
-      id: "mock-3",
-      role: "user",
-      parts: [
-        {
-          type: "text",
-          text: "Second thread — switch via the title dropdown.",
-        },
-      ],
-    },
-    {
-      id: "mock-4",
-      role: "assistant",
-      parts: [
-        {
-          type: "text",
-          text: "Same **Chat.ThreadSelect** as production when `threadHistory` is passed.",
-        },
-      ],
-    },
-  ],
-};
-
-function ChatWorkspacePreview() {
-  const [activeThreadId, setActiveThreadId] = useState(threadAId);
-  const [messagesByThread, setMessagesByThread] = useState(seedMessages);
-  const [inputValue, setInputValue] = useState("");
-
-  const threadName = activeThreadId === threadAId ? "Onboarding" : "Quick ask";
-  const messages = messagesByThread[activeThreadId] ?? [];
-
-  const appendUserAndStubAssistant = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) {
-        return;
-      }
-      const userMsg: UIMessage = {
-        id: `u-${Date.now()}`,
-        role: "user",
-        parts: [{ type: "text", text: trimmed }],
-      };
-      setMessagesByThread((prev) => ({
-        ...prev,
-        [activeThreadId]: [...(prev[activeThreadId] ?? []), userMsg],
-      }));
-      setInputValue("");
-      window.setTimeout(() => {
-        const reply: UIMessage = {
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          parts: [
-            {
-              type: "text",
-              text: "Stub reply — wire `onSend` to your model.",
-            },
-          ],
-        };
-        setMessagesByThread((p) => ({
-          ...p,
-          [activeThreadId]: [...(p[activeThreadId] ?? []), reply],
-        }));
-      });
-    },
-    [activeThreadId]
-  );
+/** Inline deployer with local dummy state for the transcript footer. */
+function TranscriptGithubDeployerDemo({
+  onCommitDeploy,
+}: {
+  onCommitDeploy: (repo: GithubDeployerRepo) => void;
+}) {
+  const [gh, setGh] = useState({
+    deployedRepo: null as GithubDeployerRepo | null,
+    githubToken: "",
+    isLoading: false,
+    repos: [...chatPreviewDemoRepos],
+  });
 
   return (
-    <div className="flex h-[min(32rem,70vh)] w-full flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm">
-      <Chat.Root
-        header={{
-          actions: {
-            onExport: () => undefined,
-            onNewThread: () => setActiveThreadId(threadAId),
-            threadHistory: {
-              activeThreadId,
-              items: [
-                { id: threadAId, title: "Onboarding", updatedAt: "2h" },
-                { id: threadBId, title: "Quick ask", updatedAt: "Yesterday" },
-              ],
-              onSelect: setActiveThreadId,
-            },
-          },
-          states: {
-            threadName,
+    <div className="rounded-xl border border-border bg-background p-3 shadow-sm">
+      <GithubDeployer.Root
+        actions={{
+          onAuthorize: () =>
+            setGh((p) => ({
+              ...p,
+              githubToken: "gho_preview_dummy",
+              isLoading: false,
+            })),
+          onDeploy: (repo) => {
+            onCommitDeploy(repo);
           },
         }}
-        messages={{
-          states: { messages, status: undefined },
-        }}
-        onSend={appendUserAndStubAssistant}
-        onValueChange={setInputValue}
-        value={inputValue}
+        states={gh}
       >
+        <GithubDeployer.Shell className="gap-3">
+          <GithubDeployer.Title />
+          <GithubDeployer.Subtitle />
+          <GithubDeployer.AuthButton />
+          <GithubDeployer.RepoSelect />
+          <GithubDeployer.Complete />
+        </GithubDeployer.Shell>
+      </GithubDeployer.Root>
+    </div>
+  );
+}
+
+function ChatWorkspacePreview({
+  onGithubButton,
+}: {
+  onGithubButton?: () => void;
+}) {
+  const [threadId, setThreadId] = useState(chatPreviewThreadAId);
+  const [rowsByThread, setRowsByThread] = useState(chatPreviewMessageSeed);
+  const [input, setInput] = useState("");
+  const [transcriptDeployerOpen, setTranscriptDeployerOpen] = useState(false);
+
+  const selectThread = useCallback((id: string) => {
+    setTranscriptDeployerOpen(false);
+    setThreadId(id);
+  }, []);
+
+  const goNewThread = useCallback(() => {
+    setTranscriptDeployerOpen(false);
+    setThreadId(chatPreviewThreadAId);
+  }, []);
+
+  const rows = rowsByThread[threadId] ?? [];
+  const title = threadId === chatPreviewThreadAId ? "Onboarding" : "Quick ask";
+
+  const handleCommitDeploy = useCallback(
+    (repo: GithubDeployerRepo) => {
+      const spec = githubDeployerDeployedAguiSpec(repo);
+      const executeInput = buildGithubDeployerDeployedAguiExecuteInput(repo);
+      const toolPart = {
+        type: "tool-emitGenUISpec" as const,
+        toolCallId: `preview-deploy-${Date.now()}`,
+        state: "output-available" as const,
+        input: executeInput,
+        output: { ok: true as const, spec },
+      } satisfies UIMessage["parts"][number];
+      setRowsByThread((p) => ({
+        ...p,
+        [threadId]: [
+          ...(p[threadId] ?? []),
+          {
+            id: `a-deploy-${Date.now()}`,
+            role: "assistant" as const,
+            parts: [toolPart],
+          },
+        ],
+      }));
+      setTranscriptDeployerOpen(false);
+    },
+    [threadId]
+  );
+
+  const transcriptFooter = transcriptDeployerOpen ? (
+    <TranscriptGithubDeployerDemo onCommitDeploy={handleCommitDeploy} />
+  ) : null;
+
+  const githubAction =
+    onGithubButton ?? (() => setTranscriptDeployerOpen((o) => !o));
+
+  const onPrimaryAction = useCallback(() => {
+    const text = input.trim();
+    if (!text) {
+      return;
+    }
+    const u: UIMessage = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      parts: [{ type: "text", text }],
+    };
+    setRowsByThread((p) => ({
+      ...p,
+      [threadId]: [...(p[threadId] ?? []), u],
+    }));
+    setInput("");
+    window.setTimeout(() => {
+      setRowsByThread((p) => ({
+        ...p,
+        [threadId]: [
+          ...(p[threadId] ?? []),
+          {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            parts: [
+              {
+                type: "text",
+                text: chatPreviewStubAssistantReply,
+              },
+            ],
+          },
+        ],
+      }));
+    });
+  }, [input, threadId]);
+
+  return (
+    <div className="flex h-[min(72rem,70vh)] w-full flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+      <Chat.Root>
         <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
           <Chat.Header
             className="shrink-0"
-            trailing={
-              <Button
-                aria-label="Close panel (preview — no action)"
-                className="hoverable rounded-xl"
-                onClick={() => undefined}
-                size="icon-lg"
-                type="button"
-                variant="ghost"
-              >
-                <PanelRightClose
-                  aria-hidden
-                  className="size-4"
-                  strokeWidth={2}
-                />
-              </Button>
-            }
+            threadHistory={{
+              activeThreadId: threadId,
+              items: [
+                {
+                  id: chatPreviewThreadAId,
+                  title: "Onboarding",
+                  updatedAt: "2h",
+                },
+                {
+                  id: chatPreviewThreadBId,
+                  title: "Quick ask",
+                  updatedAt: "Yesterday",
+                },
+              ],
+              onSelect: selectThread,
+            }}
+            threadName={title}
+          >
+            <Chat.Export onExport={() => undefined} />
+            <Chat.NewThread onNewThread={goNewThread} />
+          </Chat.Header>
+          <Chat.Transcript
+            className="min-h-0 flex-1"
+            messages={rows}
+            status={undefined}
+            transcriptFooter={transcriptFooter}
           />
-          <Chat.Transcript className="min-h-0 flex-1" />
           <div className="shrink-0 border-border p-2">
-            <Chat.Composer placeholder="Message…" />
+            <Chat.ComposerShell>
+              <Chat.ComposerTextarea
+                onPrimaryAction={onPrimaryAction}
+                onValueChange={setInput}
+                placeholder="Message…"
+                responding={false}
+                value={input}
+              />
+              <Chat.ComposerFooter>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <Chat.GithubDeployButton onComposerAction={githubAction} />
+                </div>
+                <Chat.ComposerSend
+                  onPrimaryAction={onPrimaryAction}
+                  responding={false}
+                  value={input}
+                />
+              </Chat.ComposerFooter>
+            </Chat.ComposerShell>
           </div>
         </Chat>
       </Chat.Root>
@@ -152,49 +212,16 @@ function ChatWorkspacePreview() {
   );
 }
 
-function ChatSubmittedRowPreview() {
-  const messages: UIMessage[] = useMemo(
-    () => [
-      {
-        id: "u1",
-        role: "user",
-        parts: [{ type: "text", text: "Generate a short poem." }],
-      },
-    ],
-    []
-  );
-
-  return (
-    <div className="h-56 w-full overflow-hidden rounded-xl border border-border bg-background">
-      <Chat.Root
-        header={{
-          actions: {
-            onExport: () => undefined,
-            onNewThread: () => undefined,
-          },
-          states: {
-            threadName: "Submitted",
-          },
-        }}
-        messages={{ states: { messages, status: "submitted" } }}
-      >
-        <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
-          <Chat.Header className="shrink-0" />
-          <Chat.Transcript className="min-h-0 flex-1" />
-        </Chat>
-      </Chat.Root>
-    </div>
-  );
+export interface ChatPreviewProps {
+  /** GitHub icon in the composer; omitted → toggles inline deployer in the transcript (dummy data). */
+  onGithubButton?: () => void;
 }
 
-export default function ChatPreview() {
+export default function ChatPreview({ onGithubButton }: ChatPreviewProps = {}) {
   return (
-    <PreviewWrapper className="lg:grid-cols-2">
-      <Preview title="Project pane — thread dropdown + toolbar">
-        <ChatWorkspacePreview />
-      </Preview>
-      <Preview title="Transcript — submitted (loading row)">
-        <ChatSubmittedRowPreview />
+    <PreviewWrapper>
+      <Preview showReset title="Project pane — thread dropdown + toolbar">
+        <ChatWorkspacePreview onGithubButton={onGithubButton} />
       </Preview>
     </PreviewWrapper>
   );

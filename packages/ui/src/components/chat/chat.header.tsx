@@ -18,21 +18,144 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
-import { ChevronDown } from "lucide-react";
-import { type ComponentProps, type ReactNode, useMemo } from "react";
+import { ChevronDown, PanelRightClose } from "lucide-react";
+import { type ComponentProps, useMemo } from "react";
 
-import { useChatHeader } from "./chat.context";
+import type { ChatHeaderThreadHistory } from "./chat.types";
 
-/** Thread title; becomes a selector when `actions.threadHistory` is provided. */
+const headerControlClass = "hoverable rounded-xl";
+
+export type ChatHeaderExportProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onExport?: () => void;
+};
+
+/** Export control; pass `onExport` from the host. */
+export function ChatHeaderExport({
+  className,
+  onExport,
+  ...props
+}: ChatHeaderExportProps) {
+  return (
+    <Button
+      aria-label="Export"
+      className={cn(headerControlClass, className)}
+      disabled={onExport === undefined}
+      onClick={() => onExport?.()}
+      size="icon-lg"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <HugeiconsIcon icon={FileExportIcon} size={16} strokeWidth={2} />
+    </Button>
+  );
+}
+
+export type ChatHeaderNewThreadProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onNewThread?: () => void;
+};
+
+/** New thread control; pass `onNewThread` from the host. */
+export function ChatHeaderNewThread({
+  className,
+  onNewThread,
+  ...props
+}: ChatHeaderNewThreadProps) {
+  return (
+    <Button
+      aria-label="New thread"
+      className={cn(headerControlClass, className)}
+      disabled={onNewThread === undefined}
+      onClick={() => onNewThread?.()}
+      size="icon-lg"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+    </Button>
+  );
+}
+
+export type ChatHeaderSettingProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onSettings?: () => void;
+};
+
+/** Settings control; omitted `onSettings` renders nothing. */
+export function ChatHeaderSetting({
+  className,
+  onSettings,
+  ...props
+}: ChatHeaderSettingProps) {
+  if (!onSettings) {
+    return null;
+  }
+
+  return (
+    <Button
+      aria-label="Settings"
+      className={cn(headerControlClass, className)}
+      onClick={onSettings}
+      size="icon-lg"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <HugeiconsIcon icon={Setting07Icon} size={16} strokeWidth={2} />
+    </Button>
+  );
+}
+
+export type ChatHeaderClosePaneProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onClosePane: () => void;
+};
+
+/** Close / collapse pane (e.g. assistant sidebar); host supplies `onClosePane`. */
+export function ChatHeaderClosePane({
+  className,
+  onClosePane,
+  "aria-label": ariaLabel = "Close panel",
+  ...props
+}: ChatHeaderClosePaneProps) {
+  return (
+    <Button
+      aria-label={ariaLabel}
+      className={cn(headerControlClass, className)}
+      onClick={onClosePane}
+      size="icon-lg"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <PanelRightClose aria-hidden className="size-4" strokeWidth={2} />
+    </Button>
+  );
+}
+
+export type ChatThreadSelectProps = ComponentProps<"div"> & {
+  threadHistory?: ChatHeaderThreadHistory;
+  threadName: string;
+};
+
+/** Thread title; becomes a selector when `threadHistory` is passed. */
 export function ChatThreadSelect({
   className,
+  threadHistory,
+  threadName,
   ...props
-}: ComponentProps<"div">) {
-  const {
-    actions: { threadHistory },
-    states: { threadName },
-  } = useChatHeader();
-
+}: ChatThreadSelectProps) {
   const historyItems = threadHistory?.items ?? [];
   const visibleHistoryItems = useMemo(
     () => historyItems.filter((item) => !item.referential),
@@ -120,66 +243,19 @@ export function ChatThreadSelect({
   );
 }
 
-/** Export / new thread / settings from header actions. */
-export function ChatHeaderToolbar({
-  className,
-  ...props
-}: ComponentProps<"div">) {
-  const {
-    actions: { onExport, onNewThread, onSettings },
-  } = useChatHeader();
+export type ChatHeaderProps = ComponentProps<"header"> & {
+  threadHistory?: ChatHeaderThreadHistory;
+  threadName: string;
+};
 
-  return (
-    <div
-      className={cn("flex shrink-0 items-center", className)}
-      data-slot="chat-header-toolbar"
-      {...props}
-    >
-      <Button
-        aria-label="Export"
-        className="hoverable rounded-xl"
-        onClick={onExport}
-        size="icon-lg"
-        type="button"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={FileExportIcon} size={16} strokeWidth={2} />
-      </Button>
-      <Button
-        aria-label="New thread"
-        className="hoverable rounded-xl"
-        disabled={onNewThread === undefined}
-        onClick={() => {
-          onNewThread?.();
-        }}
-        size="icon-lg"
-        type="button"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-      </Button>
-      {onSettings ? (
-        <Button
-          aria-label="Settings"
-          className="hoverable rounded-xl"
-          onClick={onSettings}
-          size="icon-lg"
-          type="button"
-          variant="ghost"
-        >
-          <HugeiconsIcon icon={Setting07Icon} size={16} strokeWidth={2} />
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-/** Single-line header: breadcrumb + toolbar (compose or replace with your own row). */
+/** Single-line header: thread title + host-composed controls (`Chat.Export`, `Chat.NewThread`, …). */
 export function ChatHeader({
   className,
-  trailing,
+  children,
+  threadHistory,
+  threadName,
   ...props
-}: ComponentProps<"header"> & { trailing?: ReactNode }) {
+}: ChatHeaderProps) {
   return (
     <header
       className={cn(
@@ -189,15 +265,20 @@ export function ChatHeader({
       data-slot="chat-header"
       {...props}
     >
-      <ChatThreadSelect />
-      <div className="flex min-w-0 shrink-0 items-center">
-        <ChatHeaderToolbar />
-        {trailing}
+      <ChatThreadSelect threadHistory={threadHistory} threadName={threadName} />
+      <div
+        className="flex min-w-0 shrink-0 items-center"
+        data-slot="chat-header-actions"
+      >
+        {children}
       </div>
     </header>
   );
 }
 
 ChatThreadSelect.displayName = "Chat.ThreadSelect";
-ChatHeaderToolbar.displayName = "Chat.HeaderToolbar";
+ChatHeaderExport.displayName = "Chat.Export";
+ChatHeaderNewThread.displayName = "Chat.NewThread";
+ChatHeaderSetting.displayName = "Chat.Setting";
+ChatHeaderClosePane.displayName = "Chat.ClosePane";
 ChatHeader.displayName = "Chat.Header";

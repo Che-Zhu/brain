@@ -2,7 +2,7 @@
 
 import { Button } from "@workspace/ui/components/button";
 import { Spinner } from "@workspace/ui/components/spinner";
-import type { EmitGenUISpecToolOutput } from "@workspace/ui/lib/gen-ui-tool";
+import type { EmitGenUISpecToolOutput } from "@workspace/ui/lib/agui/gen-ui-tool";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { isToolUIPart } from "ai";
 

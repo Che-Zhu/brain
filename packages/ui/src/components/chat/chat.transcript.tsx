@@ -13,19 +13,21 @@ import { Shimmer } from "@workspace/ui/components/ai-elements/shimmer";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps } from "react";
-
-import { useChatMessages } from "./chat.context";
 import { renderChatPart } from "./chat.part";
+import type { ChatTranscriptProps } from "./chat.types";
 
 const userBubbleClassName =
   "group-[.is-user]:rounded-3xl group-[.is-user]:rounded-br-md group-[.is-user]:border group-[.is-user]:bg-background-selected group-[.is-user]:px-3 group-[.is-user]:py-1.5";
 
-/** Message list + scroll region from the messages slice (compose your own list around `Conversation` if needed). */
-export function ChatTranscript({ className, ...props }: ComponentProps<"div">) {
-  const {
-    states: { messages, status, addToolApprovalResponse },
-  } = useChatMessages();
-
+/** Message list + scroll region; pass AI SDK message state from the host. */
+export function ChatTranscript({
+  addToolApprovalResponse,
+  className,
+  messages,
+  status,
+  transcriptFooter,
+  ...props
+}: ChatTranscriptProps & ComponentProps<"div">) {
   return (
     <div
       className={cn("flex min-h-0 w-full flex-1 flex-col", className)}
@@ -61,6 +63,14 @@ export function ChatTranscript({ className, ...props }: ComponentProps<"div">) {
                 </div>
               </MessageContent>
             </Message>
+          )}
+          {transcriptFooter != null && (
+            <div
+              className="w-full min-w-0 shrink-0"
+              data-slot="chat-transcript-footer"
+            >
+              {transcriptFooter}
+            </div>
           )}
         </ConversationContent>
         <ConversationScrollButton />

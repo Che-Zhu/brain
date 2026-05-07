@@ -2,53 +2,57 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps } from "react";
+import { ChatRoot } from "./chat.context";
 import {
-  ChatContext,
-  ChatRoot,
-  useChat,
-  useChatHeader,
-  useChatInput,
-  useChatMessages,
-} from "./chat.context";
-import { ChatHeader, ChatHeaderToolbar, ChatThreadSelect } from "./chat.header";
+  ChatHeader,
+  ChatHeaderClosePane,
+  ChatHeaderExport,
+  ChatHeaderNewThread,
+  ChatHeaderSetting,
+  ChatThreadSelect,
+} from "./chat.header";
 import {
   ChatComposer,
-  ChatComposerActionMenu,
   ChatComposerFooter,
   ChatComposerSend,
   ChatComposerShell,
   ChatComposerTextarea,
+  ChatGithubDeployButton,
+  ChatGithubDeployPopover,
+  ChatGithubMark,
 } from "./chat.input";
 import { ChatTranscript } from "./chat.transcript";
 
 // biome-ignore lint/performance/noBarrelFile: compound API re-exports
-export {
-  ChatContext,
-  ChatRoot,
-  useChat,
-  useChatHeader,
-  useChatInput,
-  useChatMessages,
-} from "./chat.context";
-
+export { ChatRoot } from "./chat.context";
+export type {
+  ChatHeaderClosePaneProps,
+  ChatHeaderExportProps,
+  ChatHeaderNewThreadProps,
+  ChatHeaderProps,
+  ChatHeaderSettingProps,
+  ChatThreadSelectProps,
+} from "./chat.header";
 export type {
   ChatComposerProps,
-  ChatHeaderActions,
-  ChatHeaderStates,
+  ChatComposerSendProps,
+  ChatComposerTextareaProps,
+  ChatGithubDeployButtonProps,
+  ChatGithubDeployPopoverProps,
+} from "./chat.input";
+export {
+  ChatGithubDeployButton,
+  ChatGithubDeployPopover,
+  ChatGithubMark,
+  GITHUB_MARK_PATH,
+} from "./chat.input";
+export type {
+  ChatGithubDeployPopoverConfig,
   ChatHeaderThreadHistory,
   ChatHeaderThreadHistoryItem,
-  ChatHeaderValue,
-  ChatInputActions,
-  ChatInputCallbacks,
-  ChatInputContextValue,
-  ChatInputMeta,
-  ChatInputState,
-  ChatInputVariant0Props,
-  ChatMessagesActions,
   ChatMessagesStates,
-  ChatMessagesValue,
   ChatRootProps,
-  ChatValue,
+  ChatTranscriptProps,
   UIMessage,
 } from "./chat.types";
 
@@ -68,22 +72,22 @@ function ChatShell({ className, children, ...props }: ComponentProps<"div">) {
 }
 
 export const Chat = Object.assign(ChatShell, {
+  ClosePane: ChatHeaderClosePane,
   Composer: ChatComposer,
-  ComposerActionMenu: ChatComposerActionMenu,
   ComposerFooter: ChatComposerFooter,
   ComposerSend: ChatComposerSend,
   ComposerShell: ChatComposerShell,
   ComposerTextarea: ChatComposerTextarea,
-  Context: ChatContext,
+  Export: ChatHeaderExport,
+  GithubDeployButton: ChatGithubDeployButton,
+  GithubDeployPopover: ChatGithubDeployPopover,
+  GithubMark: ChatGithubMark,
   Header: ChatHeader,
-  HeaderToolbar: ChatHeaderToolbar,
+  NewThread: ChatHeaderNewThread,
   Root: ChatRoot,
+  Setting: ChatHeaderSetting,
   ThreadSelect: ChatThreadSelect,
   Transcript: ChatTranscript,
-  useChat,
-  useChatHeader,
-  useChatInput,
-  useChatMessages,
 });
 
 ChatShell.displayName = "Chat";

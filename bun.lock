@@ -32,6 +32,7 @@
         "@workspace/crossplane": "workspace:*",
         "@workspace/ui": "workspace:*",
         "@xyflow/react": "^12.10.2",
+        "ai": "^6.0.169",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",

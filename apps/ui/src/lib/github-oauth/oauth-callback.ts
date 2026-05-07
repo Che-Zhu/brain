@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import {
   GITHUB_OAUTH_CALLBACK_PATH,
   GITHUB_OAUTH_CODE_VERIFIER_COOKIE,
+  GITHUB_OAUTH_RETURN_COOKIE,
   GITHUB_OAUTH_STATE_COOKIE,
 } from "./constants";
 import { namespaceFromKubeconfig } from "./namespace";
@@ -28,6 +29,7 @@ const TRAILING_EQ_RE = /=+$/;
 export function clearGitHubOAuthCookies(response: NextResponse) {
   response.cookies.delete(GITHUB_OAUTH_STATE_COOKIE);
   response.cookies.delete(GITHUB_OAUTH_CODE_VERIFIER_COOKIE);
+  response.cookies.delete(GITHUB_OAUTH_RETURN_COOKIE);
 }
 
 /** Generate PKCE code_verifier and code_challenge (S256). */
@@ -41,7 +43,10 @@ function generatePKCE(): { verifier: string; challenge: string } {
   return { verifier, challenge };
 }
 
-export function redirectToGitHubOAuthAuthorize(request: Request): NextResponse {
+export function redirectToGitHubOAuthAuthorize(
+  request: Request,
+  options?: { returnPath?: string | null }
+): NextResponse {
   const clientId = process.env.GITHUB_OAUTH_CLIENT_ID;
   if (!clientId) {
     return NextResponse.json(
@@ -73,6 +78,12 @@ export function redirectToGitHubOAuthAuthorize(request: Request): NextResponse {
     verifier,
     COOKIE_OPTS
   );
+  const returnPath = options?.returnPath?.trim();
+  if (returnPath) {
+    response.cookies.set(GITHUB_OAUTH_RETURN_COOKIE, returnPath, COOKIE_OPTS);
+  } else {
+    response.cookies.delete(GITHUB_OAUTH_RETURN_COOKIE);
+  }
   return response;
 }
 

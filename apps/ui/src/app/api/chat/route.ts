@@ -15,7 +15,6 @@ import {
 const emitGenUISpec = tool({
   description: buildEmitGenUISpecDescription(),
   inputSchema: genUISpecInputSchema,
-  needsApproval: true,
   execute: executeEmitGenUISpec,
 });
 
@@ -32,7 +31,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: provider("gpt-4o-mini"),
     system:
-      "You are a helpful assistant for the product UI. When you need to show catalog-driven UI (metrics chart, etc.), call `emitGenUISpec` with a valid spec. The user may need to approve before it renders. If approval is denied, explain briefly and do not immediately retry the same emit unless the user asks again. You may still reply with normal text before or after.",
+      "You are a helpful assistant for the product UI. When you need to show catalog-driven UI (metrics chart, etc.), call `emitGenUISpec` with a valid spec. You may still reply with normal text before or after.",
     messages: await convertToModelMessages(messages, {
       tools: {
         emitGenUISpec,

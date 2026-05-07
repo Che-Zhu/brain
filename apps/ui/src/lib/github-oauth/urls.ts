@@ -1,3 +1,5 @@
+import { parseOAuthReturnPathParam } from "./oauth-return-path";
+
 const TRAILING_SLASH_RE = /\/+$/;
 
 /**
@@ -82,4 +84,19 @@ export function buildPostGitHubOAuthRedirectUrl(baseUrl: string): string {
   }
 
   return `${root}${pathSeg}${search}`;
+}
+
+/** After successful token exchange: prefer stored relative path from cookie, else env defaults. */
+export function buildGitHubOAuthSuccessRedirectUrl(
+  baseUrl: string,
+  storedReturnRaw: string | undefined
+): string {
+  const root = baseUrl.replace(TRAILING_SLASH_RE, "");
+  const returnPath = storedReturnRaw
+    ? parseOAuthReturnPathParam(storedReturnRaw)
+    : null;
+  if (returnPath != null) {
+    return `${root}${returnPath}`;
+  }
+  return buildPostGitHubOAuthRedirectUrl(baseUrl);
 }

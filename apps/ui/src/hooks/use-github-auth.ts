@@ -8,12 +8,13 @@ import {
 } from "@workspace/api/schemas/k8s-get";
 import { ApiUrl } from "@workspace/api/utils";
 import { useAtomValue } from "jotai";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 
 import {
   GHCR_CRED_SECRET_NAME,
   GHCR_CRED_TOKEN_KEY,
+  GITHUB_OAUTH_CALLBACK_PATH,
 } from "@/lib/github-oauth/constants";
 import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
@@ -78,15 +79,20 @@ function githubTokenFromGhcrCredSecret(body: unknown): string | undefined {
   return decoded === "" ? undefined : decoded;
 }
 
-export function useGithubAuth(): {
-  isAuthorized: boolean;
-  /** Decoded PAT from Secret `githubToken` (only when present and valid). */
-  githubToken: string | undefined;
-  isLoading: boolean;
-  error: Error | undefined;
-  /** kubeconfig + namespace present so a check ran or could run */
+export interface UseGithubAuthResult {
   canCheck: boolean;
-} {
+  error: Error | undefined;
+  githubToken: string | undefined;
+  /**
+   * Starts GitHub OAuth (same entry as sidebar GitHub OAuth link) when not yet authorized.
+   * No-op while the GHCR secret fetch is in flight or when already authorized.
+   */
+  initiateGithubAuth: () => void;
+  isAuthorized: boolean;
+  isLoading: boolean;
+}
+
+export function useGithubAuth(): UseGithubAuthResult {
   const kubeconfig = useAtomValue(encodedKubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom).trim();
 
@@ -136,11 +142,25 @@ export function useGithubAuth(): {
     err = new Error(String(error));
   }
 
+  const initiateGithubAuth = useCallback(() => {
+    if (isAuthorized) {
+      return;
+    }
+    if (canCheck && isLoading) {
+      return;
+    }
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(
+      `${GITHUB_OAUTH_CALLBACK_PATH}?next=${encodeURIComponent(next)}`
+    );
+  }, [canCheck, isAuthorized, isLoading]);
+
   return {
-    isAuthorized,
-    githubToken,
-    isLoading: canCheck ? isLoading : false,
-    error: err,
     canCheck,
+    error: err,
+    githubToken,
+    initiateGithubAuth,
+    isAuthorized,
+    isLoading: canCheck ? isLoading : false,
   };
 }

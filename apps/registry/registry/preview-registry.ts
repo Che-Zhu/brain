@@ -171,7 +171,7 @@ export const Index: RegistryIndex = {
     name: "chat",
     title: "Chat",
     description:
-      "Chat workspace: single Chat.Root + shared context; compose Header, Transcript, Composer (or Breadcrumb, ComposerTextarea, etc.); AI SDK message list",
+      "Chat workspace: optional Chat.Root shell; compose Header, Transcript, and Composer pieces with explicit props; AI SDK message list",
     state: "done",
     type: "registry:preview",
     registryDependencies: [
@@ -191,6 +191,30 @@ export const Index: RegistryIndex = {
       previewUiFile,
     ],
     load: () => import("@registry/linear/components/chat/chat-preview"),
+  },
+
+  "linear/components/github-deployer": {
+    style: "linear",
+    group: "components",
+    name: "github-deployer",
+    title: "GitHub deployer",
+    description:
+      "OAuth auth control (same UX as app sidebar) + repo Select; Root states/actions align with useGithubAuth",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "select", "tooltip"],
+    files: [
+      {
+        path: "registry/linear/components/github-deployer/github-deployer-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/github-deployer/github-deployer-preview"
+      ),
   },
 
   "linear/components/mdx": {

@@ -1,13 +1,12 @@
 "use client";
 
 import { useChat as useAIChat } from "@ai-sdk/react";
-import { Button } from "@workspace/ui/components/button";
 import { Chat } from "@workspace/ui/components/chat/chat";
 import { cn } from "@workspace/ui/lib/utils";
-import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { useAtomValue } from "jotai";
-import { PanelRightClose } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback, useState } from "react";
+import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
+import { useGithubDeployer } from "@/hooks/use-github-deployer";
 import {
   rightPaneOpenAtom,
   toggleRightPaneVisibility,
@@ -18,69 +17,88 @@ function ProjectAssistantChatPane({
 }: {
   onClosePane: () => void;
 }) {
+  const { messages, sendMessage, status, stop, setMessages } = useAIChat();
+  const [input, setInput] = useState("");
   const {
-    messages,
-    sendMessage,
-    status,
-    stop,
-    setMessages,
-    addToolApprovalResponse,
-  } = useAIChat({
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-  });
+    authLoading,
+    commitDeployToMessages,
+    githubToken,
+    initiateGithubAuth,
+    isAuthorized,
+    resetChatThread,
+    toggleTranscriptDeployer,
+    transcriptDeployerOpen,
+  } = useGithubDeployer({ setMessages });
 
   const busy = status === "submitted" || status === "streaming";
 
+  const onPrimaryAction = useCallback(() => {
+    if (busy) {
+      stop();
+      return;
+    }
+    const text = input.trim();
+    if (!text) {
+      return;
+    }
+    sendMessage({ text }).catch(() => undefined);
+    setInput("");
+  }, [busy, input, sendMessage, stop]);
+
+  const transcriptFooter = transcriptDeployerOpen ? (
+    <ProjectTranscriptGithubDeployer
+      authLoading={authLoading}
+      githubToken={githubToken}
+      onAuthorize={initiateGithubAuth}
+      onDeployed={commitDeployToMessages}
+    />
+  ) : null;
+
   return (
-    <Chat.Root
-      header={{
-        actions: {
-          onExport: () => undefined,
-          onNewThread: () => setMessages([]),
-        },
-        states: {
-          threadName: "Assistant",
-        },
-      }}
-      isStreaming={busy}
-      messages={{
-        states: {
-          addToolApprovalResponse,
-          messages,
-          status,
-        },
-      }}
-      onSend={async (text) => {
-        await sendMessage({ text });
-      }}
-      onStop={stop}
-    >
+    <Chat.Root>
       <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
-        <Chat.Header
-          className="shrink-0"
-          trailing={
-            <Button
-              aria-label="Close panel"
-              className="hoverable rounded-xl"
-              onClick={onClosePane}
-              size="icon-lg"
-              type="button"
-              variant="ghost"
-            >
-              <PanelRightClose aria-hidden className="size-4" strokeWidth={2} />
-            </Button>
-          }
+        <Chat.Header className="shrink-0" threadName="Assistant">
+          <Chat.Export onExport={() => undefined} />
+          <Chat.NewThread onNewThread={resetChatThread} />
+          <Chat.ClosePane onClosePane={onClosePane} />
+        </Chat.Header>
+        <Chat.Transcript
+          className="min-h-0 flex-1"
+          messages={messages}
+          status={status}
+          transcriptFooter={transcriptFooter}
         />
-        <Chat.Transcript className="min-h-0 flex-1" />
         <div className="shrink-0 border-border p-2">
-          <Chat.Composer placeholder="Message…" />
+          <Chat.ComposerShell>
+            <Chat.ComposerTextarea
+              onPrimaryAction={onPrimaryAction}
+              onValueChange={setInput}
+              placeholder="Message…"
+              responding={busy}
+              value={input}
+            />
+            <Chat.ComposerFooter>
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <Chat.GithubDeployButton
+                  authLoading={authLoading}
+                  isAuthorized={isAuthorized}
+                  onComposerAction={toggleTranscriptDeployer}
+                />
+              </div>
+              <Chat.ComposerSend
+                onPrimaryAction={onPrimaryAction}
+                responding={busy}
+                value={input}
+              />
+            </Chat.ComposerFooter>
+          </Chat.ComposerShell>
         </div>
       </Chat>
     </Chat.Root>
   );
 }
 
-/** Main project column + optional right assistant chat pane (uses `POST /api/chat` + AI SDK `useChat`). */
+/** Main project column + optional right assistant chat pane (`POST /api/chat` + AI SDK). */
 export default function ProjectChatPaneLayout({
   children,
 }: {
