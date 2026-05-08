@@ -10,6 +10,9 @@
     "typecheck": "turbo typecheck",
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "whodb:dev": "bun --filter @sealai/whodb dev",
+    "whodb:build": "bun --filter @sealai/whodb build",
+    "whodb:test": "bun --filter @sealai/whodb test",
     "cd": "./cd.sh"
   },
   "devDependencies": {

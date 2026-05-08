@@ -1,0 +1,9 @@
+{
+  "name": "@sealai/whodb",
+  "private": true,
+  "scripts": {
+    "dev": "cd core && go run ./cmd/whodb",
+    "build": "cd core && go build ./cmd/whodb",
+    "test": "cd core && go test ./..."
+  }
+}
