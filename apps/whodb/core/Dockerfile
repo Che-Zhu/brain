@@ -54,6 +54,7 @@ COPY ./core/ ./
 ARG VERSION=dev
 ARG TARGETARCH
 ARG PLATFORM=docker
+ARG ENABLE_UPX=false
 RUN CGO_CFLAGS="-Os -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -flto -fvisibility=hidden" \
 	CGO_LDFLAGS="-Wl,--gc-sections -Wl,--as-needed -flto -L/usr/local/lib -lduckdb" \
 	CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -tags "prod duckdb_use_lib" -trimpath \
@@ -61,11 +62,13 @@ RUN CGO_CFLAGS="-Os -ffunction-sections -fdata-sections -fno-asynchronous-unwind
 	-o /core ./cmd/whodb
 
 RUN chmod +x /core && \
-    upx --best --lzma /core
+    if [ "$ENABLE_UPX" = "true" ]; then \
+        upx --best --lzma /core; \
+    fi
 
 RUN mkdir -p /runtime-libs && \
     chmod +x /usr/local/lib/libduckdb.so && \
-    if [ "$TARGETARCH" = "amd64" ]; then \
+    if [ "$ENABLE_UPX" = "true" ] && [ "$TARGETARCH" = "amd64" ]; then \
         upx --best --lzma /usr/local/lib/libduckdb.so; \
     fi && \
     cp /usr/local/lib/libduckdb.so /runtime-libs/
