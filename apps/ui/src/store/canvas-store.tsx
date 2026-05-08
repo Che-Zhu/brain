@@ -13,6 +13,7 @@ import type {
   ContainerNodeStates,
 } from "@workspace/ui/components/container-node/v1/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
+import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   type Edge,
@@ -23,6 +24,7 @@ import {
   Position,
 } from "@xyflow/react";
 import { atom, getDefaultStore } from "jotai";
+import { Cpu, MemoryStick, Pause, Play, RotateCw } from "lucide-react";
 import { memo } from "react";
 
 /** React Flow `type` for AP / workload container cards on the app canvas. */
@@ -43,6 +45,8 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   id,
 }: NodeProps<CanvasContainerRfNode>) {
   const { actions = {}, states } = data;
+  const { showPause, showRestart, showStart } =
+    containerNodeLifecycleMenuVisibility(states.status?.tone);
   const { state } = useCanvas();
   const edge = state.selectedEdge;
   const isEndpointOfSelectedEdge =
@@ -59,9 +63,82 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
       )}
     >
       <Handle position={Position.Top} type="target" />
-      <ContainerNode.Root actions={actions} states={states}>
-        <ContainerNode.Variant0 className="h-40 w-60" />
-      </ContainerNode.Root>
+      <ContainerNode.Shell className="h-40 w-60">
+        <ContainerNode.Header>
+          <ContainerNode.HeaderMain>
+            <ContainerNode.IconPlaceholder />
+            <ContainerNode.HeaderTitles>
+              <ContainerNode.Title name={states.name} />
+              <ContainerNode.Kind kind={states.kind} />
+            </ContainerNode.HeaderTitles>
+          </ContainerNode.HeaderMain>
+          <ContainerNode.HeaderMenuDropdown>
+            <ContainerNode.HeaderMenuTrigger />
+            <ContainerNode.HeaderMenuContent>
+              {showStart ? (
+                <ContainerNode.HeaderMenuItem
+                  accentHover="positive"
+                  disabled={actions.onStart == null}
+                  icon={Play}
+                  onClick={() => actions.onStart?.()}
+                >
+                  Start
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              {showPause ? (
+                <ContainerNode.HeaderMenuItem
+                  disabled={actions.onPause == null}
+                  icon={Pause}
+                  onClick={() => actions.onPause?.()}
+                >
+                  Pause
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              {showRestart ? (
+                <ContainerNode.HeaderMenuItem
+                  accentHover="positive"
+                  disabled={actions.onRestart == null}
+                  icon={RotateCw}
+                  onClick={() => actions.onRestart?.()}
+                >
+                  Restart
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              <ContainerNode.HeaderMenuDelete
+                name={states.name}
+                onConfirmDelete={actions.onDelete}
+              />
+            </ContainerNode.HeaderMenuContent>
+          </ContainerNode.HeaderMenuDropdown>
+        </ContainerNode.Header>
+        <ContainerNode.Content>
+          <ContainerNode.Image image={states.image} />
+          <div className="nodrag nopan flex min-w-0 shrink-0 flex-wrap items-center gap-1 pt-2">
+            <ContainerNode.ToolbarActivity
+              onViewActivity={actions.onViewActivity}
+            />
+            <ContainerNode.ToolbarShell onOpenShell={actions.onOpenShell} />
+            <ContainerNode.ToolbarLogs onViewLogs={actions.onViewLogs} />
+            <ContainerNode.ToolbarCalendar
+              onViewCalendar={actions.onViewCalendar}
+            />
+          </div>
+        </ContainerNode.Content>
+        <ContainerNode.Footer>
+          <ContainerNode.Status
+            label={states.status?.label}
+            tone={states.status?.tone}
+          />
+          <ContainerNode.ResourceGroup>
+            <ContainerNode.Resource icon={Cpu} percent={states.cpuPercent} />
+            <ContainerNode.Resource
+              icon={MemoryStick}
+              percent={states.memoryPercent}
+            />
+            <ContainerNode.Replicas replicas={states.replicas} />
+          </ContainerNode.ResourceGroup>
+        </ContainerNode.Footer>
+      </ContainerNode.Shell>
       <Handle position={Position.Bottom} type="source" />
     </div>
   );

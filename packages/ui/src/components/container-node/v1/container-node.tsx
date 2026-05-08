@@ -1,19 +1,28 @@
 "use client";
 
 import {
-  ContainerNodeContext,
-  ContainerNodeRoot,
-  useContainerNode as useContainerNodeBound,
-} from "./container-node.context";
-import {
   ContainerNodeDeleteDialog,
   ContainerNodeDeleteDialogPanel,
 } from "./container-node.delete-dialog";
-import { ContainerNodeHeaderMenu } from "./container-node.header-menu";
+import {
+  ContainerNodeHeaderMenuContent,
+  ContainerNodeHeaderMenuDelete,
+  ContainerNodeHeaderMenuDropdown,
+  ContainerNodeHeaderMenuItem,
+  ContainerNodeHeaderMenuTrigger,
+} from "./container-node.header-menu";
+import {
+  ContainerNodeToolbarActivity,
+  ContainerNodeToolbarCalendar,
+  ContainerNodeToolbarLogs,
+  ContainerNodeToolbarShell,
+} from "./container-node.icon-toolbar";
 import {
   ContainerNodeContent,
   ContainerNodeFooter,
   ContainerNodeHeader,
+  ContainerNodeHeaderMain,
+  ContainerNodeHeaderTitles,
   ContainerNodeResourceGroup,
   ContainerNodeShell,
 } from "./container-node.layout";
@@ -30,48 +39,55 @@ import {
   ContainerNodeScaleDialog,
   ContainerNodeScaleDialogPanel,
 } from "./container-node.scale-dialog";
-import { ContainerNodeVariant0 } from "./container-node.variant0";
 
-// biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useContainerNode }`
-export { useContainerNode } from "./container-node.context";
 export type {
   ContainerNodeActions,
   ContainerNodeStates,
   ContainerNodeStatusTone,
-  ContainerNodeValue,
 } from "./container-node.types";
 
 export const ContainerNode = Object.assign(ContainerNodeShell, {
   Content: ContainerNodeContent,
-  Context: ContainerNodeContext,
   DeleteDialog: ContainerNodeDeleteDialog,
   DeleteDialogPanel: ContainerNodeDeleteDialogPanel,
   Footer: ContainerNodeFooter,
   Header: ContainerNodeHeader,
-  ResourceGroup: ContainerNodeResourceGroup,
-  HeaderMenu: ContainerNodeHeaderMenu,
+  HeaderMain: ContainerNodeHeaderMain,
+  HeaderMenuContent: ContainerNodeHeaderMenuContent,
+  HeaderMenuDelete: ContainerNodeHeaderMenuDelete,
+  HeaderMenuDropdown: ContainerNodeHeaderMenuDropdown,
+  HeaderMenuItem: ContainerNodeHeaderMenuItem,
+  HeaderMenuTrigger: ContainerNodeHeaderMenuTrigger,
+  HeaderTitles: ContainerNodeHeaderTitles,
   IconPlaceholder: ContainerNodeIconPlaceholder,
+  ToolbarActivity: ContainerNodeToolbarActivity,
+  ToolbarCalendar: ContainerNodeToolbarCalendar,
+  ToolbarLogs: ContainerNodeToolbarLogs,
+  ToolbarShell: ContainerNodeToolbarShell,
   Image: ContainerNodeImage,
   Kind: ContainerNodeKind,
   Replicas: ContainerNodeReplicas,
   Resource: ContainerNodeResource,
-  Root: ContainerNodeRoot,
+  ResourceGroup: ContainerNodeResourceGroup,
   ScaleDialog: ContainerNodeScaleDialog,
   ScaleDialogPanel: ContainerNodeScaleDialogPanel,
   Shell: ContainerNodeShell,
   Status: ContainerNodeStatus,
   Title: ContainerNodeTitle,
-  Variant0: ContainerNodeVariant0,
-  useContainerNode: useContainerNodeBound,
 });
 
 const dn = (c: object, name: string) => {
   (c as { displayName?: string }).displayName = name;
 };
-dn(ContainerNodeRoot, "ContainerNode.Root");
-dn(ContainerNodeVariant0, "ContainerNode.Variant0");
 dn(ContainerNodeShell, "ContainerNode.Shell");
 dn(ContainerNodeHeader, "ContainerNode.Header");
+dn(ContainerNodeHeaderMain, "ContainerNode.HeaderMain");
+dn(ContainerNodeHeaderMenuDropdown, "ContainerNode.HeaderMenuDropdown");
+dn(ContainerNodeHeaderMenuTrigger, "ContainerNode.HeaderMenuTrigger");
+dn(ContainerNodeHeaderMenuContent, "ContainerNode.HeaderMenuContent");
+dn(ContainerNodeHeaderMenuItem, "ContainerNode.HeaderMenuItem");
+dn(ContainerNodeHeaderMenuDelete, "ContainerNode.HeaderMenuDelete");
+dn(ContainerNodeHeaderTitles, "ContainerNode.HeaderTitles");
 dn(ContainerNodeContent, "ContainerNode.Content");
 dn(ContainerNodeFooter, "ContainerNode.Footer");
 dn(ContainerNodeResourceGroup, "ContainerNode.ResourceGroup");

@@ -8,12 +8,10 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
-import { MoreHorizontal } from "lucide-react";
-import { type ReactNode, type SyntheticEvent, useState } from "react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
+import { type ComponentProps, type SyntheticEvent, useState } from "react";
 
-import { useContainerNode } from "./container-node.context";
 import { ContainerNodeDeleteDialog } from "./container-node.delete-dialog";
-import { ContainerNodeScaleDialog } from "./container-node.scale-dialog";
 
 /**
  * React Flow utility classes — required for controls inside custom nodes so pointer
@@ -27,102 +25,119 @@ function stopCanvasNodeClick(e: SyntheticEvent) {
   e.stopPropagation();
 }
 
-export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
-  const { actions, states } = useContainerNode();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [scaleDialogOpen, setScaleDialogOpen] = useState(false);
+/** Root — compose with `HeaderMenuTrigger` + `HeaderMenuContent`. */
+export function ContainerNodeHeaderMenuDropdown(
+  props: ComponentProps<typeof DropdownMenu>
+) {
+  return <DropdownMenu {...props} />;
+}
 
-  if (menu != null) {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              aria-label="Open menu"
-              className={cn(RF_MENU_SURFACE_CLASS, "size-7 shrink-0")}
-              onClick={stopCanvasNodeClick}
-              size="icon"
-              variant="ghost"
-            />
-          }
-        >
-          <MoreHorizontal className="size-3.5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className={cn(RF_MENU_SURFACE_CLASS, "rounded-xl")}
-        >
-          {menu}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
+/** Kebab trigger for `HeaderMenuDropdown`. */
+export function ContainerNodeHeaderMenuTrigger({
+  className,
+  ...props
+}: Omit<ComponentProps<typeof DropdownMenuTrigger>, "render">) {
+  return (
+    <DropdownMenuTrigger
+      render={
+        <Button
+          aria-label="Open menu"
+          className={cn(RF_MENU_SURFACE_CLASS, "size-7 shrink-0", className)}
+          onClick={stopCanvasNodeClick}
+          size="icon"
+          variant="ghost"
+        />
+      }
+      {...props}
+    >
+      <MoreHorizontal className="size-3.5" />
+    </DropdownMenuTrigger>
+  );
+}
+
+/** Popover surface — defaults match container-node header menus. */
+export function ContainerNodeHeaderMenuContent({
+  className,
+  ...props
+}: ComponentProps<typeof DropdownMenuContent>) {
+  return (
+    <DropdownMenuContent
+      align="start"
+      className={cn(RF_MENU_SURFACE_CLASS, "rounded-xl", className)}
+      {...props}
+    />
+  );
+}
+
+const HEADER_MENU_POSITIVE_ICON_HOVER =
+  "hover:[&_svg]:text-theme-green focus:[&_svg]:text-theme-green focus-visible:[&_svg]:text-theme-green hover:[&_svg]:opacity-100 focus:[&_svg]:opacity-100";
+
+/** Menu row — forwards to dropdown item with node-typical sizing and optional leading icon. */
+export function ContainerNodeHeaderMenuItem({
+  accentHover,
+  className,
+  children,
+  icon,
+  ...props
+}: ComponentProps<typeof DropdownMenuItem> & {
+  /** Start / Restart: icon uses `text-theme-green` on hover / focus (label color unchanged). */
+  accentHover?: "positive";
+  icon?: React.ReactNode;
+}) {
+  return (
+    <DropdownMenuItem
+      className={cn(
+        "rounded-xl text-xs",
+        accentHover === "positive" && HEADER_MENU_POSITIVE_ICON_HOVER,
+        className
+      )}
+      {...props}
+    >
+      {icon == null ? (
+        children
+      ) : (
+        <>
+          {icon}
+          {children}
+        </>
+      )}
+    </DropdownMenuItem>
+  );
+}
+
+/** Destructive row that opens `DeleteDialog` — compose next to other `HeaderMenuItem`s. */
+export function ContainerNodeHeaderMenuDelete({
+  name,
+  onConfirmDelete,
+}: {
+  name: string;
+  onConfirmDelete?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              aria-label="Open menu"
-              className={cn(RF_MENU_SURFACE_CLASS, "size-7 shrink-0")}
-              onClick={stopCanvasNodeClick}
-              size="icon"
-              variant="ghost"
-            />
-          }
-        >
-          <MoreHorizontal className="size-3.5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className={cn(RF_MENU_SURFACE_CLASS, "rounded-xl")}
-        >
-          <DropdownMenuItem
-            className="rounded-xl text-xs"
-            onClick={() => setScaleDialogOpen(true)}
-          >
-            Scale
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl text-xs"
-            onClick={actions.onRestart}
-          >
-            Restart
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl text-xs"
-            onClick={actions.onViewLogs}
-          >
-            View logs
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl text-xs"
-            onClick={actions.onOpenShell}
-          >
-            Open shell
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl text-xs"
-            onClick={() => setDeleteDialogOpen(true)}
-            variant="destructive"
-          >
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <ContainerNodeScaleDialog
-        onOpenChange={setScaleDialogOpen}
-        onScale={actions.onScale}
-        open={scaleDialogOpen}
-        replicas={states.replicas ?? 0}
-      />
+      <ContainerNodeHeaderMenuItem
+        disabled={onConfirmDelete == null}
+        icon={<Trash2 className="size-3.5 shrink-0 opacity-80" />}
+        onClick={() => setOpen(true)}
+        variant="destructive"
+      >
+        Delete
+      </ContainerNodeHeaderMenuItem>
       <ContainerNodeDeleteDialog
-        name={states.name}
-        onConfirmDelete={actions.onDelete}
-        onOpenChange={setDeleteDialogOpen}
-        open={deleteDialogOpen}
+        name={name}
+        onConfirmDelete={onConfirmDelete}
+        onOpenChange={setOpen}
+        open={open}
       />
     </>
   );
 }
+
+ContainerNodeHeaderMenuDropdown.displayName =
+  "ContainerNode.HeaderMenuDropdown";
+ContainerNodeHeaderMenuTrigger.displayName = "ContainerNode.HeaderMenuTrigger";
+ContainerNodeHeaderMenuContent.displayName = "ContainerNode.HeaderMenuContent";
+ContainerNodeHeaderMenuItem.displayName = "ContainerNode.HeaderMenuItem";
+ContainerNodeHeaderMenuDelete.displayName = "ContainerNode.HeaderMenuDelete";

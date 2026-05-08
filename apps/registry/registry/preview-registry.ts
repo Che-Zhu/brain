@@ -141,7 +141,7 @@ export const Index: RegistryIndex = {
     name: "container-node",
     title: "Container Node",
     description:
-      "Container node: Variant0 + standalone DeleteDialog / ScaleDialog previews; Root uses states/actions context.",
+      "Container node: v0 Root+context+Variant0; v1 compose `Shell` (no Root), Header, Content, Footer + explicit props per piece.",
     state: "done",
     type: "registry:preview",
     registryDependencies: [

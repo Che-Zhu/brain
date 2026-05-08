@@ -10,21 +10,17 @@ import { FlashNumber } from "@workspace/ui/components/flash-number/flash-number"
 import { cn } from "@workspace/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { Layers } from "lucide-react";
-import { type ComponentProps, useContext } from "react";
+import type { ComponentProps } from "react";
 
-import {
-  ContainerNodeContext,
-  useContainerNode,
-} from "./container-node.context";
 import type { ContainerNodeStatusTone } from "./container-node.types";
 
 export function ContainerNodeTitle({
   className,
   children,
+  name,
   ...props
-}: ComponentProps<"div">) {
-  const ctx = useContext(ContainerNodeContext);
-  const content = children ?? ctx?.states.name;
+}: ComponentProps<"div"> & { name?: string }) {
+  const content = children ?? name;
   if (content == null) {
     return null;
   }
@@ -46,10 +42,10 @@ const DEFAULT_KIND = "Container";
 export function ContainerNodeKind({
   className,
   children,
+  kind,
   ...props
-}: ComponentProps<"div">) {
-  const ctx = useContext(ContainerNodeContext);
-  const content = children ?? (ctx ? (ctx.states.kind ?? DEFAULT_KIND) : null);
+}: ComponentProps<"div"> & { kind?: string }) {
+  const content = children ?? kind ?? DEFAULT_KIND;
   if (content == null) {
     return null;
   }
@@ -68,17 +64,13 @@ export function ContainerNodeKind({
 
 export function ContainerNodeStatus({
   className,
-  label: labelProp,
-  tone: toneProp,
+  label = "unknown",
+  tone,
 }: {
   className?: string;
   label?: string;
   tone?: ContainerNodeStatusTone;
 }) {
-  const ctx = useContext(ContainerNodeContext);
-  const label = labelProp ?? ctx?.states.status?.label ?? "unknown";
-  const tone = toneProp ?? ctx?.states.status?.tone;
-
   if (tone == null) {
     return (
       <div
@@ -99,13 +91,13 @@ export function ContainerNodeStatus({
       <span aria-hidden className="relative flex size-2 shrink-0">
         <span
           className={cn(
-            "absolute inset-0 inline-flex animate-ping rounded-[2px] opacity-75",
+            "absolute inset-0 inline-flex animate-ping rounded-full opacity-75",
             getStatusIndicatorClass(tone)
           )}
         />
         <span
           className={cn(
-            "relative inline-flex size-2 shrink-0 rounded-[2px]",
+            "relative inline-flex size-2 shrink-0 rounded-full",
             getStatusIndicatorClass(tone)
           )}
         />
@@ -150,10 +142,13 @@ export function ContainerNodeResource({
 }
 
 /** Replica count from `states.replicas`, shown with a layers icon. */
-export function ContainerNodeReplicas({ className }: { className?: string }) {
-  const {
-    states: { replicas },
-  } = useContainerNode();
+export function ContainerNodeReplicas({
+  className,
+  replicas,
+}: {
+  className?: string;
+  replicas?: number;
+}) {
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
       <Layers aria-hidden className="size-3 shrink-0 text-muted-foreground" />
@@ -187,30 +182,25 @@ export function ContainerNodeIconPlaceholder({
   );
 }
 
-/** Read-only Docker / OCI image reference from context `states.image`. */
 export function ContainerNodeImage({
   className,
+  image,
   label = "Image",
   labelClassName,
 }: {
   className?: string;
+  image: string;
   label?: string;
   labelClassName?: string;
 }) {
-  const {
-    states: { image },
-  } = useContainerNode();
   const display = image.trim() === "" ? "—" : image;
   return (
     <div
-      className={cn(
-        "flex min-h-0 min-w-0 flex-1 flex-row items-start gap-2",
-        className
-      )}
+      className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-0.5", className)}
     >
       <span
         className={cn(
-          "shrink-0 pt-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide",
+          "shrink-0 font-medium text-[10px] text-muted-foreground uppercase tracking-wide",
           labelClassName
         )}
       >

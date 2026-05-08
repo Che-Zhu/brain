@@ -9,6 +9,7 @@ import type {
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
+import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -20,6 +21,7 @@ import {
   Position,
   ReactFlowProvider,
 } from "@xyflow/react";
+import { Cpu, MemoryStick, Pause, Play, RotateCw } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 
 interface CanvasContainerNodeData extends Record<string, unknown> {
@@ -30,6 +32,9 @@ const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
   data,
   id,
 }: NodeProps<Node<CanvasContainerNodeData, "containerNode">>) {
+  const { showPause, showRestart, showStart } =
+    containerNodeLifecycleMenuVisibility(data.states.status?.tone);
+
   const { state } = useCanvas();
   const edge = state.selectedEdge;
   const isEndpointOfSelectedEdge =
@@ -46,9 +51,72 @@ const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
       )}
     >
       <Handle position={Position.Top} type="target" />
-      <ContainerNode.Root actions={{}} states={data.states}>
-        <ContainerNode.Variant0 className="min-h-40 w-56 max-w-[min(100%,16rem)]" />
-      </ContainerNode.Root>
+      <ContainerNode.Shell className="min-h-40 w-56 max-w-[min(100%,16rem)]">
+        <ContainerNode.Header>
+          <ContainerNode.HeaderMain>
+            <ContainerNode.IconPlaceholder />
+            <ContainerNode.HeaderTitles>
+              <ContainerNode.Title name={data.states.name} />
+              <ContainerNode.Kind kind={data.states.kind} />
+            </ContainerNode.HeaderTitles>
+          </ContainerNode.HeaderMain>
+          <ContainerNode.HeaderMenuDropdown>
+            <ContainerNode.HeaderMenuTrigger />
+            <ContainerNode.HeaderMenuContent>
+              {showStart ? (
+                <ContainerNode.HeaderMenuItem
+                  accentHover="positive"
+                  disabled
+                  icon={Play}
+                >
+                  Start
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              {showPause ? (
+                <ContainerNode.HeaderMenuItem disabled icon={Pause}>
+                  Pause
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              {showRestart ? (
+                <ContainerNode.HeaderMenuItem
+                  accentHover="positive"
+                  disabled
+                  icon={RotateCw}
+                >
+                  Restart
+                </ContainerNode.HeaderMenuItem>
+              ) : null}
+              <ContainerNode.HeaderMenuDelete name={data.states.name} />
+            </ContainerNode.HeaderMenuContent>
+          </ContainerNode.HeaderMenuDropdown>
+        </ContainerNode.Header>
+        <ContainerNode.Content>
+          <ContainerNode.Image image={data.states.image} />
+          <div className="nodrag nopan flex min-w-0 shrink-0 flex-wrap items-center gap-1 pt-2">
+            <ContainerNode.ToolbarActivity />
+            <ContainerNode.ToolbarShell />
+            <ContainerNode.ToolbarLogs />
+            <ContainerNode.ToolbarCalendar />
+          </div>
+        </ContainerNode.Content>
+        <ContainerNode.Footer>
+          <ContainerNode.Status
+            label={data.states.status?.label}
+            tone={data.states.status?.tone}
+          />
+          <ContainerNode.ResourceGroup>
+            <ContainerNode.Resource
+              icon={Cpu}
+              percent={data.states.cpuPercent}
+            />
+            <ContainerNode.Resource
+              icon={MemoryStick}
+              percent={data.states.memoryPercent}
+            />
+            <ContainerNode.Replicas replicas={data.states.replicas} />
+          </ContainerNode.ResourceGroup>
+        </ContainerNode.Footer>
+      </ContainerNode.Shell>
       <Handle position={Position.Bottom} type="source" />
     </div>
   );

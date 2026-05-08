@@ -75,9 +75,9 @@
           "target": "components/container-node/v1/container-node.types.ts"
         },
         {
-          "path": "../../packages/ui/src/components/container-node/v1/container-node.context.tsx",
-          "type": "registry:component",
-          "target": "components/container-node/v1/container-node.context.tsx"
+          "path": "../../packages/ui/src/components/container-node/v1/container-node.menu-visibility.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/v1/container-node.menu-visibility.ts"
         },
         {
           "path": "../../packages/ui/src/components/container-node/v1/container-node.layout.tsx",
@@ -95,9 +95,9 @@
           "target": "components/container-node/v1/container-node.header-menu.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/container-node/v1/container-node.variant0.tsx",
+          "path": "../../packages/ui/src/components/container-node/v1/container-node.icon-toolbar.tsx",
           "type": "registry:component",
-          "target": "components/container-node/v1/container-node.variant0.tsx"
+          "target": "components/container-node/v1/container-node.icon-toolbar.tsx"
         },
         {
           "path": "../../packages/ui/src/components/container-node/v1/container-node.tsx",

@@ -33,6 +33,35 @@ export function ContainerNodeHeader({
   );
 }
 
+/** Icon + title stack row (left side of the header). Compose `IconPlaceholder`, `HeaderTitles`, and title primitives with their own props. */
+export function ContainerNodeHeaderMain({
+  className,
+  ...props
+}: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 flex-1 items-center gap-2",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+/** Title + kind column beside the header icon. */
+export function ContainerNodeHeaderTitles({
+  className,
+  ...props
+}: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("flex min-w-0 flex-1 flex-col gap-0.5", className)}
+      {...props}
+    />
+  );
+}
+
 export function ContainerNodeContent({
   className,
   ...props
