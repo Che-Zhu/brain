@@ -136,6 +136,52 @@ func registerAccessColumns(grp huma.API) {
 	})
 }
 
+func registerAccessRows(grp huma.API) {
+	type dbAccessRowsBody struct {
+		ProjectUID string                 `json:"projectUid" required:"true" doc:"Project metadata.uid that must match the DB ownership label."`
+		Namespace  string                 `json:"namespace,omitempty" doc:"Namespace (default from kubeconfig; admin can override)."`
+		Ref        dbsvc.AccessObjectRef  `json:"ref" required:"true" doc:"Returned table, view, collection, key, item, or index ref to read."`
+		PageSize   int                    `json:"pageSize,omitempty" doc:"Rows per page. Defaults to 100 and is capped at 500."`
+		PageOffset int                    `json:"pageOffset,omitempty" doc:"Zero-based row offset for pagination."`
+		Sort       []dbsvc.AccessRowsSort `json:"sort,omitempty" doc:"Optional fixed sort model. Each item requires column and ASC or DESC direction."`
+	}
+	type dbAccessRowsInput struct {
+		middleware.AuthInput
+		Name string `path:"name" doc:"DB claim metadata.name."`
+		Body dbAccessRowsBody
+	}
+	type dbAccessRowsOutput struct {
+		Body dbsvc.AccessRowsResult
+	}
+
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-access-rows",
+		Method:      http.MethodPost,
+		Path:        "/{name}/access/rows",
+		Summary:     "Read DB object rows",
+		Description: "Returns one bounded read-only page of rows for a supported database object ref. Requires kubeconfig authorization and projectUid ownership. Arbitrary SQL, filters, writes, imports, and mutation-like behavior are not available through this endpoint.",
+		Tags:        []string{"DB"},
+	}, func(ctx context.Context, input *dbAccessRowsInput) (*dbAccessRowsOutput, error) {
+		namespace, service, err := accessObjectsServiceFromAuth(input.Authorization, input.Body.Namespace, input.Body.ProjectUID)
+		if err != nil {
+			return nil, err
+		}
+		result, err := service.Rows(ctx, dbsvc.AccessRowsRequest{
+			Name:       input.Name,
+			Namespace:  namespace,
+			ProjectUID: input.Body.ProjectUID,
+			Ref:        input.Body.Ref,
+			PageSize:   input.Body.PageSize,
+			PageOffset: input.Body.PageOffset,
+			Sort:       input.Body.Sort,
+		})
+		if err != nil {
+			return nil, accessObjectsError(err)
+		}
+		return &dbAccessRowsOutput{Body: *result}, nil
+	})
+}
+
 func accessObjectsServiceFromAuth(authorization, namespace, projectUID string) (string, dbsvc.AccessObjectsService, error) {
 	_, cfg, err := middleware.RestConfigFromAuth(authorization)
 	if err != nil {
@@ -179,6 +225,10 @@ func accessObjectsError(err error) error {
 		return huma.Error404NotFound("DB object not found", err)
 	case errors.Is(err, dbsvc.ErrAccessObjectsUnsupportedKind):
 		return huma.Error422UnprocessableEntity("unsupported DB object kind", err)
+	case errors.Is(err, dbsvc.ErrAccessRowsInvalidPagination):
+		return huma.Error400BadRequest("invalid row pagination", err)
+	case errors.Is(err, dbsvc.ErrAccessRowsInvalidSort):
+		return huma.Error400BadRequest("invalid row sort", err)
 	case errors.Is(err, dbsvc.ErrAccessHealthProjectUID):
 		return huma.Error400BadRequest("projectUid is required", err)
 	case errors.Is(err, dbsvc.ErrAccessHealthDBNotFound):

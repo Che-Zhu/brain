@@ -269,3 +269,109 @@ func TestWhoDBHTTPClientListsSourceColumnsWithRefVariable(t *testing.T) {
 		t.Fatalf("expected object ref variable, got %+v", gotBody.Variables)
 	}
 }
+
+func TestWhoDBHTTPClientReadsSourceRowsWithFixedPaginationAndSortVariables(t *testing.T) {
+	var gotBody struct {
+		OperationName string         `json:"operationName"`
+		Query         string         `json:"query"`
+		Variables     map[string]any `json:"variables"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/query" {
+			t.Fatalf("unexpected WhoDB request target: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode WhoDB request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"SourceRows":{"Columns":[{"Name":"id","Type":"integer","IsPrimary":true,"IsForeignKey":false},{"Name":"email","Type":"varchar","IsPrimary":false,"IsForeignKey":false,"Length":320}],"Rows":[["1","ada@example.com"]],"DisableUpdate":true,"TotalCount":1}}}`))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	rows, err := client.ReadRows(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		25,
+		50,
+		[]WhoDBRowsSort{{Column: "created_at", Direction: "DESC"}},
+	)
+	if err != nil {
+		t.Fatalf("expected row lookup to succeed: %v", err)
+	}
+	if rows == nil || len(rows.Columns) != 2 || len(rows.Rows) != 1 || rows.TotalCount != 1 {
+		t.Fatalf("unexpected rows result: %+v", rows)
+	}
+	if gotBody.OperationName != "AccessRows" || !strings.Contains(gotBody.Query, "SourceRows") {
+		t.Fatalf("unexpected GraphQL request body: %+v", gotBody)
+	}
+	if strings.Contains(gotBody.Query, "RunSourceQuery") || strings.Contains(strings.ToLower(gotBody.Query), "where") {
+		t.Fatalf("rows query exposed unsupported query inputs: %s", gotBody.Query)
+	}
+	if _, ok := gotBody.Variables["query"]; ok {
+		t.Fatalf("rows variables must not include raw query input: %+v", gotBody.Variables)
+	}
+	if _, ok := gotBody.Variables["where"]; ok {
+		t.Fatalf("rows variables must not include where input: %+v", gotBody.Variables)
+	}
+	if gotBody.Variables["pageSize"] != float64(25) || gotBody.Variables["pageOffset"] != float64(50) {
+		t.Fatalf("expected pagination variables, got %+v", gotBody.Variables)
+	}
+	sortVariables, ok := gotBody.Variables["sort"].([]any)
+	if !ok || len(sortVariables) != 1 {
+		t.Fatalf("expected one sort variable, got %+v", gotBody.Variables)
+	}
+	sortVariable, ok := sortVariables[0].(map[string]any)
+	if !ok || sortVariable["Column"] != "created_at" || sortVariable["Direction"] != "DESC" {
+		t.Fatalf("unexpected sort variable: %+v", gotBody.Variables)
+	}
+	ref, ok := gotBody.Variables["ref"].(map[string]any)
+	if !ok || ref["Kind"] != "Table" {
+		t.Fatalf("expected object ref variable, got %+v", gotBody.Variables)
+	}
+}
+
+func TestWhoDBHTTPClientMapsSourceRowsTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"SourceRows":{"Columns":[],"Rows":[],"DisableUpdate":true,"TotalCount":0}}}`))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), 5*time.Millisecond)
+	_, err := client.ReadRows(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		100,
+		0,
+		nil,
+	)
+	if err == nil || !errors.Is(err, ErrAccessHealthWhoDBTimeout) {
+		t.Fatalf("expected row timeout mapping, got %v", err)
+	}
+}
+
+func TestWhoDBHTTPClientMapsSourceRowsCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("cancelled row request should not reach WhoDB")
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	_, err := client.ReadRows(
+		ctx,
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		100,
+		0,
+		nil,
+	)
+	if err == nil || !errors.Is(err, ErrAccessHealthWhoDBTimeout) {
+		t.Fatalf("expected row cancellation to map to timeout, got %v", err)
+	}
+}

@@ -12,6 +12,8 @@ var (
 	ErrAccessObjectsInvalidRef      = errors.New("invalid db object ref")
 	ErrAccessObjectsNotFound        = errors.New("db object not found")
 	ErrAccessObjectsUnsupportedKind = errors.New("unsupported db object kind")
+	ErrAccessRowsInvalidPagination  = errors.New("invalid db row pagination")
+	ErrAccessRowsInvalidSort        = errors.New("invalid db row sort")
 )
 
 const (
@@ -27,6 +29,8 @@ const (
 	AccessObjectKindTable      = "table"
 	AccessObjectKindTrigger    = "trigger"
 	AccessObjectKindView       = "view"
+	defaultAccessRowsPageSize  = 100
+	maxAccessRowsPageSize      = 500
 	maxAccessObjects           = 500
 )
 
@@ -52,9 +56,24 @@ type AccessColumnsRequest struct {
 	Ref        AccessObjectRef
 }
 
+type AccessRowsRequest struct {
+	Name       string
+	Namespace  string
+	ProjectUID string
+	Ref        AccessObjectRef
+	PageSize   int
+	PageOffset int
+	Sort       []AccessRowsSort
+}
+
 type AccessObjectRef struct {
 	Kind string   `json:"kind"`
 	Path []string `json:"path"`
+}
+
+type AccessRowsSort struct {
+	Column    string `json:"column"`
+	Direction string `json:"direction"`
 }
 
 type AccessObject struct {
@@ -93,6 +112,15 @@ type AccessColumnsResult struct {
 	Columns []AccessColumn  `json:"columns"`
 }
 
+type AccessRowsResult struct {
+	Ref        AccessObjectRef `json:"ref"`
+	Columns    []AccessColumn  `json:"columns"`
+	Rows       [][]string      `json:"rows"`
+	PageSize   int             `json:"pageSize"`
+	PageOffset int             `json:"pageOffset"`
+	TotalCount int64           `json:"totalCount"`
+}
+
 type WhoDBObjectRef struct {
 	Kind string
 	Path []string
@@ -119,10 +147,23 @@ type WhoDBColumn struct {
 	Scale            *int
 }
 
+type WhoDBRowsSort struct {
+	Column    string
+	Direction string
+}
+
+type WhoDBRowsResult struct {
+	Columns       []WhoDBColumn
+	Rows          [][]string
+	DisableUpdate bool
+	TotalCount    int64
+}
+
 type WhoDBObjectClient interface {
 	ListObjects(ctx context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error)
 	GetObject(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) (*WhoDBObject, error)
 	ListColumns(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) ([]WhoDBColumn, error)
+	ReadRows(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, pageSize int, pageOffset int, sort []WhoDBRowsSort) (*WhoDBRowsResult, error)
 }
 
 type AccessObjectsService struct {
@@ -297,6 +338,79 @@ func (s AccessObjectsService) Columns(ctx context.Context, req AccessColumnsRequ
 	}, nil
 }
 
+func (s AccessObjectsService) Rows(ctx context.Context, req AccessRowsRequest) (result *AccessRowsResult, err error) {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Namespace = strings.TrimSpace(req.Namespace)
+	req.ProjectUID = strings.TrimSpace(req.ProjectUID)
+	start := time.Now()
+	audit := AccessHealthAuditEvent{
+		Operation:  "db.access.rows",
+		ProjectUID: req.ProjectUID,
+		DBName:     req.Name,
+		Namespace:  req.Namespace,
+		Outcome:    "error",
+	}
+	defer func() {
+		if result != nil {
+			audit.Outcome = "ok"
+		}
+		audit.Duration = time.Since(start)
+		s.auditLogger().LogAccessHealth(audit)
+	}()
+
+	if req.ProjectUID == "" {
+		return nil, ErrAccessHealthProjectUID
+	}
+	ref, kind, err := accessColumnRefForWhoDB(req.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if req.PageSize < 0 || req.PageOffset < 0 {
+		return nil, ErrAccessRowsInvalidPagination
+	}
+	pageSize := req.PageSize
+	if pageSize == 0 {
+		pageSize = defaultAccessRowsPageSize
+	}
+	if pageSize > maxAccessRowsPageSize {
+		pageSize = maxAccessRowsPageSize
+	}
+	sort, err := accessRowsSortForWhoDB(req.Sort)
+	if err != nil {
+		return nil, err
+	}
+	audit.Ref = &AccessObjectRef{Kind: kind, Path: append([]string(nil), ref.Path...)}
+	audit.PageSize = pageSize
+	audit.PageOffset = req.PageOffset
+	audit.Sort = accessRowsSortFromWhoDB(sort)
+
+	engine, credentials, err := guardDBAccess(ctx, s.Store, guardedAccessRequest{
+		Name:       req.Name,
+		Namespace:  req.Namespace,
+		ProjectUID: req.ProjectUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Engine = engine
+
+	rows, err := s.WhoDB.ReadRows(ctx, credentials, ref, pageSize, req.PageOffset, sort)
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		rows = &WhoDBRowsResult{}
+	}
+	return &AccessRowsResult{
+		Ref:        AccessObjectRef{Kind: kind, Path: ref.Path},
+		Columns:    accessColumnsFromWhoDB(rows.Columns),
+		Rows:       rows.Rows,
+		PageSize:   pageSize,
+		PageOffset: req.PageOffset,
+		TotalCount: rows.TotalCount,
+	}, nil
+}
+
 func (s AccessObjectsService) getObjectFromParentListing(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, kind string) (*AccessObject, error) {
 	parent := accessObjectDetailFallbackParent(ref, kind)
 	if parent == nil {
@@ -366,6 +480,44 @@ func accessObjectParentForWhoDB(parent *AccessObjectRef) (*WhoDBObjectRef, error
 		return nil, err
 	}
 	return &ref, nil
+}
+
+func accessRowsSortForWhoDB(sort []AccessRowsSort) ([]WhoDBRowsSort, error) {
+	if len(sort) == 0 {
+		return nil, nil
+	}
+	mapped := make([]WhoDBRowsSort, 0, len(sort))
+	for _, item := range sort {
+		column := strings.TrimSpace(item.Column)
+		if column == "" {
+			return nil, ErrAccessRowsInvalidSort
+		}
+		direction := strings.ToUpper(strings.TrimSpace(item.Direction))
+		switch direction {
+		case "ASC", "DESC":
+		default:
+			return nil, ErrAccessRowsInvalidSort
+		}
+		mapped = append(mapped, WhoDBRowsSort{
+			Column:    column,
+			Direction: direction,
+		})
+	}
+	return mapped, nil
+}
+
+func accessRowsSortFromWhoDB(sort []WhoDBRowsSort) []AccessRowsSort {
+	if len(sort) == 0 {
+		return nil
+	}
+	mapped := make([]AccessRowsSort, 0, len(sort))
+	for _, item := range sort {
+		mapped = append(mapped, AccessRowsSort{
+			Column:    item.Column,
+			Direction: item.Direction,
+		})
+	}
+	return mapped
 }
 
 func accessObjectRefForWhoDB(ref AccessObjectRef) (WhoDBObjectRef, string, error) {
@@ -629,14 +781,36 @@ func (s AccessObjectsService) auditLogger() AccessHealthAuditLogger {
 type standardAccessObjectsAuditLogger struct{}
 
 func (standardAccessObjectsAuditLogger) LogAccessHealth(event AccessHealthAuditEvent) {
+	refKind := ""
+	refPath := ""
+	if event.Ref != nil {
+		refKind = event.Ref.Kind
+		refPath = strings.Join(event.Ref.Path, "/")
+	}
 	log.Printf(
-		"db access objects: operation=%s project=%s db=%s namespace=%s engine=%s duration=%s outcome=%s",
+		"db access objects: operation=%s project=%s db=%s namespace=%s engine=%s refKind=%s refPath=%s pageSize=%d pageOffset=%d sort=%s duration=%s outcome=%s",
 		event.Operation,
 		event.ProjectUID,
 		event.DBName,
 		event.Namespace,
 		event.Engine,
+		refKind,
+		refPath,
+		event.PageSize,
+		event.PageOffset,
+		accessRowsSortLogValue(event.Sort),
 		event.Duration,
 		event.Outcome,
 	)
+}
+
+func accessRowsSortLogValue(sort []AccessRowsSort) string {
+	if len(sort) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(sort))
+	for _, item := range sort {
+		parts = append(parts, item.Column+":"+item.Direction)
+	}
+	return strings.Join(parts, ",")
 }

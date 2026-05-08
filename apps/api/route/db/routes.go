@@ -23,6 +23,7 @@ func Register(api huma.API) {
 	registerAccessObjects(grp)
 	registerAccessObject(grp)
 	registerAccessColumns(grp)
+	registerAccessRows(grp)
 	registerCreate(grp)
 	registerBackup(grp)
 	registerUpdate(grp)

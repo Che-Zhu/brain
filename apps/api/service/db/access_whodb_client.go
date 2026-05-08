@@ -127,6 +127,32 @@ func (c *WhoDBHTTPClient) ListColumns(ctx context.Context, credentials WhoDBSour
 	return out.SourceColumns, nil
 }
 
+func (c *WhoDBHTTPClient) ReadRows(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, pageSize int, pageOffset int, sort []WhoDBRowsSort) (*WhoDBRowsResult, error) {
+	var out struct {
+		SourceRows WhoDBRowsResult `json:"SourceRows"`
+	}
+	variables := map[string]any{
+		"ref":        whoDBObjectRefVariable(ref),
+		"pageSize":   pageSize,
+		"pageOffset": pageOffset,
+	}
+	if len(sort) > 0 {
+		variables["sort"] = whoDBRowsSortVariables(sort)
+	}
+	err := c.query(
+		ctx,
+		credentials,
+		"AccessRows",
+		"query AccessRows($ref: SourceObjectRefInput!, $sort: [SortCondition!], $pageSize: Int!, $pageOffset: Int!) { SourceRows(ref: $ref, sort: $sort, pageSize: $pageSize, pageOffset: $pageOffset) { Columns { Name Type IsPrimary IsForeignKey ReferencedTable ReferencedColumn Length Precision Scale } Rows DisableUpdate TotalCount } }",
+		variables,
+		&out,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &out.SourceRows, nil
+}
+
 func whoDBObjectFromPayload(object whoDBObjectPayload) WhoDBObject {
 	metadata := make(map[string]string, len(object.Attributes))
 	for _, attribute := range object.Attributes {
@@ -150,6 +176,17 @@ func whoDBObjectRefVariable(ref WhoDBObjectRef) map[string]any {
 		"Kind": ref.Kind,
 		"Path": ref.Path,
 	}
+}
+
+func whoDBRowsSortVariables(sort []WhoDBRowsSort) []map[string]any {
+	variables := make([]map[string]any, 0, len(sort))
+	for _, item := range sort {
+		variables = append(variables, map[string]any{
+			"Column":    item.Column,
+			"Direction": item.Direction,
+		})
+	}
+	return variables
 }
 
 func (c *WhoDBHTTPClient) query(ctx context.Context, credentials WhoDBSourceCredentials, operationName, query string, variables map[string]any, out any) error {
@@ -188,7 +225,7 @@ func (c *WhoDBHTTPClient) query(ctx context.Context, credentials WhoDBSourceCred
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(ctx.Err(), context.Canceled) {
 			return fmt.Errorf("%w: %v", ErrAccessHealthWhoDBTimeout, err)
 		}
 		return fmt.Errorf("%w: %v", ErrAccessHealthWhoDBUnavailable, err)

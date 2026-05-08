@@ -222,6 +222,201 @@ func TestAccessColumnsReturnsColumnShapeThroughGuardedDBAccess(t *testing.T) {
 	}
 }
 
+func TestAccessRowsReturnsRowsThroughGuardedDBAccessWithDefaultPagination(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		rows: &WhoDBRowsResult{
+			Columns: []WhoDBColumn{
+				{Name: "id", Type: "integer", IsPrimary: true},
+				{Name: "email", Type: "varchar", Length: intPointer(320)},
+			},
+			Rows:       [][]string{{"1", "ada@example.com"}},
+			TotalCount: 1,
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Rows(context.Background(), AccessRowsRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+	})
+	if err != nil {
+		t.Fatalf("expected row retrieval to succeed: %v", err)
+	}
+
+	if result.Ref.Kind != "table" || strings.Join(result.Ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("unexpected result ref: %+v", result.Ref)
+	}
+	if result.PageSize != 100 || result.PageOffset != 0 || result.TotalCount != 1 {
+		t.Fatalf("unexpected pagination metadata: %+v", result)
+	}
+	if whodb.ref == nil || whodb.ref.Kind != "Table" || strings.Join(whodb.ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected WhoDB row lookup for returned ref, got %+v", whodb.ref)
+	}
+	if whodb.pageSize != 100 || whodb.pageOffset != 0 || len(whodb.sort) != 0 {
+		t.Fatalf("expected default WhoDB pagination without sort, got pageSize=%d pageOffset=%d sort=%+v", whodb.pageSize, whodb.pageOffset, whodb.sort)
+	}
+	if whodb.credentials.SourceType != "Postgres" || whodb.credentials.Values["Password"] != "s3cr3t" {
+		t.Fatalf("expected generated WhoDB credentials, got %+v", whodb.credentials)
+	}
+	if len(result.Columns) != 2 || result.Columns[0].Name != "id" || !result.Columns[0].IsPrimary {
+		t.Fatalf("unexpected columns: %+v", result.Columns)
+	}
+	if len(result.Rows) != 1 || strings.Join(result.Rows[0], ",") != "1,ada@example.com" {
+		t.Fatalf("unexpected rows: %+v", result.Rows)
+	}
+
+	body, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("failed to marshal result: %v", err)
+	}
+	for _, forbidden := range []string{"s3cr3t", "alice", "pg-main-postgresql"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("rows response exposed credential material %q: %s", forbidden, string(body))
+		}
+	}
+}
+
+func TestAccessRowsCapsLargePageSizesBeforeCallingWhoDB(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{rows: &WhoDBRowsResult{}}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Rows(context.Background(), AccessRowsRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		PageSize:   1000,
+		PageOffset: 25,
+	})
+	if err != nil {
+		t.Fatalf("expected capped row retrieval to succeed: %v", err)
+	}
+
+	if result.PageSize != maxAccessRowsPageSize || result.PageOffset != 25 {
+		t.Fatalf("unexpected pagination metadata: %+v", result)
+	}
+	if whodb.pageSize != maxAccessRowsPageSize || whodb.pageOffset != 25 {
+		t.Fatalf("expected WhoDB to receive capped pagination, got pageSize=%d pageOffset=%d", whodb.pageSize, whodb.pageOffset)
+	}
+}
+
+func TestAccessRowsRejectsInvalidPaginationBeforeCallingWhoDB(t *testing.T) {
+	store := readyAccessObjectsStore()
+	tests := []struct {
+		name       string
+		pageSize   int
+		pageOffset int
+	}{
+		{name: "negative page size", pageSize: -1},
+		{name: "negative page offset", pageOffset: -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			whodb := &recordingWhoDBObjectClient{rows: &WhoDBRowsResult{}}
+			svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+			_, err := svc.Rows(context.Background(), AccessRowsRequest{
+				Name:       "pg-main",
+				Namespace:  "ns-a",
+				ProjectUID: "project-1",
+				Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+				PageSize:   tt.pageSize,
+				PageOffset: tt.pageOffset,
+			})
+			if err == nil || !errors.Is(err, ErrAccessRowsInvalidPagination) {
+				t.Fatalf("expected invalid pagination error, got %v", err)
+			}
+			if whodb.rowsCalled != 0 {
+				t.Fatalf("expected invalid pagination to be rejected before WhoDB call")
+			}
+		})
+	}
+}
+
+func TestAccessRowsRejectsInvalidSortBeforeCallingWhoDB(t *testing.T) {
+	store := readyAccessObjectsStore()
+	tests := []struct {
+		name string
+		sort []AccessRowsSort
+	}{
+		{name: "blank column", sort: []AccessRowsSort{{Column: " ", Direction: "ASC"}}},
+		{name: "unsupported direction", sort: []AccessRowsSort{{Column: "created_at", Direction: "sideways"}}},
+		{name: "blank direction", sort: []AccessRowsSort{{Column: "created_at", Direction: " "}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			whodb := &recordingWhoDBObjectClient{rows: &WhoDBRowsResult{}}
+			svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+			_, err := svc.Rows(context.Background(), AccessRowsRequest{
+				Name:       "pg-main",
+				Namespace:  "ns-a",
+				ProjectUID: "project-1",
+				Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+				Sort:       tt.sort,
+			})
+			if err == nil || !errors.Is(err, ErrAccessRowsInvalidSort) {
+				t.Fatalf("expected invalid sort error, got %v", err)
+			}
+			if whodb.rowsCalled != 0 {
+				t.Fatalf("expected invalid sort to be rejected before WhoDB call")
+			}
+		})
+	}
+}
+
+func TestAccessRowsAuditIncludesPaginationAndSortButNotRowValues(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		rows: &WhoDBRowsResult{
+			Columns:    []WhoDBColumn{{Name: "email", Type: "varchar"}},
+			Rows:       [][]string{{"ada@example.com"}},
+			TotalCount: 1,
+		},
+	}
+	audit := &recordingAccessHealthAudit{}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb, Audit: audit}
+
+	_, err := svc.Rows(context.Background(), AccessRowsRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		PageSize:   50,
+		PageOffset: 10,
+		Sort:       []AccessRowsSort{{Column: "email", Direction: "desc"}},
+	})
+	if err != nil {
+		t.Fatalf("expected row retrieval to succeed: %v", err)
+	}
+
+	if audit.event.Operation != "db.access.rows" || audit.event.Outcome != "ok" || audit.event.Engine != "postgresql" {
+		t.Fatalf("unexpected audit event: %+v", audit.event)
+	}
+	if audit.event.Ref == nil || audit.event.Ref.Kind != "table" || strings.Join(audit.event.Ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected audit ref metadata, got %+v", audit.event.Ref)
+	}
+	if audit.event.PageSize != 50 || audit.event.PageOffset != 10 {
+		t.Fatalf("expected audit pagination metadata, got %+v", audit.event)
+	}
+	if len(audit.event.Sort) != 1 || audit.event.Sort[0].Column != "email" || audit.event.Sort[0].Direction != "DESC" {
+		t.Fatalf("expected audit sort metadata, got %+v", audit.event.Sort)
+	}
+	eventBytes, err := json.Marshal(audit.event)
+	if err != nil {
+		t.Fatalf("failed to marshal audit event: %v", err)
+	}
+	if strings.Contains(string(eventBytes), "ada@example.com") {
+		t.Fatalf("audit event exposed row values: %s", string(eventBytes))
+	}
+}
+
 func TestAccessColumnsRejectsRefsThatDoNotExposeFields(t *testing.T) {
 	store := readyAccessObjectsStore()
 	svc := AccessObjectsService{Store: store, WhoDB: &recordingWhoDBObjectClient{}}
@@ -424,9 +619,14 @@ type recordingWhoDBObjectClient struct {
 	parent      *WhoDBObjectRef
 	ref         *WhoDBObjectRef
 	kinds       []string
+	pageSize    int
+	pageOffset  int
+	sort        []WhoDBRowsSort
+	rowsCalled  int
 	objects     []WhoDBObject
 	object      *WhoDBObject
 	columns     []WhoDBColumn
+	rows        *WhoDBRowsResult
 	err         error
 	getErr      error
 }
@@ -460,6 +660,19 @@ func (r *recordingWhoDBObjectClient) ListColumns(_ context.Context, credentials 
 		return nil, r.err
 	}
 	return r.columns, nil
+}
+
+func (r *recordingWhoDBObjectClient) ReadRows(_ context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, pageSize int, pageOffset int, sort []WhoDBRowsSort) (*WhoDBRowsResult, error) {
+	r.credentials = credentials
+	r.ref = &ref
+	r.pageSize = pageSize
+	r.pageOffset = pageOffset
+	r.sort = sort
+	r.rowsCalled++
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.rows, nil
 }
 
 func stringPointer(value string) *string {

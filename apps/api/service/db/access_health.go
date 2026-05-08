@@ -54,13 +54,17 @@ type WhoDBSourceCredentials struct {
 }
 
 type AccessHealthAuditEvent struct {
-	Operation  string        `json:"operation"`
-	ProjectUID string        `json:"projectUid"`
-	DBName     string        `json:"db"`
-	Namespace  string        `json:"namespace"`
-	Engine     string        `json:"engine"`
-	Duration   time.Duration `json:"duration"`
-	Outcome    string        `json:"outcome"`
+	Operation  string           `json:"operation"`
+	ProjectUID string           `json:"projectUid"`
+	DBName     string           `json:"db"`
+	Namespace  string           `json:"namespace"`
+	Engine     string           `json:"engine"`
+	Ref        *AccessObjectRef `json:"ref,omitempty"`
+	PageSize   int              `json:"pageSize,omitempty"`
+	PageOffset int              `json:"pageOffset,omitempty"`
+	Sort       []AccessRowsSort `json:"sort,omitempty"`
+	Duration   time.Duration    `json:"duration"`
+	Outcome    string           `json:"outcome"`
 }
 
 type AccessHealthAuditLogger interface {
