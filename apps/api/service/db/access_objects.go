@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrAccessObjectsInvalidRef      = errors.New("invalid db object ref")
+	ErrAccessObjectsNotFound        = errors.New("db object not found")
 	ErrAccessObjectsUnsupportedKind = errors.New("unsupported db object kind")
 )
 
@@ -37,6 +38,20 @@ type AccessObjectsRequest struct {
 	Kinds      []string
 }
 
+type AccessObjectRequest struct {
+	Name       string
+	Namespace  string
+	ProjectUID string
+	Ref        AccessObjectRef
+}
+
+type AccessColumnsRequest struct {
+	Name       string
+	Namespace  string
+	ProjectUID string
+	Ref        AccessObjectRef
+}
+
 type AccessObjectRef struct {
 	Kind string   `json:"kind"`
 	Path []string `json:"path"`
@@ -57,6 +72,27 @@ type AccessObjectsResult struct {
 	Truncated bool           `json:"truncated"`
 }
 
+type AccessObjectResult struct {
+	Object AccessObject `json:"object"`
+}
+
+type AccessColumn struct {
+	Name             string  `json:"name"`
+	Type             string  `json:"type"`
+	IsPrimary        bool    `json:"isPrimary"`
+	IsForeignKey     bool    `json:"isForeignKey"`
+	ReferencedTable  *string `json:"referencedTable,omitempty"`
+	ReferencedColumn *string `json:"referencedColumn,omitempty"`
+	Length           *int    `json:"length,omitempty"`
+	Precision        *int    `json:"precision,omitempty"`
+	Scale            *int    `json:"scale,omitempty"`
+}
+
+type AccessColumnsResult struct {
+	Ref     AccessObjectRef `json:"ref"`
+	Columns []AccessColumn  `json:"columns"`
+}
+
 type WhoDBObjectRef struct {
 	Kind string
 	Path []string
@@ -71,8 +107,22 @@ type WhoDBObject struct {
 	Metadata    map[string]string
 }
 
+type WhoDBColumn struct {
+	Name             string
+	Type             string
+	IsPrimary        bool
+	IsForeignKey     bool
+	ReferencedTable  *string
+	ReferencedColumn *string
+	Length           *int
+	Precision        *int
+	Scale            *int
+}
+
 type WhoDBObjectClient interface {
 	ListObjects(ctx context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error)
+	GetObject(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) (*WhoDBObject, error)
+	ListColumns(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) ([]WhoDBColumn, error)
 }
 
 type AccessObjectsService struct {
@@ -136,53 +186,289 @@ func (s AccessObjectsService) List(ctx context.Context, req AccessObjectsRequest
 	return &AccessObjectsResult{Objects: resultObjects, Truncated: truncated}, nil
 }
 
+func (s AccessObjectsService) Get(ctx context.Context, req AccessObjectRequest) (result *AccessObjectResult, err error) {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Namespace = strings.TrimSpace(req.Namespace)
+	req.ProjectUID = strings.TrimSpace(req.ProjectUID)
+	start := time.Now()
+	audit := AccessHealthAuditEvent{
+		Operation:  "db.access.object",
+		ProjectUID: req.ProjectUID,
+		DBName:     req.Name,
+		Namespace:  req.Namespace,
+		Outcome:    "error",
+	}
+	defer func() {
+		if result != nil {
+			audit.Outcome = "ok"
+		}
+		audit.Duration = time.Since(start)
+		s.auditLogger().LogAccessHealth(audit)
+	}()
+
+	if req.ProjectUID == "" {
+		return nil, ErrAccessHealthProjectUID
+	}
+	ref, kind, err := accessObjectRefForWhoDB(req.Ref)
+	if err != nil {
+		return nil, err
+	}
+
+	engine, credentials, err := guardDBAccess(ctx, s.Store, guardedAccessRequest{
+		Name:       req.Name,
+		Namespace:  req.Namespace,
+		ProjectUID: req.ProjectUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Engine = engine
+
+	object, err := s.WhoDB.GetObject(ctx, credentials, ref)
+	if err != nil {
+		if !errors.Is(err, ErrAccessObjectsNotFound) {
+			return nil, err
+		}
+		fallback, fallbackErr := s.getObjectFromParentListing(ctx, credentials, ref, kind)
+		if fallbackErr != nil {
+			return nil, err
+		}
+		return &AccessObjectResult{Object: *fallback}, nil
+	}
+	if object == nil {
+		fallback, fallbackErr := s.getObjectFromParentListing(ctx, credentials, ref, kind)
+		if fallbackErr != nil {
+			return nil, ErrAccessObjectsNotFound
+		}
+		return &AccessObjectResult{Object: *fallback}, nil
+	}
+	mapped, err := accessObjectFromWhoDB(*object, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &AccessObjectResult{Object: mapped}, nil
+}
+
+func (s AccessObjectsService) Columns(ctx context.Context, req AccessColumnsRequest) (result *AccessColumnsResult, err error) {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Namespace = strings.TrimSpace(req.Namespace)
+	req.ProjectUID = strings.TrimSpace(req.ProjectUID)
+	start := time.Now()
+	audit := AccessHealthAuditEvent{
+		Operation:  "db.access.columns",
+		ProjectUID: req.ProjectUID,
+		DBName:     req.Name,
+		Namespace:  req.Namespace,
+		Outcome:    "error",
+	}
+	defer func() {
+		if result != nil {
+			audit.Outcome = "ok"
+		}
+		audit.Duration = time.Since(start)
+		s.auditLogger().LogAccessHealth(audit)
+	}()
+
+	if req.ProjectUID == "" {
+		return nil, ErrAccessHealthProjectUID
+	}
+	ref, kind, err := accessColumnRefForWhoDB(req.Ref)
+	if err != nil {
+		return nil, err
+	}
+
+	engine, credentials, err := guardDBAccess(ctx, s.Store, guardedAccessRequest{
+		Name:       req.Name,
+		Namespace:  req.Namespace,
+		ProjectUID: req.ProjectUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Engine = engine
+
+	columns, err := s.WhoDB.ListColumns(ctx, credentials, ref)
+	if err != nil {
+		return nil, err
+	}
+	return &AccessColumnsResult{
+		Ref:     AccessObjectRef{Kind: kind, Path: ref.Path},
+		Columns: accessColumnsFromWhoDB(columns),
+	}, nil
+}
+
+func (s AccessObjectsService) getObjectFromParentListing(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, kind string) (*AccessObject, error) {
+	parent := accessObjectDetailFallbackParent(ref, kind)
+	if parent == nil {
+		return nil, ErrAccessObjectsNotFound
+	}
+	objects, err := s.WhoDB.ListObjects(ctx, credentials, parent, nil)
+	if err != nil {
+		return nil, err
+	}
+	want := AccessObjectRef{Kind: kind, Path: cleanAccessObjectPath(ref.Path)}
+	for _, object := range objects {
+		mapped, err := accessObjectFromWhoDB(object, nil)
+		if err != nil {
+			return nil, err
+		}
+		if accessObjectRefsEqual(mapped.Ref, want) {
+			return &mapped, nil
+		}
+	}
+	return nil, ErrAccessObjectsNotFound
+}
+
+func accessObjectDetailFallbackParent(ref WhoDBObjectRef, kind string) *WhoDBObjectRef {
+	path := cleanAccessObjectPath(ref.Path)
+	if len(path) < 2 {
+		return nil
+	}
+	parentPath := append([]string(nil), path[:len(path)-1]...)
+	switch kind {
+	case AccessObjectKindSchema, AccessObjectKindCollection:
+		return &WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(AccessObjectKindDatabase), Path: parentPath}
+	case AccessObjectKindFunction,
+		AccessObjectKindProcedure,
+		AccessObjectKindSequence,
+		AccessObjectKindTable,
+		AccessObjectKindTrigger,
+		AccessObjectKindView:
+		if len(path) < 3 {
+			return nil
+		}
+		return &WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(AccessObjectKindSchema), Path: parentPath}
+	case AccessObjectKindIndex, AccessObjectKindItem:
+		return &WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(AccessObjectKindCollection), Path: parentPath}
+	default:
+		return nil
+	}
+}
+
+func accessObjectRefsEqual(left, right AccessObjectRef) bool {
+	if left.Kind != right.Kind || len(left.Path) != len(right.Path) {
+		return false
+	}
+	for i := range left.Path {
+		if left.Path[i] != right.Path[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func accessObjectParentForWhoDB(parent *AccessObjectRef) (*WhoDBObjectRef, error) {
 	if parent == nil {
 		return nil, nil
 	}
-	kind, err := canonicalAccessObjectKind(parent.Kind)
+	ref, _, err := accessObjectRefForWhoDB(*parent)
 	if err != nil {
 		return nil, err
 	}
-	path := cleanAccessObjectPath(parent.Path)
-	if len(path) == 0 {
-		return nil, ErrAccessObjectsInvalidRef
+	return &ref, nil
+}
+
+func accessObjectRefForWhoDB(ref AccessObjectRef) (WhoDBObjectRef, string, error) {
+	kind, err := canonicalAccessObjectKind(ref.Kind)
+	if err != nil {
+		return WhoDBObjectRef{}, "", err
 	}
-	return &WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(kind), Path: path}, nil
+	path := cleanAccessObjectPath(ref.Path)
+	if len(path) == 0 {
+		return WhoDBObjectRef{}, "", ErrAccessObjectsInvalidRef
+	}
+	return WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(kind), Path: path}, kind, nil
+}
+
+func accessColumnRefForWhoDB(ref AccessObjectRef) (WhoDBObjectRef, string, error) {
+	kind, err := canonicalAccessObjectKind(ref.Kind)
+	if err != nil {
+		return WhoDBObjectRef{}, "", err
+	}
+	if !accessObjectKindHasColumns(kind) {
+		return WhoDBObjectRef{}, "", ErrAccessObjectsUnsupportedKind
+	}
+	path := cleanAccessObjectPath(ref.Path)
+	if len(path) == 0 {
+		return WhoDBObjectRef{}, "", ErrAccessObjectsInvalidRef
+	}
+	return WhoDBObjectRef{Kind: whoDBKindForAccessObjectKind(kind), Path: path}, kind, nil
+}
+
+func accessObjectKindHasColumns(kind string) bool {
+	switch kind {
+	case AccessObjectKindCollection, AccessObjectKindIndex, AccessObjectKindItem, AccessObjectKindKey, AccessObjectKindTable, AccessObjectKindView:
+		return true
+	default:
+		return false
+	}
 }
 
 func accessObjectsFromWhoDB(objects []WhoDBObject, kindFilter accessObjectKindFilter) ([]AccessObject, error) {
 	mapped := make([]AccessObject, 0, len(objects))
 	for _, object := range objects {
-		kind, err := accessObjectKindFromWhoDB(object.Kind)
+		accessObject, err := accessObjectFromWhoDB(object, kindFilter)
 		if err != nil {
 			return nil, err
 		}
-		if !kindFilter.allows(kind) {
+		if accessObject.Ref.Kind == "" {
 			continue
 		}
-		path := object.Ref.Path
-		if len(path) == 0 {
-			path = object.Path
-		}
-		path = cleanAccessObjectPath(path)
-		if len(path) == 0 {
-			continue
-		}
-		name := strings.TrimSpace(object.Name)
-		if name == "" {
-			name = path[len(path)-1]
-		}
-		mapped = append(mapped, AccessObject{
-			Ref:         AccessObjectRef{Kind: kind, Path: path},
-			Kind:        kind,
-			Name:        name,
-			DisplayName: name,
-			HasChildren: object.HasChildren,
-			Metadata:    object.Metadata,
-		})
+		mapped = append(mapped, accessObject)
 	}
 	return mapped, nil
+}
+
+func accessObjectFromWhoDB(object WhoDBObject, kindFilter accessObjectKindFilter) (AccessObject, error) {
+	kind, err := accessObjectKindFromWhoDB(object.Kind)
+	if err != nil {
+		return AccessObject{}, err
+	}
+	if !kindFilter.allows(kind) {
+		return AccessObject{}, nil
+	}
+	path := object.Ref.Path
+	if len(path) == 0 {
+		path = object.Path
+	}
+	path = cleanAccessObjectPath(path)
+	if len(path) == 0 {
+		return AccessObject{}, nil
+	}
+	name := strings.TrimSpace(object.Name)
+	if name == "" {
+		name = path[len(path)-1]
+	}
+	return AccessObject{
+		Ref:         AccessObjectRef{Kind: kind, Path: path},
+		Kind:        kind,
+		Name:        name,
+		DisplayName: name,
+		HasChildren: object.HasChildren,
+		Metadata:    object.Metadata,
+	}, nil
+}
+
+func accessColumnsFromWhoDB(columns []WhoDBColumn) []AccessColumn {
+	mapped := make([]AccessColumn, 0, len(columns))
+	for _, column := range columns {
+		name := strings.TrimSpace(column.Name)
+		if name == "" {
+			continue
+		}
+		mapped = append(mapped, AccessColumn{
+			Name:             name,
+			Type:             column.Type,
+			IsPrimary:        column.IsPrimary,
+			IsForeignKey:     column.IsForeignKey,
+			ReferencedTable:  column.ReferencedTable,
+			ReferencedColumn: column.ReferencedColumn,
+			Length:           column.Length,
+			Precision:        column.Precision,
+			Scale:            column.Scale,
+		})
+	}
+	return mapped
 }
 
 func capAccessObjects(objects []AccessObject) ([]AccessObject, bool) {

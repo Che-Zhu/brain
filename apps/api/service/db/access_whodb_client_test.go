@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -157,5 +158,114 @@ func TestWhoDBHTTPClientListsSourceObjectsWithParentAndKindVariables(t *testing.
 	kinds, ok := gotBody.Variables["kinds"].([]any)
 	if !ok || len(kinds) != 1 || kinds[0] != "Table" {
 		t.Fatalf("expected table kind variable, got %+v", gotBody.Variables)
+	}
+}
+
+func TestWhoDBHTTPClientGetsSourceObjectWithRefVariable(t *testing.T) {
+	var gotBody struct {
+		OperationName string         `json:"operationName"`
+		Query         string         `json:"query"`
+		Variables     map[string]any `json:"variables"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/query" {
+			t.Fatalf("unexpected WhoDB request target: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode WhoDB request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"SourceObject":{"Ref":{"Kind":"Table","Path":["postgres","public","users"]},"Kind":"Table","Name":"users","Path":["postgres","public","users"],"HasChildren":false,"Metadata":[{"Key":"Type","Value":"BASE TABLE"}]}}}`))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	object, err := client.GetObject(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+	)
+	if err != nil {
+		t.Fatalf("expected object lookup to succeed: %v", err)
+	}
+	if object == nil || object.Kind != "Table" || object.Name != "users" || object.Metadata["Type"] != "BASE TABLE" {
+		t.Fatalf("unexpected object: %+v", object)
+	}
+	if gotBody.OperationName != "AccessObject" || !strings.Contains(gotBody.Query, "SourceObject") {
+		t.Fatalf("unexpected GraphQL request body: %+v", gotBody)
+	}
+	ref, ok := gotBody.Variables["ref"].(map[string]any)
+	if !ok || ref["Kind"] != "Table" {
+		t.Fatalf("expected object ref variable, got %+v", gotBody.Variables)
+	}
+	path, ok := ref["Path"].([]any)
+	if !ok || len(path) != 3 || path[2] != "users" {
+		t.Fatalf("expected object ref path variable, got %+v", gotBody.Variables)
+	}
+}
+
+func TestWhoDBHTTPClientMapsSourceObjectNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"SourceObject":null},"errors":[{"message":"source object not found"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	_, err := client.GetObject(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "missing"}},
+	)
+	if err == nil || !errors.Is(err, ErrAccessObjectsNotFound) {
+		t.Fatalf("expected source object not found mapping, got %v", err)
+	}
+}
+
+func TestWhoDBHTTPClientListsSourceColumnsWithRefVariable(t *testing.T) {
+	var gotBody struct {
+		OperationName string         `json:"operationName"`
+		Query         string         `json:"query"`
+		Variables     map[string]any `json:"variables"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/query" {
+			t.Fatalf("unexpected WhoDB request target: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode WhoDB request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"SourceColumns":[{"Name":"id","Type":"integer","IsPrimary":true,"IsForeignKey":false},{"Name":"team_id","Type":"integer","IsPrimary":false,"IsForeignKey":true,"ReferencedTable":"teams","ReferencedColumn":"id"},{"Name":"email","Type":"varchar","IsPrimary":false,"IsForeignKey":false,"Length":320}]}}`))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	columns, err := client.ListColumns(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+	)
+	if err != nil {
+		t.Fatalf("expected column lookup to succeed: %v", err)
+	}
+	if len(columns) != 3 {
+		t.Fatalf("expected three columns, got %+v", columns)
+	}
+	if !columns[0].IsPrimary || columns[0].Name != "id" || columns[0].Type != "integer" {
+		t.Fatalf("unexpected primary column: %+v", columns[0])
+	}
+	if !columns[1].IsForeignKey || columns[1].ReferencedTable == nil || *columns[1].ReferencedTable != "teams" {
+		t.Fatalf("unexpected foreign key column: %+v", columns[1])
+	}
+	if columns[2].Length == nil || *columns[2].Length != 320 {
+		t.Fatalf("unexpected length metadata: %+v", columns[2])
+	}
+	if gotBody.OperationName != "AccessColumns" || !strings.Contains(gotBody.Query, "SourceColumns") {
+		t.Fatalf("unexpected GraphQL request body: %+v", gotBody)
+	}
+	ref, ok := gotBody.Variables["ref"].(map[string]any)
+	if !ok || ref["Kind"] != "Table" {
+		t.Fatalf("expected object ref variable, got %+v", gotBody.Variables)
 	}
 }

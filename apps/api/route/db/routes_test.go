@@ -42,6 +42,29 @@ func TestRegisterIncludesAccessObjectsRoute(t *testing.T) {
 	}
 }
 
+func TestRegisterIncludesAccessObjectDetailRoutes(t *testing.T) {
+	router := chi.NewRouter()
+	api := humachi.New(router, huma.DefaultConfig("test", "0.0.0"))
+
+	Register(api)
+
+	paths := map[string]string{
+		"/api/db/v1alpha1/{name}/access/object":  "db-access-object",
+		"/api/db/v1alpha1/{name}/access/columns": "db-access-columns",
+	}
+	for path, operationID := range paths {
+		t.Run(path, func(t *testing.T) {
+			got := api.OpenAPI().Paths[path]
+			if got == nil || got.Post == nil {
+				t.Fatalf("expected POST %s to be registered", path)
+			}
+			if got.Post.OperationID != operationID {
+				t.Fatalf("unexpected operation ID: %q", got.Post.OperationID)
+			}
+		})
+	}
+}
+
 func TestAccessHealthErrorStatusMapping(t *testing.T) {
 	tests := []struct {
 		name string
@@ -79,7 +102,9 @@ func TestAccessObjectsErrorStatusMapping(t *testing.T) {
 		err  error
 		want int
 	}{
+		{name: "request validation", err: dbsvc.ErrAccessHealthProjectUID, want: http.StatusBadRequest},
 		{name: "invalid ref", err: dbsvc.ErrAccessObjectsInvalidRef, want: http.StatusUnprocessableEntity},
+		{name: "object not found", err: dbsvc.ErrAccessObjectsNotFound, want: http.StatusNotFound},
 		{name: "unsupported kind", err: dbsvc.ErrAccessObjectsUnsupportedKind, want: http.StatusUnprocessableEntity},
 		{name: "unsupported engine", err: dbsvc.ErrAccessHealthUnsupported, want: http.StatusUnprocessableEntity},
 		{name: "missing whodb config", err: dbsvc.ErrAccessHealthWhoDBMissing, want: http.StatusServiceUnavailable},

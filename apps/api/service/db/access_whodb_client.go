@@ -18,6 +18,21 @@ type WhoDBHTTPClient struct {
 	timeout time.Duration
 }
 
+type whoDBObjectPayload struct {
+	Ref struct {
+		Kind string   `json:"Kind"`
+		Path []string `json:"Path"`
+	} `json:"Ref"`
+	Kind        string `json:"Kind"`
+	Name        string `json:"Name"`
+	Path        []string
+	HasChildren bool `json:"HasChildren"`
+	Attributes  []struct {
+		Key   string `json:"Key"`
+		Value string `json:"Value"`
+	} `json:"Metadata"`
+}
+
 func NewWhoDBHTTPClient(baseURL string, client *http.Client, timeout time.Duration) *WhoDBHTTPClient {
 	if client == nil {
 		client = http.DefaultClient
@@ -41,20 +56,7 @@ func (c *WhoDBHTTPClient) CheckHealth(ctx context.Context, credentials WhoDBSour
 
 func (c *WhoDBHTTPClient) ListObjects(ctx context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error) {
 	var out struct {
-		SourceObjects []struct {
-			Ref struct {
-				Kind string   `json:"Kind"`
-				Path []string `json:"Path"`
-			} `json:"Ref"`
-			Kind        string   `json:"Kind"`
-			Name        string   `json:"Name"`
-			Path        []string `json:"Path"`
-			HasChildren bool     `json:"HasChildren"`
-			Attributes  []struct {
-				Key   string `json:"Key"`
-				Value string `json:"Value"`
-			} `json:"Metadata"`
-		} `json:"SourceObjects"`
+		SourceObjects []whoDBObjectPayload `json:"SourceObjects"`
 	}
 	variables := map[string]any{}
 	if parent != nil {
@@ -80,23 +82,74 @@ func (c *WhoDBHTTPClient) ListObjects(ctx context.Context, credentials WhoDBSour
 
 	objects := make([]WhoDBObject, 0, len(out.SourceObjects))
 	for _, object := range out.SourceObjects {
-		metadata := make(map[string]string, len(object.Attributes))
-		for _, attribute := range object.Attributes {
-			metadata[attribute.Key] = attribute.Value
-		}
-		objects = append(objects, WhoDBObject{
-			Ref: WhoDBObjectRef{
-				Kind: object.Ref.Kind,
-				Path: object.Ref.Path,
-			},
-			Kind:        object.Kind,
-			Name:        object.Name,
-			Path:        object.Path,
-			HasChildren: object.HasChildren,
-			Metadata:    metadata,
-		})
+		objects = append(objects, whoDBObjectFromPayload(object))
 	}
 	return objects, nil
+}
+
+func (c *WhoDBHTTPClient) GetObject(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) (*WhoDBObject, error) {
+	var out struct {
+		SourceObject *whoDBObjectPayload `json:"SourceObject"`
+	}
+	err := c.query(
+		ctx,
+		credentials,
+		"AccessObject",
+		"query AccessObject($ref: SourceObjectRefInput!) { SourceObject(ref: $ref) { Ref { Kind Path } Kind Name Path HasChildren Metadata { Key Value } } }",
+		map[string]any{"ref": whoDBObjectRefVariable(ref)},
+		&out,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if out.SourceObject == nil {
+		return nil, nil
+	}
+	object := whoDBObjectFromPayload(*out.SourceObject)
+	return &object, nil
+}
+
+func (c *WhoDBHTTPClient) ListColumns(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) ([]WhoDBColumn, error) {
+	var out struct {
+		SourceColumns []WhoDBColumn `json:"SourceColumns"`
+	}
+	err := c.query(
+		ctx,
+		credentials,
+		"AccessColumns",
+		"query AccessColumns($ref: SourceObjectRefInput!) { SourceColumns(ref: $ref) { Name Type IsPrimary IsForeignKey ReferencedTable ReferencedColumn Length Precision Scale } }",
+		map[string]any{"ref": whoDBObjectRefVariable(ref)},
+		&out,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return out.SourceColumns, nil
+}
+
+func whoDBObjectFromPayload(object whoDBObjectPayload) WhoDBObject {
+	metadata := make(map[string]string, len(object.Attributes))
+	for _, attribute := range object.Attributes {
+		metadata[attribute.Key] = attribute.Value
+	}
+	return WhoDBObject{
+		Ref: WhoDBObjectRef{
+			Kind: object.Ref.Kind,
+			Path: object.Ref.Path,
+		},
+		Kind:        object.Kind,
+		Name:        object.Name,
+		Path:        object.Path,
+		HasChildren: object.HasChildren,
+		Metadata:    metadata,
+	}
+}
+
+func whoDBObjectRefVariable(ref WhoDBObjectRef) map[string]any {
+	return map[string]any{
+		"Kind": ref.Kind,
+		"Path": ref.Path,
+	}
 }
 
 func (c *WhoDBHTTPClient) query(ctx context.Context, credentials WhoDBSourceCredentials, operationName, query string, variables map[string]any, out any) error {
@@ -159,7 +212,11 @@ func (c *WhoDBHTTPClient) query(ctx context.Context, credentials WhoDBSourceCred
 		return fmt.Errorf("%w: %v", ErrAccessHealthWhoDBUnavailable, err)
 	}
 	if len(response.Errors) > 0 {
-		return fmt.Errorf("%w: %s", ErrAccessHealthWhoDBUnavailable, response.Errors[0].Message)
+		message := response.Errors[0].Message
+		if isWhoDBObjectNotFound(message) {
+			return fmt.Errorf("%w: %s", ErrAccessObjectsNotFound, message)
+		}
+		return fmt.Errorf("%w: %s", ErrAccessHealthWhoDBUnavailable, message)
 	}
 	if out != nil {
 		if err := json.Unmarshal(response.Data, out); err != nil {
@@ -167,4 +224,9 @@ func (c *WhoDBHTTPClient) query(ctx context.Context, credentials WhoDBSourceCred
 		}
 	}
 	return nil
+}
+
+func isWhoDBObjectNotFound(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(message, "source object") && strings.Contains(message, "not found")
 }

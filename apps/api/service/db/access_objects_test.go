@@ -62,6 +62,181 @@ func TestAccessObjectsListsRootObjectsThroughGuardedDBAccess(t *testing.T) {
 	}
 }
 
+func TestAccessObjectReturnsSafeMetadataThroughGuardedDBAccess(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		object: &WhoDBObject{
+			Ref:         WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+			Kind:        "Table",
+			Name:        "users",
+			Path:        []string{"postgres", "public", "users"},
+			HasChildren: false,
+			Metadata: map[string]string{
+				"Type": "BASE TABLE",
+			},
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Get(context.Background(), AccessObjectRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+	})
+	if err != nil {
+		t.Fatalf("expected object detail to succeed: %v", err)
+	}
+
+	if result.Object.Kind != "table" || result.Object.Name != "users" || result.Object.Metadata["Type"] != "BASE TABLE" {
+		t.Fatalf("unexpected object detail: %+v", result.Object)
+	}
+	if whodb.ref == nil || whodb.ref.Kind != "Table" || strings.Join(whodb.ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected WhoDB object lookup for returned ref, got %+v", whodb.ref)
+	}
+	if whodb.credentials.SourceType != "Postgres" || whodb.credentials.Values["Password"] != "s3cr3t" {
+		t.Fatalf("expected generated WhoDB credentials, got %+v", whodb.credentials)
+	}
+
+	body, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("failed to marshal result: %v", err)
+	}
+	for _, forbidden := range []string{"s3cr3t", "alice", "pg-main-postgresql"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("object response exposed credential material %q: %s", forbidden, string(body))
+		}
+	}
+}
+
+func TestAccessObjectFallsBackToParentListingWhenDirectLookupMissesReturnedRef(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		getErr: ErrAccessObjectsNotFound,
+		objects: []WhoDBObject{
+			{
+				Ref:         WhoDBObjectRef{Kind: "View", Path: []string{"postgres", "public", "pg_auth_mon"}},
+				Kind:        "View",
+				Name:        "pg_auth_mon",
+				Path:        []string{"postgres", "public", "pg_auth_mon"},
+				HasChildren: false,
+			},
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Get(context.Background(), AccessObjectRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "view", Path: []string{"postgres", "public", "pg_auth_mon"}},
+	})
+	if err != nil {
+		t.Fatalf("expected object detail fallback to succeed: %v", err)
+	}
+
+	if result.Object.Kind != "view" || result.Object.Name != "pg_auth_mon" {
+		t.Fatalf("unexpected object detail fallback: %+v", result.Object)
+	}
+	if whodb.parent == nil || whodb.parent.Kind != "Schema" || strings.Join(whodb.parent.Path, "/") != "postgres/public" {
+		t.Fatalf("expected fallback listing under schema parent, got %+v", whodb.parent)
+	}
+	if len(whodb.kinds) != 0 {
+		t.Fatalf("expected fallback listing without WhoDB kind filter, got %+v", whodb.kinds)
+	}
+}
+
+func TestAccessObjectPreservesNotFoundWhenFallbackCannotFindRef(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		getErr:  ErrAccessObjectsNotFound,
+		objects: []WhoDBObject{},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	_, err := svc.Get(context.Background(), AccessObjectRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "missing"}},
+	})
+	if err == nil || !errors.Is(err, ErrAccessObjectsNotFound) {
+		t.Fatalf("expected original not found error, got %v", err)
+	}
+}
+
+func TestAccessColumnsReturnsColumnShapeThroughGuardedDBAccess(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		columns: []WhoDBColumn{
+			{Name: "id", Type: "integer", IsPrimary: true},
+			{
+				Name:             "team_id",
+				Type:             "integer",
+				IsForeignKey:     true,
+				ReferencedTable:  stringPointer("teams"),
+				ReferencedColumn: stringPointer("id"),
+			},
+			{Name: "email", Type: "varchar", Length: intPointer(320)},
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Columns(context.Background(), AccessColumnsRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+	})
+	if err != nil {
+		t.Fatalf("expected column inspection to succeed: %v", err)
+	}
+
+	if result.Ref.Kind != "table" || strings.Join(result.Ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("unexpected result ref: %+v", result.Ref)
+	}
+	if whodb.ref == nil || whodb.ref.Kind != "Table" || strings.Join(whodb.ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected WhoDB column lookup for returned ref, got %+v", whodb.ref)
+	}
+	if len(result.Columns) != 3 {
+		t.Fatalf("expected three columns, got %+v", result.Columns)
+	}
+	if !result.Columns[0].IsPrimary || result.Columns[0].Name != "id" || result.Columns[0].Type != "integer" {
+		t.Fatalf("unexpected primary column: %+v", result.Columns[0])
+	}
+	if !result.Columns[1].IsForeignKey || result.Columns[1].ReferencedTable == nil || *result.Columns[1].ReferencedTable != "teams" {
+		t.Fatalf("unexpected foreign key column: %+v", result.Columns[1])
+	}
+	if result.Columns[2].Length == nil || *result.Columns[2].Length != 320 {
+		t.Fatalf("unexpected length metadata: %+v", result.Columns[2])
+	}
+
+	body, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("failed to marshal result: %v", err)
+	}
+	for _, forbidden := range []string{"s3cr3t", "alice", "pg-main-postgresql"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("columns response exposed credential material %q: %s", forbidden, string(body))
+		}
+	}
+}
+
+func TestAccessColumnsRejectsRefsThatDoNotExposeFields(t *testing.T) {
+	store := readyAccessObjectsStore()
+	svc := AccessObjectsService{Store: store, WhoDB: &recordingWhoDBObjectClient{}}
+
+	_, err := svc.Columns(context.Background(), AccessColumnsRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "schema", Path: []string{"postgres", "public"}},
+	})
+	if err == nil || !errors.Is(err, ErrAccessObjectsUnsupportedKind) {
+		t.Fatalf("expected unsupported ref kind, got %v", err)
+	}
+}
+
 func TestAccessObjectsListsChildrenUnderReturnedRef(t *testing.T) {
 	store := readyAccessObjectsStore()
 	whodb := &recordingWhoDBObjectClient{
@@ -247,9 +422,13 @@ func readyAccessObjectsStore() *fakeAccessHealthStore {
 type recordingWhoDBObjectClient struct {
 	credentials WhoDBSourceCredentials
 	parent      *WhoDBObjectRef
+	ref         *WhoDBObjectRef
 	kinds       []string
 	objects     []WhoDBObject
+	object      *WhoDBObject
+	columns     []WhoDBColumn
 	err         error
+	getErr      error
 }
 
 func (r *recordingWhoDBObjectClient) ListObjects(_ context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error) {
@@ -260,4 +439,33 @@ func (r *recordingWhoDBObjectClient) ListObjects(_ context.Context, credentials 
 		return nil, r.err
 	}
 	return r.objects, nil
+}
+
+func (r *recordingWhoDBObjectClient) GetObject(_ context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) (*WhoDBObject, error) {
+	r.credentials = credentials
+	r.ref = &ref
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.object, nil
+}
+
+func (r *recordingWhoDBObjectClient) ListColumns(_ context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) ([]WhoDBColumn, error) {
+	r.credentials = credentials
+	r.ref = &ref
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.columns, nil
+}
+
+func stringPointer(value string) *string {
+	return &value
+}
+
+func intPointer(value int) *int {
+	return &value
 }

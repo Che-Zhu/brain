@@ -21,6 +21,8 @@ func Register(api huma.API) {
 	registerGet(grp)
 	registerAccessHealth(grp)
 	registerAccessObjects(grp)
+	registerAccessObject(grp)
+	registerAccessColumns(grp)
 	registerCreate(grp)
 	registerBackup(grp)
 	registerUpdate(grp)
