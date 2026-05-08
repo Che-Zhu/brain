@@ -109,7 +109,7 @@ export const chatPreviewMessageSeed: Record<string, UIMessage[]> = {
       parts: [
         {
           type: "text",
-          text: "Stub: `curl -sS -o /dev/null -w \"%{http_code}\" https://api.example/healthz`",
+          text: 'Stub: `curl -sS -o /dev/null -w "%{http_code}" https://api.example/healthz`',
         },
       ],
     },

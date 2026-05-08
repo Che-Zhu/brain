@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { type LucideIcon, MoreHorizontal, Trash2 } from "lucide-react";
 import { type ComponentProps, type SyntheticEvent, useState } from "react";
 
 import { ContainerNodeDeleteDialog } from "./container-node.delete-dialog";
@@ -77,12 +77,12 @@ export function ContainerNodeHeaderMenuItem({
   accentHover,
   className,
   children,
-  icon,
+  icon: Icon,
   ...props
 }: ComponentProps<typeof DropdownMenuItem> & {
   /** Start / Restart: icon uses `text-theme-green` on hover / focus (label color unchanged). */
   accentHover?: "positive";
-  icon?: React.ReactNode;
+  icon?: LucideIcon;
 }) {
   return (
     <DropdownMenuItem
@@ -93,11 +93,11 @@ export function ContainerNodeHeaderMenuItem({
       )}
       {...props}
     >
-      {icon == null ? (
+      {Icon == null ? (
         children
       ) : (
         <>
-          {icon}
+          <Icon aria-hidden className="size-3.5 shrink-0 opacity-80" />
           {children}
         </>
       )}
@@ -119,7 +119,7 @@ export function ContainerNodeHeaderMenuDelete({
     <>
       <ContainerNodeHeaderMenuItem
         disabled={onConfirmDelete == null}
-        icon={<Trash2 className="size-3.5 shrink-0 opacity-80" />}
+        icon={Trash2}
         onClick={() => setOpen(true)}
         variant="destructive"
       >

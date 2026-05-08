@@ -108,7 +108,7 @@ function V1WorkloadCard({
               <ContainerNode.HeaderMenuItem
                 accentHover="positive"
                 disabled={demoActions.onStart == null}
-                icon={<Play className="size-3.5 shrink-0 opacity-80" />}
+                icon={Play}
                 onClick={() => demoActions.onStart()}
               >
                 Start
@@ -117,7 +117,7 @@ function V1WorkloadCard({
             {showPause ? (
               <ContainerNode.HeaderMenuItem
                 disabled={demoActions.onPause == null}
-                icon={<Pause className="size-3.5 shrink-0 opacity-80" />}
+                icon={Pause}
                 onClick={() => demoActions.onPause()}
               >
                 Pause
@@ -127,7 +127,7 @@ function V1WorkloadCard({
               <ContainerNode.HeaderMenuItem
                 accentHover="positive"
                 disabled={demoActions.onRestart == null}
-                icon={<RotateCw className="size-3.5 shrink-0 opacity-80" />}
+                icon={RotateCw}
                 onClick={() => demoActions.onRestart()}
               >
                 Restart
