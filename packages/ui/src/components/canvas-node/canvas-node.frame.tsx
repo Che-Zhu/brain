@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useCanvasNode } from "./canvas-node.context";
 
 const HOVER_INTENT_GRACE_MS = 220;
-const HOVER_EXPAND_DWELL_MS = 350;
+const HOVER_EXPAND_DWELL_MS = 550;
 
 function isInsideSurface(
   currentTarget: HTMLElement,
@@ -42,7 +42,9 @@ export function CanvasNodeFrame({
     state: { interaction },
   } = useCanvasNode();
   const selected = interaction?.selected ?? false;
+  const dragging = interaction?.dragging ?? false;
   const [hoverIntent, setHoverIntent] = useState(false);
+  const pointerInsideFrameRef = useRef(false);
   const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -68,6 +70,22 @@ export function CanvasNodeFrame({
     hoverExpandTimerRef.current = null;
   }, []);
 
+  const startHoverIntent = useCallback(() => {
+    clearHoverIntentTimer();
+    setHoverIntent(true);
+
+    clearHoverExpandTimer();
+
+    if (expanded) {
+      return;
+    }
+
+    hoverExpandTimerRef.current = setTimeout(() => {
+      actions.expand();
+      hoverExpandTimerRef.current = null;
+    }, HOVER_EXPAND_DWELL_MS);
+  }, [actions, clearHoverExpandTimer, clearHoverIntentTimer, expanded]);
+
   useEffect(
     () => () => {
       clearHoverIntentTimer();
@@ -76,20 +94,44 @@ export function CanvasNodeFrame({
     [clearHoverExpandTimer, clearHoverIntentTimer]
   );
 
-  const showHoverIntent = useCallback(() => {
-    clearHoverIntentTimer();
-    setHoverIntent(true);
-
-    if (!expanded) {
+  useEffect(() => {
+    if (dragging) {
+      clearHoverIntentTimer();
       clearHoverExpandTimer();
-      hoverExpandTimerRef.current = setTimeout(() => {
-        actions.expand();
-        hoverExpandTimerRef.current = null;
-      }, HOVER_EXPAND_DWELL_MS);
+      setHoverIntent(false);
+      return;
     }
-  }, [actions, clearHoverExpandTimer, clearHoverIntentTimer, expanded]);
+
+    if (pointerInsideFrameRef.current) {
+      startHoverIntent();
+    }
+  }, [
+    clearHoverExpandTimer,
+    clearHoverIntentTimer,
+    dragging,
+    startHoverIntent,
+  ]);
+
+  const showHoverIntent = useCallback(() => {
+    pointerInsideFrameRef.current = true;
+
+    if (dragging) {
+      clearHoverIntentTimer();
+      clearHoverExpandTimer();
+      setHoverIntent(false);
+      return;
+    }
+
+    startHoverIntent();
+  }, [
+    clearHoverExpandTimer,
+    clearHoverIntentTimer,
+    dragging,
+    startHoverIntent,
+  ]);
 
   const hideHoverIntent = useCallback(() => {
+    pointerInsideFrameRef.current = false;
     clearHoverIntentTimer();
     clearHoverExpandTimer();
 
