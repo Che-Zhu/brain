@@ -20,7 +20,7 @@ export function CanvasNodeDragFrame({
 
   return (
     <div
-      className={cn("canvas-node-drag-frame inline-flex rounded-lg", className)}
+      className={cn("canvas-node-drag-frame inline-flex rounded-xl", className)}
       data-dragging="true"
       data-slot="canvas-node-drag-frame"
     >
