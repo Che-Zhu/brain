@@ -1,6 +1,5 @@
 .canvas-node-hover-surface {
-  --canvas-node-hover-overlay: rgb(255 255 255 / 4.5%);
-  --canvas-node-surface-base: #040816;
+  --canvas-node-surface-underlay: transparent;
 }
 
 .canvas-node-hover-surface:hover,
@@ -8,30 +7,18 @@
 .canvas-node-frame[data-hover-intent] .canvas-node-hover-surface,
 .canvas-node-drag-frame[data-dragging="true"] .canvas-node-hover-surface,
 .canvas-node-frame[data-selected] .canvas-node-hover-surface {
-  background:
-    linear-gradient(
-      90deg,
-      var(--canvas-node-hover-overlay) 0%,
-      var(--canvas-node-hover-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
-      var(--canvas-node-hover-overlay) 0%,
-      var(--canvas-node-hover-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-base) 0%,
-      var(--canvas-node-surface-base) 100%
-    );
+  --canvas-node-surface-underlay: var(
+    --canvas-node-surface-interaction-underlay
+  );
   box-shadow:
-    0 1px 3px 0 rgb(0 0 0 / 10%),
-    0 1px 2px 0 rgb(0 0 0 / 6%);
+    -1px -1px 6px 0 rgb(255 255 255 / 4.5%),
+    1px 1px 6px 0 rgb(255 255 255 / 4.5%);
 }
 
 .canvas-node-frame {
-  --canvas-node-surface-overlay: rgb(255 255 255 / 4.5%);
-  --canvas-node-surface-base: #040816;
+  --canvas-node-surface-base: rgb(255 255 255 / 4.5%);
+  --canvas-node-surface-interaction-underlay: rgb(9 9 11 / 20%);
+  --canvas-node-surface-underlay: transparent;
   --canvas-node-card-width-collapsed: calc(var(--spacing) * 40);
   --canvas-node-card-height-collapsed: calc(var(--spacing) * 10);
   --canvas-node-card-width-expanded: calc(var(--spacing) * 66.75);
@@ -57,7 +44,6 @@
 }
 
 .canvas-node-surface {
-  --canvas-node-surface-overlay: rgb(255 255 255 / 4.5%);
   --canvas-node-card-width-collapsed: calc(var(--spacing) * 40);
   --canvas-node-card-height-collapsed: calc(var(--spacing) * 10);
   --canvas-node-card-width-expanded: calc(var(--spacing) * 66.75);
@@ -67,13 +53,13 @@
   background:
     linear-gradient(
       90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
+      var(--canvas-node-surface-base) 0%,
+      var(--canvas-node-surface-base) 100%
     ),
     linear-gradient(
       90deg,
-      var(--canvas-node-surface-base) 0%,
-      var(--canvas-node-surface-base) 100%
+      var(--canvas-node-surface-underlay) 0%,
+      var(--canvas-node-surface-underlay) 100%
     );
   transition:
     width 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -149,19 +135,8 @@
 
 .canvas-node-connection-button {
   pointer-events: none;
-  background:
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
-    ),
-    linear-gradient(90deg, rgb(8 10 17) 0%, rgb(8 10 17) 100%);
   opacity: 0;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease;
+  transition: opacity 150ms ease;
 }
 
 .canvas-node-frame[data-state="expanded"][data-hover-intent]
@@ -170,22 +145,6 @@
   .canvas-node-connection-button {
   pointer-events: auto;
   opacity: 1;
-}
-
-.canvas-node-connection-button:hover,
-.canvas-node-connection-button:focus-visible,
-.canvas-node-connection-button[data-active="true"] {
-  background:
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-base) 0%,
-      var(--canvas-node-surface-base) 100%
-    );
 }
 
 .canvas-node-connection-button[data-side="top"] {
@@ -247,6 +206,7 @@
 }
 
 .canvas-node-expand-button {
+  --canvas-node-expand-underlay: transparent;
   position: absolute;
   top: 0;
   left: calc(
@@ -263,17 +223,14 @@
   background:
     linear-gradient(
       90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
+      var(--canvas-node-surface-base) 0%,
+      var(--canvas-node-surface-base) 100%
     ),
     linear-gradient(
       90deg,
-      var(--canvas-node-surface-base) 0%,
-      var(--canvas-node-surface-base) 100%
+      var(--canvas-node-expand-underlay) 0%,
+      var(--canvas-node-expand-underlay) 100%
     );
-  box-shadow:
-    0 1px 3px 0 rgb(0 0 0 / 10%),
-    0 1px 2px 0 rgb(0 0 0 / 6%);
   opacity: 0;
   transition:
     opacity 150ms ease,
@@ -300,21 +257,7 @@
 }
 
 .canvas-node-expand-button:hover {
-  color: rgb(244 244 245);
-  background:
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-overlay) 0%,
-      var(--canvas-node-surface-overlay) 100%
-    ),
-    linear-gradient(
-      90deg,
-      var(--canvas-node-surface-base) 0%,
-      var(--canvas-node-surface-base) 100%
-    );
+  --canvas-node-expand-underlay: var(
+    --canvas-node-surface-interaction-underlay
+  );
 }

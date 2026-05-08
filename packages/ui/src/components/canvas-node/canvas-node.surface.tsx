@@ -17,7 +17,7 @@ export function CanvasNodeSurface({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: double-click toggle is a pointer affordance paired with the explicit expand button.
     <article
       className={cn(
-        "canvas-node-surface canvas-node-hover-surface flex min-w-0 flex-col overflow-hidden rounded-lg border-[0.5px] border-white/10 text-zinc-50",
+        "canvas-node-surface canvas-node-hover-surface flex min-w-0 flex-col overflow-hidden rounded-lg border-[0.5px] border-white/10 text-zinc-50 backdrop-blur-2xl",
         className
       )}
       data-slot="canvas-node-surface"
