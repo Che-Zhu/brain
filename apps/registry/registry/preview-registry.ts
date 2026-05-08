@@ -153,16 +153,35 @@ export const Index: RegistryIndex = {
     ],
     files: [
       {
-        path: "registry/linear/components/container-node/container-node-preview.tsx",
+        path: "registry/linear/components/container-node/v0/container-node-preview-v0.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/container-node/v1/container-node-preview-v1.tsx",
         type: "registry:preview",
         target: "",
       },
       previewUiFile,
     ],
-    load: () =>
-      import(
-        "@registry/linear/components/container-node/container-node-preview"
-      ),
+    variants: [
+      {
+        id: "v0",
+        load: () =>
+          import(
+            "@registry/linear/components/container-node/v0/container-node-preview-v0"
+          ),
+        title: "v0",
+      },
+      {
+        id: "v1",
+        load: () =>
+          import(
+            "@registry/linear/components/container-node/v1/container-node-preview-v1"
+          ),
+        title: "v1",
+      },
+    ],
   },
 
   "linear/components/chat": {

@@ -11,8 +11,8 @@ import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import type {
   ContainerNodeActions,
   ContainerNodeStates,
-} from "@workspace/ui/components/container-node/container-node";
-import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
+} from "@workspace/ui/components/container-node/v1/container-node";
+import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   type Edge,

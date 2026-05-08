@@ -2,7 +2,7 @@ import type { ApTelemetryMetricsRow } from "@workspace/api/hooks";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
 import type { Edge, Node } from "@xyflow/react";
 
 import { CANVAS_CONTAINER_NODE_TYPE } from "@/store/canvas-store";

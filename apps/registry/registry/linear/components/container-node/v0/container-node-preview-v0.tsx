@@ -1,7 +1,7 @@
 "use client";
 
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
-import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v0/container-node";
+import { ContainerNode } from "@workspace/ui/components/container-node/v0/container-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { useEffect, useMemo, useState } from "react";
 
@@ -78,40 +78,32 @@ function ScaleDialogPreview() {
   );
 }
 
-export default function ContainerNodePreview() {
+export default function ContainerNodePreviewV0() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
+      <Preview
+        containerClassName="lg:col-span-2"
+        title="Green — running (live usage, shifts every 2s) · Red — failed (errored)"
+      >
+        <div className="flex flex-wrap items-start justify-center gap-8">
+          <RunningWorkloadPreview className="min-h-40 max-w-60" />
+          <ContainerNode.Root
+            states={{
+              ...staticBase,
+              name: `${staticBase.name}-failed`,
+              replicas: 0,
+              status: { label: "Failed", tone: "failed" },
+            }}
+          >
+            <ContainerNode.Variant0 className="min-h-40 max-w-60" />
+          </ContainerNode.Root>
+        </div>
+      </Preview>
       <Preview title="Delete dialog">
         <DeleteDialogPreview />
       </Preview>
       <Preview title="Scale dialog">
         <ScaleDialogPreview />
-      </Preview>
-      <Preview title="Green — running (live usage, shifts every 2s)">
-        <RunningWorkloadPreview className="min-h-40 max-w-60" />
-      </Preview>
-      <Preview title="Red — failed (errored)">
-        <ContainerNode.Root
-          states={{
-            ...staticBase,
-            name: `${staticBase.name}-failed`,
-            replicas: 0,
-            status: { label: "Failed", tone: "failed" },
-          }}
-        >
-          <ContainerNode.Variant0 className="min-h-40 max-w-60" />
-        </ContainerNode.Root>
-      </Preview>
-      <Preview title="Unknown metrics / status">
-        <ContainerNode.Root
-          states={{
-            image: "registry.example.io/demo:v2",
-            kind: "Container",
-            name: "workload-metrics-pending",
-          }}
-        >
-          <ContainerNode.Variant0 className="min-h-40 max-w-60" />
-        </ContainerNode.Root>
       </Preview>
     </PreviewWrapper>
   );
