@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -275,6 +276,181 @@ func TestAccessRowsReturnsRowsThroughGuardedDBAccessWithDefaultPagination(t *tes
 	for _, forbidden := range []string{"s3cr3t", "alice", "pg-main-postgresql"} {
 		if strings.Contains(string(body), forbidden) {
 			t.Fatalf("rows response exposed credential material %q: %s", forbidden, string(body))
+		}
+	}
+}
+
+func TestAccessExportReturnsCSVThroughGuardedDBAccess(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		export: &WhoDBExportResult{
+			ContentType: "text/csv; charset=utf-8",
+			Body:        []byte("id,email\n1,ada@example.com\n"),
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Export(context.Background(), AccessExportRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		Format:     "csv",
+	})
+	if err != nil {
+		t.Fatalf("expected CSV export to succeed: %v", err)
+	}
+
+	if result.Format != "csv" || result.ContentType != "text/csv; charset=utf-8" {
+		t.Fatalf("unexpected export metadata: %+v", result)
+	}
+	if string(result.Body) != "id,email\n1,ada@example.com\n" {
+		t.Fatalf("unexpected CSV body: %q", string(result.Body))
+	}
+	if whodb.ref == nil || whodb.ref.Kind != "Table" || strings.Join(whodb.ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected WhoDB export for returned ref, got %+v", whodb.ref)
+	}
+	if whodb.exportFormat != "csv" {
+		t.Fatalf("expected CSV export format, got %q", whodb.exportFormat)
+	}
+	if whodb.credentials.SourceType != "Postgres" || whodb.credentials.Values["Password"] != "s3cr3t" {
+		t.Fatalf("expected generated WhoDB credentials, got %+v", whodb.credentials)
+	}
+}
+
+func TestAccessExportCapsCSVDataRowsAtMVPExportLimit(t *testing.T) {
+	var exported strings.Builder
+	exported.WriteString("id,email\n")
+	for i := 1; i <= maxAccessExportRows+1; i++ {
+		exported.WriteString(fmt.Sprintf("%d,user-%d@example.com\n", i, i))
+	}
+
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		export: &WhoDBExportResult{
+			ContentType: "text/csv; charset=utf-8",
+			Body:        []byte(exported.String()),
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Export(context.Background(), AccessExportRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		Format:     "csv",
+	})
+	if err != nil {
+		t.Fatalf("expected capped CSV export to succeed: %v", err)
+	}
+
+	records, err := csv.NewReader(strings.NewReader(string(result.Body))).ReadAll()
+	if err != nil {
+		t.Fatalf("expected capped CSV to remain parseable: %v", err)
+	}
+	if len(records) != maxAccessExportRows+1 {
+		t.Fatalf("expected header plus %d data rows, got %d records", maxAccessExportRows, len(records))
+	}
+	if records[0][0] != "id" || records[len(records)-1][0] != fmt.Sprintf("%d", maxAccessExportRows) {
+		t.Fatalf("unexpected capped CSV boundary rows: first=%+v last=%+v", records[0], records[len(records)-1])
+	}
+	if result.RowLimit != maxAccessExportRows || result.RowsExported != maxAccessExportRows || !result.Truncated {
+		t.Fatalf("expected row limit metadata, got %+v", result)
+	}
+}
+
+func TestAccessExportReturnsNDJSONThroughGuardedDBAccess(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		export: &WhoDBExportResult{
+			Body: []byte("{\"id\":1,\"email\":\"ada@example.com\"}\n{\"id\":2,\"email\":\"grace@example.com\"}\n"),
+		},
+	}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	result, err := svc.Export(context.Background(), AccessExportRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		Format:     "ndjson",
+	})
+	if err != nil {
+		t.Fatalf("expected NDJSON export to succeed: %v", err)
+	}
+
+	if result.Format != "ndjson" || result.ContentType != "application/x-ndjson; charset=utf-8" {
+		t.Fatalf("unexpected NDJSON metadata: %+v", result)
+	}
+	if string(result.Body) != "{\"id\":1,\"email\":\"ada@example.com\"}\n{\"id\":2,\"email\":\"grace@example.com\"}\n" {
+		t.Fatalf("unexpected NDJSON body: %q", string(result.Body))
+	}
+	if result.RowsExported != 2 || result.Truncated {
+		t.Fatalf("unexpected NDJSON row metadata: %+v", result)
+	}
+	if whodb.exportFormat != "ndjson" {
+		t.Fatalf("expected NDJSON export format, got %q", whodb.exportFormat)
+	}
+}
+
+func TestAccessExportRejectsUnsupportedFormatsBeforeCallingWhoDB(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb}
+
+	_, err := svc.Export(context.Background(), AccessExportRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		Format:     "excel",
+	})
+	if err == nil || !errors.Is(err, ErrAccessExportInvalidFormat) {
+		t.Fatalf("expected invalid export format error, got %v", err)
+	}
+	if whodb.exportCalled != 0 {
+		t.Fatalf("expected invalid export format to be rejected before WhoDB call")
+	}
+}
+
+func TestAccessExportAuditIncludesFormatAndLimitButNotRowValues(t *testing.T) {
+	store := readyAccessObjectsStore()
+	whodb := &recordingWhoDBObjectClient{
+		export: &WhoDBExportResult{
+			Body: []byte("id,email\n1,ada@example.com\n"),
+		},
+	}
+	audit := &recordingAccessHealthAudit{}
+	svc := AccessObjectsService{Store: store, WhoDB: whodb, Audit: audit}
+
+	_, err := svc.Export(context.Background(), AccessExportRequest{
+		Name:       "pg-main",
+		Namespace:  "ns-a",
+		ProjectUID: "project-1",
+		Ref:        AccessObjectRef{Kind: "table", Path: []string{"postgres", "public", "users"}},
+		Format:     "csv",
+	})
+	if err != nil {
+		t.Fatalf("expected export to succeed: %v", err)
+	}
+
+	if audit.event.Operation != "db.access.export" || audit.event.Outcome != "ok" || audit.event.Engine != "postgresql" {
+		t.Fatalf("unexpected audit event: %+v", audit.event)
+	}
+	if audit.event.Ref == nil || audit.event.Ref.Kind != "table" || strings.Join(audit.event.Ref.Path, "/") != "postgres/public/users" {
+		t.Fatalf("expected audit ref metadata, got %+v", audit.event.Ref)
+	}
+	if audit.event.ExportFormat != "csv" || audit.event.RowLimit != maxAccessExportRows || audit.event.RowsExported != 1 || audit.event.Truncated {
+		t.Fatalf("expected audit export metadata, got %+v", audit.event)
+	}
+	eventBytes, err := json.Marshal(audit.event)
+	if err != nil {
+		t.Fatalf("failed to marshal audit event: %v", err)
+	}
+	for _, forbidden := range []string{"ada@example.com", "s3cr3t", "alice", "pg-main-postgresql"} {
+		if strings.Contains(string(eventBytes), forbidden) {
+			t.Fatalf("audit event exposed %q: %s", forbidden, string(eventBytes))
 		}
 	}
 }
@@ -615,20 +791,23 @@ func readyAccessObjectsStore() *fakeAccessHealthStore {
 }
 
 type recordingWhoDBObjectClient struct {
-	credentials WhoDBSourceCredentials
-	parent      *WhoDBObjectRef
-	ref         *WhoDBObjectRef
-	kinds       []string
-	pageSize    int
-	pageOffset  int
-	sort        []WhoDBRowsSort
-	rowsCalled  int
-	objects     []WhoDBObject
-	object      *WhoDBObject
-	columns     []WhoDBColumn
-	rows        *WhoDBRowsResult
-	err         error
-	getErr      error
+	credentials  WhoDBSourceCredentials
+	parent       *WhoDBObjectRef
+	ref          *WhoDBObjectRef
+	kinds        []string
+	exportFormat string
+	pageSize     int
+	pageOffset   int
+	sort         []WhoDBRowsSort
+	rowsCalled   int
+	exportCalled int
+	objects      []WhoDBObject
+	object       *WhoDBObject
+	columns      []WhoDBColumn
+	rows         *WhoDBRowsResult
+	export       *WhoDBExportResult
+	err          error
+	getErr       error
 }
 
 func (r *recordingWhoDBObjectClient) ListObjects(_ context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error) {
@@ -673,6 +852,17 @@ func (r *recordingWhoDBObjectClient) ReadRows(_ context.Context, credentials Who
 		return nil, r.err
 	}
 	return r.rows, nil
+}
+
+func (r *recordingWhoDBObjectClient) Export(_ context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, format string) (*WhoDBExportResult, error) {
+	r.credentials = credentials
+	r.ref = &ref
+	r.exportFormat = format
+	r.exportCalled++
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.export, nil
 }
 
 func stringPointer(value string) *string {

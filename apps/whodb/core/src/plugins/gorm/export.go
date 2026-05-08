@@ -18,6 +18,7 @@ package gorm_plugin
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -139,6 +140,78 @@ func (p *GormPlugin) ExportData(config *engine.PluginConfig, schema string, stor
 		log.WithField("totalRows", totalRows).
 			WithField("table", fmt.Sprintf("%s.%s", schema, storageUnit)).
 			Info("Export completed successfully")
+
+		return struct{}{}, nil
+	})
+	return err
+}
+
+// ExportDataNDJSON streams table rows as newline-delimited JSON.
+func (p *GormPlugin) ExportDataNDJSON(config *engine.PluginConfig, schema string, storageUnit string, writer func(string) error, selectedRows []map[string]any) error {
+	if len(selectedRows) > 0 {
+		for i, row := range selectedRows {
+			line, err := json.Marshal(row)
+			if err != nil {
+				return fmt.Errorf("failed to marshal selected row %d: %v", i+1, err)
+			}
+			if err := writer(string(line)); err != nil {
+				return fmt.Errorf("failed to write selected row %d: %v", i+1, err)
+			}
+		}
+		return nil
+	}
+
+	_, err := plugins.WithConnection(config, p.DB, func(db *gorm.DB) (struct{}, error) {
+		columnConfig := config
+		if config != nil {
+			clonedConfig := *config
+			clonedConfig.Transaction = db
+			columnConfig = &clonedConfig
+		} else {
+			columnConfig = &engine.PluginConfig{Transaction: db}
+		}
+
+		orderedColumns, err := p.PluginFunctions.GetColumnsForTable(columnConfig, schema, storageUnit)
+		if err != nil {
+			log.WithError(err).Error(fmt.Sprintf("Failed to get columns for NDJSON export of table %s.%s", schema, storageUnit))
+			return struct{}{}, fmt.Errorf("failed to get columns: %v", err)
+		}
+		if len(orderedColumns) == 0 {
+			return struct{}{}, fmt.Errorf("no columns found for table %s.%s", schema, storageUnit)
+		}
+
+		columns := make([]string, len(orderedColumns))
+		for i, col := range orderedColumns {
+			columns[i] = col.Name
+		}
+
+		processor := NewBatchProcessor(p, p.Type, &BatchConfig{
+			BatchSize:   10000,
+			LogProgress: true,
+		})
+
+		totalRows := 0
+		err = processor.ExportInBatches(db, schema, storageUnit, columns, func(batch []map[string]any) error {
+			for _, record := range batch {
+				line, err := json.Marshal(record)
+				if err != nil {
+					return fmt.Errorf("failed to marshal row %d: %v", totalRows+1, err)
+				}
+				if err := writer(string(line)); err != nil {
+					log.WithError(err).Error(fmt.Sprintf("Failed to write NDJSON row %d during export of table %s.%s", totalRows+1, schema, storageUnit))
+					return fmt.Errorf("failed to write row %d: %v", totalRows+1, err)
+				}
+				totalRows++
+			}
+			return nil
+		})
+		if err != nil {
+			return struct{}{}, fmt.Errorf("NDJSON export failed after %d rows: %v", totalRows, err)
+		}
+
+		log.WithField("totalRows", totalRows).
+			WithField("table", fmt.Sprintf("%s.%s", schema, storageUnit)).
+			Info("NDJSON export completed successfully")
 
 		return struct{}{}, nil
 	})

@@ -54,6 +54,7 @@ func TestRegisterIncludesAccessObjectDetailRoutes(t *testing.T) {
 		"/api/db/v1alpha1/{name}/access/object":  "db-access-object",
 		"/api/db/v1alpha1/{name}/access/columns": "db-access-columns",
 		"/api/db/v1alpha1/{name}/access/rows":    "db-access-rows",
+		"/api/db/v1alpha1/{name}/access/export":  "db-access-export",
 	}
 	for path, operationID := range paths {
 		t.Run(path, func(t *testing.T) {
@@ -63,6 +64,46 @@ func TestRegisterIncludesAccessObjectDetailRoutes(t *testing.T) {
 			}
 			if got.Post.OperationID != operationID {
 				t.Fatalf("unexpected operation ID: %q", got.Post.OperationID)
+			}
+		})
+	}
+}
+
+func TestAccessExportRejectsUnsupportedInputsAtHTTPBoundary(t *testing.T) {
+	tests := []struct {
+		name         string
+		extraPayload string
+		location     string
+	}{
+		{name: "unsupported format", extraPayload: `"format": "excel"`, location: "body.format"},
+		{name: "query", extraPayload: `"query": "select * from users"`, location: "body.query"},
+		{name: "where", extraPayload: `"where": {"column":"id","op":"=","value":"1"}`, location: "body.where"},
+		{name: "selected rows", extraPayload: `"selectedRows": [{"id": 1}]`, location: "body.selectedRows"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := chi.NewRouter()
+			api := humachi.New(router, huma.DefaultConfig("test", "0.0.0"))
+			Register(api)
+
+			body := []byte(fmt.Sprintf(`{
+				"projectUid": "project-1",
+				"ref": {"kind": "table", "path": ["postgres", "public", "users"]},
+				%s
+			}`, tt.extraPayload))
+			req := httptest.NewRequest(http.MethodPost, "/api/db/v1alpha1/pg-main/access/export", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer not-a-kubeconfig")
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if w.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("expected unsupported export input to be rejected before auth, got %d: %s", w.Code, w.Body.String())
+			}
+			if !bytes.Contains(w.Body.Bytes(), []byte(tt.location)) {
+				t.Fatalf("expected schema validation to reference %s, got: %s", tt.location, w.Body.String())
 			}
 		})
 	}
@@ -150,6 +191,7 @@ func TestAccessObjectsErrorStatusMapping(t *testing.T) {
 		{name: "unsupported kind", err: dbsvc.ErrAccessObjectsUnsupportedKind, want: http.StatusUnprocessableEntity},
 		{name: "invalid row pagination", err: dbsvc.ErrAccessRowsInvalidPagination, want: http.StatusBadRequest},
 		{name: "invalid row sort", err: dbsvc.ErrAccessRowsInvalidSort, want: http.StatusBadRequest},
+		{name: "invalid export format", err: dbsvc.ErrAccessExportInvalidFormat, want: http.StatusBadRequest},
 		{name: "unsupported engine", err: dbsvc.ErrAccessHealthUnsupported, want: http.StatusUnprocessableEntity},
 		{name: "missing whodb config", err: dbsvc.ErrAccessHealthWhoDBMissing, want: http.StatusServiceUnavailable},
 		{name: "timeout", err: fmt.Errorf("%w: deadline", dbsvc.ErrAccessHealthWhoDBTimeout), want: http.StatusGatewayTimeout},

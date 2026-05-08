@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -153,6 +155,63 @@ func (c *WhoDBHTTPClient) ReadRows(ctx context.Context, credentials WhoDBSourceC
 	return &out.SourceRows, nil
 }
 
+func (c *WhoDBHTTPClient) Export(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, format string) (*WhoDBExportResult, error) {
+	if c == nil || c.baseURL == "" {
+		return nil, ErrAccessHealthWhoDBMissing
+	}
+	if c.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
+
+	body := map[string]any{
+		"ref":    whoDBObjectRefVariable(ref),
+		"format": format,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	tokenBytes, err := json.Marshal(credentials)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/export", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(tokenBytes))
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(ctx.Err(), context.Canceled) {
+			return nil, fmt.Errorf("%w: %v", ErrAccessHealthWhoDBTimeout, err)
+		}
+		return nil, fmt.Errorf("%w: %v", ErrAccessHealthWhoDBUnavailable, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return nil, fmt.Errorf("%w: status %d", ErrAccessHealthWhoDBUnavailable, resp.StatusCode)
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, fmt.Errorf("%w: status %d", ErrAccessHealthWhoDBUnavailable, resp.StatusCode)
+	}
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAccessHealthWhoDBUnavailable, err)
+	}
+	return &WhoDBExportResult{
+		ContentType: resp.Header.Get("Content-Type"),
+		Filename:    exportFilenameFromContentDisposition(resp.Header.Get("Content-Disposition")),
+		Body:        responseBody,
+	}, nil
+}
+
 func whoDBObjectFromPayload(object whoDBObjectPayload) WhoDBObject {
 	metadata := make(map[string]string, len(object.Attributes))
 	for _, attribute := range object.Attributes {
@@ -169,6 +228,14 @@ func whoDBObjectFromPayload(object whoDBObjectPayload) WhoDBObject {
 		HasChildren: object.HasChildren,
 		Metadata:    metadata,
 	}
+}
+
+func exportFilenameFromContentDisposition(header string) string {
+	_, params, err := mime.ParseMediaType(header)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(params["filename"])
 }
 
 func whoDBObjectRefVariable(ref WhoDBObjectRef) map[string]any {

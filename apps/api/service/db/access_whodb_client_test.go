@@ -332,6 +332,66 @@ func TestWhoDBHTTPClientReadsSourceRowsWithFixedPaginationAndSortVariables(t *te
 	}
 }
 
+func TestWhoDBHTTPClientExportsSourceObjectWithBearerSourceCredentials(t *testing.T) {
+	var gotAuth string
+	var gotBody struct {
+		Ref struct {
+			Kind string   `json:"Kind"`
+			Path []string `json:"Path"`
+		} `json:"ref"`
+		Format       string           `json:"format"`
+		SelectedRows []map[string]any `json:"selectedRows,omitempty"`
+		Query        string           `json:"query,omitempty"`
+		Where        map[string]any   `json:"where,omitempty"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/export" {
+			t.Fatalf("unexpected WhoDB export request target: %s %s", r.Method, r.URL.Path)
+		}
+		gotAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode WhoDB export request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="users.csv"`)
+		_, _ = w.Write([]byte("id,email\n1,ada@example.com\n"))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	export, err := client.Export(
+		context.Background(),
+		WhoDBSourceCredentials{
+			SourceType: "Postgres",
+			Values: map[string]string{
+				"Hostname": "pg-main-postgresql.ns-a.svc",
+				"Port":     "5432",
+				"Username": "alice",
+				"Password": "s3cr3t",
+				"Database": "postgres",
+			},
+		},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		"csv",
+	)
+	if err != nil {
+		t.Fatalf("expected export to succeed: %v", err)
+	}
+
+	if export.ContentType != "text/csv; charset=utf-8" || export.Filename != "users.csv" || string(export.Body) != "id,email\n1,ada@example.com\n" {
+		t.Fatalf("unexpected export response: %+v body=%q", export, string(export.Body))
+	}
+	if gotBody.Ref.Kind != "Table" || len(gotBody.Ref.Path) != 3 || gotBody.Ref.Path[2] != "users" || gotBody.Format != "csv" {
+		t.Fatalf("unexpected export request body: %+v", gotBody)
+	}
+	if len(gotBody.SelectedRows) != 0 || gotBody.Query != "" || len(gotBody.Where) != 0 {
+		t.Fatalf("export request must not include row values or query inputs: %+v", gotBody)
+	}
+	if gotAuth == "" || !strings.HasPrefix(gotAuth, "Bearer ") {
+		t.Fatalf("expected bearer credentials, got %q", gotAuth)
+	}
+}
+
 func TestWhoDBHTTPClientMapsSourceRowsTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(50 * time.Millisecond)
@@ -351,6 +411,46 @@ func TestWhoDBHTTPClientMapsSourceRowsTimeout(t *testing.T) {
 	)
 	if err == nil || !errors.Is(err, ErrAccessHealthWhoDBTimeout) {
 		t.Fatalf("expected row timeout mapping, got %v", err)
+	}
+}
+
+func TestWhoDBHTTPClientMapsExportTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		_, _ = w.Write([]byte("id\n1\n"))
+	}))
+	defer server.Close()
+
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), 5*time.Millisecond)
+	_, err := client.Export(
+		context.Background(),
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		"csv",
+	)
+	if err == nil || !errors.Is(err, ErrAccessHealthWhoDBTimeout) {
+		t.Fatalf("expected export timeout mapping, got %v", err)
+	}
+}
+
+func TestWhoDBHTTPClientMapsExportCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("cancelled export request should not reach WhoDB")
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	client := NewWhoDBHTTPClient(server.URL, server.Client(), time.Second)
+	_, err := client.Export(
+		ctx,
+		WhoDBSourceCredentials{SourceType: "Postgres"},
+		WhoDBObjectRef{Kind: "Table", Path: []string{"postgres", "public", "users"}},
+		"csv",
+	)
+	if err == nil || !errors.Is(err, ErrAccessHealthWhoDBTimeout) {
+		t.Fatalf("expected export cancellation to map to timeout, got %v", err)
 	}
 }
 

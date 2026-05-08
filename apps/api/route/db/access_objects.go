@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 
 	"sealos/api/middleware"
 	dbsvc "sealos/api/service/db"
+)
+
+const (
+	accessWhoDBTimeout       = 15 * time.Second
+	accessExportWhoDBTimeout = 120 * time.Second
 )
 
 func registerAccessObjects(grp huma.API) {
@@ -182,7 +188,74 @@ func registerAccessRows(grp huma.API) {
 	})
 }
 
+func registerAccessExport(grp huma.API) {
+	type dbAccessExportBody struct {
+		ProjectUID string                `json:"projectUid" required:"true" doc:"Project metadata.uid that must match the DB ownership label."`
+		Namespace  string                `json:"namespace,omitempty" doc:"Namespace (default from kubeconfig; admin can override)."`
+		Ref        dbsvc.AccessObjectRef `json:"ref" required:"true" doc:"Returned table, view, collection, key, item, or index ref to export."`
+		Format     string                `json:"format,omitempty" enum:"csv,ndjson" doc:"Export format. Defaults to csv. Only csv and ndjson are supported."`
+	}
+	type dbAccessExportInput struct {
+		middleware.AuthInput
+		Name string `path:"name" doc:"DB claim metadata.name."`
+		Body dbAccessExportBody
+	}
+	type dbAccessExportOutput struct {
+		ContentType        string `header:"Content-Type"`
+		ContentDisposition string `header:"Content-Disposition"`
+		CacheControl       string `header:"Cache-Control"`
+		Body               []byte
+	}
+
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-access-export",
+		Method:      http.MethodPost,
+		Path:        "/{name}/access/export",
+		Summary:     "Export DB object data",
+		Description: "Exports CSV or NDJSON data for a supported database object ref. Requires kubeconfig authorization and projectUid ownership. Arbitrary SQL, selected client rows, writes, imports, and mutation-like behavior are not available through this endpoint.",
+		Tags:        []string{"DB"},
+		Responses: map[string]*huma.Response{
+			"200": {
+				Description: "Export file",
+				Content: map[string]*huma.MediaType{
+					"text/csv": {
+						Schema: &huma.Schema{Type: "string", Format: "binary"},
+					},
+					"application/x-ndjson": {
+						Schema: &huma.Schema{Type: "string", Format: "binary"},
+					},
+				},
+			},
+		},
+	}, func(ctx context.Context, input *dbAccessExportInput) (*dbAccessExportOutput, error) {
+		namespace, service, err := accessObjectsServiceFromAuthWithTimeout(input.Authorization, input.Body.Namespace, input.Body.ProjectUID, accessExportWhoDBTimeout)
+		if err != nil {
+			return nil, err
+		}
+		result, err := service.Export(ctx, dbsvc.AccessExportRequest{
+			Name:       input.Name,
+			Namespace:  namespace,
+			ProjectUID: input.Body.ProjectUID,
+			Ref:        input.Body.Ref,
+			Format:     input.Body.Format,
+		})
+		if err != nil {
+			return nil, accessObjectsError(err)
+		}
+		return &dbAccessExportOutput{
+			ContentType:        result.ContentType,
+			ContentDisposition: `attachment; filename="` + accessExportFilename(input.Name, result) + `"`,
+			CacheControl:       "no-cache, no-store, must-revalidate",
+			Body:               result.Body,
+		}, nil
+	})
+}
+
 func accessObjectsServiceFromAuth(authorization, namespace, projectUID string) (string, dbsvc.AccessObjectsService, error) {
+	return accessObjectsServiceFromAuthWithTimeout(authorization, namespace, projectUID, accessWhoDBTimeout)
+}
+
+func accessObjectsServiceFromAuthWithTimeout(authorization, namespace, projectUID string, whodbTimeout time.Duration) (string, dbsvc.AccessObjectsService, error) {
 	_, cfg, err := middleware.RestConfigFromAuth(authorization)
 	if err != nil {
 		return "", dbsvc.AccessObjectsService{}, huma.Error401Unauthorized("invalid kubeconfig", err)
@@ -211,7 +284,7 @@ func accessObjectsServiceFromAuth(authorization, namespace, projectUID string) (
 		WhoDB: dbsvc.NewWhoDBHTTPClient(
 			os.Getenv("WHODB_URL"),
 			http.DefaultClient,
-			15*time.Second,
+			whodbTimeout,
 		),
 	}
 	return resolved.Namespace, service, nil
@@ -229,6 +302,8 @@ func accessObjectsError(err error) error {
 		return huma.Error400BadRequest("invalid row pagination", err)
 	case errors.Is(err, dbsvc.ErrAccessRowsInvalidSort):
 		return huma.Error400BadRequest("invalid row sort", err)
+	case errors.Is(err, dbsvc.ErrAccessExportInvalidFormat):
+		return huma.Error400BadRequest("invalid export format", err)
 	case errors.Is(err, dbsvc.ErrAccessHealthProjectUID):
 		return huma.Error400BadRequest("projectUid is required", err)
 	case errors.Is(err, dbsvc.ErrAccessHealthDBNotFound):
@@ -252,4 +327,55 @@ func accessObjectsError(err error) error {
 	default:
 		return huma.Error500InternalServerError("failed to browse DB objects", err)
 	}
+}
+
+func accessExportFilename(dbName string, result *dbsvc.AccessExportResult) string {
+	if result == nil {
+		return "db-export.csv"
+	}
+	if result.Filename != "" {
+		return sanitizeAccessExportFilename(result.Filename, result.Format)
+	}
+	name := strings.TrimSpace(dbName)
+	if len(result.Ref.Path) > 0 {
+		name += "-" + result.Ref.Path[len(result.Ref.Path)-1]
+	}
+	if strings.TrimSpace(name) == "" {
+		name = "db-export"
+	}
+	return sanitizeAccessExportFilename(name+"."+accessExportExtension(result.Format), result.Format)
+}
+
+func sanitizeAccessExportFilename(name, format string) string {
+	ext := accessExportExtension(format)
+	base := filepath.Base(strings.TrimSpace(name))
+	base = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '.', r == '-', r == '_':
+			return r
+		default:
+			return '-'
+		}
+	}, base)
+	base = strings.Trim(base, ".-")
+	if base == "" {
+		base = "db-export"
+	}
+	if !strings.HasSuffix(strings.ToLower(base), "."+ext) {
+		base += "." + ext
+	}
+	return base
+}
+
+func accessExportExtension(format string) string {
+	if strings.EqualFold(format, "ndjson") {
+		return "ndjson"
+	}
+	return "csv"
 }

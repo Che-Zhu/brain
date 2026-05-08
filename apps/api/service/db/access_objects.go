@@ -1,8 +1,11 @@
 package db
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"errors"
+	"io"
 	"log"
 	"strings"
 	"time"
@@ -14,6 +17,7 @@ var (
 	ErrAccessObjectsUnsupportedKind = errors.New("unsupported db object kind")
 	ErrAccessRowsInvalidPagination  = errors.New("invalid db row pagination")
 	ErrAccessRowsInvalidSort        = errors.New("invalid db row sort")
+	ErrAccessExportInvalidFormat    = errors.New("invalid db export format")
 )
 
 const (
@@ -32,6 +36,7 @@ const (
 	defaultAccessRowsPageSize  = 100
 	maxAccessRowsPageSize      = 500
 	maxAccessObjects           = 500
+	maxAccessExportRows        = 100000
 )
 
 type AccessObjectsRequest struct {
@@ -64,6 +69,14 @@ type AccessRowsRequest struct {
 	PageSize   int
 	PageOffset int
 	Sort       []AccessRowsSort
+}
+
+type AccessExportRequest struct {
+	Name       string
+	Namespace  string
+	ProjectUID string
+	Ref        AccessObjectRef
+	Format     string
 }
 
 type AccessObjectRef struct {
@@ -121,6 +134,17 @@ type AccessRowsResult struct {
 	TotalCount int64           `json:"totalCount"`
 }
 
+type AccessExportResult struct {
+	Ref          AccessObjectRef `json:"ref"`
+	Format       string          `json:"format"`
+	ContentType  string          `json:"contentType"`
+	Filename     string          `json:"filename,omitempty"`
+	RowLimit     int             `json:"rowLimit"`
+	RowsExported int             `json:"rowsExported"`
+	Truncated    bool            `json:"truncated"`
+	Body         []byte          `json:"-"`
+}
+
 type WhoDBObjectRef struct {
 	Kind string
 	Path []string
@@ -159,11 +183,18 @@ type WhoDBRowsResult struct {
 	TotalCount    int64
 }
 
+type WhoDBExportResult struct {
+	ContentType string
+	Filename    string
+	Body        []byte
+}
+
 type WhoDBObjectClient interface {
 	ListObjects(ctx context.Context, credentials WhoDBSourceCredentials, parent *WhoDBObjectRef, kinds []string) ([]WhoDBObject, error)
 	GetObject(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) (*WhoDBObject, error)
 	ListColumns(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef) ([]WhoDBColumn, error)
 	ReadRows(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, pageSize int, pageOffset int, sort []WhoDBRowsSort) (*WhoDBRowsResult, error)
+	Export(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, format string) (*WhoDBExportResult, error)
 }
 
 type AccessObjectsService struct {
@@ -411,6 +442,76 @@ func (s AccessObjectsService) Rows(ctx context.Context, req AccessRowsRequest) (
 	}, nil
 }
 
+func (s AccessObjectsService) Export(ctx context.Context, req AccessExportRequest) (result *AccessExportResult, err error) {
+	req.Name = strings.TrimSpace(req.Name)
+	req.Namespace = strings.TrimSpace(req.Namespace)
+	req.ProjectUID = strings.TrimSpace(req.ProjectUID)
+	start := time.Now()
+	audit := AccessHealthAuditEvent{
+		Operation:  "db.access.export",
+		ProjectUID: req.ProjectUID,
+		DBName:     req.Name,
+		Namespace:  req.Namespace,
+		Outcome:    "error",
+	}
+	defer func() {
+		if result != nil {
+			audit.Outcome = "ok"
+		}
+		audit.Duration = time.Since(start)
+		s.auditLogger().LogAccessHealth(audit)
+	}()
+
+	if req.ProjectUID == "" {
+		return nil, ErrAccessHealthProjectUID
+	}
+	ref, kind, err := accessColumnRefForWhoDB(req.Ref)
+	if err != nil {
+		return nil, err
+	}
+	format, err := canonicalAccessExportFormat(req.Format)
+	if err != nil {
+		return nil, err
+	}
+	audit.Ref = &AccessObjectRef{Kind: kind, Path: append([]string(nil), ref.Path...)}
+	audit.ExportFormat = format
+
+	engine, credentials, err := guardDBAccess(ctx, s.Store, guardedAccessRequest{
+		Name:       req.Name,
+		Namespace:  req.Namespace,
+		ProjectUID: req.ProjectUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Engine = engine
+
+	export, err := s.WhoDB.Export(ctx, credentials, ref, format)
+	if err != nil {
+		return nil, err
+	}
+	if export == nil {
+		export = &WhoDBExportResult{}
+	}
+	body, rowsExported, truncated, err := capAccessExportBody(format, export.Body, maxAccessExportRows)
+	if err != nil {
+		return nil, err
+	}
+	audit.RowLimit = maxAccessExportRows
+	audit.RowsExported = rowsExported
+	audit.Truncated = truncated
+	return &AccessExportResult{
+		Ref:          AccessObjectRef{Kind: kind, Path: ref.Path},
+		Format:       format,
+		ContentType:  accessExportContentType(format, export.ContentType),
+		Filename:     export.Filename,
+		RowLimit:     maxAccessExportRows,
+		RowsExported: rowsExported,
+		Truncated:    truncated,
+		Body:         body,
+	}, nil
+}
+
 func (s AccessObjectsService) getObjectFromParentListing(ctx context.Context, credentials WhoDBSourceCredentials, ref WhoDBObjectRef, kind string) (*AccessObject, error) {
 	parent := accessObjectDetailFallbackParent(ref, kind)
 	if parent == nil {
@@ -518,6 +619,106 @@ func accessRowsSortFromWhoDB(sort []WhoDBRowsSort) []AccessRowsSort {
 		})
 	}
 	return mapped
+}
+
+func canonicalAccessExportFormat(format string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "", "csv":
+		return "csv", nil
+	case "ndjson":
+		return "ndjson", nil
+	default:
+		return "", ErrAccessExportInvalidFormat
+	}
+}
+
+func accessExportContentType(format, contentType string) string {
+	contentType = strings.TrimSpace(contentType)
+	if contentType != "" {
+		return contentType
+	}
+	if format == "ndjson" {
+		return "application/x-ndjson; charset=utf-8"
+	}
+	return "text/csv; charset=utf-8"
+}
+
+func capAccessExportBody(format string, body []byte, rowLimit int) ([]byte, int, bool, error) {
+	if rowLimit < 0 {
+		rowLimit = 0
+	}
+	switch format {
+	case "ndjson":
+		return capAccessNDJSONExportBody(body, rowLimit)
+	default:
+		return capAccessCSVExportBody(body, rowLimit)
+	}
+}
+
+func capAccessCSVExportBody(body []byte, rowLimit int) ([]byte, int, bool, error) {
+	reader := csv.NewReader(bytes.NewReader(body))
+	var out bytes.Buffer
+	writer := csv.NewWriter(&out)
+
+	header, err := reader.Read()
+	if errors.Is(err, io.EOF) {
+		return body, 0, false, nil
+	}
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if err := writer.Write(header); err != nil {
+		return nil, 0, false, err
+	}
+
+	rowsExported := 0
+	truncated := false
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, rowsExported, false, err
+		}
+		if rowsExported >= rowLimit {
+			truncated = true
+			break
+		}
+		if err := writer.Write(record); err != nil {
+			return nil, rowsExported, false, err
+		}
+		rowsExported++
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, rowsExported, false, err
+	}
+	return out.Bytes(), rowsExported, truncated, nil
+}
+
+func capAccessNDJSONExportBody(body []byte, rowLimit int) ([]byte, int, bool, error) {
+	lines := bytes.SplitAfter(body, []byte("\n"))
+	var out bytes.Buffer
+	rowsExported := 0
+	truncated := false
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		if rowsExported >= rowLimit {
+			truncated = true
+			break
+		}
+		if _, err := out.Write(line); err != nil {
+			return nil, rowsExported, false, err
+		}
+		rowsExported++
+	}
+	return out.Bytes(), rowsExported, truncated, nil
 }
 
 func accessObjectRefForWhoDB(ref AccessObjectRef) (WhoDBObjectRef, string, error) {
@@ -788,7 +989,7 @@ func (standardAccessObjectsAuditLogger) LogAccessHealth(event AccessHealthAuditE
 		refPath = strings.Join(event.Ref.Path, "/")
 	}
 	log.Printf(
-		"db access objects: operation=%s project=%s db=%s namespace=%s engine=%s refKind=%s refPath=%s pageSize=%d pageOffset=%d sort=%s duration=%s outcome=%s",
+		"db access objects: operation=%s project=%s db=%s namespace=%s engine=%s refKind=%s refPath=%s pageSize=%d pageOffset=%d sort=%s exportFormat=%s rowLimit=%d rowsExported=%d truncated=%t duration=%s outcome=%s",
 		event.Operation,
 		event.ProjectUID,
 		event.DBName,
@@ -799,6 +1000,10 @@ func (standardAccessObjectsAuditLogger) LogAccessHealth(event AccessHealthAuditE
 		event.PageSize,
 		event.PageOffset,
 		accessRowsSortLogValue(event.Sort),
+		event.ExportFormat,
+		event.RowLimit,
+		event.RowsExported,
+		event.Truncated,
 		event.Duration,
 		event.Outcome,
 	)

@@ -17,6 +17,7 @@
 package gorm_plugin
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -127,5 +128,36 @@ func TestExportDataUsesPluginFormatValueOverride(t *testing.T) {
 	}
 	if len(written) != 2 || written[1][0] != "OVERRIDE:"+createdAt.Format(time.RFC3339Nano) {
 		t.Fatalf("unexpected formatted export rows: %#v", written)
+	}
+}
+
+func TestExportDataNDJSONUsesPluginColumnLookup(t *testing.T) {
+	plugin := newExportTestPlugin(t)
+	config := engine.NewPluginConfig(&engine.Credentials{Type: string(engine.DatabaseType_Postgres)})
+
+	var lines []string
+	err := plugin.ExportDataNDJSON(config, "", "orders", func(line string) error {
+		lines = append(lines, line)
+		return nil
+	}, nil)
+	if err != nil {
+		t.Fatalf("ExportDataNDJSON returned error: %v", err)
+	}
+
+	if plugin.columnsRead.Load() != 1 {
+		t.Fatalf("expected NDJSON export to use plugin GetColumnsForTable exactly once, got %d", plugin.columnsRead.Load())
+	}
+	if !plugin.columnsUsedTransaction.Load() {
+		t.Fatal("expected NDJSON export column lookup to reuse the active connection")
+	}
+	if len(lines) != 1 {
+		t.Fatalf("expected one NDJSON row, got %#v", lines)
+	}
+	var row map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &row); err != nil {
+		t.Fatalf("expected valid NDJSON row, got %q: %v", lines[0], err)
+	}
+	if row["customer_name"] != "alice" {
+		t.Fatalf("unexpected exported row: %#v", row)
 	}
 }
