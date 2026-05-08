@@ -2,7 +2,6 @@
 
 import type {
   EntryNodeDomains,
-  EntryNodeDragAngle,
   EntryNodeStates,
 } from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
@@ -69,34 +68,32 @@ function PreviewSurface({ children }: { children: ReactNode }) {
 
 function EntryNodeSample({
   defaultExpanded = false,
-  dragAngle,
   dragging,
   selected,
   states,
 }: {
   defaultExpanded?: boolean;
-  dragAngle?: EntryNodeDragAngle;
   dragging?: boolean;
   selected?: boolean;
   states: EntryNodeStates;
 }) {
   return (
-    <EntryNode
+    <EntryNode.Root
       defaultExpanded={defaultExpanded}
-      state={{
-        domains: defaultDomains,
-        interaction: { dragAngle, dragging, selected },
-        states,
-      }}
-    />
+      domains={defaultDomains}
+      interaction={{ dragging, selected }}
+      states={states}
+    >
+      <EntryNode.Content />
+    </EntryNode.Root>
   );
 }
 
-function DragSample({ angle, label }: { angle: number; label: string }) {
+function DragSample() {
   return (
     <div className="flex flex-col items-center gap-2">
-      <EntryNodeSample dragAngle={angle} dragging states={accessible} />
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <EntryNodeSample dragging states={accessible} />
+      <span className="text-muted-foreground text-xs">fixed stroke</span>
     </div>
   );
 }
@@ -119,14 +116,9 @@ export default function EntryNodePreview() {
           <EntryNodeSample defaultExpanded states={accessible} />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Drag direction strokes">
+      <Preview className="lg:col-span-2" title="Drag stroke">
         <PreviewSurface>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <DragSample angle={0} label="right" />
-            <DragSample angle={90} label="down" />
-            <DragSample angle={180} label="left" />
-            <DragSample angle={-90} label="up" />
-          </div>
+          <DragSample />
         </PreviewSurface>
       </Preview>
       <Preview title="Long name truncation">

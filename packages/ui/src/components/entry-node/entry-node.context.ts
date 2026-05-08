@@ -10,10 +10,12 @@ export const EntryNodeContext = createContext<EntryNodeContextValue | null>(
 
 export function useEntryNode(): EntryNodeContextValue {
   const value = use(EntryNodeContext);
+
   if (!value) {
     throw new Error(
-      "EntryNode: compound components must be used within EntryNode.Root or EntryNode.Provider"
+      "EntryNode: compound components must be used within EntryNode.Root"
     );
   }
+
   return value;
 }

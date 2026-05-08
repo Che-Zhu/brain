@@ -2,8 +2,10 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 
-import { normalizeEntryNodeStatus } from "./entry-node.guards";
-import type { EntryNodeStatus, EntryNodeStatusTone } from "./entry-node.types";
+import type {
+  CanvasNodeStatus as CanvasNodeStatusData,
+  CanvasNodeStatusTone,
+} from "./canvas-node.types";
 
 interface StatusVisual {
   breathing: boolean;
@@ -42,7 +44,46 @@ const RED: StatusVisual = {
   pillClassName: "bg-red-500/30 text-zinc-50",
 };
 
-function getStatusVisual(tone: EntryNodeStatusTone): StatusVisual {
+export function normalizeCanvasNodeStatus(
+  input: string | undefined
+): CanvasNodeStatusTone {
+  const normalized = input
+    ?.trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+
+  switch (normalized) {
+    case "accessible":
+    case "available":
+    case "bound":
+    case "complete":
+    case "ready":
+    case "running":
+    case "succeeded":
+      return normalized;
+    case "binding":
+    case "creating":
+    case "pending":
+    case "progressing":
+      return normalized;
+    case "deleting":
+    case "stopping":
+      return normalized;
+    case "shutdown":
+    case "stopped":
+      return normalized;
+    case "degraded":
+    case "error":
+    case "failed":
+    case "inaccessible":
+    case "unhealthy":
+      return normalized;
+    default:
+      return "unknown";
+  }
+}
+
+function getStatusVisual(tone: CanvasNodeStatusTone): StatusVisual {
   switch (tone) {
     case "accessible":
     case "available":
@@ -76,18 +117,18 @@ function getStatusVisual(tone: EntryNodeStatusTone): StatusVisual {
   }
 }
 
-function resolveTone(status: EntryNodeStatus | undefined) {
-  return status?.tone ?? normalizeEntryNodeStatus(status?.label);
+function resolveTone(status: CanvasNodeStatusData | undefined) {
+  return status?.tone ?? normalizeCanvasNodeStatus(status?.label);
 }
 
-export function EntryNodeStatusDot({
+export function CanvasNodeStatusDot({
   className,
   size = "default",
   status,
 }: {
   className?: string;
   size?: "collapsed" | "default" | "small";
-  status?: EntryNodeStatus;
+  status?: CanvasNodeStatusData;
 }) {
   const visual = getStatusVisual(resolveTone(status));
   const dotSize = size === "default" ? "size-3" : "size-2";
@@ -118,12 +159,12 @@ export function EntryNodeStatusDot({
   );
 }
 
-export function EntryNodeStatusPill({
+export function CanvasNodeStatusPill({
   className,
   status,
 }: {
   className?: string;
-  status?: EntryNodeStatus;
+  status?: CanvasNodeStatusData;
 }) {
   const statusLabel = status?.label?.trim() || "Unknown";
   const visual = getStatusVisual(resolveTone(status));
@@ -137,7 +178,29 @@ export function EntryNodeStatusPill({
       )}
     >
       <span className="truncate">{statusLabel}</span>
-      <EntryNodeStatusDot size="small" status={status} />
+      <CanvasNodeStatusDot size="small" status={status} />
+    </span>
+  );
+}
+
+export function CanvasNodeStatus({
+  className,
+  status,
+}: {
+  className?: string;
+  status: CanvasNodeStatusData;
+}) {
+  return (
+    <span className={cn("canvas-node-status min-w-0 shrink-0", className)}>
+      <CanvasNodeStatusPill
+        className="canvas-node-status-pill max-w-28"
+        status={status}
+      />
+      <CanvasNodeStatusDot
+        className="canvas-node-status-dot"
+        size="collapsed"
+        status={status}
+      />
     </span>
   );
 }

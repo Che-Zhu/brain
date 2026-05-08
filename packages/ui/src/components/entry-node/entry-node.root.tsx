@@ -1,12 +1,10 @@
 "use client";
 
+import { CanvasNodeRoot } from "@workspace/ui/components/canvas-node/canvas-node.root";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { EntryNodeDefaultView } from "./entry-node.default-view";
 import { EntryNodeProvider } from "./entry-node.provider";
 import type {
-  EntryNodeConnectionEvent,
-  EntryNodeConnectionSide,
   EntryNodeContextValue,
   EntryNodeDomainKey,
   EntryNodeRootProps,
@@ -23,21 +21,22 @@ async function copyTextToClipboard(value: string) {
 }
 
 export function EntryNodeRoot({
-  actions,
   children,
-  defaultExpanded = false,
+  copiedDomainKey,
+  copiedFeedbackMs = DEFAULT_COPIED_FEEDBACK_MS,
+  defaultExpanded,
+  domains,
   expanded,
-  meta,
+  interaction,
+  onCopyDomain,
   onExpandedChange,
-  state,
+  onStartConnection,
+  states,
 }: EntryNodeRootProps) {
-  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
   const [internalCopiedDomainKey, setInternalCopiedDomainKey] =
     useState<EntryNodeDomainKey | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expandedControlled = expanded !== undefined;
-  const copiedDomainControlled = state.copiedDomainKey !== undefined;
-  const resolvedExpanded = expanded ?? internalExpanded;
+  const copiedDomainControlled = copiedDomainKey !== undefined;
 
   useEffect(
     () => () => {
@@ -48,34 +47,14 @@ export function EntryNodeRoot({
     []
   );
 
-  const setExpandedState = useCallback(
-    (nextExpanded: boolean) => {
-      if (!expandedControlled) {
-        setInternalExpanded(nextExpanded);
-      }
-      onExpandedChange?.(nextExpanded);
-    },
-    [expandedControlled, onExpandedChange]
-  );
-
-  const collapse = useCallback(() => {
-    actions?.collapse?.();
-    setExpandedState(false);
-  }, [actions?.collapse, setExpandedState]);
-
-  const expand = useCallback(() => {
-    actions?.expand?.();
-    setExpandedState(true);
-  }, [actions?.expand, setExpandedState]);
-
   const copyDomain = useCallback(
     async (key: EntryNodeDomainKey, domainValue: string) => {
       if (!domainValue) {
         return;
       }
 
-      if (actions?.copyDomain) {
-        await actions.copyDomain(key, domainValue);
+      if (onCopyDomain) {
+        await onCopyDomain(key, domainValue);
       } else {
         await copyTextToClipboard(domainValue);
       }
@@ -90,54 +69,48 @@ export function EntryNodeRoot({
         resetTimerRef.current = setTimeout(() => {
           setInternalCopiedDomainKey(null);
           resetTimerRef.current = null;
-        }, meta?.copiedFeedbackMs ?? DEFAULT_COPIED_FEEDBACK_MS);
+        }, copiedFeedbackMs);
       }
     },
-    [actions?.copyDomain, copiedDomainControlled, meta?.copiedFeedbackMs]
-  );
-
-  const startConnection = useCallback(
-    (side: EntryNodeConnectionSide, event: EntryNodeConnectionEvent) => {
-      actions?.startConnection?.(side, event);
-    },
-    [actions?.startConnection]
+    [copiedDomainControlled, copiedFeedbackMs, onCopyDomain]
   );
 
   const value = useMemo(
     (): EntryNodeContextValue => ({
       actions: {
-        collapse,
         copyDomain,
-        expand,
-        startConnection,
       },
       meta: {
-        ...meta,
-        expanded: resolvedExpanded,
+        copiedFeedbackMs,
       },
       state: {
-        ...state,
         copiedDomainKey: copiedDomainControlled
-          ? state.copiedDomainKey
+          ? copiedDomainKey
           : internalCopiedDomainKey,
+        domains,
+        states,
       },
     }),
     [
-      collapse,
       copiedDomainControlled,
+      copiedDomainKey,
+      copiedFeedbackMs,
       copyDomain,
-      expand,
+      domains,
       internalCopiedDomainKey,
-      meta,
-      resolvedExpanded,
-      startConnection,
-      state,
+      states,
     ]
   );
 
   return (
-    <EntryNodeProvider value={value}>
-      {children ?? <EntryNodeDefaultView />}
-    </EntryNodeProvider>
+    <CanvasNodeRoot
+      defaultExpanded={defaultExpanded}
+      expanded={expanded}
+      interaction={interaction}
+      onExpandedChange={onExpandedChange}
+      onStartConnection={onStartConnection}
+    >
+      <EntryNodeProvider value={value}>{children}</EntryNodeProvider>
+    </CanvasNodeRoot>
   );
 }

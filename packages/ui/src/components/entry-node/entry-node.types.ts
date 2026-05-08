@@ -1,43 +1,21 @@
-import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
-
-export type EntryNodeStatusTone =
-  | "accessible"
-  | "available"
-  | "binding"
-  | "bound"
-  | "complete"
-  | "creating"
-  | "degraded"
-  | "deleting"
-  | "error"
-  | "failed"
-  | "inaccessible"
-  | "pending"
-  | "progressing"
-  | "ready"
-  | "running"
-  | "shutdown"
-  | "stopped"
-  | "stopping"
-  | "succeeded"
-  | "unhealthy"
-  | "unknown";
-
-export interface EntryNodeStatus {
-  label: string;
-  tone?: EntryNodeStatusTone;
-}
+import type {
+  CanvasNodeConnectionEvent,
+  CanvasNodeConnectionSide,
+  CanvasNodeInteractionState,
+  CanvasNodeStatus,
+} from "@workspace/ui/components/canvas-node/canvas-node";
+import type { ReactNode } from "react";
 
 export interface EntryNodeStates {
   name: string;
-  status?: EntryNodeStatus;
+  status?: CanvasNodeStatus;
 }
 
 export type EntryNodeDomainKey = "access" | "private" | "public";
 
 export interface EntryNodeDomain {
   label: string;
-  status?: EntryNodeStatus;
+  status?: CanvasNodeStatus;
   value: string;
 }
 
@@ -45,46 +23,32 @@ export type EntryNodeDomains = Partial<
   Record<EntryNodeDomainKey, EntryNodeDomain>
 >;
 
-/** Screen-space drag angle in degrees: 0 = right, 90 = down. */
-export type EntryNodeDragAngle = number;
+export type EntryNodeCopyDomainHandler = (
+  key: EntryNodeDomainKey,
+  value: string
+) => Promise<void> | void;
 
-export type EntryNodeConnectionSide = "bottom" | "left" | "right" | "top";
-
-export type EntryNodeConnectionEvent =
-  | KeyboardEvent<HTMLButtonElement>
-  | PointerEvent<HTMLButtonElement>;
-
-export interface EntryNodeInteractionState {
-  dragAngle?: EntryNodeDragAngle;
-  dragging?: boolean;
-  selected?: boolean;
-}
+export type EntryNodeStartConnectionHandler = (
+  side: CanvasNodeConnectionSide,
+  event: CanvasNodeConnectionEvent
+) => void;
 
 export interface EntryNodeState {
   copiedDomainKey?: EntryNodeDomainKey | null;
   domains?: EntryNodeDomains;
-  interaction?: EntryNodeInteractionState;
   states: EntryNodeStates;
 }
 
 export interface EntryNodeActions {
-  collapse?: () => void;
-  copyDomain?: (key: EntryNodeDomainKey, value: string) => Promise<void> | void;
-  expand?: () => void;
-  startConnection?: (
-    side: EntryNodeConnectionSide,
-    event: EntryNodeConnectionEvent
-  ) => void;
+  copyDomain: EntryNodeCopyDomainHandler;
 }
 
 export interface EntryNodeMeta {
   copiedFeedbackMs?: number;
-  expanded?: boolean;
 }
 
 export interface EntryNodeContextValue {
-  actions: Required<Pick<EntryNodeActions, "copyDomain">> &
-    Omit<EntryNodeActions, "copyDomain">;
+  actions: EntryNodeActions;
   meta: EntryNodeMeta;
   state: EntryNodeState;
 }
@@ -95,11 +59,15 @@ export interface EntryNodeProviderProps {
 }
 
 export interface EntryNodeRootProps {
-  actions?: EntryNodeActions;
   children?: ReactNode;
+  copiedDomainKey?: EntryNodeDomainKey | null;
+  copiedFeedbackMs?: number;
   defaultExpanded?: boolean;
+  domains?: EntryNodeDomains;
   expanded?: boolean;
-  meta?: Omit<EntryNodeMeta, "expanded">;
+  interaction?: CanvasNodeInteractionState;
+  onCopyDomain?: EntryNodeCopyDomainHandler;
   onExpandedChange?: (expanded: boolean) => void;
-  state: EntryNodeState;
+  onStartConnection?: EntryNodeStartConnectionHandler;
+  states: EntryNodeStates;
 }

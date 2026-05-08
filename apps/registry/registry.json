@@ -127,12 +127,92 @@
       ]
     },
     {
+      "name": "canvas-node",
+      "type": "registry:ui",
+      "title": "Canvas Node",
+      "description": "Shared canvas node chrome with frame, surface, layout, status, drag, expand, and connector controls",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["button"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/canvas-node/canvas-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.context.ts",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.frame.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.frame.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.surface.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.surface.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.layout.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.layout.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.connection.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.connection.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.expand-button.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.expand-button.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.drag-frame.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.drag-frame.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.status.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.status.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.css",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/index.ts",
+          "type": "registry:component",
+          "target": "components/canvas-node/index.ts"
+        }
+      ]
+    },
+    {
       "name": "entry-node",
       "type": "registry:ui",
       "title": "Entry Node",
-      "description": "Animated entry node card with expanded domain details and connector controls",
+      "description": "Entry domain node content composed with shared canvas node chrome",
       "dependencies": ["lucide-react"],
-      "registryDependencies": ["button"],
+      "registryDependencies": ["button", "canvas-node"],
       "files": [
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",
@@ -160,69 +240,19 @@
           "target": "components/entry-node/entry-node.root.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.default-view.tsx",
+          "path": "../../packages/ui/src/components/entry-node/entry-node.content.tsx",
           "type": "registry:component",
-          "target": "components/entry-node/entry-node.default-view.tsx"
+          "target": "components/entry-node/entry-node.content.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.status.tsx",
+          "path": "../../packages/ui/src/components/entry-node/entry-node.domain.tsx",
           "type": "registry:component",
-          "target": "components/entry-node/entry-node.status.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.drag-frame.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.drag-frame.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.connection-button.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.connection-button.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.connection-layer.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.connection-layer.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.header.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.header.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.domain-section.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.domain-section.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.domain-list.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.domain-list.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.body.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.body.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.card.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.card.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.bounds.tsx",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.bounds.tsx"
+          "target": "components/entry-node/entry-node.domain.tsx"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/index.ts",
           "type": "registry:component",
           "target": "components/entry-node/index.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.css",
-          "type": "registry:component",
-          "target": "components/entry-node/entry-node.css"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.tsx",
