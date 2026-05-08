@@ -107,34 +107,15 @@ func (s AccessHealthService) Check(ctx context.Context, req AccessHealthRequest)
 		return nil, ErrAccessHealthProjectUID
 	}
 
-	db, err := s.Store.GetDB(ctx, req.Namespace, req.Name)
+	engine, credentials, err := guardDBAccess(ctx, s.Store, guardedAccessRequest{
+		Name:       req.Name,
+		Namespace:  req.Namespace,
+		ProjectUID: req.ProjectUID,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyDBProject(db, req.ProjectUID); err != nil {
-		return nil, err
-	}
-	if !isDBAccessReady(db) {
-		return nil, ErrAccessHealthDBNotReady
-	}
-
-	engine, _, _ := unstructured.NestedString(db.Object, "spec", "engine")
-	engine = strings.TrimSpace(engine)
 	audit.Engine = engine
-	sourceType, defaultDatabase, err := whodbSourceForEngine(engine)
-	if err != nil {
-		return nil, err
-	}
-
-	secretName := accessHealthSecretName(req.Name, engine)
-	secret, err := s.Store.GetSecret(ctx, req.Namespace, secretName)
-	if err != nil {
-		return nil, err
-	}
-	credentials, err := buildWhoDBSourceCredentials(sourceType, defaultDatabase, req.Name, req.Namespace, secret)
-	if err != nil {
-		return nil, err
-	}
 
 	health, err := s.WhoDB.CheckHealth(ctx, credentials)
 	if err != nil {
@@ -176,6 +157,43 @@ func (standardAccessHealthAuditLogger) LogAccessHealth(event AccessHealthAuditEv
 		event.Duration,
 		event.Outcome,
 	)
+}
+
+type guardedAccessRequest struct {
+	Name       string
+	Namespace  string
+	ProjectUID string
+}
+
+func guardDBAccess(ctx context.Context, store AccessHealthStore, req guardedAccessRequest) (string, WhoDBSourceCredentials, error) {
+	db, err := store.GetDB(ctx, req.Namespace, req.Name)
+	if err != nil {
+		return "", WhoDBSourceCredentials{}, err
+	}
+	if err := verifyDBProject(db, req.ProjectUID); err != nil {
+		return "", WhoDBSourceCredentials{}, err
+	}
+	if !isDBAccessReady(db) {
+		return "", WhoDBSourceCredentials{}, ErrAccessHealthDBNotReady
+	}
+
+	engine, _, _ := unstructured.NestedString(db.Object, "spec", "engine")
+	engine = strings.TrimSpace(engine)
+	sourceType, defaultDatabase, err := whodbSourceForEngine(engine)
+	if err != nil {
+		return "", WhoDBSourceCredentials{}, err
+	}
+
+	secretName := accessHealthSecretName(req.Name, engine)
+	secret, err := store.GetSecret(ctx, req.Namespace, secretName)
+	if err != nil {
+		return "", WhoDBSourceCredentials{}, err
+	}
+	credentials, err := buildWhoDBSourceCredentials(sourceType, defaultDatabase, req.Name, req.Namespace, secret)
+	if err != nil {
+		return "", WhoDBSourceCredentials{}, err
+	}
+	return engine, credentials, nil
 }
 
 func verifyDBProject(db *unstructured.Unstructured, projectUID string) error {
