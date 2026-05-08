@@ -1,7 +1,11 @@
 "use client";
 
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
-import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
+import type {
+  CanvasMeta,
+  CanvasPanelBodyProps,
+  CanvasPanelTypes,
+} from "@workspace/ui/components/canvas/canvas.types";
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
@@ -103,6 +107,35 @@ const CANVAS_PREVIEW_NODE_TYPES = {
   containerNode: PreviewCanvasContainerNode,
 } as const satisfies NodeTypes;
 
+/** Demo `panelTypes.containerNode`: same key as {@link CANVAS_PREVIEW_NODE_TYPES}. */
+const PreviewContainerNodePanel = memo(function PreviewContainerNodePanel({
+  node,
+}: CanvasPanelBodyProps) {
+  const states =
+    node.data !== null && typeof node.data === "object" && "states" in node.data
+      ? (node.data as { states: { name?: string } }).states
+      : undefined;
+  const label =
+    states?.name != null && states.name !== "" ? states.name : node.id;
+  return (
+    <div className="rounded-lg border border-primary/50 border-dashed bg-primary/5 p-3">
+      <p className="font-medium text-primary text-xs">
+        panelTypes · containerNode
+      </p>
+      <p className="mt-2 text-muted-foreground text-xs">
+        Registry preview: details for{" "}
+        <span className="text-foreground">{label}</span>
+      </p>
+    </div>
+  );
+});
+
+PreviewContainerNodePanel.displayName = "PreviewContainerNodePanel";
+
+const CANVAS_PREVIEW_PANEL_TYPES = {
+  containerNode: PreviewContainerNodePanel,
+} as const satisfies CanvasPanelTypes;
+
 /** Local-only selection logic (production uses Jotai + `canvasMetaAtom`). */
 function useCanvasPreviewSelection(
   nodes: readonly Node[],
@@ -119,6 +152,7 @@ function useCanvasPreviewSelection(
   const canvasMeta = useMemo((): CanvasMeta => {
     return {
       nodeTypes: CANVAS_PREVIEW_NODE_TYPES,
+      panelTypes: CANVAS_PREVIEW_PANEL_TYPES,
       reactFlowProps: {
         onEdgeClick: (_event, edge) => {
           setSelection(null, edge);

@@ -40,7 +40,7 @@ function panelHeadingFromNode(selected: Node): { kind: string; title: string } {
 }
 
 export function CanvasPanel({ children, className }: CanvasPanelProps) {
-  const { actions, state } = useCanvas();
+  const { actions, meta, state } = useCanvas();
 
   if (state.selectedNode == null) {
     return null;
@@ -48,6 +48,9 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
 
   const selected = state.selectedNode;
   const { kind, title } = panelHeadingFromNode(selected);
+  const panelKey =
+    selected.type != null && selected.type !== "" ? selected.type : null;
+  const PanelBody = panelKey == null ? undefined : meta.panelTypes?.[panelKey];
 
   return (
     <aside
@@ -91,7 +94,7 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
         </Button>
       </header>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2">
-        {children}
+        {PanelBody == null ? children : <PanelBody node={selected} />}
       </div>
     </aside>
   );

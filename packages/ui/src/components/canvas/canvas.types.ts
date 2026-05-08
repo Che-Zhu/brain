@@ -5,7 +5,20 @@ import type {
   NodeTypes,
   ReactFlowProps,
 } from "@xyflow/react";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
+
+/** Body content for {@link CanvasPanel}; receives the selected React Flow node. */
+export interface CanvasPanelBodyProps {
+  node: Node;
+}
+
+export type CanvasPanelComponent = ComponentType<CanvasPanelBodyProps>;
+
+/**
+ * Panel body components keyed by React Flow node `type` string — use the same keys as
+ * {@link CanvasMeta.nodeTypes} so selection shows the matching panel.
+ */
+export type CanvasPanelTypes = Partial<Record<string, CanvasPanelComponent>>;
 
 /** Props forwarded to `<ReactFlow />`; canvas owns nodes/edges/types/change handlers. */
 export type CanvasReactFlowProps = Omit<
@@ -45,6 +58,7 @@ export interface CanvasActions {
 export interface CanvasMeta {
   edgeTypes?: EdgeTypes;
   nodeTypes?: NodeTypes;
+  panelTypes?: CanvasPanelTypes;
   reactFlowProps?: CanvasReactFlowProps;
 }
 

@@ -1,5 +1,6 @@
-# Notif — user-facing notification record. Default composition adds optional Project affiliation
-# (observe Project, labels, owner refs, SSA patch, status.projectName / status.projectUid).
+# Notif composite - inbox fields under spec.notification; optional Grafana alerting resources under spec.grafana.
+# Default composition: notifs-project-go-templating (notification/project only).
+# Select notifs-grafana-alert-system-go-templating for Grafana Folder/ContactPoint/Policy/RuleGroup.
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
@@ -13,123 +14,192 @@ spec:
   defaultCompositionRef:
     name: notifs-project-go-templating
   versions:
-  - name: v1
-    served: true
-    referenceable: true
-    schema:
-      openAPIV3Schema:
-        type: object
-        properties:
-          spec:
-            type: object
-            properties:
-              crossplane:
-                type: object
-                description: Optional — select a Composition if you add one later
-                properties:
-                  compositionRef:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                  compositionSelector:
-                    type: object
-                    properties:
-                      matchLabels:
-                        type: object
-                        additionalProperties:
-                          type: string
-              projectName:
-                type: string
-                description: >
-                  When set, notifs-project-go-templating observes the Project claim with this name
-                  in the same namespace, adds labels crossplane.io/project-name and
-                  crossplane.io/project-uid to the Notif via SSA patch, sets ownerReferences, and
-                  echoes status.projectName / status.projectUid.
-              title:
-                type: string
-                description: Short headline shown in the inbox or toast
-              content:
-                type: string
-                description: Full message body (plain text or markdown, app-defined)
-              severity:
-                type: string
-                description: Visual priority / tone
-                enum:
-                - info
-                - success
-                - warning
-                - error
-                default: info
-              category:
-                type: string
-                description: Free-form bucket for filtering (e.g. deploy, billing, system)
-              link:
-                type: string
-                description: URL to open when the user follows the notification
-              read:
-                type: boolean
-                description: Whether the recipient has acknowledged / read the notification
-                default: false
-              archived:
-                type: boolean
-                description: Hide from default lists without deleting
-                default: false
-              dedupeKey:
-                type: string
-                description: Idempotency key to collapse duplicate events from producers
-              expiresAt:
-                type: string
-                format: date-time
-                description: After this time UIs may hide or garbage-collect the record
-              sourceRef:
-                type: object
-                description: Related Kubernetes or platform object (task, AP, etc.)
-                properties:
-                  apiVersion:
-                    type: string
-                  kind:
-                    type: string
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                  uid:
-                    type: string
-              data:
-                type: object
-                description: Arbitrary structured payload for clients (counts, IDs, etc.)
-                x-kubernetes-preserve-unknown-fields: true
-          status:
-            type: object
-            properties:
-              phase:
-                type: string
-                description: Optional delivery lifecycle (e.g. pending, delivered) if a pipeline sets it
-              observedGeneration:
-                type: integer
-                format: int64
-              lastTransitionTime:
-                type: string
-                format: date-time
-              projectName:
-                type: string
-                description: Observed Project claim name when spec.projectName is set.
-              projectUid:
-                type: string
-                description: Observed Project UID when the Project is resolved.
-              conditions:
-                type: array
-                items:
+    - name: v1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                crossplane:
                   type: object
+                  description: Optional Composition selection
                   properties:
-                    type:
+                    compositionRef:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                    compositionSelector:
+                      type: object
+                      properties:
+                        matchLabels:
+                          type: object
+                          additionalProperties:
+                            type: string
+                # --- In-app / inbox notification record (Sealos notifications) ---
+                notification:
+                  type: object
+                  description: User-visible notification payload and optional Project linkage
+                  properties:
+                    projectName:
                       type: string
-                    status:
+                      description: >
+                        When set, composition observes Project with this name in the claim namespace and
+                        may patch labels / owner refs on this Notif composite.
+                    title:
                       type: string
-                    reason:
+                      description: Short headline for inbox/toast UI
+                    content:
                       type: string
-                    message:
+                    severity:
                       type: string
-                    lastTransitionTime:
+                      enum:
+                        - info
+                        - success
+                        - warning
+                        - error
+                      default: info
+                    category:
                       type: string
+                    link:
+                      type: string
+                    read:
+                      type: boolean
+                      default: false
+                    archived:
+                      type: boolean
+                      default: false
+                    dedupeKey:
+                      type: string
+                    expiresAt:
+                      type: string
+                      format: date-time
+                    sourceRef:
+                      type: object
+                      properties:
+                        apiVersion:
+                          type: string
+                        kind:
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                        uid:
+                          type: string
+                    data:
+                      type: object
+                      description: Arbitrary structured payload for clients
+                      x-kubernetes-preserve-unknown-fields: true
+                # --- Grafana Operator resources (select compositionRef: notifs-grafana-alert-system-go-templating) ---
+                grafana:
+                  type: object
+                  description: >
+                    Input for a reusable Grafana alert system composition. The Grafana composition creates GrafanaFolder, GrafanaContactPoint,
+                    GrafanaNotificationPolicy, and GrafanaAlertRuleGroup via provider-kubernetes Objects.
+                  properties:
+                    name:
+                      type: string
+                      description: Basename used to derive all four Grafana resource names when metadataName fields are omitted.
+                    namespace:
+                      type: string
+                      description: Namespace where Grafana Operator reconciles Grafana* CRs.
+                    matchLabels:
+                      type: object
+                      description: Grafana instance labels (rendered as spec.instanceSelector.matchLabels).
+                      additionalProperties:
+                        type: string
+                    folder:
+                      type: object
+                      properties:
+                        metadataName:
+                          type: string
+                          description: GrafanaFolder metadata.name (default {grafana.name}-folder).
+                        alert:
+                          type: object
+                          properties:
+                            title:
+                              type: string
+                              description: GrafanaFolder spec.title.
+                    contactPoint:
+                      type: object
+                      properties:
+                        metadataName:
+                          type: string
+                          description: Kubernetes object name for GrafanaContactPoint (default {grafana.name}-contact-point).
+                        grafanaReceiverName:
+                          type: string
+                          description: Grafana contact point name (spec.name); defaults to {grafana.name}.
+                        type:
+                          type: string
+                        resyncPeriod:
+                          type: string
+                        allowCrossNamespaceImport:
+                          type: boolean
+                        settings:
+                          type: object
+                          description: Webhook settings (url, httpMethod, etc.)
+                          x-kubernetes-preserve-unknown-fields: true
+                    notificationPolicy:
+                      type: object
+                      properties:
+                        metadataName:
+                          type: string
+                          description: GrafanaNotificationPolicy metadata.name (default {grafana.name}-policy).
+                        route:
+                          type: object
+                          description: GrafanaNotificationPolicy spec.route subtree
+                          x-kubernetes-preserve-unknown-fields: true
+                    alertRuleGroup:
+                      type: object
+                      properties:
+                        metadataName:
+                          type: string
+                          description: GrafanaAlertRuleGroup metadata.name (default {grafana.name}-alert-rule-group).
+                        interval:
+                          type: string
+                        resyncPeriod:
+                          type: string
+                        folderRef:
+                          type: string
+                          description: Usually folder.metadataName
+                        rules:
+                          type: array
+                          description: Grafana alert rules (full rule objects)
+                          items:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                lastTransitionTime:
+                  type: string
+                  format: date-time
+                projectName:
+                  type: string
+                projectUid:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string

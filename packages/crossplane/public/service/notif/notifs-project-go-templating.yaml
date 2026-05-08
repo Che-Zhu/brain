@@ -1,7 +1,6 @@
-# Optional spec.projectName: observes example.crossplane.io Project (same namespace), SSA-patches
-# the Notif composite with crossplane.io/project-name and crossplane.io/project-uid, owner refs,
-# and sets status.projectName / status.projectUid. Requires provider-kubernetes RBAC on notifs
-# (see packages/crossplane/public/provider-kubernetes-example-rbac.yaml).
+# Notification-only Notif Composition:
+# - spec.notification: optional Project observe + SSA patch when projectName is set.
+# Grafana resources are handled by notifs-grafana-alert-system-go-templating.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -9,7 +8,7 @@ metadata:
   annotations:
     meta.crossplane.io/display-name: notif
     meta.crossplane.io/description: >
-      Notification record with optional Project affiliation (observe, labels, SSA patch, status).
+      Notification record with optional Project affiliation (spec.notification.projectName).
 spec:
   compositeTypeRef:
     apiVersion: example.crossplane.io/v1
@@ -25,21 +24,26 @@ spec:
         source: Inline
         inline:
           template: |
-            {{- $spec := .observed.composite.resource.spec }}
-            {{- $name := .observed.composite.resource.metadata.name }}
-            {{- $ns := .observed.composite.resource.metadata.namespace }}
-            {{- $projectName := "" }}
-            {{- if hasKey $spec "projectName" }}{{ $projectName = trim (toString $spec.projectName) }}{{ end }}
-            {{- $projectObs := getComposedResource . "project-observe" }}
-            {{- $projectUid := "" }}
-            {{- if and $projectObs $projectObs.status $projectObs.status.atProvider $projectObs.status.atProvider.manifest }}
-            {{- $m := $projectObs.status.atProvider.manifest }}
-            {{- $meta := index $m "metadata" }}
-            {{- if $meta }}
-            {{- $uidVal := index $meta "uid" }}
-            {{- if $uidVal }}{{ $projectUid = toString $uidVal }}{{ end }}
-            {{- end }}
-            {{- end }}
+            {{- $r := .observed.composite.resource -}}
+            {{- $spec := $r.spec | default dict -}}
+            {{- $meta := $r.metadata -}}
+            {{- $name := $meta.name -}}
+            {{- $ns := $meta.namespace -}}
+            {{- $notif := index $spec "notification" | default dict -}}
+            {{- $projectName := "" -}}
+            {{- if hasKey $notif "projectName" }}{{ $projectName = trim (toString (index $notif "projectName")) }}{{ end -}}
+            {{- $projectObs := getComposedResource . "project-observe" -}}
+            {{- $projectUid := "" -}}
+            {{- if and $projectObs $projectObs.status $projectObs.status.atProvider $projectObs.status.atProvider.manifest -}}
+            {{- $m := $projectObs.status.atProvider.manifest -}}
+            {{- $pmeta := index $m "metadata" -}}
+            {{- if $pmeta -}}
+            {{- $uidVal := index $pmeta "uid" -}}
+            {{- if $uidVal -}}{{ $projectUid = toString $uidVal }}{{- end -}}
+            {{- end -}}
+            {{- end -}}
+
+            {{- /* --- Project observe & patch (unchanged behavior, nested spec.notification.projectName) --- */ -}}
             {{- if ne $projectName "" }}
             ---
             apiVersion: kubernetes.m.crossplane.io/v1alpha1
@@ -64,6 +68,7 @@ spec:
                     name: {{ $projectName }}
                     namespace: {{ $ns }}
             {{- end }}
+
             {{- if and (ne $projectName "") (ne $projectUid "") }}
             ---
             apiVersion: kubernetes.m.crossplane.io/v1alpha1
@@ -93,11 +98,12 @@ spec:
                       crossplane.io/project-name: {{ $projectName | quote }}
                       crossplane.io/project-uid: {{ $projectUid | quote }}
                     ownerReferences:
-                    - apiVersion: example.crossplane.io/v1
-                      kind: Project
-                      name: {{ $projectName }}
-                      uid: {{ $projectUid }}
+                      - apiVersion: example.crossplane.io/v1
+                        kind: Project
+                        name: {{ $projectName }}
+                        uid: {{ $projectUid }}
             {{- end }}
+
             ---
             apiVersion: example.crossplane.io/v1
             kind: Notif

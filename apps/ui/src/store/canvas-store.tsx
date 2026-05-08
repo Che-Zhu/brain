@@ -2,6 +2,8 @@
 
 import type {
   CanvasMeta,
+  CanvasPanelBodyProps,
+  CanvasPanelTypes,
   CanvasSelectedEdge,
   CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
@@ -72,6 +74,64 @@ export const canvasDefaultNodeTypes = {
   [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNode,
 } as const satisfies NodeTypes;
 
+function containerStatesFromNode(node: Node): ContainerNodeStates | null {
+  if (
+    node.type !== CANVAS_CONTAINER_NODE_TYPE ||
+    node.data === null ||
+    typeof node.data !== "object" ||
+    !("states" in node.data)
+  ) {
+    return null;
+  }
+  return (node.data as { states: ContainerNodeStates }).states;
+}
+
+export const CanvasContainerNodePanel = memo(function CanvasContainerNodePanel({
+  node,
+}: CanvasPanelBodyProps) {
+  const states = containerStatesFromNode(node);
+  if (states == null) {
+    return (
+      <p className="text-muted-foreground text-sm">No workload details.</p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-muted-foreground text-xs">Image</span>
+        <span className="break-all font-mono text-xs">{states.image}</span>
+      </div>
+      <div className="flex flex-row flex-wrap gap-x-6 gap-y-2">
+        {states.cpuPercent != null && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-muted-foreground text-xs">CPU</span>
+            <span>{states.cpuPercent}%</span>
+          </div>
+        )}
+        {states.memoryPercent != null && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-muted-foreground text-xs">Memory</span>
+            <span>{states.memoryPercent}%</span>
+          </div>
+        )}
+        {states.replicas != null && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-muted-foreground text-xs">Replicas</span>
+            <span>{states.replicas}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+CanvasContainerNodePanel.displayName = "CanvasContainerNodePanel";
+
+/** Default `meta.panelTypes` — keys match {@link canvasDefaultNodeTypes}. */
+export const canvasDefaultPanelTypes = {
+  [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNodePanel,
+} as const satisfies CanvasPanelTypes;
+
 /** Selected canvas node; `canvasMetaAtom` click handlers write via `getDefaultStore()` matching the app root `JotaiProvider` store. */
 export const selectedNodeAtom = atom<CanvasSelectedNode>(null);
 
@@ -92,9 +152,10 @@ export function closeCanvasSelection() {
   setCanvasSelection(null, null);
 }
 
-/** Canvas `meta` (`nodeTypes`, `edgeTypes`, `reactFlowProps`) — not fetch-derived `state`. */
+/** Canvas `meta` (`nodeTypes`, `panelTypes`, `edgeTypes`, `reactFlowProps`) — not fetch-derived `state`. */
 export const canvasMetaAtom = atom<CanvasMeta>({
   nodeTypes: canvasDefaultNodeTypes,
+  panelTypes: canvasDefaultPanelTypes,
   reactFlowProps: {
     onNodeClick: (_event, node: Node) => {
       setCanvasSelection(node, null);

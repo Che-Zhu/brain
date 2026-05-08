@@ -276,6 +276,28 @@ export const Index: RegistryIndex = {
     load: () => import("@registry/linear/components/canvas/canvas-preview"),
   },
 
+  "linear/components/metrics-chart": {
+    style: "linear",
+    group: "components",
+    name: "metrics-chart",
+    title: "Metrics chart",
+    description:
+      "Multi-series metrics area chart: MetricsChart.Root + Area compound API, MetricsChartProvider, useMetricsChart; Variant0 / Variant1",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "chart"],
+    files: [
+      {
+        path: "registry/linear/components/metrics-chart/metrics-chart-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/metrics-chart/metrics-chart-preview"),
+  },
+
   "shadcn/components/accordion": {
     style: "shadcn",
     group: "components",

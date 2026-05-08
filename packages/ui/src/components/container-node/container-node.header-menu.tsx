@@ -7,12 +7,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import { cn } from "@workspace/ui/lib/utils";
 import { MoreHorizontal } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, type SyntheticEvent, useState } from "react";
 
 import { useContainerNode } from "./container-node.context";
 import { ContainerNodeDeleteDialog } from "./container-node.delete-dialog";
 import { ContainerNodeScaleDialog } from "./container-node.scale-dialog";
+
+/**
+ * React Flow utility classes — required for controls inside custom nodes so pointer
+ * events are not consumed for drag/pan. Prefer these over `stopPropagation` on the
+ * trigger, which can break Base UI menu triggers. See:
+ * https://reactflow.dev/learn/customization/utility-classes
+ */
+const RF_MENU_SURFACE_CLASS = "nodrag nopan";
+
+function stopCanvasNodeClick(e: SyntheticEvent) {
+  e.stopPropagation();
+}
 
 export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
   const { actions, states } = useContainerNode();
@@ -26,7 +39,8 @@ export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
           render={
             <Button
               aria-label="Open menu"
-              className="size-7 shrink-0"
+              className={cn(RF_MENU_SURFACE_CLASS, "size-7 shrink-0")}
+              onClick={stopCanvasNodeClick}
               size="icon"
               variant="ghost"
             />
@@ -34,7 +48,10 @@ export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
         >
           <MoreHorizontal className="size-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="rounded-xl">
+        <DropdownMenuContent
+          align="start"
+          className={cn(RF_MENU_SURFACE_CLASS, "rounded-xl")}
+        >
           {menu}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -48,7 +65,8 @@ export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
           render={
             <Button
               aria-label="Open menu"
-              className="size-7 shrink-0"
+              className={cn(RF_MENU_SURFACE_CLASS, "size-7 shrink-0")}
+              onClick={stopCanvasNodeClick}
               size="icon"
               variant="ghost"
             />
@@ -56,7 +74,10 @@ export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
         >
           <MoreHorizontal className="size-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="rounded-xl">
+        <DropdownMenuContent
+          align="start"
+          className={cn(RF_MENU_SURFACE_CLASS, "rounded-xl")}
+        >
           <DropdownMenuItem
             className="rounded-xl text-xs"
             onClick={() => setScaleDialogOpen(true)}
