@@ -5,8 +5,8 @@ description: >-
   `aps-deployment-ingress-go-templating`) and `Project` (group resources via
   `project-instance-go-templating`), both `example.crossplane.io/v1`, namespaced. Lists every
   configurable spec field, a few valid claim examples, and the bash commands the chat sandbox
-  needs (KUBECONFIG=/tmp/kubeconfig, kubectl on PATH) to pick the namespace, derive the
-  ingress base host, and prepare the `ghcr-cred` pull Secret before applying.
+  needs (KUBECONFIG=/tmp/kubeconfig, kubectl on PATH) to pick the namespace and derive the
+  ingress base host before applying.
   Use when authoring or applying AP/Project manifests against a Kubernetes cluster.
 ---
 
@@ -39,14 +39,24 @@ kubectl explain project.spec --api-version=example.crossplane.io/v1
 
 Composition behavior to know before you write a claim:
 
-- The Pod template hard-codes `imagePullSecrets: [{ name: ghcr-cred }]`. The Secret named
-  **`ghcr-cred`** must exist in the claim's namespace (see [§5.4](#54-ghcr-cred-pull-secret)).
 - The `Ingress` uses `ingressClassName: nginx` and TLS via `secretName: wildcard-cert` in the
   same namespace.
-- If `metadata.labels.region: <base-host>` is set, the composition **overwrites every**
+- If `metadata.labels.region` is set, the composition **overwrites every**
   `spec.endpoints[].host` with `{metadata.name}-{slug6}.{region}` where `slug6` is the first
-  6 hex chars of `sha256(name|namespace|uid)`. Either set `region` and let it compute hosts,
-  **or** set explicit `endpoints[].host` and omit `region`. Don't mix.
+  6 hex chars of `sha256(name|namespace|uid)`. **That label must equal the ingress base host
+  `BASE_HOST`** from the active kubeconfig cluster server ([§5.3](#53-derive-the-ingress-base-host)):
+  read `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` (e.g. stdout
+  `https://192.168.12.53.nip.io:6443`), strip scheme/path/trailing `:port` → **`192.168.12.53.nip.io`**,
+  and set `region` to **that hostname only**—not the raw `https://…:6443` URL and not an invented zone.
+  Either use `region` and let it compute hosts, **or** set explicit `endpoints[].host` and omit
+  `region`. Don't mix.
+- **If `metadata.labels.region` is omitted**, the composition **does not** replace your hosts and
+  **does not** auto-fill `BASE_HOST` or default to `*.example.com`. Ingress `rules[].host` is taken
+  **verbatim** from `spec.endpoints[].host` (the template only overwrites endpoints when `region` is
+  set; see `packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml` in this
+  repo). So a live Ingress ending in `.example.com` matches a **literal** hostname you (or a prior
+  apply) put in the AP—compare `kubectl get ap <name> -n <ns> -o yaml` with
+  `kubectl get ingress <name>-ingress -n <ns> -o yaml` if they disagree.
 - The composed `Deployment`/`Service`/`Ingress`/`ConfigMap` ownerReference the `AP`. Composed
   child names: `Deployment={name}`, `Service={name}-service-port-{port}`,
   `Ingress={name}-ingress`, ConfigMap=`{name}-config-backup` (managed) and
@@ -70,8 +80,10 @@ Composition behavior to know before you write a claim:
 | `projectName`                    | string                                      | —           | Name of a `Project` claim **in the same namespace**. Adds labels `crossplane.io/project-name` + `crossplane.io/project-uid` to composed children and SSA-patches the AP itself with the same labels + a `Project` `ownerReference`. |
 | `type`                           | `prelude`                                   | unset       | UI-only hint that the image may not be pullable yet (e.g. mid-build). Omit for normal deploys. |
 
-`metadata.labels.region` (string) — see host-rewrite note above; treated as part of the
-configurable surface even though it lives on `metadata`, not `spec`.
+`metadata.labels.region` (string) — **must match `BASE_HOST`** derived from
+`{.clusters[0].cluster.server}` as in [§5.3](#53-derive-the-ingress-base-host) when you use this
+strategy; see host-rewrite note above. Treated as part of the configurable surface even though it
+lives on `metadata`, not `spec`.
 
 `status` fields (read-only, useful when polling): `phase` (`Running` / `Progressing` /
 `Failed` / `Degraded` / `Paused` / `Unknown`), `configVersionHash`, `projectName`,
@@ -124,11 +136,9 @@ user's cluster. Read it to make decisions; never assume a value.
 3. For an `AP`:
    - Pick a host strategy ([§5.3](#53-derive-the-ingress-base-host)): explicit
      `endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
-   - For `image: ghcr.io/...` make sure `ghcr-cred` exists with valid creds
-     ([§5.4](#54-ghcr-cred-pull-secret)).
 4. **Apply Project before AP** when the AP sets `spec.projectName`, otherwise the AP's
    `project-observe` step has nothing to find on the first reconcile.
-5. **Apply, then watch readiness** ([§5.5](#55-apply-and-watch)).
+5. **Apply, then watch readiness** ([§5.4](#54-apply-and-watch)).
 
 ---
 
@@ -185,6 +195,11 @@ BASE_HOST=$(printf '%s' "$SERVER" | sed -E 's#^https?://##; s#/.*$##; s#:[0-9]+$
 echo "$BASE_HOST"
 ```
 
+**`metadata.labels.region`:** when you choose the region-based host strategy, set this label to
+**exactly** the `BASE_HOST` value produced above (host only: no `https://`, no trailing `:6443`).
+Example: if the command prints `https://192.168.12.53.nip.io:6443`, then `region` must be
+`192.168.12.53.nip.io`.
+
 Then either:
 
 - Set `endpoints[].host: <your-app>.<BASE_HOST>` per endpoint (use distinct slugs to avoid
@@ -195,47 +210,28 @@ Then either:
 If `$SERVER` is an internal IP that won't resolve publicly, ask the user what ingress base host
 the platform exposes — don't guess.
 
-### 5.4 `ghcr-cred` pull Secret
+#### Hostname shape and collision-proof slugs
 
-The Pod always references `imagePullSecrets: [{ name: ghcr-cred }]`. Check before applying:
+- Typical Sealos kubeconfig server: `https://192.168.12.53.nip.io:6443` → `BASE_HOST` is
+  `192.168.12.53.nip.io` (strip scheme, path, trailing `:6443`). The ingress hostname is always
+  **`<slug>.<BASE_HOST>`**, e.g. `demo-app.192.168.12.53.nip.io`.
+- **Do not** invent `*.example.com` unless the user gave you that real DNS zone; it will not
+  resolve on-cluster.
+
+**Avoid host collisions**: reusing bare names like `nginx-app` across delete/recreate or
+parallel demos in the same namespace clashes on the same `rules[].host`. Append a short random
+or time-based postfix to **`metadata.name` and** the left DNS label:
 
 ```bash
-kubectl get secret ghcr-cred -n "$NS" 2>/dev/null || echo "missing"
+RAND=$(openssl rand -hex 3)
+APP_SLUG="nginx-${RAND}"
+# Use $APP_SLUG as metadata.name; host="${APP_SLUG}.${BASE_HOST}"
 ```
 
-- **Public image** (Docker Hub `nginx:latest`, etc.): the Secret can be missing (kubelet logs a
-  warning, pull still works). To silence the warning:
+If `metadata.labels.region` is set, the composition ignores your literal `endpoints[].host` for
+the rendered Ingress and uses `<metadata.name>-<slug6>.<region>` anyway ([§1](#1-ap--deploy-one-docker-image)) — pick a collision-safe **`metadata.name`** there too.
 
-  ```bash
-  kubectl create secret docker-registry ghcr-cred -n "$NS" \
-    --docker-server=ghcr.io \
-    --docker-username=anonymous --docker-password=anonymous \
-    --docker-email=unused@example.com
-  ```
-
-- **Private `ghcr.io/<owner>/...` image**: the Secret **must** be valid or kubelet will loop
-  on `ImagePullBackOff`. Ask the user for a GitHub PAT (classic `read:packages` or fine-grained
-  packages-read) and the owner:
-
-  ```bash
-  OWNER="<github-owner>"; TOKEN="<github-pat>"
-  AUTH=$(printf '%s:%s' "$OWNER" "$TOKEN" | base64 | tr -d '\n')
-  cat <<EOF | kubectl apply -n "$NS" -f -
-  apiVersion: v1
-  kind: Secret
-  metadata: { name: ghcr-cred }
-  type: kubernetes.io/dockerconfigjson
-  stringData:
-    githubToken: "$TOKEN"
-    .dockerconfigjson: |
-      {"auths":{"ghcr.io":{"auth":"$AUTH","email":"unused@example.com"}}}
-  EOF
-  ```
-
-  If the user can't provide a token, **stop** — don't apply an AP that will permanently fail
-  to pull.
-
-### 5.5 Apply and watch
+### 5.4 Apply and watch
 
 ```bash
 NS="<your-namespace>"; NAME="<your-app>"
@@ -253,7 +249,7 @@ If `describe ap` shows `SYNCED=False` or `READY=False`, read `status.conditions[
 and the events on the composed Deployment for the actual failure (image pull, OOMKilled,
 missing Secret, etc.).
 
-### 5.6 Common gotchas
+### 5.5 Common gotchas
 
 - **Endpoint host clashes** when two APs pick the same host. Either keep hosts unique or use
   `metadata.labels.region` so the composition appends a hash.
@@ -269,12 +265,42 @@ missing Secret, etc.).
   `crossplane.io/project-*` labels and ownerRef — delete the dependent APs first, or accept
   GC chaining.
 
+### 5.6 Troubleshooting: wrong host (e.g. `.example.com`), or `kubectl apply` says `unchanged`
+
+1. **Compare claim vs composed Ingress** (traffic follows the Ingress, not your YAML file on disk):
+
+   ```bash
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.endpoints}' ; echo
+   kubectl get ingress "${NAME}-ingress" -n "$NS" -o jsonpath='{.spec.rules[*].host}' ; echo
+   ```
+
+2. **`metadata.labels.region` overrides `spec.endpoints[].host`**: when `region` is set, the
+   composition **replaces** every endpoint host with `<metadata.name>-<slug6>.<region>` for
+   the rendered Ingress. Remove `metadata.labels.region` if you need full manual control of
+   `endpoints[].host` ([§1](#1-ap--deploy-one-docker-image)).
+
+3. **`kubectl apply ... unchanged`**: the live **AP** object already matched your manifest. If
+   you thought you changed the host, re-check namespace/name, `kubectl get ap ... -o yaml`, and
+   whether another controller (SSA field manager / webhook) resets `spec.endpoints`.
+
+4. **Stale Ingress after fixing `spec.endpoints`**: if the AP spec shows the new host but
+   `kubectl get ingress` still shows an old one, inspect `kubectl describe ap` (sync/ready).
+   Wait for reconcile, or apply a harmless metadata annotation bump to force a new pipeline
+   pass; if still wedged, recreate the AP with a **new** `metadata.name` and a fresh host.
+
+5. **UI / list APIs**: some stacks treat `placeholder.example.com` as a non-user-facing
+   placeholder; bogus `example.com` hosts from an early apply may also confuse summaries until
+   the Ingress actually updates. Trust `kubectl get ingress` for the live routing hostname.
+
 ---
 
 ## 6. Claim YAML examples
 
 Replace `<your-namespace>`, `<your-app>`, `<your-project>`, `<base-host>`, `<owner>`, `<repo>`,
-`<tag>` with values you've validated on the active cluster ([§5](#5-tips)).
+`<tag>` with values you've validated on the active cluster ([§5](#5-tips)). **`<base-host>` must
+come from [§5.3](#53-derive-the-ingress-base-host)** (often a `*.nip.io` / cluster-specific domain),
+never a made-up `example.com` zone. Prefer collision-proof `<your-app>` labels (see hostname and
+collision notes under §5.3).
 
 ### 6.1 Minimal `AP` (public image, explicit host)
 
@@ -331,7 +357,7 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: ghcr.io/<owner>/<repo>:<tag>     # requires ghcr-cred (§5.4)
+  image: ghcr.io/<owner>/<repo>:<tag>
   replicas: 2
   endpoints:
     - port: 8080
@@ -376,7 +402,8 @@ spec:
   image: nginx:latest
   endpoints:
     - port: 80
-      host: ignored.example.com    # overwritten with <your-app>-<slug6>.<base-host>
+      # When `region` is set, this host is NOT used for Ingress; effective host is <name>-<slug6>.<region>
+      host: dns-ignored.invalid
 ```
 
 ### 6.5 Minimal `Project`

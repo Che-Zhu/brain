@@ -136,6 +136,8 @@ function ProjectAssistantChatSession({
       },
     });
 
+  // console.log("messages", messages);
+
   addToolOutputRef.current = addToolOutput;
   const [input, setInput] = useState("");
   const {

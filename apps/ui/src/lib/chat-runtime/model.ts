@@ -5,7 +5,7 @@ import type { streamText } from "ai";
 
 type ChatModel = Parameters<typeof streamText>[0]["model"];
 
-export const CHAT_MODEL_ID = "gpt-4o-mini";
+export const CHAT_MODEL_ID = "gpt-5.5";
 export const CHAT_MAX_STEPS = 15;
 export const CHAT_BASE_SYSTEM_PROMPT =
   "You are a helpful assistant for the product UI. When you need to show catalog-driven UI (metrics chart, etc.), call `emitGenUISpec` with a valid spec. You may still reply with normal text before or after.";
