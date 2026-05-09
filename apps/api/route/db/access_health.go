@@ -1,0 +1,107 @@
+package db
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"sealos/api/middleware"
+	dbsvc "sealos/api/service/db"
+)
+
+func registerAccessHealth(grp huma.API) {
+	type dbAccessHealthBody struct {
+		ProjectUID string `json:"projectUid" required:"true" doc:"Project metadata.uid that must match the DB ownership label."`
+		Namespace  string `json:"namespace,omitempty" doc:"Namespace (default from kubeconfig; admin can override)."`
+	}
+	type dbAccessHealthInput struct {
+		middleware.AuthInput
+		Name string `path:"name" doc:"DB claim metadata.name."`
+		Body dbAccessHealthBody
+	}
+	type dbAccessHealthOutput struct {
+		Body dbsvc.AccessHealthResult
+	}
+
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-access-health",
+		Method:      http.MethodPost,
+		Path:        "/{name}/access/health",
+		Summary:     "Check DB access health",
+		Description: "Checks server-side read-only DB access wiring for one managed DB claim. Requires kubeconfig authorization and projectUid ownership. The response never includes raw database credentials.",
+		Tags:        []string{"DB"},
+	}, func(ctx context.Context, input *dbAccessHealthInput) (*dbAccessHealthOutput, error) {
+		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
+		if err != nil {
+			return nil, huma.Error401Unauthorized("invalid kubeconfig", err)
+		}
+		if strings.TrimSpace(input.Body.ProjectUID) == "" {
+			return nil, huma.Error400BadRequest("projectUid is required", nil)
+		}
+
+		gvr := middleware.PodsGVR()
+		resolved, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        input.Body.Namespace,
+			AllNamespaces:    false,
+			DefaultNamespace: "",
+			AdminCheckGVR:    &gvr,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to resolve request context", err)
+		}
+
+		store, err := dbsvc.NewKubernetesAccessHealthStore(resolved.RestConfig)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to initialize DB access store", err)
+		}
+		service := dbsvc.AccessHealthService{
+			Store: store,
+			WhoDB: dbsvc.NewWhoDBHTTPClient(
+				os.Getenv("WHODB_URL"),
+				http.DefaultClient,
+				15*time.Second,
+			),
+		}
+		result, err := service.Check(ctx, dbsvc.AccessHealthRequest{
+			Name:       input.Name,
+			Namespace:  resolved.Namespace,
+			ProjectUID: input.Body.ProjectUID,
+		})
+		if err != nil {
+			return nil, accessHealthError(err)
+		}
+		return &dbAccessHealthOutput{Body: *result}, nil
+	})
+}
+
+func accessHealthError(err error) error {
+	switch {
+	case errors.Is(err, dbsvc.ErrAccessHealthProjectUID):
+		return huma.Error400BadRequest("projectUid is required", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthDBNotFound):
+		return huma.Error404NotFound("DB not found", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthProjectForbidden):
+		return huma.Error403Forbidden("DB does not belong to project", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthProjectMissing):
+		return huma.Error409Conflict("DB is missing project ownership metadata", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthDBNotReady):
+		return huma.Error409Conflict("DB is not ready", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthSecretMissing):
+		return huma.Error409Conflict("DB connection secret is missing", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthUnsupported):
+		return huma.Error422UnprocessableEntity("unsupported DB engine", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthWhoDBMissing):
+		return huma.Error503ServiceUnavailable("WHODB_URL is not configured", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthWhoDBTimeout):
+		return huma.Error504GatewayTimeout("WhoDB request timed out", err)
+	case errors.Is(err, dbsvc.ErrAccessHealthWhoDBUnavailable):
+		return huma.Error503ServiceUnavailable("WhoDB is unavailable", err)
+	default:
+		return huma.Error500InternalServerError("failed to check DB access health", err)
+	}
+}
