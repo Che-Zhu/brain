@@ -102,6 +102,9 @@
         "typescript": "^5.9.3",
       },
     },
+    "apps/whodb": {
+      "name": "@sealai/whodb",
+    },
     "packages/api": {
       "name": "@workspace/api",
       "version": "0.0.0",
@@ -633,6 +636,8 @@
     "@sealai/registry": ["@sealai/registry@workspace:apps/registry"],
 
     "@sealai/ui": ["@sealai/ui@workspace:apps/ui"],
+
+    "@sealai/whodb": ["@sealai/whodb@workspace:apps/whodb"],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 

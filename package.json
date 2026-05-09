@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=!@sealai/whodb",
+    "dev:all": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "whodb:dev": "bun --filter @sealai/whodb dev",
+    "whodb:build": "bun --filter @sealai/whodb build",
+    "whodb:test": "bun --filter @sealai/whodb test",
     "cd": "./cd.sh"
   },
   "devDependencies": {
