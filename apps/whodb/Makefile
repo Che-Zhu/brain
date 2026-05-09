@@ -4,8 +4,8 @@ DOCKER_USERNAME ?=
 IMAGE_NAME ?= whodb
 DOCKER_IMAGE := $(DOCKER_REGISTRY)/$(DOCKER_USERNAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 DOCKER_PLATFORM ?= linux/amd64
-DOCKERFILE ?= apps/whodb/core/Dockerfile
-BUILD_CONTEXT ?= apps/whodb
+DOCKERFILE ?= core/Dockerfile
+BUILD_CONTEXT ?= .
 BUILD_PLATFORM ?= cluster-dev
 ENABLE_UPX ?= false
 
