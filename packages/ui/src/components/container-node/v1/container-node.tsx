@@ -39,12 +39,15 @@ import {
   ContainerNodeScaleDialog,
   ContainerNodeScaleDialogPanel,
 } from "./container-node.scale-dialog";
+import { ContainerNodeVariant1 } from "./container-node.variant1";
 
 export type {
   ContainerNodeActions,
   ContainerNodeStates,
   ContainerNodeStatusTone,
 } from "./container-node.types";
+
+export type { ContainerNodeVariant1Props } from "./container-node.variant1";
 
 export const ContainerNode = Object.assign(ContainerNodeShell, {
   Content: ContainerNodeContent,
@@ -74,6 +77,7 @@ export const ContainerNode = Object.assign(ContainerNodeShell, {
   Shell: ContainerNodeShell,
   Status: ContainerNodeStatus,
   Title: ContainerNodeTitle,
+  Variant1: ContainerNodeVariant1,
 });
 
 const dn = (c: object, name: string) => {
@@ -92,6 +96,7 @@ dn(ContainerNodeContent, "ContainerNode.Content");
 dn(ContainerNodeFooter, "ContainerNode.Footer");
 dn(ContainerNodeResourceGroup, "ContainerNode.ResourceGroup");
 dn(ContainerNodeReplicas, "ContainerNode.Replicas");
+dn(ContainerNodeVariant1, "ContainerNode.Variant1");
 
 export type {
   ContainerNodeDeleteDialogPanelProps,

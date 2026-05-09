@@ -1,10 +1,11 @@
 "use client";
 
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
+import type {
+  ContainerNodeActions,
+  ContainerNodeStates,
+} from "@workspace/ui/components/container-node/v1/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
-import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
-import { Cpu, MemoryStick, Pause, Play, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const staticBase = {
@@ -65,7 +66,7 @@ function buildPreviewStates(
 }
 
 /** Stub handlers — same pattern as `Chat.Export onExport={() => undefined}`. */
-const demoActions = {
+const demoActions: ContainerNodeActions = {
   onDelete: () => undefined,
   onOpenShell: () => undefined,
   onPause: () => undefined,
@@ -74,104 +75,7 @@ const demoActions = {
   onViewActivity: () => undefined,
   onViewCalendar: () => undefined,
   onViewLogs: () => undefined,
-} as const;
-
-/**
- * v1 node: `Shell` → `Header` → optional `Content` → `Footer`.
- */
-function V1WorkloadCard({
-  className,
-  content = "full",
-  states,
-}: {
-  className?: string;
-  content?: "collapsed" | "full";
-  states: ContainerNodeStates;
-}) {
-  const { showPause, showRestart, showStart } =
-    containerNodeLifecycleMenuVisibility(states.status?.tone);
-
-  return (
-    <ContainerNode.Shell className={className}>
-      <ContainerNode.Header>
-        <ContainerNode.HeaderMain>
-          <ContainerNode.IconPlaceholder />
-          <ContainerNode.HeaderTitles>
-            <ContainerNode.Title name={states.name} />
-            <ContainerNode.Kind kind={states.kind} />
-          </ContainerNode.HeaderTitles>
-        </ContainerNode.HeaderMain>
-        <ContainerNode.HeaderMenuDropdown>
-          <ContainerNode.HeaderMenuTrigger />
-          <ContainerNode.HeaderMenuContent>
-            {showStart ? (
-              <ContainerNode.HeaderMenuItem
-                accentHover="positive"
-                disabled={demoActions.onStart == null}
-                icon={Play}
-                onClick={() => demoActions.onStart()}
-              >
-                Start
-              </ContainerNode.HeaderMenuItem>
-            ) : null}
-            {showPause ? (
-              <ContainerNode.HeaderMenuItem
-                disabled={demoActions.onPause == null}
-                icon={Pause}
-                onClick={() => demoActions.onPause()}
-              >
-                Pause
-              </ContainerNode.HeaderMenuItem>
-            ) : null}
-            {showRestart ? (
-              <ContainerNode.HeaderMenuItem
-                accentHover="positive"
-                disabled={demoActions.onRestart == null}
-                icon={RotateCw}
-                onClick={() => demoActions.onRestart()}
-              >
-                Restart
-              </ContainerNode.HeaderMenuItem>
-            ) : null}
-            <ContainerNode.HeaderMenuDelete
-              name={states.name}
-              onConfirmDelete={demoActions.onDelete}
-            />
-          </ContainerNode.HeaderMenuContent>
-        </ContainerNode.HeaderMenuDropdown>
-      </ContainerNode.Header>
-      {content === "full" ? (
-        <ContainerNode.Content className="gap-2">
-          <ContainerNode.Image image={states.image} />
-          <div className="nodrag nopan flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-1">
-            <ContainerNode.ToolbarActivity
-              onViewActivity={demoActions.onViewActivity}
-            />
-            <ContainerNode.ToolbarShell onOpenShell={demoActions.onOpenShell} />
-            <ContainerNode.ToolbarLogs onViewLogs={demoActions.onViewLogs} />
-            <ContainerNode.ToolbarCalendar
-              onViewCalendar={demoActions.onViewCalendar}
-            />
-          </div>
-        </ContainerNode.Content>
-      ) : null}
-      <ContainerNode.Footer>
-        <ContainerNode.Status
-          label={states.status?.label}
-          tone={states.status?.tone}
-        />
-        <ContainerNode.ResourceGroup>
-          <ContainerNode.Resource icon={Cpu} percent={states.cpuPercent} />
-          <ContainerNode.Resource
-            icon={MemoryStick}
-            percent={states.memoryPercent}
-          />
-          <ContainerNode.Replicas replicas={states.replicas} />
-        </ContainerNode.ResourceGroup>
-      </ContainerNode.Footer>
-    </ContainerNode.Shell>
-  );
-}
+};
 
 function StatusVariantRows({ content }: { content: "collapsed" | "full" }) {
   const [step, setStep] = useState(0);
@@ -187,17 +91,20 @@ function StatusVariantRows({ content }: { content: "collapsed" | "full" }) {
 
   return (
     <div className="flex flex-wrap items-start justify-center gap-8">
-      <V1WorkloadCard
+      <ContainerNode.Variant1
+        actions={demoActions}
         className={shellClass}
         content={content}
         states={buildPreviewStates("running", step)}
       />
-      <V1WorkloadCard
+      <ContainerNode.Variant1
+        actions={demoActions}
         className={shellClass}
         content={content}
         states={buildPreviewStates("failed", 0)}
       />
-      <V1WorkloadCard
+      <ContainerNode.Variant1
+        actions={demoActions}
         className={shellClass}
         content={content}
         states={buildPreviewStates("paused", 0)}

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { API_ROUTES } from "@workspace/api/constants";
 import { cookies } from "next/headers";
 

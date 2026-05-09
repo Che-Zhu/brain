@@ -32,6 +32,7 @@ const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
   data,
   id,
 }: NodeProps<Node<CanvasContainerNodeData, "containerNode">>) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { showPause, showRestart, showStart } =
     containerNodeLifecycleMenuVisibility(data.states.status?.tone);
 
@@ -86,7 +87,9 @@ const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
                   Restart
                 </ContainerNode.HeaderMenuItem>
               ) : null}
-              <ContainerNode.HeaderMenuDelete name={data.states.name} />
+              <ContainerNode.HeaderMenuDelete
+                onRequestDelete={() => setDeleteDialogOpen(true)}
+              />
             </ContainerNode.HeaderMenuContent>
           </ContainerNode.HeaderMenuDropdown>
         </ContainerNode.Header>
@@ -116,6 +119,11 @@ const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
             <ContainerNode.Replicas replicas={data.states.replicas} />
           </ContainerNode.ResourceGroup>
         </ContainerNode.Footer>
+        <ContainerNode.DeleteDialog
+          name={data.states.name}
+          onOpenChange={setDeleteDialogOpen}
+          open={deleteDialogOpen}
+        />
       </ContainerNode.Shell>
       <Handle position={Position.Bottom} type="source" />
     </div>

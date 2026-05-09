@@ -12,8 +12,13 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import type { SyntheticEvent } from "react";
 
 const DELETE_TITLE = "Delete container?";
+
+function stopCanvasNodeClick(e: SyntheticEvent) {
+  e.stopPropagation();
+}
 
 function deleteDescriptionText(name: string) {
   return `This will permanently delete "${name}". This action cannot be undone.`;
@@ -91,13 +96,21 @@ export function ContainerNodeDeleteDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+          <AlertDialogCancel
+            className="text-xs"
+            onClick={stopCanvasNodeClick}
+            onPointerDown={stopCanvasNodeClick}
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             className="text-xs"
-            onClick={() => {
+            onClick={(event) => {
+              stopCanvasNodeClick(event);
               onConfirmDelete?.();
               onOpenChange(false);
             }}
+            onPointerDown={stopCanvasNodeClick}
             variant="destructive"
           >
             Delete

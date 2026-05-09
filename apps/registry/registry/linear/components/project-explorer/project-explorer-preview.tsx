@@ -38,7 +38,7 @@ export default function ProjectExplorerPreview() {
             }}
             states={{ projects: [...sampleProjects] }}
           >
-            <ProjectExplorer.Variant0 />
+            <ProjectExplorer.Variant1 />
           </ProjectExplorer.Root>
           {lastId ? (
             <p className="text-muted-foreground text-xs">
@@ -59,7 +59,7 @@ export default function ProjectExplorerPreview() {
             },
           }}
         >
-          <ProjectExplorer.Variant0 />
+          <ProjectExplorer.Variant1 />
         </ProjectExplorer.Root>
       </Preview>
     </PreviewWrapper>

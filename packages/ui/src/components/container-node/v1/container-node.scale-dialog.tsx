@@ -3,6 +3,7 @@
 import { Dialog, DialogContent } from "@workspace/ui/components/dialog";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { cn } from "@workspace/ui/lib/utils";
+import type { SyntheticEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface ContainerNodeScaleDialogPanelProps {
@@ -11,6 +12,10 @@ export interface ContainerNodeScaleDialogPanelProps {
   max: number;
   onDraftChange: (next: number) => void;
   onScale?: (nextReplicas: number) => void;
+}
+
+function stopCanvasNodeClick(e: SyntheticEvent) {
+  e.stopPropagation();
 }
 
 /** In-flow scale controls (no portal). Use in previews or custom layouts. */
@@ -96,6 +101,8 @@ export function ContainerNodeScaleDialog({
       <DialogContent
         className="gap-0 p-0 sm:max-w-sm"
         closeButtonClassName="top-2 right-2 size-5"
+        onClick={stopCanvasNodeClick}
+        onPointerDown={stopCanvasNodeClick}
       >
         <ContainerNodeScaleDialogPanel
           draft={draft}

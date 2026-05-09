@@ -24,6 +24,8 @@ export interface UseGithubDeployerOptions {
 
 export interface UseGithubDeployerResult {
   authLoading: boolean;
+  /** Clears the transcript deployer query flag without clearing chat messages. */
+  clearTranscriptUi: () => void;
   closeTranscriptDeployer: () => void;
   commitDeployToMessages: (repo: GithubDeployerRepo) => void;
   githubToken: string | undefined;
@@ -58,6 +60,10 @@ export function useGithubDeployer({
     Promise.resolve(setTranscriptDeployerOpen(false)).catch(() => undefined);
   }, [setTranscriptDeployerOpen]);
 
+  const clearTranscriptUi = useCallback(() => {
+    Promise.resolve(setTranscriptDeployerOpen(false)).catch(() => undefined);
+  }, [setTranscriptDeployerOpen]);
+
   const commitDeployToMessages = useCallback(
     (repo: GithubDeployerRepo) => {
       const spec = githubDeployerDeployedAguiSpec(repo);
@@ -89,6 +95,7 @@ export function useGithubDeployer({
 
   return {
     authLoading,
+    clearTranscriptUi,
     closeTranscriptDeployer,
     commitDeployToMessages,
     githubToken,

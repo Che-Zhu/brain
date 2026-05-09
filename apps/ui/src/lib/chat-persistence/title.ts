@@ -1,0 +1,95 @@
+import "server-only";
+
+import { generateText, type UIMessage } from "ai";
+
+type ChatTitleModel = Parameters<typeof generateText>[0]["model"];
+
+const SYSTEM_PROMPT =
+  "Reply with only a short conversation title (maximum 6 words). No quotation marks. No trailing period. Summarize the user's topic.";
+
+const LEADING_QUOTES = /^["'「『]+/;
+const TRAILING_QUOTES = /["'」』]+$/;
+const WHITESPACE_RUN = /\s+/g;
+const SPLIT_WORDS = /\s+/;
+
+const FIRST_USER_PROMPT_CHARS = 800;
+const TITLE_OUTPUT_TOKENS = 32;
+const MAX_TITLE_LEN = 80;
+const FALLBACK_WORDS = 8;
+const FALLBACK_HARD_LEN = 60;
+const FALLBACK_TRIM_LEN = 57;
+
+/** Date-stamped placeholder used until the AI title replaces it after the first turn. */
+export function placeholderThreadTitle(date = new Date()): string {
+  return `chat-${date.toISOString().slice(0, 10)}`;
+}
+
+function firstUserText(messages: UIMessage[]): string {
+  for (const m of messages) {
+    if (m.role !== "user" || !Array.isArray(m.parts)) {
+      continue;
+    }
+    for (const p of m.parts) {
+      if (
+        p &&
+        typeof p === "object" &&
+        "type" in p &&
+        p.type === "text" &&
+        "text" in p &&
+        typeof (p as { text: unknown }).text === "string"
+      ) {
+        const text = (p as { text: string }).text.trim();
+        if (text !== "") {
+          return text;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function fallbackTitle(firstUserMessage: string): string {
+  const words = firstUserMessage
+    .trim()
+    .split(SPLIT_WORDS)
+    .slice(0, FALLBACK_WORDS)
+    .join(" ");
+  const shortened =
+    words.length > FALLBACK_HARD_LEN
+      ? `${words.slice(0, FALLBACK_TRIM_LEN).trim()}…`
+      : words;
+  return shortened.trim() === "" ? "Chat" : shortened;
+}
+
+/**
+ * Concise title from the first user turn. Falls back to a heuristic if the model
+ * call fails so the caller never has to handle an error path.
+ */
+export async function deriveThreadTitle(input: {
+  languageModel: ChatTitleModel;
+  messages: UIMessage[];
+}): Promise<string> {
+  const first = firstUserText(input.messages);
+  if (first === "") {
+    return fallbackTitle("");
+  }
+  try {
+    const { text } = await generateText({
+      model: input.languageModel,
+      system: SYSTEM_PROMPT,
+      prompt: first.slice(0, FIRST_USER_PROMPT_CHARS),
+      maxOutputTokens: TITLE_OUTPUT_TOKENS,
+    });
+    const cleaned = text
+      .trim()
+      .replace(LEADING_QUOTES, "")
+      .replace(TRAILING_QUOTES, "")
+      .replace(WHITESPACE_RUN, " ");
+    if (cleaned !== "") {
+      return cleaned.slice(0, MAX_TITLE_LEN);
+    }
+  } catch (e) {
+    console.error("[chat-persistence] title generation failed:", e);
+  }
+  return fallbackTitle(first);
+}

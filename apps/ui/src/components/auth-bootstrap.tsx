@@ -1,7 +1,7 @@
 "use client";
 
 import { useHydrateAtoms } from "jotai/utils";
-import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 interface AuthBootstrapProps {
   serverEncodedKubeconfig: string;
@@ -29,15 +29,12 @@ export default function AuthBootstrap({
 
   // Dev env is an all-or-nothing override vs server: if any dev field is set,
   // never mix in server kubeconfig/namespace (no dev kubeconfig + server ns).
-  const hasDevOverride =
-    devEncodedKubeconfig !== "" || devNamespace !== "";
-  const kubeconfig = hasDevOverride
-    ? devEncodedKubeconfig
-    : fallbackKubeconfig;
+  const hasDevOverride = devEncodedKubeconfig !== "" || devNamespace !== "";
+  const kubeconfig = hasDevOverride ? devEncodedKubeconfig : fallbackKubeconfig;
   const namespace = hasDevOverride ? devNamespace : fallbackNamespace;
 
   useHydrateAtoms([
-    [encodedKubeconfigAtom, kubeconfig],
+    [kubeconfigAtom, kubeconfig],
     [namespaceAtom, namespace],
   ]);
 

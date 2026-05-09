@@ -4,6 +4,7 @@ import {
   AppShellView,
 } from "@/components/app-shell";
 import AuthBootstrap from "@/components/auth-bootstrap";
+import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
 import { fetchServerCredentials } from "@/lib/server-credentials";
 
 export default async function ProjectLayout({
@@ -22,7 +23,7 @@ export default async function ProjectLayout({
       />
       <AppShellSidebar />
       <AppShellView className="min-w-0 flex-1 basis-0">
-        {children}
+        <ProjectChatPaneLayout>{children}</ProjectChatPaneLayout>
       </AppShellView>
     </AppShellChrome>
   );

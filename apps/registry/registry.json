@@ -100,6 +100,11 @@
           "target": "components/container-node/v1/container-node.icon-toolbar.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/container-node/v1/container-node.variant1.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v1/container-node.variant1.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/container-node/v1/container-node.tsx",
           "type": "registry:component",
           "target": "components/container-node/v1/container-node.tsx"
@@ -130,9 +135,16 @@
       "name": "project-explorer",
       "type": "registry:ui",
       "title": "Project Explorer",
-      "description": "Projects list with header and rows showing name and created date",
+      "description": "Projects list with composable header (brand, search, new-project) and rows (rename / delete menu). Default preset: Variant1.",
       "dependencies": [],
-      "registryDependencies": [],
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "dialog",
+        "dropdown-menu",
+        "input",
+        "label"
+      ],
       "files": [
         {
           "path": "../../packages/ui/src/components/project-explorer/project-explorer.types.ts",
@@ -155,14 +167,24 @@
           "target": "components/project-explorer/project-explorer.layout.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.header.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.header.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/project-explorer/project-explorer.list.tsx",
           "type": "registry:component",
           "target": "components/project-explorer/project-explorer.list.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/project-explorer/project-explorer.variant0.tsx",
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.list-item.tsx",
           "type": "registry:component",
-          "target": "components/project-explorer/project-explorer.variant0.tsx"
+          "target": "components/project-explorer/project-explorer.list-item.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/project-explorer/project-explorer.variant1.tsx",
+          "type": "registry:component",
+          "target": "components/project-explorer/project-explorer.variant1.tsx"
         },
         {
           "path": "../../packages/ui/src/components/project-explorer/project-explorer.tsx",
@@ -208,6 +230,11 @@
           "path": "../../packages/ui/src/components/canvas/canvas.css",
           "type": "registry:component",
           "target": "components/canvas/canvas.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas/canvas.upper-right.tsx",
+          "type": "registry:component",
+          "target": "components/canvas/canvas.upper-right.tsx"
         },
         {
           "path": "../../packages/ui/src/components/canvas/canvas.tsx",

@@ -263,10 +263,18 @@ export const Index: RegistryIndex = {
     name: "project-explorer",
     title: "Project Explorer",
     description:
-      "Projects sidebar-style list: header and rows with name and created date",
+      "Composable project list: header (brand, search, new project), rows with row menu (rename / delete). Default preset is Variant1.",
     state: "coding",
     type: "registry:preview",
-    registryDependencies: ["preview"],
+    registryDependencies: [
+      "preview",
+      "button",
+      "dialog",
+      "dropdown-menu",
+      "alert-dialog",
+      "input",
+      "label",
+    ],
     files: [
       {
         path: "registry/linear/components/project-explorer/project-explorer-preview.tsx",

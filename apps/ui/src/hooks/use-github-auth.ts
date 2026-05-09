@@ -15,8 +15,8 @@ import {
   GHCR_CRED_SECRET_NAME,
   GHCR_CRED_TOKEN_KEY,
   GITHUB_OAUTH_CALLBACK_PATH,
-} from "@/lib/github-oauth/constants";
-import { encodedKubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+} from "@/lib/github-oauth/types";
+import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 /** True when GET k8s `secrets/ghcr-cred` succeeds in the current namespace (GHCR wired). */
 function isGhcrCredResponse(body: unknown): boolean {
@@ -93,7 +93,7 @@ export interface UseGithubAuthResult {
 }
 
 export function useGithubAuth(): UseGithubAuthResult {
-  const kubeconfig = useAtomValue(encodedKubeconfigAtom);
+  const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom).trim();
 
   const authHeader = useMemo((): Record<string, string> => {

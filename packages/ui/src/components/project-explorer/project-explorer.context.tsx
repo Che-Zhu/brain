@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
 import type {
   ProjectExplorerActions,
@@ -30,9 +36,16 @@ export function ProjectExplorerRoot({
   children?: ReactNode;
   states: ProjectExplorerStates;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const value = useMemo(
-    (): ProjectExplorerValue => ({ actions, states }),
-    [actions, states]
+    (): ProjectExplorerValue => ({
+      actions,
+      searchQuery,
+      setSearchQuery,
+      states,
+    }),
+    [actions, searchQuery, states]
   );
 
   return (

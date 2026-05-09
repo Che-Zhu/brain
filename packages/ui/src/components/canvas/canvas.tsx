@@ -18,6 +18,11 @@ import { useEffect, useMemo } from "react";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
+import {
+  CanvasUpperRight,
+  CanvasUpperRightAnchor,
+  CanvasUpperRightProvider,
+} from "./canvas.upper-right";
 import { useCanvas } from "./canvas.use";
 
 export interface CanvasFlowProps {
@@ -78,35 +83,30 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   };
 
   return (
-    <div className="relative h-full min-h-0 w-full min-w-0">
-      {meta.upperRight ? (
-        <div
-          className="pointer-events-auto absolute top-2 right-2 z-10 flex items-center gap-2"
-          data-slot="canvas-upper-right"
-        >
-          {meta.upperRight}
+    <CanvasUpperRightProvider>
+      <div className="relative h-full min-h-0 w-full min-w-0">
+        <CanvasUpperRightAnchor />
+        <div className="canvas-surface">
+          <ReactFlow
+            {...passThrough}
+            edges={edgesWithSelectionStyle}
+            edgeTypes={meta.edgeTypes}
+            nodes={nodes}
+            nodeTypes={meta.nodeTypes}
+            onEdgesChange={onEdgesChange}
+            onNodesChange={onNodesChange}
+          >
+            <Background
+              color="var(--color-canvas-dot)"
+              gap={[32, 41]}
+              size={1}
+              variant={BackgroundVariant.Dots}
+            />
+          </ReactFlow>
         </div>
-      ) : null}
-      <div className="canvas-surface">
-        <ReactFlow
-          {...passThrough}
-          edges={edgesWithSelectionStyle}
-          edgeTypes={meta.edgeTypes}
-          nodes={nodes}
-          nodeTypes={meta.nodeTypes}
-          onEdgesChange={onEdgesChange}
-          onNodesChange={onNodesChange}
-        >
-          <Background
-            color="var(--color-canvas-dot)"
-            gap={[32, 41]}
-            size={1}
-            variant={BackgroundVariant.Dots}
-          />
-        </ReactFlow>
+        {children}
       </div>
-      {children}
-    </div>
+    </CanvasUpperRightProvider>
   );
 }
 
@@ -132,6 +132,7 @@ export const Canvas = Object.assign(CanvasSurface, {
   Flow: CanvasSurface,
   Panel: CanvasPanel,
   Root: CanvasRoot,
+  UpperRight: CanvasUpperRight,
 });
 
 export type CanvasProps = CanvasRootProps;

@@ -8,6 +8,7 @@ import type { Node } from "@xyflow/react";
 import { X } from "lucide-react";
 
 import type { CanvasPanelProps } from "./canvas.types";
+import { useCanvasUpperRightContent } from "./canvas.upper-right";
 import { useCanvas } from "./canvas.use";
 
 /** Matches container header default subtitle when `kind` is omitted. */
@@ -41,6 +42,7 @@ function panelHeadingFromNode(selected: Node): { kind: string; title: string } {
 
 export function CanvasPanel({ children, className }: CanvasPanelProps) {
   const { actions, meta, state } = useCanvas();
+  const upperRight = useCanvasUpperRightContent();
 
   if (state.selectedNode == null) {
     return null;
@@ -55,11 +57,11 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
   return (
     <aside
       className={cn(
-        "canvas-panel pointer-events-auto absolute top-0 right-0 bottom-0 z-[20] flex w-[60%] min-w-0 flex-col bg-background/95 shadow-lg backdrop-blur-sm",
+        "canvas-panel pointer-events-auto absolute top-0 right-0 bottom-0 z-[20] flex w-full min-w-0 flex-col bg-background/95 shadow-lg backdrop-blur-sm",
         className
       )}
     >
-      <header className="flex shrink-0 flex-row flex-wrap items-center gap-2 border-border/60 border-b px-3 py-2">
+      <header className="flex shrink-0 flex-row flex-wrap items-center gap-2 border-border/60 border-b p-2">
         <div className="flex min-h-0 min-w-0 flex-1 items-center gap-2">
           <div
             aria-hidden
@@ -82,16 +84,19 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
             </div>
           </div>
         </div>
-        <Button
-          aria-label="Close panel"
-          className="size-7 shrink-0"
-          onClick={() => actions.onPanelClose()}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <X className="size-3.5" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            aria-label="Close panel"
+            className="size-7 shrink-0"
+            onClick={() => actions.onPanelClose()}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-3.5" />
+          </Button>
+          {upperRight}
+        </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2">
         {PanelBody == null ? children : <PanelBody node={selected} />}

@@ -9,9 +9,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
 import { type LucideIcon, MoreHorizontal, Trash2 } from "lucide-react";
-import { type ComponentProps, type SyntheticEvent, useState } from "react";
-
-import { ContainerNodeDeleteDialog } from "./container-node.delete-dialog";
+import type { ComponentProps, SyntheticEvent } from "react";
 
 /**
  * React Flow utility classes — required for controls inside custom nodes so pointer
@@ -78,6 +76,7 @@ export function ContainerNodeHeaderMenuItem({
   className,
   children,
   icon: Icon,
+  onClick,
   ...props
 }: ComponentProps<typeof DropdownMenuItem> & {
   /** Start / Restart: icon uses `text-theme-green` on hover / focus (label color unchanged). */
@@ -91,6 +90,10 @@ export function ContainerNodeHeaderMenuItem({
         accentHover === "positive" && HEADER_MENU_POSITIVE_ICON_HOVER,
         className
       )}
+      onClick={(event) => {
+        stopCanvasNodeClick(event);
+        onClick?.(event);
+      }}
       {...props}
     >
       {Icon == null ? (
@@ -105,33 +108,25 @@ export function ContainerNodeHeaderMenuItem({
   );
 }
 
-/** Destructive row that opens `DeleteDialog` — compose next to other `HeaderMenuItem`s. */
+/** Destructive row item — host opens `DeleteDialog` outside dropdown content. */
 export function ContainerNodeHeaderMenuDelete({
-  name,
   onConfirmDelete,
+  onRequestDelete,
 }: {
-  name: string;
   onConfirmDelete?: () => void;
+  onRequestDelete?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const requestDelete = onRequestDelete ?? onConfirmDelete;
 
   return (
-    <>
-      <ContainerNodeHeaderMenuItem
-        disabled={onConfirmDelete == null}
-        icon={Trash2}
-        onClick={() => setOpen(true)}
-        variant="destructive"
-      >
-        Delete
-      </ContainerNodeHeaderMenuItem>
-      <ContainerNodeDeleteDialog
-        name={name}
-        onConfirmDelete={onConfirmDelete}
-        onOpenChange={setOpen}
-        open={open}
-      />
-    </>
+    <ContainerNodeHeaderMenuItem
+      disabled={requestDelete == null}
+      icon={Trash2}
+      onClick={requestDelete}
+      variant="destructive"
+    >
+      Delete
+    </ContainerNodeHeaderMenuItem>
   );
 }
 

@@ -6,6 +6,7 @@ import { isToolUIPart } from "ai";
 import { Fragment, type ReactNode } from "react";
 
 import { ChatTool } from "./chat.tool";
+import { ChatToolInvocation } from "./chat.tool-invocation";
 
 export function renderChatPart({
   addToolApprovalResponse,
@@ -29,6 +30,17 @@ export function renderChatPart({
       <ChatTool
         addToolApprovalResponse={addToolApprovalResponse}
         key={`${partKeyPrefix}-tool`}
+        part={part}
+        partKeyPrefix={partKeyPrefix}
+      />
+    );
+  }
+
+  if (isToolUIPart(part)) {
+    return (
+      <ChatToolInvocation
+        addToolApprovalResponse={addToolApprovalResponse}
+        key={`${partKeyPrefix}-tool-inv`}
         part={part}
         partKeyPrefix={partKeyPrefix}
       />

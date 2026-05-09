@@ -54,13 +54,22 @@ export function projectsListToExplorerProjects(
   return items.map((item, index) => {
     const meta = item.metadata ?? {};
     const id = meta.uid ?? meta.name ?? `project-${index}`;
+    const resourceName =
+      typeof meta.name === "string" && meta.name !== "" ? meta.name : undefined;
+    const title = item.spec?.title?.trim();
     const name =
-      meta.name ??
-      item.spec?.title ??
-      (typeof id === "string" ? id : "Untitled");
+      title && title.length > 0
+        ? title
+        : (resourceName ??
+          (typeof id === "string" && id !== "" ? id : "Untitled"));
     const createdAt = meta.creationTimestamp ?? "";
     const specPublic = item.spec?.public;
-    const base: ProjectExplorerProject = { id, name, createdAt };
+    const base: ProjectExplorerProject = {
+      id,
+      name,
+      createdAt,
+      ...(resourceName === undefined ? {} : { resourceName }),
+    };
     if (specPublic === null || specPublic === undefined) {
       return base;
     }

@@ -7,9 +7,9 @@ import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import { unauthorized } from "next/navigation";
 
 /**
- * Replays the list request used by the preview route: `kind=aps` with project UID label
- * selector and `shareToken` in the query. The API returns 401 for invalid/malformed JWTs
- * and 403 for non-public / forbidden share access.
+ * Replays the list request used by the preview route: `kind=aps` with project UID
+ * label selector and `shareToken` in the query. The API returns 401 for
+ * invalid/malformed JWTs and 403 for non-public / forbidden share access.
  */
 export async function assertPreviewShareAuthorized(input: {
   namespace: string;
@@ -21,8 +21,7 @@ export async function assertPreviewShareAuthorized(input: {
     namespace: input.namespace,
     "label-selector": `${PROJECT_UID_LABEL}=${input.projectUid}`,
   });
-  const path = API_ROUTES.k8s.get as ApiRoute;
-  const url = new URL(ApiUrl(path));
+  const url = new URL(ApiUrl(API_ROUTES.k8s.get as ApiRoute));
   for (const [k, v] of Object.entries({
     ...getParams,
     shareToken: input.shareToken,
