@@ -1,0 +1,5 @@
+*
+!core/
+core/**/node_modules
+core/whodb
+core/cmd/whodb/build

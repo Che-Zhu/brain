@@ -460,6 +460,8 @@ spec:
                     uid: {{ $projectUid }}
           {{- end }}
 
+          ---
+
           apiVersion: example.crossplane.io/v1
           kind: DB
           metadata:
