@@ -15,11 +15,14 @@ const CONNECTION_SIDES = [
 
 export function CanvasNodeConnectionLayer() {
   return (
-    <>
+    <div
+      className="canvas-node-connection-layer pointer-events-none absolute"
+      data-slot="canvas-node-connection-layer"
+    >
       {CONNECTION_SIDES.map((side) => (
         <CanvasNodeConnectionButton key={side} side={side} />
       ))}
-    </>
+    </div>
   );
 }
 
@@ -36,7 +39,7 @@ export function CanvasNodeConnectionButton({
     <Button
       aria-label={`Connect from ${side}`}
       className={cn(
-        "nodrag nopan canvas-node-connection-button absolute flex size-5 cursor-pointer items-center justify-center p-0",
+        "nodrag nopan canvas-node-connection-button absolute flex size-2 cursor-pointer items-center justify-center rounded-full bg-zinc-50 p-0",
         className
       )}
       data-side={side}

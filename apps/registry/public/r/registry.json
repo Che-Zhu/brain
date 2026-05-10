@@ -210,7 +210,7 @@
       "name": "entry-node",
       "type": "registry:ui",
       "title": "Entry Node",
-      "description": "Entry domain node content composed with shared canvas node chrome",
+      "description": "Entry point node content composed with shared canvas node chrome",
       "dependencies": ["lucide-react"],
       "registryDependencies": ["button", "canvas-node"],
       "files": [
@@ -218,11 +218,6 @@
           "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",
           "type": "registry:lib",
           "target": "components/entry-node/entry-node.types.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.guards.ts",
-          "type": "registry:lib",
-          "target": "components/entry-node/entry-node.guards.ts"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.context.ts",
@@ -245,9 +240,19 @@
           "target": "components/entry-node/entry-node.content.tsx"
         },
         {
-          "path": "../../packages/ui/src/components/entry-node/entry-node.domain.tsx",
+          "path": "../../packages/ui/src/components/entry-node/entry-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/entry-node/entry-node.status.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.target.tsx",
           "type": "registry:component",
-          "target": "components/entry-node/entry-node.domain.tsx"
+          "target": "components/entry-node/entry-node.target.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.css",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.css"
         },
         {
           "path": "../../packages/ui/src/components/entry-node/index.ts",

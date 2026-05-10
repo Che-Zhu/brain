@@ -28,11 +28,6 @@ const YELLOW: StatusVisual = {
   dotClassName: "bg-yellow-500",
   pillClassName: "bg-yellow-500/30 text-zinc-50",
 };
-const GRAY_BREATHING: StatusVisual = {
-  breathing: true,
-  dotClassName: "bg-neutral-500",
-  pillClassName: "bg-neutral-500/30 text-zinc-50",
-};
 const GRAY_STATIC: StatusVisual = {
   breathing: false,
   dotClassName: "bg-neutral-500",
@@ -99,10 +94,8 @@ function getStatusVisual(tone: CanvasNodeStatusTone): StatusVisual {
     case "progressing":
       return BLUE;
     case "deleting":
-      return YELLOW;
-    case "stopping":
-      return GRAY_BREATHING;
     case "degraded":
+      return YELLOW;
     case "error":
     case "failed":
     case "inaccessible":
@@ -110,6 +103,7 @@ function getStatusVisual(tone: CanvasNodeStatusTone): StatusVisual {
       return RED;
     case "shutdown":
     case "stopped":
+    case "stopping":
     case "unknown":
       return GRAY_STATIC;
     default:
@@ -191,11 +185,12 @@ export function CanvasNodeStatus({
   status: CanvasNodeStatusData;
 }) {
   return (
-    <span className={cn("canvas-node-status min-w-0 shrink-0", className)}>
-      <CanvasNodeStatusPill
-        className="canvas-node-status-pill max-w-28"
-        status={status}
-      />
+    <span
+      className={cn(
+        "canvas-node-status flex size-8 shrink-0 items-center justify-center",
+        className
+      )}
+    >
       <CanvasNodeStatusDot
         className="canvas-node-status-dot"
         size="collapsed"

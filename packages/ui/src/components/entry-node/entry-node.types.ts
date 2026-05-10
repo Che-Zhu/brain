@@ -8,25 +8,31 @@ import type { ReactNode } from "react";
 
 export interface EntryNodeStates {
   name: string;
-  status?: CanvasNodeStatus;
 }
 
-export type EntryNodeDomainKey = "access" | "private" | "public";
+export interface EntryNodeAccessDomain {
+  label?: string;
+  value: string;
+}
 
-export interface EntryNodeDomain {
+export interface EntryNodeTarget {
+  id?: string;
   label: string;
   status?: CanvasNodeStatus;
   value: string;
 }
 
-export type EntryNodeDomains = Partial<
-  Record<EntryNodeDomainKey, EntryNodeDomain>
->;
+export type EntryNodeTargetKey = string;
 
-export type EntryNodeCopyDomainHandler = (
-  key: EntryNodeDomainKey,
-  value: string
+export type EntryNodeCopyTargetHandler = (
+  target: EntryNodeTarget,
+  index: number
 ) => Promise<void> | void;
+
+export type EntryNodeOpenTargetSettingsHandler = (
+  target: EntryNodeTarget,
+  index: number
+) => void;
 
 export type EntryNodeStartConnectionHandler = (
   side: CanvasNodeConnectionSide,
@@ -34,13 +40,15 @@ export type EntryNodeStartConnectionHandler = (
 ) => void;
 
 export interface EntryNodeState {
-  copiedDomainKey?: EntryNodeDomainKey | null;
-  domains?: EntryNodeDomains;
+  accessDomain?: EntryNodeAccessDomain;
+  copiedTargetKey?: EntryNodeTargetKey | null;
   states: EntryNodeStates;
+  targets?: EntryNodeTarget[];
 }
 
 export interface EntryNodeActions {
-  copyDomain: EntryNodeCopyDomainHandler;
+  copyTarget: EntryNodeCopyTargetHandler;
+  openTargetSettings?: EntryNodeOpenTargetSettingsHandler;
 }
 
 export interface EntryNodeMeta {
@@ -59,15 +67,17 @@ export interface EntryNodeProviderProps {
 }
 
 export interface EntryNodeRootProps {
+  accessDomain?: EntryNodeAccessDomain;
   children?: ReactNode;
-  copiedDomainKey?: EntryNodeDomainKey | null;
   copiedFeedbackMs?: number;
+  copiedTargetKey?: EntryNodeTargetKey | null;
   defaultExpanded?: boolean;
-  domains?: EntryNodeDomains;
   expanded?: boolean;
   interaction?: CanvasNodeInteractionState;
-  onCopyDomain?: EntryNodeCopyDomainHandler;
+  onCopyTarget?: EntryNodeCopyTargetHandler;
   onExpandedChange?: (expanded: boolean) => void;
+  onOpenTargetSettings?: EntryNodeOpenTargetSettingsHandler;
   onStartConnection?: EntryNodeStartConnectionHandler;
   states: EntryNodeStates;
+  targets?: EntryNodeTarget[];
 }

@@ -3,8 +3,9 @@
 import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
 import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
 import type {
-  EntryNodeDomains,
+  EntryNodeAccessDomain,
   EntryNodeStates,
+  EntryNodeTarget,
 } from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
@@ -12,8 +13,9 @@ import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
 import { memo, useMemo } from "react";
 
 interface CanvasEntryNodeData extends Record<string, unknown> {
-  domains: EntryNodeDomains;
+  accessDomain: EntryNodeAccessDomain;
   states: EntryNodeStates;
+  targets: EntryNodeTarget[];
 }
 
 const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
@@ -23,9 +25,10 @@ const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
 }: NodeProps<Node<CanvasEntryNodeData, "entryNode">>) {
   return (
     <EntryNode.Root
-      domains={data.domains}
+      accessDomain={data.accessDomain}
       interaction={{ dragging, selected }}
       states={data.states}
+      targets={data.targets}
     >
       <EntryNode.Content />
     </EntryNode.Root>
@@ -36,30 +39,24 @@ PreviewCanvasEntryNode.displayName = "PreviewCanvasEntryNode";
 
 const entryNodeStates: EntryNodeStates = {
   name: "orders.demo.sealos.run",
-  status: { label: "Accessible", tone: "accessible" },
 };
 
-const entryNodeDomains: EntryNodeDomains = {
-  access: {
-    label: "Access domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
-  private: {
-    label: "Private domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
-  public: {
-    label: "Public domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
+const accessDomain: EntryNodeAccessDomain = {
+  value: "orders.demo.sealos.run",
 };
+
+const targets: EntryNodeTarget[] = [
+  {
+    id: "public",
+    label: "Public Domain",
+    status: { label: "Accessible", tone: "accessible" },
+    value: "orders.demo.sealos.run",
+  },
+];
 
 const ENTRY_NODE_CANVAS_NODES: Node<CanvasEntryNodeData, "entryNode">[] = [
   {
-    data: { domains: entryNodeDomains, states: entryNodeStates },
+    data: { accessDomain, states: entryNodeStates, targets },
     id: "entry-node-1",
     position: { x: 220, y: 160 },
     type: "entryNode",

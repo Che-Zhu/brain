@@ -5,15 +5,16 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Router } from "lucide-react";
 
 import { useEntryNode } from "./entry-node.context";
-import { EntryNodeDomainList } from "./entry-node.domain";
-import type { EntryNodeDomain } from "./entry-node.types";
+import { resolveEntryNodeTargetStatus } from "./entry-node.status";
+import { EntryNodeTargetList } from "./entry-node.target";
+import type { EntryNodeAccessDomain } from "./entry-node.types";
 
 function getAccessDomain(
   fallbackName: string,
-  domain: EntryNodeDomain | undefined
+  accessDomain: EntryNodeAccessDomain | undefined
 ) {
   return (
-    domain ?? {
+    accessDomain ?? {
       label: "Access domain",
       value: fallbackName,
     }
@@ -22,19 +23,18 @@ function getAccessDomain(
 
 function useEntryNodeAccessDomain() {
   const {
-    state: { domains, states },
+    state: { accessDomain, states },
   } = useEntryNode();
 
-  return getAccessDomain(states.name, domains?.access);
+  return getAccessDomain(states.name, accessDomain);
 }
 
 function useEntryNodeResolvedStatus() {
   const {
-    state: { states },
+    state: { targets },
   } = useEntryNode();
-  const accessDomain = useEntryNodeAccessDomain();
 
-  return accessDomain.status ?? states.status ?? null;
+  return resolveEntryNodeTargetStatus(targets);
 }
 
 export function EntryNodeContent() {
@@ -47,7 +47,7 @@ export function EntryNodeContent() {
             <EntryNodeHeaderContent />
           </CanvasNode.Header>
           <CanvasNode.Body>
-            <EntryNodeDomainList />
+            <EntryNodeTargetList />
           </CanvasNode.Body>
         </CanvasNode.Surface>
       </CanvasNode.DragStateFrame>
@@ -59,7 +59,7 @@ export function EntryNodeContent() {
 export function EntryNodeHeaderContent({ className }: { className?: string }) {
   return (
     <div className={cn("canvas-node-header-content min-w-0 flex-1", className)}>
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-1.5">
         <EntryNodeAccess />
         <EntryNodeStatus />
       </div>
@@ -72,18 +72,20 @@ export function EntryNodeAccess({ className }: { className?: string }) {
   const Icon = Router;
 
   return (
-    <span className={cn("flex min-w-0 flex-1 flex-col", className)}>
-      <span className="flex min-w-0 items-center gap-2">
-        <Icon aria-hidden className="size-4 shrink-0 text-zinc-50" />
+    <span className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5">
+        <Icon aria-hidden className="size-4 text-zinc-50" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span
           className="min-w-0 truncate font-normal text-sm text-zinc-50 leading-5"
           title={accessDomain.value}
         >
           {accessDomain.value}
         </span>
-      </span>
-      <span className="canvas-node-header-secondary mt-1 min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
-        {accessDomain.label}
+        <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+          {accessDomain.label ?? "Access domain"}
+        </span>
       </span>
     </span>
   );
@@ -91,10 +93,6 @@ export function EntryNodeAccess({ className }: { className?: string }) {
 
 export function EntryNodeStatus({ className }: { className?: string }) {
   const status = useEntryNodeResolvedStatus();
-
-  if (!status) {
-    return null;
-  }
 
   return <CanvasNode.Status className={className} status={status} />;
 }

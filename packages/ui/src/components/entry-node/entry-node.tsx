@@ -1,42 +1,43 @@
 "use client";
 
+import "./entry-node.css";
+
 import {
   EntryNodeAccess,
   EntryNodeContent,
   EntryNodeHeaderContent,
   EntryNodeStatus,
 } from "./entry-node.content";
-import {
-  EntryNodeDomainList,
-  EntryNodeDomainSection,
-} from "./entry-node.domain";
 import { EntryNodeRoot } from "./entry-node.root";
+import { EntryNodeTargetList, EntryNodeTargetRow } from "./entry-node.target";
 
 // biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useEntryNode }`
 export { useEntryNode } from "./entry-node.context";
+export { resolveEntryNodeTargetStatus } from "./entry-node.status";
 export type {
+  EntryNodeAccessDomain,
   EntryNodeActions,
   EntryNodeContextValue,
-  EntryNodeCopyDomainHandler,
-  EntryNodeDomain,
-  EntryNodeDomainKey,
-  EntryNodeDomains,
+  EntryNodeCopyTargetHandler,
   EntryNodeMeta,
+  EntryNodeOpenTargetSettingsHandler,
   EntryNodeProviderProps,
   EntryNodeRootProps,
   EntryNodeStartConnectionHandler,
   EntryNodeState,
   EntryNodeStates,
+  EntryNodeTarget,
+  EntryNodeTargetKey,
 } from "./entry-node.types";
 
 export const EntryNode = {
   Access: EntryNodeAccess,
   Content: EntryNodeContent,
-  DomainList: EntryNodeDomainList,
-  DomainSection: EntryNodeDomainSection,
   HeaderContent: EntryNodeHeaderContent,
   Root: EntryNodeRoot,
   Status: EntryNodeStatus,
+  TargetList: EntryNodeTargetList,
+  TargetRow: EntryNodeTargetRow,
 } as const;
 
 const dn = (component: object, name: string) => {
@@ -48,5 +49,5 @@ dn(EntryNodeContent, "EntryNode.Content");
 dn(EntryNodeHeaderContent, "EntryNode.HeaderContent");
 dn(EntryNodeAccess, "EntryNode.Access");
 dn(EntryNodeStatus, "EntryNode.Status");
-dn(EntryNodeDomainList, "EntryNode.DomainList");
-dn(EntryNodeDomainSection, "EntryNode.DomainSection");
+dn(EntryNodeTargetList, "EntryNode.TargetList");
+dn(EntryNodeTargetRow, "EntryNode.TargetRow");

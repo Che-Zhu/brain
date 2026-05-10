@@ -6,8 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EntryNodeProvider } from "./entry-node.provider";
 import type {
   EntryNodeContextValue,
-  EntryNodeDomainKey,
   EntryNodeRootProps,
+  EntryNodeTarget,
+  EntryNodeTargetKey,
 } from "./entry-node.types";
 
 const DEFAULT_COPIED_FEEDBACK_MS = 1200;
@@ -21,22 +22,24 @@ async function copyTextToClipboard(value: string) {
 }
 
 export function EntryNodeRoot({
+  accessDomain,
   children,
-  copiedDomainKey,
   copiedFeedbackMs = DEFAULT_COPIED_FEEDBACK_MS,
+  copiedTargetKey,
   defaultExpanded,
-  domains,
   expanded,
   interaction,
-  onCopyDomain,
+  onCopyTarget,
   onExpandedChange,
+  onOpenTargetSettings,
   onStartConnection,
   states,
+  targets,
 }: EntryNodeRootProps) {
-  const [internalCopiedDomainKey, setInternalCopiedDomainKey] =
-    useState<EntryNodeDomainKey | null>(null);
+  const [internalCopiedTargetKey, setInternalCopiedTargetKey] =
+    useState<EntryNodeTargetKey | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const copiedDomainControlled = copiedDomainKey !== undefined;
+  const copiedTargetControlled = copiedTargetKey !== undefined;
 
   useEffect(
     () => () => {
@@ -47,58 +50,62 @@ export function EntryNodeRoot({
     []
   );
 
-  const copyDomain = useCallback(
-    async (key: EntryNodeDomainKey, domainValue: string) => {
-      if (!domainValue) {
+  const copyTarget = useCallback(
+    async (target: EntryNodeTarget, index: number) => {
+      if (!target.value) {
         return;
       }
 
-      if (onCopyDomain) {
-        await onCopyDomain(key, domainValue);
+      if (onCopyTarget) {
+        await onCopyTarget(target, index);
       } else {
-        await copyTextToClipboard(domainValue);
+        await copyTextToClipboard(target.value);
       }
 
-      if (!copiedDomainControlled) {
-        setInternalCopiedDomainKey(key);
+      if (!copiedTargetControlled) {
+        setInternalCopiedTargetKey(target.id ?? String(index));
 
         if (resetTimerRef.current) {
           clearTimeout(resetTimerRef.current);
         }
 
         resetTimerRef.current = setTimeout(() => {
-          setInternalCopiedDomainKey(null);
+          setInternalCopiedTargetKey(null);
           resetTimerRef.current = null;
         }, copiedFeedbackMs);
       }
     },
-    [copiedDomainControlled, copiedFeedbackMs, onCopyDomain]
+    [copiedFeedbackMs, copiedTargetControlled, onCopyTarget]
   );
 
   const value = useMemo(
     (): EntryNodeContextValue => ({
       actions: {
-        copyDomain,
+        copyTarget,
+        openTargetSettings: onOpenTargetSettings,
       },
       meta: {
         copiedFeedbackMs,
       },
       state: {
-        copiedDomainKey: copiedDomainControlled
-          ? copiedDomainKey
-          : internalCopiedDomainKey,
-        domains,
+        accessDomain,
+        copiedTargetKey: copiedTargetControlled
+          ? copiedTargetKey
+          : internalCopiedTargetKey,
         states,
+        targets,
       },
     }),
     [
-      copiedDomainControlled,
-      copiedDomainKey,
       copiedFeedbackMs,
-      copyDomain,
-      domains,
-      internalCopiedDomainKey,
+      copiedTargetControlled,
+      copiedTargetKey,
+      copyTarget,
+      accessDomain,
+      internalCopiedTargetKey,
+      onOpenTargetSettings,
       states,
+      targets,
     ]
   );
 

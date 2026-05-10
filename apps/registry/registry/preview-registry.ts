@@ -170,7 +170,8 @@ export const Index: RegistryIndex = {
     group: "components",
     name: "entry-node",
     title: "Entry Node",
-    description: "Collapsed entry node status badge with local status colours.",
+    description:
+      "Entry point node canvas states with access-domain header and target rows.",
     state: "done",
     type: "registry:preview",
     registryDependencies: ["preview"],

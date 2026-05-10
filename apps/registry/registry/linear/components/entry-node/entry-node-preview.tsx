@@ -1,141 +1,196 @@
 "use client";
 
 import type {
-  EntryNodeDomains,
+  EntryNodeAccessDomain,
   EntryNodeStates,
+  EntryNodeTarget,
+  EntryNodeTargetKey,
 } from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
 
-const accessible: EntryNodeStates = {
+const entryNodeStates: EntryNodeStates = {
   name: "orders.demo.sealos.run",
-  status: { label: "Accessible", tone: "accessible" },
 };
 
-const statusSamples: EntryNodeStates[] = [
+const accessDomain: EntryNodeAccessDomain = {
+  value: "orders.demo.sealos.run",
+};
+
+const accessibleTarget: EntryNodeTarget = {
+  id: "public",
+  label: "Public Domain",
+  status: { label: "Accessible", tone: "accessible" },
+  value: "orders.demo.sealos.run",
+};
+
+const secondAccessibleTarget: EntryNodeTarget = {
+  id: "public-secondary",
+  label: "Public Domain",
+  status: { label: "Accessible", tone: "accessible" },
+  value: "api.orders.demo.sealos.run",
+};
+
+const progressingTarget: EntryNodeTarget = {
+  id: "progressing",
+  label: "Public Domain",
+  status: { label: "Progressing", tone: "progressing" },
+  value: "orders-preview.demo.sealos.run",
+};
+
+const failedTarget: EntryNodeTarget = {
+  id: "failed",
+  label: "Public Domain",
+  status: { label: "Inaccessible", tone: "inaccessible" },
+  value: "orders-failed.demo.sealos.run",
+};
+
+const longAccessDomain: EntryNodeAccessDomain = {
+  value:
+    "orders-public-domain-with-a-very-long-entry-node-name.demo.sealos.run",
+};
+
+const longTarget: EntryNodeTarget = {
+  id: "long-target",
+  label: "Public Domain",
+  status: { label: "Accessible", tone: "accessible" },
+  value: "orders-public-domain-with-a-very-long-target-value.demo.sealos.run",
+};
+
+const aggregateSamples: {
+  title: string;
+  targets: EntryNodeTarget[];
+}[] = [
+  { title: "Not configured", targets: [] },
+  { title: "Accessible", targets: [accessibleTarget, secondAccessibleTarget] },
   {
-    name: "Running",
-    status: { label: "Running", tone: "running" },
+    title: "Progressing",
+    targets: [progressingTarget, { ...progressingTarget, id: "progressing-2" }],
   },
+  { title: "Degraded", targets: [accessibleTarget, failedTarget] },
+  { title: "Inaccessible", targets: [failedTarget] },
   {
-    name: "Deleting",
-    status: { label: "Deleting", tone: "deleting" },
-  },
-  {
-    name: "Stopping",
-    status: { label: "Stopping", tone: "stopping" },
-  },
-  {
-    name: "Stopped",
-    status: { label: "Stopped", tone: "stopped" },
-  },
-  {
-    name: "Accessible",
-    status: { label: "Accessible", tone: "accessible" },
-  },
-  {
-    name: "Pending",
-    status: { label: "Pending", tone: "pending" },
+    title: "Missing status",
+    targets: [{ id: "missing", label: "Public Domain", value: "pending" }],
   },
 ];
 
-const defaultDomains: EntryNodeDomains = {
-  access: {
-    label: "Access domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
-  private: {
-    label: "Private domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
-  public: {
-    label: "Public domain",
-    status: { label: "Accessible", tone: "accessible" },
-    value: "orders.demo.sealos.run",
-  },
-};
-
 function PreviewSurface({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-28 items-center justify-center bg-canvas-surface p-6">
+    <div className="flex min-h-36 items-center justify-center bg-canvas-surface p-6">
       {children}
     </div>
   );
 }
 
 function EntryNodeSample({
+  access = accessDomain,
+  copiedTargetKey,
   defaultExpanded = false,
   dragging,
   selected,
-  states,
+  targets = [accessibleTarget],
 }: {
+  access?: EntryNodeAccessDomain;
+  copiedTargetKey?: EntryNodeTargetKey | null;
   defaultExpanded?: boolean;
   dragging?: boolean;
   selected?: boolean;
-  states: EntryNodeStates;
+  targets?: EntryNodeTarget[];
 }) {
   return (
     <EntryNode.Root
+      accessDomain={access}
+      copiedTargetKey={copiedTargetKey}
       defaultExpanded={defaultExpanded}
-      domains={defaultDomains}
       interaction={{ dragging, selected }}
-      states={states}
+      onOpenTargetSettings={() => undefined}
+      states={entryNodeStates}
+      targets={targets}
     >
       <EntryNode.Content />
     </EntryNode.Root>
   );
 }
 
-function DragSample() {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <EntryNodeSample dragging states={accessible} />
-      <span className="text-muted-foreground text-xs">fixed stroke</span>
-    </div>
-  );
-}
-
 export default function EntryNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
-      <Preview title="Collapsed card">
+      <Preview title="Collapsed default">
         <PreviewSurface>
-          <EntryNodeSample states={accessible} />
+          <EntryNodeSample />
         </PreviewSurface>
       </Preview>
-      <Preview title="Selected card">
+      <Preview title="Collapsed selected">
         <PreviewSurface>
-          <EntryNodeSample selected states={accessible} />
+          <EntryNodeSample selected />
         </PreviewSurface>
       </Preview>
-      <Preview title="Expanded card">
+      <Preview title="Expanded one target">
         <PreviewSurface>
-          <EntryNodeSample defaultExpanded states={accessible} />
+          <EntryNodeSample defaultExpanded />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Drag stroke">
-        <PreviewSurface>
-          <DragSample />
-        </PreviewSurface>
-      </Preview>
-      <Preview title="Long name truncation">
+      <Preview title="Expanded two targets">
         <PreviewSurface>
           <EntryNodeSample
-            states={{
-              name: "orders-public-domain-with-a-very-long-entry-node-name",
-              status: { label: "Accessible", tone: "accessible" },
-            }}
+            defaultExpanded
+            targets={[accessibleTarget, secondAccessibleTarget]}
           />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Status colours">
+      <Preview title="Scrollable targets">
         <PreviewSurface>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {statusSamples.map((states) => (
-              <EntryNodeSample key={states.name} states={states} />
+          <EntryNodeSample
+            defaultExpanded
+            targets={[
+              accessibleTarget,
+              secondAccessibleTarget,
+              progressingTarget,
+              failedTarget,
+            ]}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Empty targets">
+        <PreviewSurface>
+          <EntryNodeSample defaultExpanded targets={[]} />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Copied feedback">
+        <PreviewSurface>
+          <EntryNodeSample
+            copiedTargetKey="public"
+            defaultExpanded
+            targets={[accessibleTarget, secondAccessibleTarget]}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Drag visual">
+        <PreviewSurface>
+          <EntryNodeSample defaultExpanded dragging />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Long values">
+        <PreviewSurface>
+          <EntryNodeSample
+            access={longAccessDomain}
+            defaultExpanded
+            targets={[longTarget]}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview className="lg:col-span-2" title="Aggregate status">
+        <PreviewSurface>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {aggregateSamples.map((sample) => (
+              <div className="flex flex-col gap-2" key={sample.title}>
+                <EntryNodeSample targets={sample.targets} />
+                <span className="text-muted-foreground text-xs">
+                  {sample.title}
+                </span>
+              </div>
             ))}
           </div>
         </PreviewSurface>

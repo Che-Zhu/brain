@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { CanvasNodeProvider } from "./canvas-node.provider";
 import type {
@@ -47,12 +47,6 @@ export function CanvasNodeRoot({
     },
     [onStartConnection]
   );
-
-  useEffect(() => {
-    if (interaction?.selected && !resolvedExpanded) {
-      expand();
-    }
-  }, [expand, interaction?.selected, resolvedExpanded]);
 
   const value = useMemo(
     (): CanvasNodeContextValue => ({
