@@ -14,15 +14,15 @@ export function CanvasNodeDragFrame({
   className?: string;
   dragging?: boolean;
 }) {
-  if (!dragging) {
-    return <>{children}</>;
-  }
-
   return (
     <div
-      className={cn("canvas-node-drag-frame inline-flex rounded-xl", className)}
-      data-dragging="true"
-      data-slot="canvas-node-drag-frame"
+      className={cn(
+        "canvas-node-card-frame inline-flex rounded-xl",
+        dragging && "canvas-node-drag-frame",
+        className
+      )}
+      data-dragging={dragging || undefined}
+      data-slot="canvas-node-card-frame"
     >
       {children}
     </div>

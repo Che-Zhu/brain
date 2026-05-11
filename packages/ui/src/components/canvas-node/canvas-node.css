@@ -4,12 +4,7 @@
     var(--color-white) 4.5%,
     transparent
   );
-  --canvas-node-surface-interaction-underlay: color-mix(
-    in oklab,
-    var(--color-zinc-950) 20%,
-    transparent
-  );
-  --canvas-node-surface-underlay: transparent;
+  --canvas-node-surface-active-bg: transparent;
   --canvas-node-card-width: calc(var(--spacing) * 66.75);
   --canvas-node-card-height-collapsed: calc(var(--spacing) * 15.5);
   --canvas-node-control-size: calc(var(--spacing) * 8);
@@ -30,22 +25,13 @@
   transition: min-height 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.canvas-node-hover-surface {
-  --canvas-node-surface-underlay: transparent;
-}
-
-.canvas-node-frame:not([data-dragging]):is(
+.canvas-node-frame:is(
     :hover,
     [data-hover-intent],
+    [data-dragging],
     [data-selected]
-  )
-  .canvas-node-hover-surface {
-  --canvas-node-surface-underlay: var(
-    --canvas-node-surface-interaction-underlay
-  );
-  box-shadow:
-    -1px -1px 6px 0 color-mix(in oklab, var(--color-white) 4.5%, transparent),
-    1px 1px 6px 0 color-mix(in oklab, var(--color-white) 4.5%, transparent);
+  ) {
+  --canvas-node-surface-active-bg: rgb(9 9 11 / 0.2);
 }
 
 .canvas-node-surface {
@@ -61,12 +47,16 @@
     ),
     linear-gradient(
       90deg,
-      var(--canvas-node-surface-underlay) 0%,
-      var(--canvas-node-surface-underlay) 100%
+      var(--canvas-node-surface-active-bg) 0%,
+      var(--canvas-node-surface-active-bg) 100%
     );
   transition:
     background 150ms ease-out,
-    box-shadow 150ms ease-out;
+    border-color 150ms ease-out;
+}
+
+.canvas-node-frame:is([data-dragging], [data-selected]) .canvas-node-surface {
+  border-color: var(--color-blue-400);
 }
 
 .canvas-node-header {
@@ -126,8 +116,7 @@
 
 .canvas-node-frame[data-state="expanded"]:not([data-dragging]):is(
     :hover,
-    [data-hover-intent],
-    [data-selected]
+    [data-hover-intent]
   )
   .canvas-node-connection-button {
   pointer-events: auto;
@@ -158,13 +147,34 @@
   transform: translateY(-50%);
 }
 
-.canvas-node-drag-frame {
+.canvas-node-card-frame {
   position: relative;
   grid-row: 1;
   grid-column: 3;
 }
 
-.canvas-node-drag-frame::before {
+.canvas-node-card-frame::before {
+  position: absolute;
+  inset: calc(var(--spacing) * -1);
+  pointer-events: none;
+  content: "";
+  background: var(--canvas-node-surface-base);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.canvas-node-frame:is(
+    :hover,
+    [data-hover-intent],
+    [data-dragging],
+    [data-selected]
+  )
+  .canvas-node-card-frame::before {
+  opacity: 1;
+}
+
+.canvas-node-drag-frame::after {
   --canvas-node-drag-stroke: color-mix(
     in oklab,
     var(--color-white) 15%,
@@ -237,8 +247,6 @@
 }
 
 .canvas-node-expand-button:hover {
-  --canvas-node-expand-underlay: var(
-    --canvas-node-surface-interaction-underlay
-  );
+  --canvas-node-expand-underlay: var(--canvas-node-surface-active-bg);
   color: var(--color-zinc-50);
 }
