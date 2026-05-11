@@ -50,32 +50,41 @@ export function EntryNodeRoot({
     []
   );
 
+  const showCopiedFeedback = useCallback(
+    (target: EntryNodeTarget, index: number) => {
+      if (copiedTargetControlled) {
+        return;
+      }
+
+      setInternalCopiedTargetKey(target.id ?? String(index));
+
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current);
+      }
+
+      resetTimerRef.current = setTimeout(() => {
+        setInternalCopiedTargetKey(null);
+        resetTimerRef.current = null;
+      }, copiedFeedbackMs);
+    },
+    [copiedFeedbackMs, copiedTargetControlled]
+  );
+
   const copyTarget = useCallback(
     async (target: EntryNodeTarget, index: number) => {
       if (!target.value) {
         return;
       }
 
+      showCopiedFeedback(target, index);
+
       if (onCopyTarget) {
         await onCopyTarget(target, index);
       } else {
         await copyTextToClipboard(target.value);
       }
-
-      if (!copiedTargetControlled) {
-        setInternalCopiedTargetKey(target.id ?? String(index));
-
-        if (resetTimerRef.current) {
-          clearTimeout(resetTimerRef.current);
-        }
-
-        resetTimerRef.current = setTimeout(() => {
-          setInternalCopiedTargetKey(null);
-          resetTimerRef.current = null;
-        }, copiedFeedbackMs);
-      }
     },
-    [copiedFeedbackMs, copiedTargetControlled, onCopyTarget]
+    [onCopyTarget, showCopiedFeedback]
   );
 
   const value = useMemo(

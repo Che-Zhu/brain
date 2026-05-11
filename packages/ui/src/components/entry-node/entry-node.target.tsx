@@ -71,38 +71,47 @@ export function EntryNodeTargetRow({
     state: { copiedTargetKey },
   } = useEntryNode();
   const copied = copiedTargetKey === getTargetKey(target, index);
+  const copyTarget = () => {
+    Promise.resolve(actions.copyTarget(target, index)).catch(() => undefined);
+  };
 
   return (
     <section
       className={cn(
-        "group/target entry-node-target-row flex min-w-0 items-start gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors hover:bg-zinc-950/30",
+        "group/target entry-node-target-row relative flex min-w-0 items-start gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
         className
       )}
       data-slot="entry-node-target-row"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <button
+        aria-label={`Copy ${target.label} ${target.value}`}
+        className="nodrag nopan entry-node-target-copy-hitarea absolute inset-0 z-0 cursor-pointer rounded-lg focus-visible:outline-none"
+        data-slot="entry-node-target-copy"
+        onClick={(event) => {
+          event.stopPropagation();
+          copyTarget();
+        }}
+        onDoubleClick={stopNodeControlEvent}
+        onKeyDown={stopNodeControlEvent}
+        onPointerDown={stopNodeControlEvent}
+        title={target.value}
+        type="button"
+      />
+      <div
+        aria-hidden
+        className="entry-node-target-content pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-2"
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           <CanvasNode.StatusDot size="small" status={target.status} />
           <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
             {target.label}
           </span>
         </div>
-        <Button
-          className="group/copy flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-md border-0 bg-transparent px-0 py-1.5 text-left font-normal text-xs text-zinc-50 leading-4 shadow-none transition-colors hover:bg-transparent hover:text-zinc-50 focus-visible:bg-white/5 data-[copied=true]:bg-transparent"
+        <span
+          className="flex h-7 w-full min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs text-zinc-50 leading-4"
           data-copied={copied ? "true" : undefined}
-          data-slot="entry-node-target-copy"
-          onClick={(event) => {
-            event.stopPropagation();
-            Promise.resolve(actions.copyTarget(target, index)).catch(
-              () => undefined
-            );
-          }}
-          onDoubleClick={stopNodeControlEvent}
-          onPointerDown={stopNodeControlEvent}
-          size={null}
+          data-slot="entry-node-target-value"
           title={target.value}
-          type="button"
-          variant={null}
         >
           <span className="min-w-0 truncate">{target.value}</span>
           {copied ? (
@@ -110,20 +119,21 @@ export function EntryNodeTargetRow({
           ) : (
             <Copy
               aria-hidden
-              className="size-4 shrink-0 opacity-0 transition-opacity group-hover/target:opacity-100 group-focus-visible/copy:opacity-100"
+              className="entry-node-target-copy-icon size-4 shrink-0 opacity-0 transition-opacity group-hover/target:opacity-100"
             />
           )}
-        </Button>
+        </span>
       </div>
       <Button
         aria-label={`Open settings for ${target.label}`}
-        className="nodrag nopan flex size-8 shrink-0 items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:bg-zinc-950/30 hover:text-zinc-50 focus-visible:bg-zinc-950/30"
+        className="nodrag nopan entry-node-target-settings pointer-events-auto relative z-20 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
         data-slot="entry-node-target-settings"
         onClick={(event) => {
           event.stopPropagation();
           actions.openTargetSettings?.(target, index);
         }}
         onDoubleClick={stopNodeControlEvent}
+        onKeyDown={stopNodeControlEvent}
         onPointerDown={stopNodeControlEvent}
         size={null}
         title={`Open settings for ${target.label}`}
