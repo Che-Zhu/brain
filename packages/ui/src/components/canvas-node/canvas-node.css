@@ -193,6 +193,16 @@
       var(--canvas-node-drag-stroke-clear) 18%
     ),
     linear-gradient(
+      135deg,
+      var(--canvas-node-drag-stroke) 0%,
+      var(--canvas-node-drag-stroke-clear) 18%
+    ),
+    linear-gradient(
+      315deg,
+      var(--canvas-node-drag-stroke) 0%,
+      var(--canvas-node-drag-stroke-clear) 18%
+    ),
+    linear-gradient(
       315deg,
       var(--canvas-node-drag-stroke) 0%,
       var(--canvas-node-drag-stroke-clear) 18%
