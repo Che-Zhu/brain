@@ -73,6 +73,9 @@ const QUICK_ACTION_ITEMS = [
   label: string;
 }[];
 
+const DATABASE_NODE_MENU_ALIGN_OFFSET = -10;
+const DATABASE_NODE_MENU_SIDE_OFFSET = 14;
+
 interface LifecycleActionItem {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   key: DatabaseNodeLifecycleActionKey;
@@ -574,7 +577,7 @@ function DatabaseNodeHeaderMenu() {
             aria-label="Open database actions"
             className={cn(
               RF_CONTROL_CLASS,
-              "database-node-menu-trigger flex size-8 shrink-0 items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
+              "database-node-menu-trigger flex size-8 shrink-0 items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50 aria-expanded:bg-white/15 data-popup-open:bg-white/15"
             )}
             onClick={stopNodeControlEvent}
             size={null}
@@ -586,11 +589,14 @@ function DatabaseNodeHeaderMenu() {
         <Ellipsis aria-hidden className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align="start"
+        alignOffset={DATABASE_NODE_MENU_ALIGN_OFFSET}
         className={cn(
           RF_CONTROL_CLASS,
-          "database-node-menu-content w-38 rounded-md border-0 bg-white/5 p-1 shadow-none ring-1 ring-white/10"
+          "database-node-menu-content w-38 min-w-38 rounded-md border-0 bg-white/5 p-1 text-zinc-50 shadow-none ring-1 ring-white/10 ring-inset"
         )}
+        side="right"
+        sideOffset={DATABASE_NODE_MENU_SIDE_OFFSET}
       >
         {LIFECYCLE_ACTION_ITEMS.map((item) => {
           const action = lifecycleActions?.[item.key];
@@ -605,6 +611,7 @@ function DatabaseNodeHeaderMenu() {
                 item.variant === "destructive" &&
                   "database-node-menu-item-danger"
               )}
+              data-lifecycle-action={item.key}
               disabled={disabled}
               key={item.key}
               onClick={(event) => {
@@ -613,9 +620,9 @@ function DatabaseNodeHeaderMenu() {
               }}
             >
               {action?.loading ? (
-                <Spinner className="size-3.5" />
+                <Spinner className="size-4" />
               ) : (
-                <Icon aria-hidden className="size-3.5" />
+                <Icon aria-hidden className="size-4" />
               )}
               {item.label}
             </DropdownMenuItem>
