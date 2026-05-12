@@ -34,6 +34,13 @@ export function CanvasNodeExpandButton({ className }: { className?: string }) {
       onPointerDown={(event) => {
         event.stopPropagation();
       }}
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse" || meta.expanded) {
+          return;
+        }
+
+        actions.expand();
+      }}
       size={null}
       type="button"
       variant={null}

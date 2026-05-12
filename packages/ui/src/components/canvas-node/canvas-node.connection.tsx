@@ -2,6 +2,7 @@
 
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { Plus } from "lucide-react";
 
 import { useCanvasNode } from "./canvas-node.context";
 import type { CanvasNodeConnectionSide } from "./canvas-node.types";
@@ -26,6 +27,23 @@ export function CanvasNodeConnectionLayer() {
   );
 }
 
+function setFrameHoverSide(
+  target: EventTarget,
+  side: CanvasNodeConnectionSide | null
+) {
+  const frame = (target as HTMLElement).closest(
+    '[data-slot="canvas-node-frame"]'
+  );
+  if (!(frame instanceof HTMLElement)) {
+    return;
+  }
+  if (side) {
+    frame.dataset.hoverSide = side;
+  } else {
+    delete frame.dataset.hoverSide;
+  }
+}
+
 export function CanvasNodeConnectionButton({
   className,
   side,
@@ -39,7 +57,7 @@ export function CanvasNodeConnectionButton({
     <Button
       aria-label={`Connect from ${side}`}
       className={cn(
-        "nodrag nopan canvas-node-connection-button absolute flex size-2 cursor-pointer items-center justify-center rounded-full bg-zinc-50 p-0",
+        "nodrag nopan canvas-node-connection-button absolute flex cursor-pointer items-center justify-center rounded-full p-0",
         className
       )}
       data-side={side}
@@ -47,10 +65,22 @@ export function CanvasNodeConnectionButton({
       onPointerDown={(event) => {
         actions.startConnection?.(side, event);
       }}
+      onPointerEnter={(event) => {
+        setFrameHoverSide(event.currentTarget, side);
+      }}
+      onPointerLeave={(event) => {
+        setFrameHoverSide(event.currentTarget, null);
+      }}
       size={null}
       tabIndex={-1}
       type="button"
       variant={null}
-    />
+    >
+      <Plus
+        aria-hidden
+        className="canvas-node-connection-icon pointer-events-none"
+        size={10}
+      />
+    </Button>
   );
 }
