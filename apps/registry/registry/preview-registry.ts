@@ -210,6 +210,51 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/database-node": {
+    style: "linear",
+    group: "components",
+    name: "database-node",
+    title: "Database Node",
+    description:
+      "Managed database canvas node states with connection controls, quick actions, and footer metrics.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "dropdown-menu", "switch"],
+    files: [
+      {
+        path: "registry/linear/components/database-node/database-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/database-node/database-node-preview"),
+  },
+
+  "linear/components/database-node-canvas": {
+    style: "linear",
+    group: "components",
+    name: "database-node-canvas",
+    title: "Database Node Canvas",
+    description: "Dedicated React Flow canvas preview for the database node.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "canvas", "database-node"],
+    files: [
+      {
+        path: "registry/linear/components/database-node-canvas/database-node-canvas-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/database-node-canvas/database-node-canvas-preview"
+      ),
+  },
+
   "linear/components/project-explorer": {
     style: "linear",
     group: "components",

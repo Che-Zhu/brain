@@ -12,7 +12,11 @@ import {
 } from "./canvas-node.drag-frame";
 import { CanvasNodeExpandButton } from "./canvas-node.expand-button";
 import { CanvasNodeFrame } from "./canvas-node.frame";
-import { CanvasNodeBody, CanvasNodeHeader } from "./canvas-node.layout";
+import {
+  CanvasNodeBody,
+  CanvasNodeFooter,
+  CanvasNodeHeader,
+} from "./canvas-node.layout";
 import { CanvasNodeRoot } from "./canvas-node.root";
 import {
   CanvasNodeStatus,
@@ -43,6 +47,7 @@ export const CanvasNode = {
   DragStateFrame: CanvasNodeDragStateFrame,
   ExpandButton: CanvasNodeExpandButton,
   Frame: CanvasNodeFrame,
+  Footer: CanvasNodeFooter,
   Header: CanvasNodeHeader,
   Root: CanvasNodeRoot,
   Status: CanvasNodeStatus,
@@ -60,6 +65,7 @@ dn(CanvasNodeFrame, "CanvasNode.Frame");
 dn(CanvasNodeSurface, "CanvasNode.Surface");
 dn(CanvasNodeHeader, "CanvasNode.Header");
 dn(CanvasNodeBody, "CanvasNode.Body");
+dn(CanvasNodeFooter, "CanvasNode.Footer");
 dn(CanvasNodeConnectionLayer, "CanvasNode.ConnectionLayer");
 dn(CanvasNodeConnectionButton, "CanvasNode.ConnectionButton");
 dn(CanvasNodeExpandButton, "CanvasNode.ExpandButton");

@@ -127,6 +127,13 @@
   padding-bottom: calc(var(--spacing) * 2.5);
 }
 
+.canvas-node-footer {
+  min-height: calc(var(--spacing) * 10);
+  padding: calc(var(--spacing) * 2.5);
+  border-top: 0.5px solid
+    color-mix(in oklab, var(--color-white) 10%, transparent);
+}
+
 .canvas-node-connection-layer {
   top: 0;
   bottom: 0;

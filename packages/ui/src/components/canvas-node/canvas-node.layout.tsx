@@ -34,3 +34,19 @@ export function CanvasNodeBody({
     </div>
   );
 }
+
+export function CanvasNodeFooter({
+  className,
+  ...props
+}: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "canvas-node-footer flex w-full min-w-0 items-center justify-between font-normal text-zinc-50",
+        className
+      )}
+      data-slot="canvas-node-footer"
+      {...props}
+    />
+  );
+}
