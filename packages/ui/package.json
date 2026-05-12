@@ -61,10 +61,12 @@
     "./components/canvas/*": "./src/components/canvas/*",
     "./components/canvas-alter/*": "./src/components/canvas-alter/*",
     "./components/container-node/*": "./src/components/container-node/*",
+    "./components/database-node/*": "./src/components/database-node/*",
     "./components/entry-node/*": "./src/components/entry-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
     "./components/project-explorer/*": "./src/components/project-explorer/*",
     "./components/*": "./src/components/*.tsx",
-    "./hooks/*": "./src/hooks/*.ts"
+    "./hooks/*": "./src/hooks/*.ts",
+    "./assets/db-icons": "./src/assets/db-icons/index.ts"
   }
 }
