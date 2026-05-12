@@ -17,6 +17,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import { Spinner } from "@workspace/ui/components/spinner";
+import { chatScrollbarThinClass } from "@workspace/ui/lib/chat-scrollbar";
 import { cn } from "@workspace/ui/lib/utils";
 import { ChevronDown, PanelRightClose } from "lucide-react";
 import { type ComponentProps, useMemo } from "react";
@@ -24,6 +26,37 @@ import { type ComponentProps, useMemo } from "react";
 import type { ChatHeaderThreadHistory } from "./chat.types";
 
 const headerControlClass = "hoverable rounded-xl";
+
+function formatThreadDropdownTimestamp(source: string | number | Date): string {
+  const d = new Date(source);
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+
+  const now = new Date();
+  const today =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  const clock: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+  };
+
+  if (today) {
+    return new Intl.DateTimeFormat(undefined, clock).format(d);
+  }
+
+  const sameYearAsNow = d.getFullYear() === now.getFullYear();
+  const datePart: Intl.DateTimeFormatOptions = sameYearAsNow
+    ? { day: "numeric", month: "short" }
+    : { day: "numeric", month: "short", year: "numeric" };
+
+  return new Intl.DateTimeFormat(undefined, { ...datePart, ...clock }).format(
+    d
+  );
+}
 
 export type ChatHeaderExportProps = Omit<
   ComponentProps<typeof Button>,
@@ -58,27 +91,39 @@ export type ChatHeaderNewThreadProps = Omit<
   ComponentProps<typeof Button>,
   "children" | "onClick" | "size" | "type" | "variant"
 > & {
+  /** When true, shows `Spinner` in place of the add icon while the handler runs. */
+  creating?: boolean;
   onNewThread?: () => void;
 };
 
 /** New thread control; pass `onNewThread` from the host. */
 export function ChatHeaderNewThread({
   className,
+  creating = false,
   onNewThread,
+  disabled = false,
+  "aria-label": ariaLabel = "New thread",
   ...props
 }: ChatHeaderNewThreadProps) {
+  const busy = Boolean(creating);
+
   return (
     <Button
-      aria-label="New thread"
+      {...props}
+      aria-busy={busy}
+      aria-label={busy ? "Creating thread" : ariaLabel}
       className={cn(headerControlClass, className)}
-      disabled={onNewThread === undefined}
+      disabled={busy || disabled || onNewThread === undefined}
       onClick={() => onNewThread?.()}
       size="icon-lg"
       type="button"
       variant="ghost"
-      {...props}
     >
-      <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+      {busy ? (
+        <Spinner aria-hidden />
+      ) : (
+        <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+      )}
     </Button>
   );
 }
@@ -206,6 +251,10 @@ export function ChatThreadSelect({
             <DropdownMenuSeparator />
             {canPickHistory ? (
               <DropdownMenuRadioGroup
+                className={cn(
+                  "max-h-[300px] overflow-y-auto",
+                  chatScrollbarThinClass
+                )}
                 defaultValue={threadHistory.activeThreadId}
                 key={threadHistory.activeThreadId}
                 onValueChange={(v) => {
@@ -229,7 +278,11 @@ export function ChatThreadSelect({
                         {item.title}
                       </span>
                       <span className="shrink-0 text-muted-foreground tabular-nums">
-                        {item.updatedAt}
+                        {item.updatedAtSource == null
+                          ? item.updatedAt
+                          : formatThreadDropdownTimestamp(
+                              item.updatedAtSource
+                            ) || item.updatedAt}
                       </span>
                     </span>
                   </DropdownMenuRadioItem>

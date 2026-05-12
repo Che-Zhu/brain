@@ -9,6 +9,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@workspace/ui/components/combobox";
+import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { useState } from "react";
@@ -21,35 +22,32 @@ import type {
 } from "./project-creator.types";
 
 function GithubPanel() {
-  const { actions } = useProjectCreator();
-  const [value, setValue] = useState("");
+  const {
+    meta: { githubDeployer },
+  } = useProjectCreator();
 
-  const trimmed = value.trim();
-  const disabled = trimmed.length === 0;
+  const states = githubDeployer?.states ?? {
+    deployedRepo: null,
+    githubToken: null as string | null,
+    isLoading: false,
+    repos: [] as const,
+  };
+  const actions = githubDeployer?.actions ?? {};
 
   return (
     <div
       className="flex min-w-0 flex-col gap-3"
       data-slot="project-creator-github"
     >
-      <Label htmlFor="project-creator-github-url">Repository URL</Label>
-      <Input
-        autoComplete="off"
-        className="w-full min-w-0"
-        id="project-creator-github-url"
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="https://github.com/org/repo"
-        value={value}
-      />
-      <div className="flex justify-end">
-        <Button
-          disabled={disabled}
-          onClick={() => actions.onGithubConfirm?.(trimmed)}
-          type="button"
-        >
-          Confirm
-        </Button>
-      </div>
+      <GithubDeployer.Root actions={actions} states={states}>
+        <GithubDeployer.Shell className="gap-3">
+          <GithubDeployer.Title />
+          <GithubDeployer.Subtitle />
+          <GithubDeployer.AuthButton />
+          <GithubDeployer.RepoSelect />
+          <GithubDeployer.Complete />
+        </GithubDeployer.Shell>
+      </GithubDeployer.Root>
     </div>
   );
 }

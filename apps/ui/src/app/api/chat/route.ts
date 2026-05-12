@@ -12,7 +12,11 @@ import {
 } from "@/lib/chat-persistence/types";
 import { jsonError } from "@/lib/chat-runtime/errors";
 import { decodeKubeconfig } from "@/lib/chat-runtime/kubeconfig";
-import { CHAT_MAX_STEPS, chatLanguageModel } from "@/lib/chat-runtime/model";
+import {
+  CHAT_MAX_STEPS,
+  chatLanguageModel,
+  threadTitleLanguageModel,
+} from "@/lib/chat-runtime/model";
 import { buildChatToolset } from "@/lib/chat-runtime/tools";
 
 export const maxDuration = 120;
@@ -28,7 +32,8 @@ export async function POST(req: Request) {
     return jsonError("Invalid chat request", 400, parsed.error.flatten());
   }
 
-  const { chatId, message, encodedKubeconfig, namespace } = parsed.data;
+  const { assistantContext, chatId, encodedKubeconfig, message, namespace } =
+    parsed.data;
 
   if (!isPersistedUIMessage(message)) {
     return jsonError("Malformed UI message payload", 400);
@@ -49,8 +54,13 @@ export async function POST(req: Request) {
 
     await appendMessage(chatId, message);
     const history = await loadThreadMessages(chatId);
-    const { tools, systemPrompt } = await buildChatToolset({ kubeconfig });
+    const { tools, systemPrompt } = await buildChatToolset({
+      assistantContext,
+      kubeconfig,
+      kubernetesNamespace: namespace,
+    });
     const model = chatLanguageModel();
+    const titleModel = threadTitleLanguageModel();
 
     const result = streamText({
       model,
@@ -65,7 +75,10 @@ export async function POST(req: Request) {
       onFinish: async ({ responseMessage }) => {
         try {
           await appendMessage(chatId, responseMessage);
-          await maybeAutoTitleThread({ chatId, languageModel: model });
+          await maybeAutoTitleThread({
+            chatId,
+            languageModel: titleModel,
+          });
         } catch (error) {
           console.error("[api/chat] persist assistant turn:", error);
         }

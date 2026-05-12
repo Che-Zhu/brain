@@ -17,10 +17,10 @@ import {
   apsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 import {
-  canvasMetaAtom,
-  closeCanvasSelection,
   selectedEdgeAtom,
-  selectedNodeAtom,
+  useCanvasMeta,
+  useCanvasSelectionActions,
+  useSelectedCanvasNode,
 } from "@/store/canvas-store";
 
 const METRICS_REFRESH_MS = 5000;
@@ -87,15 +87,17 @@ export default function PreviewProjectPage() {
   const ns = (searchParams.get("ns") ?? "").trim();
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 
-  const canvasMeta = useAtomValue(canvasMetaAtom);
+  const canvasMeta = useCanvasMeta();
   const selectedEdge = useAtomValue(selectedEdgeAtom);
-  const selectedNode = useAtomValue(selectedNodeAtom);
+  const { clearSelection } = useCanvasSelectionActions();
 
   const { canvasState, error, isLoading } = usePreviewProjectCanvas({
     namespace: ns,
     shareToken,
     uid,
   });
+
+  const selectedNode = useSelectedCanvasNode(canvasState.nodes);
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
@@ -116,7 +118,7 @@ export default function PreviewProjectPage() {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Canvas.Root
-          actions={{ onPanelClose: closeCanvasSelection }}
+          actions={{ onPanelClose: clearSelection }}
           meta={canvasMeta}
           state={{ ...canvasState, selectedEdge, selectedNode }}
         >

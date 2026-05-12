@@ -35,12 +35,28 @@ export interface AssistantSessionPayload {
   threads: AssistantThreadDTO[];
 }
 
+/** Optional client-provided UI context for the model system prompt (project + selection). */
+export const assistantContextPayloadSchema = z.object({
+  projectUid: z.string().max(256).optional(),
+  selectedWorkload: z
+    .object({
+      kubernetesUid: z.string().max(256),
+      name: z.string().max(512).optional(),
+      kind: z.string().max(128).optional(),
+    })
+    .optional(),
+});
+export type AssistantContextPayload = z.infer<
+  typeof assistantContextPayloadSchema
+>;
+
 /** Body of `POST /api/chat`. */
 export const chatStreamRequestSchema = z.object({
   chatId: z.string().min(1),
   namespace: z.string(),
   message: z.unknown(),
   encodedKubeconfig: z.string().optional(),
+  assistantContext: assistantContextPayloadSchema.optional(),
 });
 export type ChatStreamRequest = z.infer<typeof chatStreamRequestSchema>;
 

@@ -99,7 +99,8 @@ function metadataUid(item: unknown): string | undefined {
 
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
- * Sets **kind**, **image**, **name**, **replicas** (from spec), and **status** from `status.phase`.
+ * Sets **kind**, **image**, **name**, **replicas** (from spec), **uid** (from
+ * `metadata.uid` when present), and **status** from `status.phase`.
  * When `spec.replicas === 0`, status is shown as **Paused** regardless of `status.phase`.
  */
 export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
@@ -129,17 +130,21 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
   const tone = getToneForStatus(phaseForTone) ?? "pending";
 
+  const uid = metadataUid(ap);
+
   return {
     kind: "AP",
     name,
     image,
     ...(typeof replicas === "number" ? { replicas } : {}),
+    ...(uid != null && uid !== "" ? { uid } : {}),
     status: { label, tone },
   };
 }
 
 /**
  * Maps one DB list item (example.crossplane.io/v1 `DB`) into {@link ContainerNodeStates}.
+ * Sets **kind**, **image**, **name**, **uid** (from `metadata.uid` when present), and **status** from `status.phase`.
  */
 export function dbToWorkloadStates(db: unknown): ContainerNodeStates {
   const root = asRecord(db) ?? {};
@@ -159,10 +164,13 @@ export function dbToWorkloadStates(db: unknown): ContainerNodeStates {
   const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
   const tone = getToneForStatus(phaseForTone) ?? "pending";
 
+  const uid = metadataUid(db);
+
   return {
     kind: "DB",
     image: engine,
     name,
+    ...(uid != null && uid !== "" ? { uid } : {}),
     status: { label, tone },
   };
 }

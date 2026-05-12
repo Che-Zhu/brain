@@ -15,6 +15,11 @@ export interface ContainerNodeStates {
     label: string;
     tone: ContainerNodeStatusTone;
   };
+  /**
+   * Kubernetes `metadata.uid` when this payload was built from a live
+   * resource; stable across renames. Omit for static / storybook-only nodes.
+   */
+  uid?: string;
 }
 
 /** Optional handlers for host-composed header / toolbar controls. */

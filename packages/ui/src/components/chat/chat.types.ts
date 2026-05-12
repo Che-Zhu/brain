@@ -25,12 +25,20 @@ export interface ChatGithubDeployPopoverConfig {
 
 export type ChatGithubDeployPopoverProps = ChatGithubDeployPopoverConfig;
 
-/** One row in the thread history menu (`title` truncates; `updatedAt` stays visible on the right). */
+/** One row in the thread history menu (`title` truncates; timestamp on the right). */
 export interface ChatHeaderThreadHistoryItem {
   id: string;
   referential?: boolean;
   title: string;
+  /**
+   * Pre-formatted fallback when `updatedAtSource` is omitted (e.g. registry demos).
+   */
   updatedAt: string;
+  /**
+   * Parsed instant (e.g. ISO from the server). When set, the header shows time-only for today’s
+   * threads and adds the calendar date for older ones.
+   */
+  updatedAtSource?: string | number | Date;
 }
 
 export interface ChatHeaderThreadHistory {

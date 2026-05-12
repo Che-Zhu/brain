@@ -172,17 +172,32 @@ export function hashKubeconfigForSandboxTag(kubeconfig: string): string {
   return createHash("sha256").update(kubeconfig).digest("hex").slice(0, 32);
 }
 
+/**
+ * When `SANDBOX_PROXY` is set (trimmed), adds HTTP(S) proxy env vars for sandbox commands.
+ * Lowercase + uppercase variants so curl and Go (`kubectl`) both honor them consistently.
+ */
+function sandboxProxyEnv(): Partial<Record<string, string>> {
+  const proxy =
+    process.env.SANDBOX_PROXY === undefined
+      ? ""
+      : process.env.SANDBOX_PROXY.trim();
+  if (proxy === "") {
+    return {};
+  }
+  return {
+    HTTP_PROXY: proxy,
+    HTTPS_PROXY: proxy,
+    http_proxy: proxy,
+    https_proxy: proxy,
+  };
+}
+
 function sandboxCommandEnv(): Record<string, string> {
-  const env: Record<string, string> = {
+  return {
     KUBECONFIG: KUBECONFIG_PATH,
     PATH: SANDBOX_PATH,
+    ...sandboxProxyEnv(),
   };
-  const proxy = process.env.SANDBOX_HTTPS_PROXY;
-  if (proxy !== undefined && proxy !== "") {
-    env.HTTPS_PROXY = proxy;
-    env.https_proxy = proxy;
-  }
-  return env;
 }
 
 async function findSandboxByTags(
@@ -311,6 +326,42 @@ export function createLazyVercelBashSandbox(
       sandboxPromise = undefined;
       preparePromise = undefined;
     },
+  };
+}
+
+/**
+ * Create a Vercel Sandbox and install kubectl for this kubeconfig, or do nothing
+ * when a sandbox with the same kubeconfig tag already exists (no create, no
+ * prepare).
+ *
+ * Throws if kubeconfig fails {@link normalizeKubeconfig} validation.
+ */
+export async function bootstrapChatSandboxIfNeeded(
+  kubeconfigYaml: string,
+  sandboxParams?: Partial<VercelSandboxCreateParams>
+): Promise<{
+  sandboxName: string;
+  skippedExisting: boolean;
+}> {
+  const kubeconfig = normalizeKubeconfig(kubeconfigYaml);
+  const tags = {
+    kubeconfig: hashKubeconfigForSandboxTag(kubeconfig),
+  };
+  const existing = await findSandboxByTags(tags, sandboxParams);
+  if (existing !== undefined) {
+    return {
+      sandboxName: existing.name,
+      skippedExisting: true,
+    };
+  }
+  const sandbox = await createVercelSandboxFromEnv({
+    ...sandboxParams,
+    tags,
+  });
+  await prepareSandboxForKubectl(sandbox, kubeconfig);
+  return {
+    sandboxName: sandbox.name,
+    skippedExisting: false,
   };
 }
 

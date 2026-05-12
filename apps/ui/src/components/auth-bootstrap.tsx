@@ -1,6 +1,9 @@
 "use client";
 
+import { useAtomValue } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
+import { useEffect } from "react";
+import { scheduleChatSandboxWarmup } from "@/lib/vercel-sandbox.actions";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 interface AuthBootstrapProps {
@@ -37,6 +40,38 @@ export default function AuthBootstrap({
     [kubeconfigAtom, kubeconfig],
     [namespaceAtom, namespace],
   ]);
+
+  return null;
+}
+
+/**
+ * Dispatches {@link scheduleChatSandboxWarmup} once the hydrated kubeconfig is non-empty.
+ * Sandbox work runs on the server after the action resolves (does not block the UI).
+ */
+export function SandboxBootstrap() {
+  const kubeconfig = useAtomValue(kubeconfigAtom);
+
+  useEffect(() => {
+    const kubeconfigDecoded = kubeconfig.trim();
+    if (kubeconfigDecoded === "") {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        const result = await scheduleChatSandboxWarmup(
+          encodeURIComponent(kubeconfigDecoded)
+        );
+        if (!result.ok) {
+          console.warn("[SandboxBootstrap] skipped: invalid kubeconfig");
+        }
+      } catch (e: unknown) {
+        console.warn("[SandboxBootstrap] schedule failed:", e);
+      }
+    };
+
+    run().catch(() => undefined);
+  }, [kubeconfig]);
 
   return null;
 }

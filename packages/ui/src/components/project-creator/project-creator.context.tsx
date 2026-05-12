@@ -12,6 +12,7 @@ import {
 import type {
   ProjectCreatorActions,
   ProjectCreatorDatabaseChoice,
+  ProjectCreatorGithubDeployerSlot,
   ProjectCreatorSourceKind,
   ProjectCreatorValue,
 } from "./project-creator.types";
@@ -42,12 +43,15 @@ export interface ProjectCreatorRootProps {
   children: ReactNode;
   /** Options for the database step combobox. */
   databaseOptions?: ProjectCreatorDatabaseChoice[];
+  /** Wired into the GitHub step’s `GithubDeployer` (authorize + repos + deploy). */
+  githubDeployer?: ProjectCreatorGithubDeployerSlot;
 }
 
 export function ProjectCreatorRoot({
   actions: actionsProp,
   children,
   databaseOptions,
+  githubDeployer: githubDeployerProp,
 }: ProjectCreatorRootProps) {
   const [step, setStep] = useState<ProjectCreatorSourceKind | null>(null);
   const reset = useCallback(() => setStep(null), []);
@@ -74,9 +78,9 @@ export function ProjectCreatorRoot({
         onDockerConfirm: actionsProp?.onDockerConfirm,
         onDatabaseConfirm: actionsProp?.onDatabaseConfirm,
       },
-      meta: { databaseOptions: dbOptions },
+      meta: { databaseOptions: dbOptions, githubDeployer: githubDeployerProp },
     }),
-    [step, reset, pick, actionsProp, dbOptions]
+    [step, reset, pick, actionsProp, dbOptions, githubDeployerProp]
   );
 
   return (

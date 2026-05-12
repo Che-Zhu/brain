@@ -8,10 +8,10 @@ import { useParams } from "next/navigation";
 import { useProjectServices } from "@/hooks/use-project-services";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import {
-  canvasMetaAtom,
-  closeCanvasSelection,
   selectedEdgeAtom,
-  selectedNodeAtom,
+  useCanvasMeta,
+  useCanvasSelectionActions,
+  useSelectedCanvasNode,
 } from "@/store/canvas-store";
 import { openRightPane, rightPaneOpenAtom } from "@/store/layout-store";
 
@@ -20,16 +20,18 @@ export default function ProjectUidPage() {
   const uid = decodeURIComponent(params.uid ?? "");
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
-  const canvasMeta = useAtomValue(canvasMetaAtom);
+  const canvasMeta = useCanvasMeta();
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
-  const selectedNode = useAtomValue(selectedNodeAtom);
+  const { clearSelection } = useCanvasSelectionActions();
 
   const { canvasState, error, isLoading } = useProjectServices({
     kubeconfig,
     namespace,
     uid,
   });
+
+  const selectedNode = useSelectedCanvasNode(canvasState.nodes);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
@@ -39,7 +41,7 @@ export default function ProjectUidPage() {
         canvasState.nodes.length > 0 && (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <Canvas.Root
-              actions={{ onPanelClose: closeCanvasSelection }}
+              actions={{ onPanelClose: clearSelection }}
               meta={canvasMeta}
               state={{ ...canvasState, selectedEdge, selectedNode }}
             >

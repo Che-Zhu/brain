@@ -1,5 +1,6 @@
 "use client";
 
+import type { GithubDeployerRepo } from "@workspace/ui/components/github-deployer/github-deployer.types";
 import type { ProjectCreatorRootProps } from "@workspace/ui/components/project-creator/project-creator.context";
 import type {
   ProjectCreatorActions,
@@ -7,12 +8,14 @@ import type {
 } from "@workspace/ui/components/project-creator/project-creator.types";
 import { randomNano } from "@workspace/ui/lib/generator";
 import { randomName } from "@workspace/ui/lib/random-name";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useApCompositions } from "@/hooks/compositions/use-ap-composition";
 import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 import { useProjectCompositions } from "@/hooks/compositions/use-project-composition";
+import { useGithubAuth } from "@/hooks/use-github-auth";
+import { useGithubRepos } from "@/hooks/use-github-repos";
 import {
   mergeApSpecProjectName,
   mergeDbSpecProjectName,
@@ -79,7 +82,7 @@ export interface UseProjectCreatorOptions {
 export function useProjectCreator(options?: UseProjectCreatorOptions): {
   creatorRootProps: Pick<
     ProjectCreatorRootProps,
-    "actions" | "databaseOptions"
+    "actions" | "databaseOptions" | "githubDeployer"
   >;
   dialogOpen: boolean;
   lastConfirmedKind: string | null;
@@ -90,6 +93,11 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const namespace = options?.namespace?.trim() ?? "";
   const onProjectCreated = options?.onProjectCreated;
   const hasKubeconfig = kubeconfig !== "";
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [lastConfirmedKind, setLastConfirmedKind] = useState<string | null>(
+    null
+  );
 
   const { items: dbCompositionRows } = useDbCompositions({
     kubeconfig,
@@ -104,10 +112,25 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     toItems: true,
   });
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [lastConfirmedKind, setLastConfirmedKind] = useState<string | null>(
-    null
-  );
+  const {
+    githubToken,
+    initiateGithubAuth,
+    isLoading: githubAuthLoading,
+  } = useGithubAuth();
+
+  const { isLoading: githubReposLoading, repos: githubRepos } =
+    useGithubRepos(githubToken);
+
+  const [githubDeployedRepo, setGithubDeployedRepo] =
+    useState<GithubDeployerRepo | null>(null);
+
+  const prevDialogOpen = useRef(false);
+  useEffect(() => {
+    if (dialogOpen && !prevDialogOpen.current) {
+      setGithubDeployedRepo(null);
+    }
+    prevDialogOpen.current = dialogOpen;
+  }, [dialogOpen]);
 
   const openDialog = useCallback(() => {
     setDialogOpen(true);
@@ -131,16 +154,43 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     );
   }, [dbCompositionRows, hasKubeconfig]);
 
+  const handleGithubDeploy = useCallback((repo: GithubDeployerRepo) => {
+    setGithubDeployedRepo(repo);
+    const label = repo.fullName ?? repo.name;
+    setLastConfirmedKind(`github:${label}`);
+    toast.success("GitHub import selected.", {
+      description: label || undefined,
+    });
+    setDialogOpen(false);
+  }, []);
+
+  const githubDeployer = useMemo(
+    () => ({
+      actions: {
+        onAuthorize: initiateGithubAuth,
+        onDeploy: handleGithubDeploy,
+      },
+      states: {
+        deployedRepo: githubDeployedRepo,
+        githubToken: githubToken ?? "",
+        isLoading:
+          githubAuthLoading || (!!githubToken?.trim() && githubReposLoading),
+        repos: githubRepos,
+      },
+    }),
+    [
+      githubAuthLoading,
+      githubDeployedRepo,
+      githubRepos,
+      githubReposLoading,
+      githubToken,
+      handleGithubDeploy,
+      initiateGithubAuth,
+    ]
+  );
+
   const actions = useMemo<ProjectCreatorActions>(
     () => ({
-      onGithubConfirm: (url) => {
-        const u = url.trim();
-        setLastConfirmedKind(u ? `github:${u}` : "github:");
-        toast.info("GitHub deploy is not implemented yet.", {
-          description: u || undefined,
-        });
-        setDialogOpen(false);
-      },
       onDockerConfirm: async (imageRef) => {
         const trimmed = imageRef.trim();
         if (!(kubeconfig && namespace)) {
@@ -274,8 +324,9 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     () => ({
       actions,
       databaseOptions,
+      githubDeployer,
     }),
-    [actions, databaseOptions]
+    [actions, databaseOptions, githubDeployer]
   );
 
   return {

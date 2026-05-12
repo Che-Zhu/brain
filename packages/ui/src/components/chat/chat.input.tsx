@@ -95,7 +95,21 @@ export function ChatGithubDeployPopover({
   );
 }
 
-/** Bordered composer container. */
+/** Wrapper with `group` for sibling layouts (context strip + shell). Borders on shell/indicator react via `group-focus-within:border-border`. */
+export function ChatComposerFocusScope({
+  className,
+  ...props
+}: ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("group flex w-full flex-col", className)}
+      data-slot="chat-composer-focus-scope"
+      {...props}
+    />
+  );
+}
+
+/** Bordered composer container; border color shows when this stack or any wrapping focus scope has focus-within. */
 export function ChatComposerShell({
   className,
   ...props
@@ -103,7 +117,7 @@ export function ChatComposerShell({
   return (
     <div
       className={cn(
-        "flex w-full flex-col gap-2 rounded-xl border border-background-selected bg-background-tertiary p-2 shadow-sm focus-within:border-border",
+        "group flex w-full flex-col gap-2 rounded-xl border border-transparent bg-background-tertiary p-2 shadow-sm focus-within:border-border group-focus-within:border-border",
         className
       )}
       data-slot="chat-composer-shell"
@@ -219,6 +233,72 @@ export function ChatComposerFooter({
   );
 }
 
+export type ChatComposerContextIndicatorProps = Omit<
+  ComponentProps<"div">,
+  "children"
+> & {
+  /** Labels shown as always-active toggles after the “Context:” prefix (empty strings omitted). */
+  contextToggles?: readonly string[];
+  /** Merged onto the bordered context chip row (below the outer overflow wrapper). */
+  chipClassName?: string;
+};
+
+/** Context strip above footer; collapsed when the enclosing `group` has no focus-within, expands and slides into place when focused. */
+export function ChatComposerContextIndicator({
+  chipClassName,
+  className,
+  contextToggles,
+  ...props
+}: ChatComposerContextIndicatorProps) {
+  const labels = (contextToggles ?? []).map((t) => t.trim()).filter(Boolean);
+  if (labels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 shrink-0 overflow-hidden",
+        // Exit animation: add delay when grid contracts (focus lost)
+        "group-not-focus-within:delay-70",
+        className
+      )}
+      data-slot="chat-composer-context-indicator"
+      {...props}
+    >
+      <div className="flex min-h-0 items-center justify-center">
+        <div
+          className={cn(
+            "flex h-12 min-h-8 w-[98%] min-w-0 translate-y-full gap-1 overflow-hidden rounded-xl border border-transparent bg-background-tertiary p-1 px-2 text-muted-foreground text-xs opacity-0 shadow-sm",
+
+            // Base transition (applies to both enter + exit)
+            "transition-all duration-300 ease-out motion-reduce:transition-none",
+
+            // Enter state
+            "group-focus-within:translate-y-6 group-focus-within:border-border group-focus-within:opacity-100",
+
+            // Optional: slight delay on exit for polish
+            "group-focus-within:delay-75",
+            chipClassName
+          )}
+        >
+          <span className="shrink-0 text-muted-foreground">Context:</span>
+          <div className="min-w-0 flex-1 flex-wrap items-center">
+            {labels.map((label, index) => (
+              <span
+                className="pointer-events-none shrink-0 text-foreground text-xs"
+                key={`${label}:${String(index)}`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Icon-only control for GitHub deploy; omitted `onComposerAction` renders nothing. */
 export function ChatGithubDeployButton({
   className,
@@ -301,6 +381,8 @@ export function ChatComposerSend({
 }
 
 export type ChatComposerProps = ComponentProps<typeof ChatComposerShell> & {
+  /** Shown as always-on chips in {@link ChatComposerContextIndicator}. */
+  contextToggles?: readonly string[];
   onComposerAction?: () => void;
   onPrimaryAction: () => void;
   onValueChange: (value: string) => void;
@@ -309,9 +391,10 @@ export type ChatComposerProps = ComponentProps<typeof ChatComposerShell> & {
   value: string;
 };
 
-/** Shell + textarea + footer row (default composer). */
+/** Shell + textarea + optional context row + footer row (default composer). */
 export function ChatComposer({
   className,
+  contextToggles,
   onComposerAction,
   onPrimaryAction,
   onValueChange,
@@ -322,30 +405,37 @@ export function ChatComposer({
 }: ChatComposerProps) {
   return (
     <ChatComposerShell className={className} {...shellProps}>
-      <ChatComposerTextarea
-        onPrimaryAction={onPrimaryAction}
-        onValueChange={onValueChange}
-        placeholder={placeholder}
-        responding={responding}
-        value={value}
-      />
-      <ChatComposerFooter>
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <ChatGithubDeployButton onComposerAction={onComposerAction} />
+      <div className="flex min-h-0 w-full flex-col gap-2">
+        <div className="flex min-h-0 w-full flex-col">
+          <ChatComposerTextarea
+            onPrimaryAction={onPrimaryAction}
+            onValueChange={onValueChange}
+            placeholder={placeholder}
+            responding={responding}
+            value={value}
+          />
+          <ChatComposerContextIndicator contextToggles={contextToggles} />
         </div>
-        <ChatComposerSend
-          onPrimaryAction={onPrimaryAction}
-          responding={responding}
-          value={value}
-        />
-      </ChatComposerFooter>
+        <ChatComposerFooter>
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <ChatGithubDeployButton onComposerAction={onComposerAction} />
+          </div>
+          <ChatComposerSend
+            onPrimaryAction={onPrimaryAction}
+            responding={responding}
+            value={value}
+          />
+        </ChatComposerFooter>
+      </div>
     </ChatComposerShell>
   );
 }
 
+ChatComposerFocusScope.displayName = "Chat.ComposerFocusScope";
 ChatComposerShell.displayName = "Chat.ComposerShell";
 ChatComposerTextarea.displayName = "Chat.ComposerTextarea";
 ChatComposerFooter.displayName = "Chat.ComposerFooter";
+ChatComposerContextIndicator.displayName = "Chat.ContextIndicator";
 ChatComposerSend.displayName = "Chat.ComposerSend";
 ChatGithubMark.displayName = "Chat.GithubMark";
 ChatGithubDeployPopover.displayName = "Chat.GithubDeployPopover";

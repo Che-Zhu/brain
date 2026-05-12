@@ -16,6 +16,7 @@ export { useProjectCreator } from "./project-creator.context";
 export type {
   ProjectCreatorActions,
   ProjectCreatorDatabaseChoice,
+  ProjectCreatorGithubDeployerSlot,
   ProjectCreatorSourceKind,
   ProjectCreatorStates,
   ProjectCreatorValue,

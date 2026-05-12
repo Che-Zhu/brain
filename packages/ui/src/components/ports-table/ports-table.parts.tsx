@@ -10,9 +10,51 @@ import {
 import { TableCell, TableRow } from "@workspace/ui/components/table";
 import { MoreHorizontal, Plus } from "lucide-react";
 import type * as React from "react";
+import { toast } from "sonner";
 
 import { usePortsTableContext } from "./ports-table.context";
 import type { PortRow } from "./ports-table.types";
+
+async function copyPortAddress(value: string): Promise<void> {
+  const text = value.trim();
+  if (text === "") {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  } catch {
+    toast.error("Could not copy");
+  }
+}
+
+function PortsTableAddressCell({ value }: { value: string }) {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return (
+      <TableCell
+        className="min-w-0 max-w-0 truncate font-mono text-muted-foreground"
+        title={value}
+      >
+        {value}
+      </TableCell>
+    );
+  }
+  return (
+    <TableCell className="min-w-0 max-w-0 p-0 align-middle">
+      <button
+        className="block w-full min-w-0 truncate px-2 py-2 text-left font-mono text-muted-foreground transition-colors hover:bg-muted/50"
+        onClick={async () => {
+          await copyPortAddress(value);
+        }}
+        title={`${value} — Click to copy`}
+        type="button"
+      >
+        {value}
+      </button>
+    </TableCell>
+  );
+}
 
 function PortsTableNewButton({
   onClick,
@@ -49,18 +91,8 @@ function PortsTableRow({
       <TableCell className="w-16 whitespace-nowrap font-mono">
         {port.number}
       </TableCell>
-      <TableCell
-        className="min-w-0 max-w-0 truncate font-mono text-muted-foreground"
-        title={port.privateAddress}
-      >
-        {port.privateAddress}
-      </TableCell>
-      <TableCell
-        className="min-w-0 max-w-0 truncate font-mono text-muted-foreground"
-        title={port.publicAddress}
-      >
-        {port.publicAddress}
-      </TableCell>
+      <PortsTableAddressCell value={port.privateAddress} />
+      <PortsTableAddressCell value={port.publicAddress} />
       <TableCell className="w-12 shrink-0">{children}</TableCell>
     </TableRow>
   );

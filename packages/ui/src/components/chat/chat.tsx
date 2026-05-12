@@ -13,6 +13,8 @@ import {
 } from "./chat.header";
 import {
   ChatComposer,
+  ChatComposerContextIndicator,
+  ChatComposerFocusScope,
   ChatComposerFooter,
   ChatComposerSend,
   ChatComposerShell,
@@ -34,6 +36,7 @@ export type {
   ChatThreadSelectProps,
 } from "./chat.header";
 export type {
+  ChatComposerContextIndicatorProps,
   ChatComposerProps,
   ChatComposerSendProps,
   ChatComposerTextareaProps,
@@ -41,6 +44,8 @@ export type {
   ChatGithubDeployPopoverProps,
 } from "./chat.input";
 export {
+  ChatComposerContextIndicator,
+  ChatComposerFocusScope,
   ChatGithubDeployButton,
   ChatGithubDeployPopover,
   ChatGithubMark,
@@ -74,10 +79,12 @@ function ChatShell({ className, children, ...props }: ComponentProps<"div">) {
 export const Chat = Object.assign(ChatShell, {
   ClosePane: ChatHeaderClosePane,
   Composer: ChatComposer,
+  ComposerFocusScope: ChatComposerFocusScope,
   ComposerFooter: ChatComposerFooter,
   ComposerSend: ChatComposerSend,
   ComposerShell: ChatComposerShell,
   ComposerTextarea: ChatComposerTextarea,
+  ContextIndicator: ChatComposerContextIndicator,
   Export: ChatHeaderExport,
   GithubDeployButton: ChatGithubDeployButton,
   GithubDeployPopover: ChatGithubDeployPopover,

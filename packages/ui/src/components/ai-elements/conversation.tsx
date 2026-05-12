@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
+import { chatScrollbarThinClass } from "@workspace/ui/lib/chat-scrollbar";
 import { cn } from "@workspace/ui/lib/utils";
 import type { UIMessage } from "ai";
 import { ArrowDownIcon, DownloadIcon } from "lucide-react";
@@ -25,8 +26,7 @@ export type ConversationContentProps = ComponentProps<
 >;
 
 /** Scrollbar styles apply to the inner scroll port (`scrollClassName` on `StickToBottom.Content`). */
-const conversationScrollDefaults =
-  "min-h-0 [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 hover:[&::-webkit-scrollbar-thumb]:bg-border";
+const conversationScrollDefaults = cn("min-h-0", chatScrollbarThinClass);
 
 export const ConversationContent = ({
   className,

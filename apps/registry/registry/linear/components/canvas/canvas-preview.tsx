@@ -289,6 +289,7 @@ const containerCanvasStatesPrimary: ContainerNodeStates = {
   name: "workload-demo-001",
   replicas: 3,
   status: { label: "Running", tone: "running" },
+  uid: "preview-uid-primary",
 };
 
 const containerCanvasStatesSecondary: ContainerNodeStates = {
@@ -299,6 +300,7 @@ const containerCanvasStatesSecondary: ContainerNodeStates = {
   name: "workload-demo-002",
   replicas: 1,
   status: { label: "Synced", tone: "running" },
+  uid: "preview-uid-secondary",
 };
 
 /** Frozen graph preview data (mirrors `useProjectServices` canvas output without fetch). */
@@ -332,7 +334,7 @@ const CANVAS_PREVIEW_NODE_TYPES = {
   containerNode: PreviewCanvasContainerNode,
 } as const satisfies NodeTypes;
 
-/** Local-only selection logic (production uses Jotai + `canvasMetaAtom`). */
+/** Local-only selection logic (production uses URL + `useCanvasMeta`). */
 function useCanvasPreviewSelection(
   nodes: readonly Node[],
   edges: readonly Edge[]

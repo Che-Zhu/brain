@@ -185,8 +185,12 @@ function ChatWorkspacePreview({
             status={undefined}
             transcriptFooter={transcriptFooter}
           />
-          <div className="shrink-0 border-border p-2">
-            <Chat.ComposerShell>
+          <Chat.ComposerFocusScope className="relative flex shrink-0 flex-col items-center p-2">
+            <Chat.ContextIndicator
+              className="z-10"
+              contextToggles={[title, "Sample preview context"]}
+            />
+            <Chat.ComposerShell className="z-20">
               <Chat.ComposerTextarea
                 onPrimaryAction={onPrimaryAction}
                 onValueChange={setInput}
@@ -194,6 +198,7 @@ function ChatWorkspacePreview({
                 responding={false}
                 value={input}
               />
+
               <Chat.ComposerFooter>
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   <Chat.GithubDeployButton onComposerAction={githubAction} />
@@ -205,7 +210,7 @@ function ChatWorkspacePreview({
                 />
               </Chat.ComposerFooter>
             </Chat.ComposerShell>
-          </div>
+          </Chat.ComposerFocusScope>
         </Chat>
       </Chat.Root>
     </div>

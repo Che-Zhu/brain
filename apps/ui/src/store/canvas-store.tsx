@@ -7,7 +7,9 @@ import type {
   CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
 import type { Edge, Node, NodeTypes } from "@xyflow/react";
-import { atom, getDefaultStore } from "jotai";
+import { atom, useSetAtom } from "jotai";
+import { parseAsString, useQueryState } from "nuqs";
+import { useEffect, useMemo } from "react";
 
 import { CanvasContainerNode } from "@/lib/project-canvas/nodes/canvas-container-node";
 import { CANVAS_CONTAINER_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
@@ -17,10 +19,33 @@ import { WorkloadSettingsCanvasPanel } from "@/lib/project-canvas/panels/workloa
 
 /**
  * Central wiring for the project canvas. Edit this file to swap node types,
- * register new panel tabs, or change selection behavior — implementations
- * live under `@/lib/project-canvas/*` and are intentionally leaf-level so
- * this hub stays small and configurable.
+ * register new panel tabs, or change selection behavior.
+ *
+ * Design:
+ * - **Node selection** lives in the URL (`?service=<k8s-uid>`), which is the
+ *   single source of truth. We sync the underlying resource's `metadata.uid`
+ *   rather than the React Flow node id so links survive rename-style edits
+ *   and stay stable per resource. `selectedNode` is derived from URL + `nodes`
+ *   via {@link useSelectedCanvasNode}. Deep links, browser back/forward, and
+ *   the panel close button all work without bidirectional sync between an
+ *   atom and the URL.
+ * - **Edge selection** is local-only (`selectedEdgeAtom`) — edges don't deep
+ *   link.
+ * - Click handlers and selection setters live on hooks so they can talk to
+ *   nuqs.
  */
+
+// -- URL key ------------------------------------------------------------------
+
+/** nuqs key for the selected workload card (Kubernetes `metadata.uid`). */
+export const CANVAS_SERVICE_QUERY_KEY = "service" as const;
+
+/** Reads {@link ContainerNodeStates.uid} from the node's `data.states`. */
+function nodeServiceUid(node: Node): string | null {
+  const data = node.data as { states?: { uid?: unknown } } | undefined;
+  const uid = data?.states?.uid;
+  return typeof uid === "string" && uid !== "" ? uid : null;
+}
 
 // -- React Flow node registry -------------------------------------------------
 
@@ -54,48 +79,106 @@ const workloadPanelTabs: CanvasPanelTab[] = [
   },
 ];
 
-// -- Selection state ----------------------------------------------------------
+// -- Edge selection (local-only) ----------------------------------------------
 
-/** Selected canvas node; `canvasMetaAtom` click handlers write via `getDefaultStore()`. */
-export const selectedNodeAtom = atom<CanvasSelectedNode>(null);
-
-/** Selected canvas edge; mutually exclusive with {@link selectedNodeAtom}. */
+/** Transient: currently selected canvas edge (no URL sync). */
 export const selectedEdgeAtom = atom<CanvasSelectedEdge>(null);
 
-function setCanvasSelection(
-  node: CanvasSelectedNode,
-  edge: CanvasSelectedEdge
-) {
-  const store = getDefaultStore();
-  store.set(selectedNodeAtom, node);
-  store.set(selectedEdgeAtom, edge);
+// -- Selection hooks ----------------------------------------------------------
+
+function useServiceQuery() {
+  return useQueryState(CANVAS_SERVICE_QUERY_KEY, parseAsString);
 }
 
-/** Clears node and edge selection (e.g. closing the canvas panel). */
-export function closeCanvasSelection() {
-  setCanvasSelection(null, null);
+/**
+ * Selected workload node derived from `?service=<uid>` + the current `nodes`
+ * list (matched by `data.uid`). Drops stale uids when the URL references a
+ * resource that no longer exists in the list.
+ */
+export function useSelectedCanvasNode(nodes: Node[]): CanvasSelectedNode {
+  const [serviceUid, setServiceUid] = useServiceQuery();
+
+  const selectedNode = useMemo<CanvasSelectedNode>(() => {
+    if (serviceUid == null || serviceUid === "") {
+      return null;
+    }
+    return nodes.find((n) => nodeServiceUid(n) === serviceUid) ?? null;
+  }, [serviceUid, nodes]);
+
+  const isStale =
+    serviceUid != null &&
+    serviceUid !== "" &&
+    nodes.length > 0 &&
+    selectedNode == null;
+
+  useEffect(() => {
+    if (isStale) {
+      setServiceUid(null).catch(() => undefined);
+    }
+  }, [isStale, setServiceUid]);
+
+  return selectedNode;
+}
+
+export interface CanvasSelectionActions {
+  /** Clear both node and edge selection (e.g. panel close button). */
+  clearSelection: () => void;
+  /** Select an edge (clears node URL). */
+  selectEdge: (edge: Edge) => void;
+  /** Select a node (URL becomes `?service=<node.id>`, edge is cleared). */
+  selectNode: (node: Node) => void;
+}
+
+/**
+ * Imperative selection setters wired to the URL (node) + edge atom.
+ * Stable across renders so callers — including {@link useCanvasMeta} — don't
+ * thrash the canvas provider memo.
+ */
+export function useCanvasSelectionActions(): CanvasSelectionActions {
+  const [, setServiceUid] = useServiceQuery();
+  const setSelectedEdge = useSetAtom(selectedEdgeAtom);
+
+  return useMemo<CanvasSelectionActions>(
+    () => ({
+      clearSelection() {
+        setSelectedEdge(null);
+        setServiceUid(null).catch(() => undefined);
+      },
+      selectEdge(edge) {
+        setSelectedEdge(edge);
+        setServiceUid(null).catch(() => undefined);
+      },
+      selectNode(node) {
+        setSelectedEdge(null);
+        setServiceUid(nodeServiceUid(node)).catch(() => undefined);
+      },
+    }),
+    [setSelectedEdge, setServiceUid]
+  );
 }
 
 // -- Canvas meta --------------------------------------------------------------
 
 /**
- * Canvas `meta` (`nodeTypes`, `panelTabs`, `reactFlowProps`) — not fetch-derived `state`.
- * Single source of truth for what the canvas knows how to render and how it reacts to clicks.
+ * Canvas `meta` (`nodeTypes`, `panelTabs`, `reactFlowProps`) with click
+ * handlers bound to {@link useCanvasSelectionActions}. Use alongside
+ * {@link useSelectedCanvasNode} and `selectedEdgeAtom` to feed `<Canvas.Root />`.
  */
-export const canvasMetaAtom = atom<CanvasMeta>({
-  nodeTypes,
-  panelTabs: {
-    [CANVAS_CONTAINER_NODE_TYPE]: workloadPanelTabs,
-  },
-  reactFlowProps: {
-    onNodeClick: (_event, node: Node) => {
-      setCanvasSelection(node, null);
-    },
-    onEdgeClick: (_event, edge: Edge) => {
-      setCanvasSelection(null, edge);
-    },
-    onPaneClick: () => {
-      setCanvasSelection(null, null);
-    },
-  },
-});
+export function useCanvasMeta(): CanvasMeta {
+  const { clearSelection, selectEdge, selectNode } =
+    useCanvasSelectionActions();
+  return useMemo<CanvasMeta>(
+    () => ({
+      nodeTypes,
+      panelTabs: {
+        [CANVAS_CONTAINER_NODE_TYPE]: workloadPanelTabs,
+      },
+      reactFlowProps: {
+        onNodeClick: (_event, node: Node) => selectNode(node),
+        onEdgeClick: (_event, edge: Edge) => selectEdge(edge),
+        onPaneClick: () => clearSelection(),
+      },
+    }),
+    [clearSelection, selectEdge, selectNode]
+  );
+}

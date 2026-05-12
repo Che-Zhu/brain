@@ -9,7 +9,8 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 import { useAtomValue } from "jotai";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { parseAsString, useQueryState } from "nuqs";
 import {
   type ReactNode,
   useCallback,
@@ -27,6 +28,7 @@ import {
   fetchAssistantThreads,
 } from "@/lib/chat-persistence/client";
 import type {
+  AssistantContextPayload,
   AssistantSessionPayload,
   AssistantThreadDTO,
 } from "@/lib/chat-persistence/types";
@@ -36,13 +38,30 @@ import {
   runNavigateAppTool,
 } from "@/lib/tool/chat-navigate-app-tool";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
 import {
   rightPaneOpenAtom,
   toggleRightPaneVisibility,
 } from "@/store/layout-store";
 
+function buildAssistantContextPayload(
+  projectUid: string,
+  selectedServiceUid: string
+): AssistantContextPayload | undefined {
+  const pu = projectUid.trim();
+  const sw = selectedServiceUid.trim();
+  if (pu === "" && sw === "") {
+    return undefined;
+  }
+  return {
+    ...(pu === "" ? {} : { projectUid: pu }),
+    ...(sw === "" ? {} : { selectedWorkload: { kubernetesUid: sw } }),
+  };
+}
+
 function ProjectAssistantChatSession({
   bootstrap,
+  creatingThread,
   threads,
   assistantNamespaceRaw,
   onAssistantStreamFinished,
@@ -51,6 +70,7 @@ function ProjectAssistantChatSession({
   onSelectThread,
 }: {
   bootstrap: Pick<AssistantSessionPayload, "chatId" | "messages">;
+  creatingThread: boolean;
   threads: AssistantThreadDTO[];
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
@@ -70,8 +90,24 @@ function ProjectAssistantChatSession({
     | null
   >(null);
 
-  const nsRef = useRef(assistantNamespaceRaw);
-  nsRef.current = assistantNamespaceRaw;
+  const params = useParams<{ uid?: string }>();
+  const projectUid = decodeURIComponent(params.uid ?? "");
+  const [serviceUidQuery] = useQueryState(
+    CANVAS_SERVICE_QUERY_KEY,
+    parseAsString
+  );
+
+  // Keep a live ref so the transport memo stays stable across URL changes.
+  const wireRef = useRef({
+    namespace: assistantNamespaceRaw,
+    projectUid,
+    selectedServiceUid: serviceUidQuery ?? "",
+  });
+  wireRef.current = {
+    namespace: assistantNamespaceRaw,
+    projectUid,
+    selectedServiceUid: serviceUidQuery ?? "",
+  };
 
   const transport = useMemo(
     () =>
@@ -89,16 +125,23 @@ function ProjectAssistantChatSession({
           if (last == null) {
             throw new Error("Assistant chat: no message to send");
           }
+          const wire = wireRef.current;
+          const assistantContext = buildAssistantContextPayload(
+            wire.projectUid,
+            wire.selectedServiceUid
+          );
+
           return {
             api,
             credentials,
             headers,
             body: {
-              chatId: id,
-              namespace: nsRef.current,
-              message: last,
-              encodedKubeconfig: encodeURIComponent(kubeconfig),
               ...(body && typeof body === "object" ? body : {}),
+              ...(assistantContext == null ? {} : { assistantContext }),
+              chatId: id,
+              encodedKubeconfig: encodeURIComponent(kubeconfig),
+              message: last,
+              namespace: wire.namespace,
             },
           };
         },
@@ -169,6 +212,7 @@ function ProjectAssistantChatSession({
           hour: "numeric",
           minute: "2-digit",
         }).format(new Date(t.updatedAt)),
+        updatedAtSource: t.updatedAt,
       })),
       onSelect: (threadId: string) => {
         clearTranscriptUi();
@@ -183,6 +227,17 @@ function ProjectAssistantChatSession({
   }, [threads, chatId]);
 
   const busy = status === "submitted" || status === "streaming";
+
+  const composerContextToggles = useMemo(() => {
+    const toggles: string[] = [];
+    if (projectUid.trim() !== "") {
+      toggles.push("Current Project");
+    }
+    if ((serviceUidQuery ?? "").trim() !== "") {
+      toggles.push("Current Service");
+    }
+    return toggles;
+  }, [projectUid, serviceUidQuery]);
 
   const onPrimaryAction = useCallback(() => {
     if (busy) {
@@ -217,6 +272,7 @@ function ProjectAssistantChatSession({
           <Chat.Export onExport={() => undefined} />
           <Chat.NewThread
             aria-label="Create thread"
+            creating={creatingThread}
             onNewThread={createThreadClicked}
           />
           <Chat.ClosePane onClosePane={onClosePane} />
@@ -227,30 +283,40 @@ function ProjectAssistantChatSession({
           status={status}
           transcriptFooter={transcriptFooter}
         />
-        <div className="shrink-0 border-border p-2">
-          <Chat.ComposerShell>
-            <Chat.ComposerTextarea
-              onPrimaryAction={onPrimaryAction}
-              onValueChange={setInput}
-              placeholder="Message…"
-              responding={busy}
-              value={input}
-            />
-            <Chat.ComposerFooter>
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <Chat.GithubDeployButton
-                  authLoading={authLoading}
-                  isAuthorized={isAuthorized}
-                  onComposerAction={toggleTranscriptDeployer}
+        <div className="group flex w-full shrink-0 flex-col p-2 pt-4">
+          <div className="relative isolate w-full">
+            {composerContextToggles.length > 0 ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 w-full -translate-y-full">
+                <Chat.ContextIndicator
+                  className="w-full"
+                  contextToggles={composerContextToggles}
                 />
               </div>
-              <Chat.ComposerSend
+            ) : null}
+            <Chat.ComposerShell>
+              <Chat.ComposerTextarea
                 onPrimaryAction={onPrimaryAction}
+                onValueChange={setInput}
+                placeholder="Message…"
                 responding={busy}
                 value={input}
               />
-            </Chat.ComposerFooter>
-          </Chat.ComposerShell>
+              <Chat.ComposerFooter>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <Chat.GithubDeployButton
+                    authLoading={authLoading}
+                    isAuthorized={isAuthorized}
+                    onComposerAction={toggleTranscriptDeployer}
+                  />
+                </div>
+                <Chat.ComposerSend
+                  onPrimaryAction={onPrimaryAction}
+                  responding={busy}
+                  value={input}
+                />
+              </Chat.ComposerFooter>
+            </Chat.ComposerShell>
+          </div>
         </div>
       </Chat>
     </Chat.Root>
@@ -263,6 +329,7 @@ function ProjectAssistantChatPane({
   onClosePane: () => void;
 }) {
   const namespaceRaw = useAtomValue(namespaceAtom);
+  const [creatingThread, setCreatingThread] = useState(false);
   const [session, setSession] = useState<AssistantSessionPayload | null>(null);
   const [sessionError, setSessionError] = useState(false);
 
@@ -307,15 +374,20 @@ function ProjectAssistantChatPane({
   );
 
   const createThread = useCallback(async () => {
-    const created = await createAssistantThread(namespaceRaw);
-    if (created == null) {
-      return;
+    setCreatingThread(true);
+    try {
+      const created = await createAssistantThread(namespaceRaw);
+      if (created == null) {
+        return;
+      }
+      setSession({
+        chatId: created.chatId,
+        messages: [],
+        threads: created.threads,
+      });
+    } finally {
+      setCreatingThread(false);
     }
-    setSession({
-      chatId: created.chatId,
-      messages: [],
-      threads: created.threads,
-    });
   }, [namespaceRaw]);
 
   const refreshThreads = useCallback(async () => {
@@ -352,6 +424,7 @@ function ProjectAssistantChatPane({
     <ProjectAssistantChatSession
       assistantNamespaceRaw={namespaceRaw}
       bootstrap={session}
+      creatingThread={creatingThread}
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
       onClosePane={onClosePane}

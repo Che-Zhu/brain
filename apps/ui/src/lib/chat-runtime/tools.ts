@@ -6,7 +6,7 @@ import {
   genUISpecInputSchema,
 } from "@workspace/ui/lib/gen-ui-tool";
 import { type ToolSet, tool } from "ai";
-
+import type { AssistantContextPayload } from "@/lib/chat-persistence/types";
 import { createChatBashTool } from "@/lib/tool/chat-bash-tool";
 import { navigateAppTool } from "@/lib/tool/chat-navigate-app-tool";
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/lib/tool/chat-skill-tool";
 
 import { CHAT_BASE_SYSTEM_PROMPT } from "./model";
+import { buildAssistantWorkspaceContextPrompt } from "./workspace-context-prompt";
 
 const emitGenUISpec = tool({
   description: buildEmitGenUISpecDescription(),
@@ -37,8 +38,12 @@ export interface ChatToolset {
  */
 export async function buildChatToolset({
   kubeconfig,
+  kubernetesNamespace,
+  assistantContext,
 }: {
   kubeconfig: string;
+  kubernetesNamespace: string;
+  assistantContext?: AssistantContextPayload;
 }): Promise<ChatToolset> {
   const [skillIndex, { tools: bashTools }] = await Promise.all([
     discoverPublicSkills(),
@@ -52,7 +57,18 @@ export async function buildChatToolset({
     ...bashTools,
   } as unknown as ToolSet;
 
-  const systemPrompt = `${CHAT_BASE_SYSTEM_PROMPT}\n\n${buildChatSkillsDiscoveryPrompt(skillIndex)}`;
+  const workspaceBlock = buildAssistantWorkspaceContextPrompt({
+    kubernetesNamespace,
+    assistantContext,
+  }).trimEnd();
+
+  const systemPromptParts = [
+    CHAT_BASE_SYSTEM_PROMPT,
+    ...(workspaceBlock.length > 0 ? [workspaceBlock] : []),
+    buildChatSkillsDiscoveryPrompt(skillIndex),
+  ];
+
+  const systemPrompt = systemPromptParts.join("\n\n");
 
   return { tools, systemPrompt };
 }
