@@ -3,87 +3,145 @@
 import {
   useApsK8sList,
   useApTelemetryMetricsBatch,
+  useDbsK8sList,
 } from "@workspace/api/hooks";
-import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
+import {
+  apItemsFromList,
+  apNamespaceNameTargetsFromList,
+} from "@workspace/api/lib/ap-list";
+import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import {
   apMetricsLookupFromResults,
   apsToCanvasState,
-} from "@/lib/ap-to-canvas-state";
+  dbsToCanvasState,
+} from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 
 const METRICS_REFRESH_MS = 5000;
 
-export type UseProjectServicesAuth =
-  | { type: "kubeconfig"; kubeconfig: string }
-  | { type: "share"; shareToken: string };
-
 export function useProjectServices(options: {
-  auth: UseProjectServicesAuth;
+  /** URL-encoded kubeconfig (Authorization bearer body). */
+  kubeconfig: string;
   /** K8s namespace for the AP list and telemetry targets. */
   namespace: string;
   /** Project UID from the route (decoded). */
   uid: string;
 }): {
+  /** Raw list payloads for canvas-adjacent tooling. */
+  data: {
+    aps: K8sGetResponse | undefined;
+    dbs: K8sGetResponse | undefined;
+  };
   canvasState: CanvasState;
   error: Error | undefined;
   isLoading: boolean;
 } {
-  const { auth, namespace, uid } = options;
+  const { kubeconfig, namespace, uid } = options;
 
   const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
 
-  const listArgs =
-    auth.type === "kubeconfig"
-      ? {
-          kubeconfig: auth.kubeconfig,
-          labelSelector,
-          namespace,
-        }
-      : {
-          labelSelector,
-          namespace,
-          shareToken:
-            auth.shareToken.trim() === "" ? undefined : auth.shareToken.trim(),
-        };
+  const apsListRef = useRef<K8sGetResponse | undefined>(undefined);
+  const dbsListRef = useRef<K8sGetResponse | undefined>(undefined);
 
-  const { data, error, isLoading } = useApsK8sList(listArgs);
-
-  const apMetricsTargets = useMemo(
-    () => apNamespaceNameTargetsFromList(data, namespace),
-    [data, namespace]
+  const peerDbsEmpty = useCallback(
+    () => apItemsFromList(dbsListRef.current).length === 0,
+    []
+  );
+  const peerApsEmpty = useCallback(
+    () => apItemsFromList(apsListRef.current).length === 0,
+    []
   );
 
-  const metricsArgs =
-    auth.type === "kubeconfig"
-      ? {
-          kubeconfig: auth.kubeconfig,
-          refreshInterval: METRICS_REFRESH_MS,
-          targets: apMetricsTargets,
-        }
-      : {
-          refreshInterval: METRICS_REFRESH_MS,
-          shareToken:
-            auth.shareToken.trim() === "" ? undefined : auth.shareToken.trim(),
-          targets: apMetricsTargets,
-        };
+  const {
+    data: apsData,
+    error: apsError,
+    isLoading: apsLoading,
+  } = useApsK8sList({
+    kubeconfig,
+    labelSelector,
+    namespace,
+    peerEmpty: peerDbsEmpty,
+    pollWhileEmpty: true,
+  });
 
-  const { data: apMetrics } = useApTelemetryMetricsBatch(metricsArgs);
+  const {
+    data: dbsData,
+    error: dbsError,
+    isLoading: dbsLoading,
+  } = useDbsK8sList({
+    kubeconfig,
+    labelSelector,
+    namespace,
+    peerEmpty: peerApsEmpty,
+    pollWhileEmpty: true,
+  });
+
+  apsListRef.current = apsData;
+  dbsListRef.current = dbsData;
+
+  const data = useMemo(
+    () => ({ aps: apsData, dbs: dbsData }),
+    [apsData, dbsData]
+  );
+
+  const apTargets = useMemo(
+    () =>
+      apNamespaceNameTargetsFromList(apsData, namespace).map((t) => ({
+        ...t,
+        kind: "ap" as const,
+      })),
+    [apsData, namespace]
+  );
+
+  const dbTargets = useMemo(
+    () =>
+      apNamespaceNameTargetsFromList(dbsData, namespace).map((t) => ({
+        ...t,
+        kind: "db" as const,
+      })),
+    [dbsData, namespace]
+  );
+
+  const telemetryTargets = useMemo(
+    () => [...apTargets, ...dbTargets],
+    [apTargets, dbTargets]
+  );
+
+  const { data: telemetryBatch } = useApTelemetryMetricsBatch({
+    kubeconfig,
+    refreshInterval: METRICS_REFRESH_MS,
+    targets: telemetryTargets,
+  });
 
   const metricsLookup = useMemo(
-    () => apMetricsLookupFromResults(apMetrics),
-    [apMetrics]
+    () => apMetricsLookupFromResults(telemetryBatch),
+    [telemetryBatch]
   );
 
   const canvasState = useMemo((): CanvasState => {
-    const { edges, nodes } = apsToCanvasState(data, {
+    const apBlock = apsToCanvasState(apsData, {
+      gridIndexOffset: 0,
       metricsLookup,
       namespaceFallback: namespace,
     });
-    return { edges, nodes, selectedEdge: null, selectedNode: null };
-  }, [data, namespace, metricsLookup]);
+    const dbBlock = dbsToCanvasState(dbsData, {
+      gridIndexOffset: apBlock.nodes.length,
+      metricsLookup,
+      namespaceFallback: namespace,
+    });
+    return {
+      edges: [...apBlock.edges, ...dbBlock.edges],
+      nodes: [...apBlock.nodes, ...dbBlock.nodes],
+      selectedEdge: null,
+      selectedNode: null,
+    };
+  }, [apsData, dbsData, namespace, metricsLookup]);
 
-  return { canvasState, error, isLoading };
+  const error = apsError ?? dbsError;
+  const isLoading = apsLoading || dbsLoading;
+
+  return { data, canvasState, error, isLoading };
 }

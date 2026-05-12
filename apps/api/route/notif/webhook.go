@@ -63,7 +63,7 @@ func registerWebhookAlert(grp huma.API) {
 				}
 				return nil, huma.Error500InternalServerError("failed to build Notif manifest", yerr)
 			}
-			if err := k8ssvc.ApplyYAML(restCfg, yamlBytes); err != nil {
+			if err := k8ssvc.ApplyYAML(restCfg, yamlBytes, ns); err != nil {
 				log.Printf("notif webhook apply error (item %d): %v", i, err)
 				return nil, huma.Error500InternalServerError(fmt.Sprintf("failed to apply Notif %q", name), err)
 			}

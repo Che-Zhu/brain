@@ -13,7 +13,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	corev1 "k8s.io/api/core/v1"
-	apierrors 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -235,7 +235,7 @@ func registerS2i(grp huma.API) {
 			return nil, huma.Error500InternalServerError("failed to build task manifest", err)
 		}
 
-		if err := k8ssvc.ApplyYAML(restConfig, yamlBytes); err != nil {
+		if err := k8ssvc.ApplyYAML(restConfig, yamlBytes, ns); err != nil {
 			return nil, huma.Error500InternalServerError("failed to apply task", err)
 		}
 
@@ -380,13 +380,13 @@ func registerS2iGet(grp huma.API) {
 		Namespace string `query:"namespace" doc:"Target namespace (admin kubeconfig only)"`
 	}
 	type s2iGetBody struct {
-		Phase          string           `json:"phase" doc:"Pending, Running, Complete, or Failed"`
-		JobName        string           `json:"jobName,omitempty" doc:"Underlying Job name"`
-		StartTime      string           `json:"startTime,omitempty"`
-		CompletionTime string           `json:"completionTime,omitempty"`
-		Succeeded      *int             `json:"succeeded,omitempty" doc:"1 when the Job completed successfully"`
-		Duration       string           `json:"duration,omitempty"`
-		Conditions     any              `json:"conditions,omitempty"`
+		Phase          string            `json:"phase" doc:"Pending, Running, Complete, or Failed"`
+		JobName        string            `json:"jobName,omitempty" doc:"Underlying Job name"`
+		StartTime      string            `json:"startTime,omitempty"`
+		CompletionTime string            `json:"completionTime,omitempty"`
+		Succeeded      *int              `json:"succeeded,omitempty" doc:"1 when the Job completed successfully"`
+		Duration       string            `json:"duration,omitempty"`
+		Conditions     any               `json:"conditions,omitempty"`
 		Result         *s2iResultPayload `json:"result,omitempty" doc:"Populated when phase is Complete and ConfigMap <jobName>-s2i-result exists"`
 	}
 	type s2iGetOutput struct {

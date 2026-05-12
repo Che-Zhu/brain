@@ -157,7 +157,7 @@ export function HighlightedCodeRoot({
   return (
     <div
       className={cn(
-        "group not-prose relative my-4 overflow-hidden rounded-xl border bg-background",
+        "group/code not-prose relative my-4 overflow-hidden rounded-xl border bg-background",
         className
       )}
       {...props}
@@ -219,7 +219,7 @@ export function HighlightedCodeCopyButton({
       className={cn(
         "flex cursor-pointer items-center gap-1.5 rounded-xl p-2 text-muted-foreground transition-colors",
         "pointer-events-none opacity-0 transition-opacity duration-150",
-        "group-hover:pointer-events-auto group-hover:opacity-100",
+        "group-hover/code:pointer-events-auto group-hover/code:opacity-100",
         "focus-visible:pointer-events-auto focus-visible:opacity-100",
         copied && "pointer-events-auto opacity-100",
         "hover:bg-muted-foreground/20 hover:text-foreground",

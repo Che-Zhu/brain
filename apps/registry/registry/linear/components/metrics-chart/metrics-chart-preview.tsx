@@ -24,6 +24,7 @@ function buildSampleSeries(
 const SAMPLE_MULTI_SERIES: MetricsData = {
   cpu: buildSampleSeries(14, 48, 18),
   memory: buildSampleSeries(14, 38, 12),
+  disk: buildSampleSeries(14, 58, 10),
 };
 
 /** Single-series dummy storage utilization (palette maps `storage` → chart‑4). */

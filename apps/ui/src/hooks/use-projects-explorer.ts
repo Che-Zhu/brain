@@ -17,7 +17,10 @@ import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 
-import { projectsListToExplorerProjects } from "@/lib/projects-to-explorer-projects";
+import {
+  PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
+  projectsListToExplorerProjects,
+} from "@/lib/projects-to-explorer-projects";
 import { openRightPane } from "@/store/layout-store";
 
 function projectResourceName(p: ProjectExplorerProject): string {
@@ -29,14 +32,19 @@ export function useProjectsExplorer(options: {
   kubeconfig: string;
   /** Kubernetes namespace for list / patch / delete calls. */
   ns: string;
+  /** When set, replaces the default “open assistant pane” handler for New Project. */
+  onNewProject?: () => void;
 }): {
   actions: ProjectExplorerActions;
   states: ProjectExplorerStates;
+  /** Revalidate the projects list (e.g. after creating a project). */
+  refreshProjects: () => Promise<ProjectExplorerProject[] | undefined>;
 } {
   const router = useRouter();
   const pathname = usePathname();
   const kubeconfig = options.kubeconfig.trim();
   const ns = options.ns;
+  const onNewProjectOverride = options.onNewProject;
   const hasKubeconfig = kubeconfig !== "";
 
   const getParams = useMemo(
@@ -79,8 +87,12 @@ export function useProjectsExplorer(options: {
   );
 
   const onNewProject = useCallback(() => {
+    if (onNewProjectOverride) {
+      onNewProjectOverride();
+      return;
+    }
     openRightPane();
-  }, []);
+  }, [onNewProjectOverride]);
 
   const onProjectRename = useCallback(
     async (p: ProjectExplorerProject, newDisplayName: string) => {
@@ -99,7 +111,13 @@ export function useProjectsExplorer(options: {
             ...(ns === "" ? {} : { namespace: ns }),
           },
           method: "PATCH",
-          body: { spec: { title: newDisplayName } },
+          body: {
+            metadata: {
+              annotations: {
+                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: newDisplayName,
+              },
+            },
+          },
           header: {
             Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
           },
@@ -160,5 +178,5 @@ export function useProjectsExplorer(options: {
     [onNewProject, onProjectClick, onProjectDelete, onProjectRename]
   );
 
-  return { actions, states };
+  return { actions, states, refreshProjects: mutate };
 }

@@ -12,6 +12,21 @@ export interface CanvasPanelBodyProps {
   node: Node;
 }
 
+/** One tab in {@link CanvasMeta.panelTabs}: use either static `component` or `render({ node })`. Tab `name`s should be unique within a list (used for stable React keys). */
+export type CanvasPanelTab =
+  | {
+      name: string;
+      /** Static fragment (no access to selection). */
+      component: ReactNode;
+      render?: never;
+    }
+  | {
+      name: string;
+      component?: never;
+      /** Body with selected node — for dynamic copy or nested panels. */
+      render: (panel: CanvasPanelBodyProps) => ReactNode;
+    };
+
 export type CanvasPanelComponent = ComponentType<CanvasPanelBodyProps>;
 
 /**
@@ -58,6 +73,11 @@ export interface CanvasActions {
 export interface CanvasMeta {
   edgeTypes?: EdgeTypes;
   nodeTypes?: NodeTypes;
+  /**
+   * Tabbed panel bodies per node `type`. When the selected type entry is non-empty, it replaces
+   * {@link CanvasMeta.panelTypes} for that type (Vercel-style tabs in {@link CanvasPanel}).
+   */
+  panelTabs?: Partial<Record<string, CanvasPanelTab[]>>;
   panelTypes?: CanvasPanelTypes;
   reactFlowProps?: CanvasReactFlowProps;
 }

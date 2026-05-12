@@ -1,19 +1,50 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
+import { Dialog, DialogContent } from "@workspace/ui/components/dialog";
+import { ProjectCreator } from "@workspace/ui/components/project-creator/project-creator";
 import { ProjectExplorer } from "@workspace/ui/components/project-explorer/project-explorer";
 import { useAtomValue } from "jotai";
 import { PanelRightOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo } from "react";
 
+import { useProjectCreator } from "@/hooks/use-project-creator";
 import { useProjectsExplorer } from "@/hooks/use-projects-explorer";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { openRightPane, rightPaneOpenAtom } from "@/store/layout-store";
 
 export default function ProjectIndexPage() {
+  const router = useRouter();
   const kubeconfig = useAtomValue(kubeconfigAtom).trim();
   const ns = useAtomValue(namespaceAtom);
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
-  const { actions, states } = useProjectsExplorer({ kubeconfig, ns });
+
+  const { actions, states, refreshProjects } = useProjectsExplorer({
+    kubeconfig,
+    ns,
+  });
+
+  const onProjectCreated = useCallback(
+    async (projectUid: string | undefined) => {
+      await refreshProjects();
+      if (projectUid) {
+        router.push(`/project/${encodeURIComponent(projectUid)}`);
+      }
+    },
+    [refreshProjects, router]
+  );
+
+  const projectCreator = useProjectCreator({
+    kubeconfig,
+    namespace: ns,
+    onProjectCreated,
+  });
+
+  const explorerActions = useMemo(
+    () => ({ ...actions, onNewProject: projectCreator.openDialog }),
+    [actions, projectCreator.openDialog]
+  );
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
@@ -35,10 +66,24 @@ export default function ProjectIndexPage() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 p-6">
-        <ProjectExplorer.Root actions={actions} states={states}>
+        <ProjectExplorer.Root actions={explorerActions} states={states}>
           <ProjectExplorer.Variant1 className="w-full min-w-0 max-w-2xl flex-1" />
         </ProjectExplorer.Root>
       </div>
+
+      <Dialog
+        onOpenChange={projectCreator.onDialogOpenChange}
+        open={projectCreator.dialogOpen}
+      >
+        <DialogContent className="border-none bg-transparent p-0 ring-0 sm:max-w-lg">
+          {/* <DialogHeader /> */}
+          {projectCreator.dialogOpen ? (
+            <ProjectCreator.Root {...projectCreator.creatorRootProps}>
+              <ProjectCreator.Variant1 className="min-w-0 rounded-xl border border-border bg-card p-4" />
+            </ProjectCreator.Root>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

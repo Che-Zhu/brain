@@ -1,16 +1,30 @@
 "use client";
 
+import {
+  buildMockLogs,
+  LOG_VIEWER_PREVIEW_QUICK_RANGE_MS,
+} from "@registry/linear/components/log-viewer/log-viewer-mock";
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
 import type {
   CanvasMeta,
   CanvasPanelBodyProps,
-  CanvasPanelTypes,
+  CanvasPanelTab,
 } from "@workspace/ui/components/canvas/canvas.types";
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
 import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
+import {
+  type ContainerEnvVar,
+  type ContainerPort,
+  ContainerSettingsPane,
+} from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import { LogViewer } from "@workspace/ui/components/log-viewer/log-viewer";
+import type { MetricsData } from "@workspace/ui/components/metrics-chart/metrics-chart.types";
+import { MetricsPane } from "@workspace/ui/components/metrics-pane/metrics-pane";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
+import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
+import type { TimeRange } from "@workspace/ui/components/time-range-selector";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   type Edge,
@@ -27,6 +41,141 @@ import { memo, useCallback, useMemo, useState } from "react";
 interface CanvasContainerNodeData extends Record<string, unknown> {
   states: ContainerNodeStates;
 }
+
+const SAMPLE_BASE_SECONDS = Math.floor(Date.now() / 1000) - 3600;
+
+function buildSampleSeries(
+  count: number,
+  offset: number,
+  amplitude: number
+): MetricsData[string] {
+  return Array.from({ length: count }, (_, i) => ({
+    timestamp: SAMPLE_BASE_SECONDS + i * 300,
+    value: Math.min(
+      100,
+      Math.max(0, offset + amplitude * Math.sin(i * 0.42) + i * 0.7)
+    ),
+  }));
+}
+
+/** Demo metrics fed into {@link MetricsPane} on the container node panel Metrics tab. */
+const CANVAS_PREVIEW_METRICS_DATA: MetricsData = {
+  cpu: buildSampleSeries(12, 48, 16),
+  memory: buildSampleSeries(12, 36, 12),
+  storage: buildSampleSeries(10, 40, 8),
+};
+
+const CANVAS_PREVIEW_SETTINGS_DEMO_ENV: ContainerEnvVar[] = [
+  { name: "NODE_ENV", value: "production" },
+  { name: "LOG_LEVEL", value: "info" },
+];
+
+const CANVAS_PREVIEW_SETTINGS_DEMO_PORTS: ContainerPort[] = [
+  { port: 8080, protocol: "tcp" },
+  { port: 8443, protocol: "tcp" },
+];
+
+function canvasPreviewStatesFromNode(node: Node): ContainerNodeStates | null {
+  if (
+    node.data === null ||
+    typeof node.data !== "object" ||
+    !("states" in node.data)
+  ) {
+    return null;
+  }
+  return (node.data as CanvasContainerNodeData).states;
+}
+
+/** Settings tab body: mirrors container settings registry preview, seeded from node `states`. */
+function CanvasPreviewContainerSettingsTab({ node }: CanvasPanelBodyProps) {
+  const states = canvasPreviewStatesFromNode(node);
+  const imageSeed =
+    states?.image != null && states.image !== ""
+      ? states.image
+      : "registry.example.io/unknown:latest";
+  const cpuInit = clampScale(((states?.cpuPercent ?? 50) / 100) * 4, 0.25, 8);
+  const memInit = clampScale(
+    Math.round((((states?.memoryPercent ?? 50) / 100) * 4096) / 128) * 128,
+    512,
+    4096
+  );
+
+  const [image, setImage] = useState(imageSeed);
+  const [env, setEnv] = useState<ContainerEnvVar[]>(() => [
+    ...CANVAS_PREVIEW_SETTINGS_DEMO_ENV,
+  ]);
+  const [ports, setPorts] = useState<ContainerPort[]>(() => [
+    ...CANVAS_PREVIEW_SETTINGS_DEMO_PORTS,
+  ]);
+  const [cpuCores, setCpuCores] = useState(cpuInit);
+  const [memoryMib, setMemoryMib] = useState(memInit);
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <ContainerSettingsPane
+        className="gap-4"
+        cpuQuota={{
+          max: 8,
+          min: 0.25,
+          onValueChange: setCpuCores,
+          step: 0.25,
+          value: cpuCores,
+        }}
+        env={env}
+        image={image}
+        memoryQuota={{
+          max: 4096,
+          min: 512,
+          onValueChange: setMemoryMib,
+          step: 128,
+          value: memoryMib,
+        }}
+        onEnvChange={setEnv}
+        onImageChange={setImage}
+        onPortsChange={setPorts}
+        ports={ports}
+      />
+    </div>
+  );
+}
+
+/** Mocked log stream shared with the Log Viewer registry preview. */
+function CanvasPreviewContainerLogViewerTab() {
+  const [logs] = useState(() => buildMockLogs(Date.now()));
+  const [timeRange, setTimeRange] = useState<TimeRange>({
+    mode: "quick",
+    ms: LOG_VIEWER_PREVIEW_QUICK_RANGE_MS,
+  });
+  return (
+    <LogViewer.Variant0
+      className="h-full min-h-0 min-w-0 flex-1"
+      logs={logs}
+      onTimeRangeChange={setTimeRange}
+      timeRange={timeRange}
+    />
+  );
+}
+
+const CANVAS_PREVIEW_CONTAINER_PANEL_TABS: CanvasPanelTab[] = [
+  {
+    name: "Settings",
+    render: ({ node }) => (
+      <CanvasPreviewContainerSettingsTab key={node.id} node={node} />
+    ),
+  },
+  {
+    name: "Metrics",
+    render: () => (
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <MetricsPane data={CANVAS_PREVIEW_METRICS_DATA} />
+      </div>
+    ),
+  },
+  {
+    name: "Logs",
+    component: <CanvasPreviewContainerLogViewerTab />,
+  },
+];
 
 const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
   data,
@@ -183,35 +332,6 @@ const CANVAS_PREVIEW_NODE_TYPES = {
   containerNode: PreviewCanvasContainerNode,
 } as const satisfies NodeTypes;
 
-/** Demo `panelTypes.containerNode`: same key as {@link CANVAS_PREVIEW_NODE_TYPES}. */
-const PreviewContainerNodePanel = memo(function PreviewContainerNodePanel({
-  node,
-}: CanvasPanelBodyProps) {
-  const states =
-    node.data !== null && typeof node.data === "object" && "states" in node.data
-      ? (node.data as { states: { name?: string } }).states
-      : undefined;
-  const label =
-    states?.name != null && states.name !== "" ? states.name : node.id;
-  return (
-    <div className="rounded-lg border border-primary/50 border-dashed bg-primary/5 p-3">
-      <p className="font-medium text-primary text-xs">
-        panelTypes · containerNode
-      </p>
-      <p className="mt-2 text-muted-foreground text-xs">
-        Registry preview: details for{" "}
-        <span className="text-foreground">{label}</span>
-      </p>
-    </div>
-  );
-});
-
-PreviewContainerNodePanel.displayName = "PreviewContainerNodePanel";
-
-const CANVAS_PREVIEW_PANEL_TYPES = {
-  containerNode: PreviewContainerNodePanel,
-} as const satisfies CanvasPanelTypes;
-
 /** Local-only selection logic (production uses Jotai + `canvasMetaAtom`). */
 function useCanvasPreviewSelection(
   nodes: readonly Node[],
@@ -228,7 +348,9 @@ function useCanvasPreviewSelection(
   const canvasMeta = useMemo((): CanvasMeta => {
     return {
       nodeTypes: CANVAS_PREVIEW_NODE_TYPES,
-      panelTypes: CANVAS_PREVIEW_PANEL_TYPES,
+      panelTabs: {
+        containerNode: CANVAS_PREVIEW_CONTAINER_PANEL_TABS,
+      },
       reactFlowProps: {
         onEdgeClick: (_event, edge) => {
           setSelection(null, edge);

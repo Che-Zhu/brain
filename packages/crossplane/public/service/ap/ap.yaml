@@ -23,8 +23,11 @@ spec:
             type: object
             description: >
               Claim metadata. Set metadata.labels.region to a DNS base (e.g. 192.168.12.53.nip.io).
-              When set, aps-deployment-ingress-go-templating replaces each endpoint host with
-              {metadata.name}-{slug}.{region} (slug is a short hash of name, namespace, and uid).
+              When set, aps-deployment-ingress-go-templating uses {metadata.name}-{slug}.{region} as the
+              Ingress hostname for a **single** public endpoint (spec.endpoints[].public true, default), and
+              {metadata.name}-p{port}-{slug}.{region} when **two or more** endpoints are public, so each port
+              gets a distinct hostname. spec.endpoints[].host is ignored for those rules when region is set.
+              Endpoints with public false get a ClusterIP Service only.
             properties:
               labels:
                 type: object
@@ -95,13 +98,15 @@ spec:
               endpoints:
                 type: array
                 description: >
-                  Port/host pairs for Services and Ingress (one per entry). Empty array means no exposed
-                  ports. When the field is omitted, legacy spec.port + spec.host may define one endpoint.
-                  If metadata.labels.region is set, the composition overwrites each endpoint host with
-                  {metadata.name}-{slug}.{region} for Ingress (spec values may still supply port).
+                  Per-port exposure: one ClusterIP Service per unique port; Ingress rules only for entries
+                  with public true (default) and a resolvable hostname. Optional endpoints.host when
+                  metadata.labels.region is omitted. With metadata.labels.region, the composition sets host to
+                  {metadata.name}-{slug}.{region} for one public port, or {metadata.name}-p{port}-{slug}.{region}
+                  when multiple entries are public, so ports do not share one hostname. public false keeps the
+                  Service cluster-internal (no Ingress rule).
                 items:
                   type: object
-                  required: [port, host]
+                  required: [port]
                   properties:
                     port:
                       type: integer
@@ -109,8 +114,15 @@ spec:
                     host:
                       type: string
                       description: >
-                        Ingress host (e.g. ai.example.com). When metadata.labels.region is set, this value
-                        is replaced by the composition with {name}-{slug}.{region}.
+                        Optional Ingress hostname when metadata.labels.region is omitted. When region is set,
+                        the composition chooses {name}-{slug}.{region} or {name}-p{port}-{slug}.{region} for
+                        multiple public ports, and ignores this field.
+                    public:
+                      type: boolean
+                      default: true
+                      description: >
+                        When true (default), compose an Ingress rule for this port when a hostname resolves.
+                        When false, only the in-cluster Service is created.
               cpuRequest:
                 type: string
                 default: "200m"
@@ -228,6 +240,29 @@ spec:
                 type: string
                 description: >
                   UID of the observed Project claim when spec.projectName is set and project-observe has synced.
+              endpoints:
+                type: array
+                description: >
+                  Per exposed port: Kubernetes service port number, cluster-internal URL from the composed
+                  ClusterIP Service (observed clusterIP when assigned, else in-cluster DNS), and external URL
+                  from the composed Ingress (scheme from Ingress TLS stanza).
+                items:
+                  type: object
+                  required: [number]
+                  properties:
+                    number:
+                      type: integer
+                      description: Service and Ingress backend port.
+                    privateAddress:
+                      type: string
+                      description: >
+                        http URL reachable inside the cluster (Service ClusterIP or
+                        {name}-service-port-{port}.{namespace}.svc).
+                    publicAddress:
+                      type: string
+                      description: >
+                        http(s) URL when this port is public on Ingress. Omitted when spec.endpoints[].public
+                        is false or no hostname was resolved for the Ingress rule.
               conditions:
                 type: array
                 items:

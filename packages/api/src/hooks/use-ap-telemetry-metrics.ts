@@ -6,7 +6,11 @@ import { API_ROUTES } from "../constants";
 import { fetcher } from "../fetch";
 import { ApiUrl } from "../utils";
 
+/** `GET .../metrics?kind=` — share-token auth allows `ap` only (server-enforced). */
+export type ApTelemetryResourceKind = "ap" | "db";
+
 export interface ApTelemetryTarget {
+  kind: ApTelemetryResourceKind;
   name: string;
   namespace: string;
 }
@@ -21,7 +25,7 @@ export function useApTelemetryMetricsBatch(options: {
   targets: ApTelemetryTarget[];
   /** @default 5000 */
   refreshInterval?: number;
-  /** When set, metrics requests use share token auth (kind=ap only on server). */
+  /** When set without kubeconfig, metrics use share token auth (`kind=ap` targets only). */
   shareToken?: string;
 }) {
   const { targets, refreshInterval = 5000, shareToken } = options;
@@ -39,26 +43,33 @@ export function useApTelemetryMetricsBatch(options: {
   const useShare = st !== "";
   const hasKubeconfig = kubeconfig.trim() !== "";
 
+  const fetchTargets = useMemo(() => {
+    if (useShare) {
+      return targets.filter((t) => t.kind === "ap");
+    }
+    return targets;
+  }, [useShare, targets]);
+
   return useSWR(
-    (useShare || hasKubeconfig) && targets.length > 0
+    (useShare || hasKubeconfig) && fetchTargets.length > 0
       ? ([
           API_ROUTES.telemetry.metrics,
           useShare ? "share" : "kc",
           st,
-          targets,
+          fetchTargets,
         ] as const)
       : null,
     () =>
       Promise.all(
-        targets.map((target) =>
+        fetchTargets.map((target) =>
           fetcher<Record<string, number | string>[]>({
             base: ApiUrl(),
             path: API_ROUTES.telemetry.metrics,
             query: {
-              namespace: target.namespace,
               name: target.name,
-              kind: "ap",
               ...(useShare ? { shareToken: st } : {}),
+              kind: target.kind,
+              namespace: target.namespace,
             },
             header: authHeader,
             method: "GET",

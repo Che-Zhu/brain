@@ -1,7 +1,7 @@
 export interface ProjectExplorerProject {
   createdAt: Date | string;
   id: string;
-  /** Display name (preferred: `spec.title` when set on the claim). */
+  /** Display name (preferred: `metadata.annotations.displayName`, else legacy `spec.title`). */
   name: string;
   /** `spec.public` on the Project claim when known. */
   public?: boolean;
@@ -33,8 +33,8 @@ export interface ProjectExplorerActions {
   onProjectClick?: (project: ProjectExplorerProject) => void;
   onProjectDelete?: (project: ProjectExplorerProject) => void | Promise<void>;
   /**
-   * Display rename; typically PATCH `spec.title` while keeping `metadata.name`
-   * ({@link ProjectExplorerProject.resourceName}).
+   * Display rename; typically merge-PATCH `metadata.annotations.displayName` while
+   * keeping `metadata.name` ({@link ProjectExplorerProject.resourceName}).
    */
   onProjectRename?: (
     project: ProjectExplorerProject,

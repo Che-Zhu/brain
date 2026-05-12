@@ -1,11 +1,14 @@
-import type { ApTelemetryMetricsRow } from "@workspace/api/hooks";
+import type {
+  ApTelemetryMetricsRow,
+  ApTelemetryResourceKind,
+} from "@workspace/api/hooks";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
 import type { Edge, Node } from "@xyflow/react";
 
-import { CANVAS_CONTAINER_NODE_TYPE } from "@/store/canvas-store";
+import { CANVAS_CONTAINER_NODE_TYPE } from "../nodes/constants";
 
 const COL = 280;
 const ROW = 220;
@@ -53,6 +56,15 @@ export function telemetryLatestPercents(
   return out;
 }
 
+/** Map key for merging telemetry into AP/DB workload nodes (`kind:ns:name`). */
+export function telemetryWorkloadKey(
+  kind: ApTelemetryResourceKind,
+  namespace: string,
+  name: string
+): string {
+  return `${kind}:${namespace}:${name}`;
+}
+
 export function apMetricsLookupFromResults(
   results: ApTelemetryMetricsRow[] | undefined
 ): Map<string, CpuMemoryPercents> {
@@ -61,7 +73,10 @@ export function apMetricsLookupFromResults(
     return map;
   }
   for (const r of results) {
-    map.set(`${r.namespace}:${r.name}`, telemetryLatestPercents(r.metrics));
+    map.set(
+      telemetryWorkloadKey(r.kind, r.namespace, r.name),
+      telemetryLatestPercents(r.metrics)
+    );
   }
   return map;
 }
@@ -123,10 +138,41 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   };
 }
 
+/**
+ * Maps one DB list item (example.crossplane.io/v1 `DB`) into {@link ContainerNodeStates}.
+ */
+export function dbToWorkloadStates(db: unknown): ContainerNodeStates {
+  const root = asRecord(db) ?? {};
+  const spec = asRecord(root.spec) ?? {};
+  const status = asRecord(root.status) ?? {};
+  const meta = asRecord(root.metadata) ?? {};
+
+  const name =
+    typeof meta.name === "string" && meta.name !== "" ? meta.name : "unknown";
+  const engine =
+    typeof spec.engine === "string" && spec.engine.trim() !== ""
+      ? spec.engine.trim()
+      : "database";
+
+  const phaseRaw = typeof status.phase === "string" ? status.phase.trim() : "";
+  const label = phaseRaw === "" ? "Unknown" : phaseRaw;
+  const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
+  const tone = getToneForStatus(phaseForTone) ?? "pending";
+
+  return {
+    kind: "DB",
+    image: engine,
+    name,
+    status: { label, tone },
+  };
+}
+
 export interface ApsToCanvasStateOptions {
-  /** Key `${namespace}:${name}` → latest CPU/memory % from telemetry series. */
+  /** First slot in the shared AP+DB grid (append DB nodes after APs). @default 0 */
+  gridIndexOffset?: number;
+  /** Key from {@link telemetryWorkloadKey} → latest CPU/memory % from telemetry. */
   metricsLookup?: Map<string, CpuMemoryPercents>;
-  /** Used when an AP list item has no `metadata.namespace` (same as k8s list query). */
+  /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
   namespaceFallback?: string;
 }
 
@@ -138,16 +184,19 @@ export function apsToCanvasState(
   options?: ApsToCanvasStateOptions
 ): { edges: Edge[]; nodes: Node[] } {
   const items = apItemsFromList(data);
+  const grid0 = options?.gridIndexOffset ?? 0;
   const nodes: Node[] = items.map((item, i) => {
     const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
     const meta = asRecord(asRecord(item)?.metadata) ?? {};
     const ns =
-      typeof meta.namespace === "string"
+      typeof meta.namespace === "string" && meta.namespace !== ""
         ? meta.namespace
         : options?.namespaceFallback;
     const n = typeof meta.name === "string" ? meta.name : "";
     const lookupKey =
-      ns === undefined || ns === "" || n === "" ? undefined : `${ns}:${n}`;
+      ns === undefined || ns === "" || n === ""
+        ? undefined
+        : telemetryWorkloadKey("ap", ns, n);
     const tel =
       lookupKey === undefined
         ? undefined
@@ -160,11 +209,58 @@ export function apsToCanvasState(
         ? {}
         : { memoryPercent: tel.memoryPercent }),
     };
+    const g = grid0 + i;
     return {
-      id: `ap-${String(stable).replace(/\s+/g, "-")}`,
-      type: CANVAS_CONTAINER_NODE_TYPE,
-      position: { x: (i % 3) * COL, y: Math.floor(i / 3) * ROW },
       data: { states },
+      id: `ap-${String(stable).replace(/\s+/g, "-")}`,
+      position: { x: (g % 3) * COL, y: Math.floor(g / 3) * ROW },
+      type: CANVAS_CONTAINER_NODE_TYPE,
+    };
+  });
+  return { nodes, edges: [] };
+}
+
+export type DbsToCanvasStateOptions = ApsToCanvasStateOptions;
+
+/**
+ * Builds React Flow `nodes` for the project DB (`dbs`) list — same card type as APs.
+ */
+export function dbsToCanvasState(
+  data: K8sGetResponse | undefined,
+  options?: DbsToCanvasStateOptions
+): { edges: Edge[]; nodes: Node[] } {
+  const items = apItemsFromList(data);
+  const grid0 = options?.gridIndexOffset ?? 0;
+  const nodes: Node[] = items.map((item, i) => {
+    const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
+    const meta = asRecord(asRecord(item)?.metadata) ?? {};
+    const ns =
+      typeof meta.namespace === "string" && meta.namespace !== ""
+        ? meta.namespace
+        : options?.namespaceFallback;
+    const n = typeof meta.name === "string" ? meta.name : "";
+    const lookupKey =
+      ns === undefined || ns === "" || n === ""
+        ? undefined
+        : telemetryWorkloadKey("db", ns, n);
+    const tel =
+      lookupKey === undefined
+        ? undefined
+        : options?.metricsLookup?.get(lookupKey);
+    const base = dbToWorkloadStates(item);
+    const states: ContainerNodeStates = {
+      ...base,
+      ...(tel?.cpuPercent === undefined ? {} : { cpuPercent: tel.cpuPercent }),
+      ...(tel?.memoryPercent === undefined
+        ? {}
+        : { memoryPercent: tel.memoryPercent }),
+    };
+    const g = grid0 + i;
+    return {
+      data: { states },
+      id: `db-${String(stable).replace(/\s+/g, "-")}`,
+      position: { x: (g % 3) * COL, y: Math.floor(g / 3) * ROW },
+      type: CANVAS_CONTAINER_NODE_TYPE,
     };
   });
   return { nodes, edges: [] };

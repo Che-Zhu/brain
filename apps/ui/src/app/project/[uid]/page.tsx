@@ -26,7 +26,7 @@ export default function ProjectUidPage() {
   const selectedNode = useAtomValue(selectedNodeAtom);
 
   const { canvasState, error, isLoading } = useProjectServices({
-    auth: { kubeconfig, type: "kubeconfig" },
+    kubeconfig,
     namespace,
     uid,
   });

@@ -129,6 +129,11 @@ export const Index: RegistryIndex = {
         type: "registry:preview",
         target: "",
       },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-mock.ts",
+        target: "",
+        type: "registry:preview",
+      },
       previewUiFile,
     ],
     load: () =>
@@ -182,6 +187,216 @@ export const Index: RegistryIndex = {
         title: "v1",
       },
     ],
+  },
+
+  "linear/components/container-settings-pane": {
+    style: "linear",
+    group: "components",
+    name: "container-settings-pane",
+    title: "Container settings pane",
+    description:
+      "Fully controlled: `image`, `env`, `ports`, and CPU/Memory quota (`value` + `onValueChange`). Image/env editors use dialogs; ports flow through required `onPortsChange`.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "scale-slider",
+      "button",
+      "textarea",
+      "field",
+      "dropdown-menu",
+      "dialog",
+      "label",
+      "input",
+      "table",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/container-settings-pane/container-settings-pane-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "packages/ui/src/components/container-settings-pane/container-settings-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.context.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.helpers.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.parts.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.root.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.variant0.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/dialog.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/label.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/textarea.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/button.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/scale-slider/scale-slider.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/raw-editor.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/lib/parse-env-text.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/field.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/container-settings-pane/container-settings-pane-preview"
+      ),
+  },
+
+  "linear/components/ports-table": {
+    style: "linear",
+    group: "components",
+    name: "ports-table",
+    title: "Ports table",
+    description:
+      "Compound PortsTable (split module): dialogs edit port numbers only; host callbacks receive numbers; addresses are display state.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "button",
+      "dropdown-menu",
+      "dialog",
+      "label",
+      "input",
+      "table",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/ports-table/ports-table-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.context.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.helpers.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.parts.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.root.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.variant0.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/button.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/dropdown-menu.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/dialog.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/label.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/input.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/table.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/ports-table/ports-table-preview"),
   },
 
   "linear/components/chat": {
@@ -289,6 +504,117 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/project-creator": {
+    style: "linear",
+    group: "components",
+    name: "project-creator",
+    title: "Project creator",
+    description:
+      "Breadcrumb new-project flow: Github, Docker image, or Database; compound Root + Trail / Stage / Variant1",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "input", "label", "breadcrumb"],
+    files: [
+      {
+        path: "registry/linear/components/project-creator/project-creator-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.context.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.layout.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.trail.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.pick.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.stage.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/project-creator/project-creator.variant1.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/project-creator/project-creator-preview"
+      ),
+  },
+
+  "linear/components/raw-editor": {
+    style: "linear",
+    group: "components",
+    name: "raw-editor",
+    title: "Raw editor",
+    description:
+      "TanStack Form + .env-style KEY=value textarea (K8s env name filtering); compound Provider / Root / Input / Submit / Variant0.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "field", "textarea"],
+    files: [
+      {
+        path: "registry/linear/components/raw-editor/raw-editor-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "packages/ui/src/components/raw-editor.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/lib/parse-env-text.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/button.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/field.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/textarea.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/raw-editor/raw-editor-preview"),
+  },
+
   "linear/components/scale-slider": {
     style: "linear",
     group: "components",
@@ -317,15 +643,139 @@ export const Index: RegistryIndex = {
     name: "canvas",
     title: "Canvas",
     description:
-      "React Flow workspace surface (dots, glow), Jotai, provider context",
+      "React Flow workspace (dots, glow), Jotai context; container panel tabs include Settings (`ContainerSettingsPane`), Metrics, Logs.",
     state: "coding",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "container-node"],
+    registryDependencies: [
+      "preview",
+      "button",
+      "container-node",
+      "chart",
+      "log-viewer",
+      "scale-slider",
+      "textarea",
+      "field",
+      "dropdown-menu",
+      "dialog",
+      "label",
+      "input",
+      "table",
+    ],
     files: [
       {
         path: "registry/linear/components/canvas/canvas-preview.tsx",
         type: "registry:preview",
         target: "",
+      },
+      {
+        path: "packages/ui/src/components/canvas/canvas.panel.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/canvas/canvas.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/metrics-pane/metrics-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/log-viewer/log-viewer.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "registry/linear/components/log-viewer/log-viewer-mock.ts",
+        target: "",
+        type: "registry:preview",
+      },
+      {
+        path: "packages/ui/src/components/container-settings-pane/container-settings-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.context.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.helpers.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.parts.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.root.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/ports-table/ports-table.variant0.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/separator.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/dialog.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/label.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/textarea.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/scale-slider/scale-slider.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/raw-editor.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/lib/parse-env-text.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/field.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/vercel-tabs.tsx",
+        target: "",
+        type: "registry:ui",
       },
       previewUiFile,
     ],
@@ -352,6 +802,38 @@ export const Index: RegistryIndex = {
     ],
     load: () =>
       import("@registry/linear/components/metrics-chart/metrics-chart-preview"),
+  },
+
+  "linear/components/metrics-pane": {
+    style: "linear",
+    group: "components",
+    name: "metrics-pane",
+    title: "Metrics pane",
+    description:
+      "Data-driven grid: one MetricsChart per metric key (`cpu`, `memory`, …); auto-fill layout from `MetricsData`.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "chart"],
+    files: [
+      {
+        path: "registry/linear/components/metrics-pane/metrics-pane-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "packages/ui/src/components/metrics-pane/metrics-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "registry/linear/components/metrics-chart/metrics-chart-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/metrics-pane/metrics-pane-preview"),
   },
 
   "linear/components/agui": {

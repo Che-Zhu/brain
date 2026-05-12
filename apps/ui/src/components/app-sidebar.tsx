@@ -19,7 +19,7 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAtomValue } from "jotai";
-import { Boxes, FolderKanban } from "lucide-react";
+import { Boxes, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { namespaceAtom } from "@/store/auth-store";
@@ -53,7 +53,7 @@ export default function AppSidebar() {
                         className="flex min-h-0 min-w-0 flex-1 items-center gap-2 overflow-hidden group-data-[collapsible=icon]:justify-center"
                         href={projectsHref}
                       >
-                        <FolderKanban
+                        <LayoutGrid
                           aria-hidden
                           className="size-4 shrink-0"
                           strokeWidth={2}

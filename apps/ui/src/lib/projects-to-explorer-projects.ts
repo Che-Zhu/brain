@@ -1,16 +1,20 @@
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type { ProjectExplorerProject } from "@workspace/ui/components/project-explorer/project-explorer";
 
+/** Key on `metadata.annotations` for the UI display name (merge-patched on rename). */
+export const PROJECT_DISPLAY_NAME_ANNOTATION_KEY = "displayName";
+
 /** One Project from `kubectl get projects -o json` / k8s get `kind=projects` (example.crossplane.io/v1). */
 export interface ProjectListItem {
   metadata?: {
     creationTimestamp?: string;
     name?: string;
     uid?: string;
+    annotations?: Record<string, string>;
   };
   spec?: {
     public?: boolean;
-    /** Not part of the core Project XRD; kept for optional display fallbacks. */
+    /** Legacy display fallback when {@link PROJECT_DISPLAY_NAME_ANNOTATION_KEY} is unset. */
     title?: string;
   };
 }
@@ -40,6 +44,19 @@ function getProjectItems(
   return undefined;
 }
 
+function projectExplorerDisplayName(item: ProjectListItem): string | undefined {
+  const fromAnnotation =
+    item.metadata?.annotations?.[PROJECT_DISPLAY_NAME_ANNOTATION_KEY]?.trim();
+  if (fromAnnotation && fromAnnotation.length > 0) {
+    return fromAnnotation;
+  }
+  const legacyTitle = item.spec?.title?.trim();
+  if (legacyTitle && legacyTitle.length > 0) {
+    return legacyTitle;
+  }
+  return undefined;
+}
+
 /**
  * Maps a Project list (or unknown k8s get / SWR `data` payload) into
  * {@link ProjectExplorerProject} rows for {@link ProjectExplorer}.
@@ -56,12 +73,14 @@ export function projectsListToExplorerProjects(
     const id = meta.uid ?? meta.name ?? `project-${index}`;
     const resourceName =
       typeof meta.name === "string" && meta.name !== "" ? meta.name : undefined;
-    const title = item.spec?.title?.trim();
-    const name =
-      title && title.length > 0
-        ? title
-        : (resourceName ??
-          (typeof id === "string" && id !== "" ? id : "Untitled"));
+    const displayName = projectExplorerDisplayName(item);
+    let name =
+      displayName ??
+      resourceName ??
+      (typeof id === "string" && id !== "" ? id : undefined);
+    if (!name || name === "") {
+      name = "Untitled";
+    }
     const createdAt = meta.creationTimestamp ?? "";
     const specPublic = item.spec?.public;
     const base: ProjectExplorerProject = {

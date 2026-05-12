@@ -191,15 +191,15 @@ export function ProjectExplorerListItem({
           <DialogHeader>
             <DialogTitle>Rename project</DialogTitle>
             <DialogDescription>
-              Updates the display name for{" "}
-              <span className="font-medium text-foreground">
-                {project.name}
+              Sets{" "}
+              <span className="font-mono text-foreground">
+                metadata.annotations.displayName
               </span>{" "}
-              (resource{" "}
+              on project{" "}
               <span className="font-mono text-foreground">
                 {k8sName(project)}
               </span>
-              ).
+              . The Kubernetes resource name does not change.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
