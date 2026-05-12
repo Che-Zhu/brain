@@ -2,9 +2,18 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 import type { MouseEvent, PointerEvent, ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCanvasNode } from "./canvas-node.context";
+
+const HOVER_HIDE_DELAY_MS = 100;
+const HOVER_ZONE_SELECTOR = [
+  '[data-slot="canvas-node-surface"]',
+  '[data-slot="canvas-node-expand-button"]',
+  '[data-slot="canvas-node-connection-button"]',
+].join(",");
+
+type CanvasNodeHoverZone = "connection" | "expand-control" | "surface";
 
 function isInsideSurface(
   currentTarget: HTMLElement,
@@ -26,6 +35,32 @@ function stopOutsideSurface<E extends MouseEvent | PointerEvent>(event: E) {
   }
 }
 
+function getCanvasNodeHoverZone(
+  currentTarget: HTMLElement,
+  target: EventTarget | null
+): CanvasNodeHoverZone | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+
+  const hoverEl = target.closest(HOVER_ZONE_SELECTOR);
+
+  if (!(hoverEl instanceof HTMLElement && currentTarget.contains(hoverEl))) {
+    return null;
+  }
+
+  switch (hoverEl.dataset.slot) {
+    case "canvas-node-connection-button":
+      return "connection";
+    case "canvas-node-expand-button":
+      return "expand-control";
+    case "canvas-node-surface":
+      return "surface";
+    default:
+      return null;
+  }
+}
+
 export function CanvasNodeFrame({
   children,
   className,
@@ -40,19 +75,99 @@ export function CanvasNodeFrame({
   const selected = interaction?.selected ?? false;
   const dragging = interaction?.dragging ?? false;
   const [hoverIntent, setHoverIntent] = useState(false);
+  const hoverIntentRef = useRef(false);
+  const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
-  const showHoverIntent = useCallback(() => {
-    if (dragging) {
-      setHoverIntent(false);
+  const setResolvedHoverIntent = useCallback((nextHoverIntent: boolean) => {
+    hoverIntentRef.current = nextHoverIntent;
+    setHoverIntent((currentHoverIntent) =>
+      currentHoverIntent === nextHoverIntent
+        ? currentHoverIntent
+        : nextHoverIntent
+    );
+  }, []);
+
+  const clearHoverIntentTimer = useCallback(() => {
+    if (!hoverIntentTimerRef.current) {
       return;
     }
 
-    setHoverIntent(true);
-  }, [dragging]);
+    clearTimeout(hoverIntentTimerRef.current);
+    hoverIntentTimerRef.current = null;
+  }, []);
+
+  const showHoverIntent = useCallback(() => {
+    clearHoverIntentTimer();
+
+    if (dragging) {
+      setResolvedHoverIntent(false);
+      return;
+    }
+
+    setResolvedHoverIntent(true);
+  }, [clearHoverIntentTimer, dragging, setResolvedHoverIntent]);
 
   const hideHoverIntent = useCallback(() => {
-    setHoverIntent(false);
-  }, []);
+    clearHoverIntentTimer();
+    setResolvedHoverIntent(false);
+  }, [clearHoverIntentTimer, setResolvedHoverIntent]);
+
+  const scheduleHideHoverIntent = useCallback(() => {
+    if (!hoverIntentRef.current) {
+      return;
+    }
+
+    clearHoverIntentTimer();
+    hoverIntentTimerRef.current = setTimeout(() => {
+      hoverIntentTimerRef.current = null;
+      setResolvedHoverIntent(false);
+    }, HOVER_HIDE_DELAY_MS);
+  }, [clearHoverIntentTimer, setResolvedHoverIntent]);
+
+  const handleHoverPointer = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType !== "mouse") {
+        return;
+      }
+
+      const hoverZone = getCanvasNodeHoverZone(
+        event.currentTarget,
+        event.target
+      );
+
+      if (hoverZone === "surface") {
+        showHoverIntent();
+        return;
+      }
+
+      if (
+        hoverIntentRef.current &&
+        (hoverZone === "connection" || hoverZone === "expand-control")
+      ) {
+        clearHoverIntentTimer();
+        setResolvedHoverIntent(true);
+        return;
+      }
+
+      scheduleHideHoverIntent();
+    },
+    [
+      clearHoverIntentTimer,
+      scheduleHideHoverIntent,
+      setResolvedHoverIntent,
+      showHoverIntent,
+    ]
+  );
+
+  useEffect(() => {
+    if (dragging) {
+      hideHoverIntent();
+    }
+  }, [dragging, hideHoverIntent]);
+
+  useEffect(() => () => clearHoverIntentTimer(), [clearHoverIntentTimer]);
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: frame scopes canvas hit targets and hover state; interaction stays on child controls.
@@ -67,8 +182,9 @@ export function CanvasNodeFrame({
       data-state={expanded ? "expanded" : "collapsed"}
       onClick={stopOutsideSurface}
       onPointerDown={stopOutsideSurface}
-      onPointerEnter={showHoverIntent}
-      onPointerLeave={hideHoverIntent}
+      onPointerLeave={scheduleHideHoverIntent}
+      onPointerMove={handleHoverPointer}
+      onPointerOver={handleHoverPointer}
     >
       {children}
     </div>

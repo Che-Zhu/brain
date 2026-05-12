@@ -6,6 +6,11 @@ import { PanelRightClose, PanelRightOpen } from "lucide-react";
 
 import { useCanvasNode } from "./canvas-node.context";
 
+function isFrameHoverWarm(target: HTMLElement) {
+  const frame = target.closest('[data-slot="canvas-node-frame"]');
+  return frame instanceof HTMLElement && frame.dataset.hoverIntent === "true";
+}
+
 export function CanvasNodeExpandButton({ className }: { className?: string }) {
   const { actions, meta } = useCanvasNode();
   const Icon = meta.expanded ? PanelRightOpen : PanelRightClose;
@@ -35,7 +40,11 @@ export function CanvasNodeExpandButton({ className }: { className?: string }) {
         event.stopPropagation();
       }}
       onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse" || meta.expanded) {
+        if (
+          event.pointerType !== "mouse" ||
+          meta.expanded ||
+          !isFrameHoverWarm(event.currentTarget)
+        ) {
           return;
         }
 

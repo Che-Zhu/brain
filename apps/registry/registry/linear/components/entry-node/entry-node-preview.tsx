@@ -132,6 +132,11 @@ export default function EntryNodePreview() {
           <EntryNodeSample defaultExpanded />
         </PreviewSurface>
       </Preview>
+      <Preview title="Expanded selected">
+        <PreviewSurface>
+          <EntryNodeSample defaultExpanded selected />
+        </PreviewSurface>
+      </Preview>
       <Preview title="Expanded two targets">
         <PreviewSurface>
           <EntryNodeSample
