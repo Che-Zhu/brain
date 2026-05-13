@@ -90,11 +90,12 @@
 .canvas-node-header {
   min-height: var(--canvas-node-card-height-collapsed);
   padding: calc(var(--spacing) * 2.5);
+  border-bottom: 0.5px solid transparent;
+  transition: border-color 150ms ease-out;
 }
 
 .canvas-node-frame[data-state="expanded"] .canvas-node-header {
-  border-bottom: 0.5px solid
-    color-mix(in oklab, var(--color-white) 10%, transparent);
+  border-bottom-color: color-mix(in oklab, var(--color-white) 10%, transparent);
 }
 
 .canvas-node-header-content {
@@ -105,26 +106,31 @@
 .canvas-node-body {
   display: grid;
   grid-template-rows: 0fr;
+  overflow: hidden;
   opacity: 0;
   transition:
-    grid-template-rows 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 120ms ease;
+    grid-template-rows 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 100ms ease;
 }
 
 .canvas-node-frame[data-state="expanded"] .canvas-node-body {
   grid-template-rows: 1fr;
   opacity: 1;
-  transition-delay: 40ms;
+  transition-delay: 40ms, 40ms;
+  transition-duration: 180ms, 120ms;
 }
 
 .canvas-node-body-clip {
   min-height: 0;
   padding: 0 calc(var(--spacing) * 2.5);
   overflow: hidden;
+  transition: padding-bottom 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .canvas-node-frame[data-state="expanded"] .canvas-node-body-clip {
   padding-bottom: calc(var(--spacing) * 2.5);
+  transition-delay: 40ms;
+  transition-duration: 180ms;
 }
 
 .canvas-node-footer {
