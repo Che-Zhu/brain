@@ -1,6 +1,4 @@
 import type {
-  CanvasNodeConnectionEvent,
-  CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
   CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
@@ -99,11 +97,6 @@ export type DatabaseNodeTogglePublicConnectionHandler = (
   nextEnabled: boolean
 ) => Promise<void> | void;
 
-export type DatabaseNodeStartConnectionHandler = (
-  side: CanvasNodeConnectionSide,
-  event: CanvasNodeConnectionEvent
-) => void;
-
 export type DatabaseNodeQuickActionKey = "console" | "logs" | "metrics";
 
 export type DatabaseNodeLifecycleActionKey =
@@ -165,7 +158,6 @@ export interface DatabaseNodeRootProps {
   lifecycleActions?: DatabaseNodeLifecycleActions;
   onCopyConnection?: DatabaseNodeCopyConnectionHandler;
   onExpandedChange?: (expanded: boolean) => void;
-  onStartConnection?: DatabaseNodeStartConnectionHandler;
   onTogglePublicConnection?: DatabaseNodeTogglePublicConnectionHandler;
   quickActions?: DatabaseNodeQuickActions;
   states: DatabaseNodeStates;

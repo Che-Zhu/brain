@@ -1,4 +1,4 @@
-import type { PointerEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export type CanvasNodeVisualStatusTone =
   | "negative"
@@ -17,9 +17,8 @@ export interface CanvasNodeInteractionState {
   selected?: boolean;
 }
 
+/** Visual side identifier used for connection handle placement and card-edge hover glow. */
 export type CanvasNodeConnectionSide = "bottom" | "left" | "right" | "top";
-
-export type CanvasNodeConnectionEvent = PointerEvent<HTMLButtonElement>;
 
 export interface CanvasNodeState {
   interaction?: CanvasNodeInteractionState;
@@ -28,10 +27,6 @@ export interface CanvasNodeState {
 export interface CanvasNodeActions {
   collapse?: () => void;
   expand?: () => void;
-  startConnection?: (
-    side: CanvasNodeConnectionSide,
-    event: CanvasNodeConnectionEvent
-  ) => void;
 }
 
 export interface CanvasNodeMeta {
@@ -56,5 +51,4 @@ export interface CanvasNodeRootProps {
   expanded?: boolean;
   interaction?: CanvasNodeInteractionState;
   onExpandedChange?: (expanded: boolean) => void;
-  onStartConnection?: CanvasNodeActions["startConnection"];
 }

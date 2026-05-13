@@ -14,7 +14,6 @@ export type {
   EntryNodeOpenTargetSettingsHandler,
   EntryNodeProviderProps,
   EntryNodeRootProps,
-  EntryNodeStartConnectionHandler,
   EntryNodeState,
   EntryNodeStates,
   EntryNodeTarget,

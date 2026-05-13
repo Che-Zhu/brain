@@ -46,7 +46,6 @@ export function DatabaseNodeRoot({
   lifecycleActions,
   onCopyConnection,
   onExpandedChange,
-  onStartConnection,
   onTogglePublicConnection,
   quickActions,
   states,
@@ -57,7 +56,6 @@ export function DatabaseNodeRoot({
       expanded={expanded}
       interaction={interaction}
       onExpandedChange={onExpandedChange}
-      onStartConnection={onStartConnection}
     >
       <CanvasNodeCopyFeedbackScope
         copiedFeedbackMs={copiedFeedbackMs}

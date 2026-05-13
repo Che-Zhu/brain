@@ -1,6 +1,5 @@
 export type {
   CanvasNodeActions,
-  CanvasNodeConnectionEvent,
   CanvasNodeConnectionSide,
   CanvasNodeContextValue,
   CanvasNodeCopyableRowKey,
@@ -17,3 +16,4 @@ export type {
 } from "./canvas-node";
 // biome-ignore lint/performance/noBarrelFile: canvas-node public package surface
 export { CanvasNode } from "./canvas-node";
+export type { CanvasNodeConnectionAnchorProps } from "./canvas-node.connection";

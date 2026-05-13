@@ -1,6 +1,4 @@
 import type {
-  CanvasNodeConnectionEvent,
-  CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
   CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
@@ -96,11 +94,6 @@ export type EnvironmentNodeCopyLaunchCommandHandler = (
   launchCommand: string
 ) => Promise<void> | void;
 
-export type EnvironmentNodeStartConnectionHandler = (
-  side: CanvasNodeConnectionSide,
-  event: CanvasNodeConnectionEvent
-) => void;
-
 export interface EnvironmentNodeActions {
   copyLaunchCommand?: EnvironmentNodeCopyLaunchCommandHandler;
   lifecycleActions?: EnvironmentNodeLifecycleActions;
@@ -139,7 +132,6 @@ export interface EnvironmentNodeRootProps {
   lifecycleActions?: EnvironmentNodeLifecycleActions;
   onCopyLaunchCommand?: EnvironmentNodeCopyLaunchCommandHandler;
   onExpandedChange?: (expanded: boolean) => void;
-  onStartConnection?: EnvironmentNodeStartConnectionHandler;
   quickActions?: EnvironmentNodeQuickActions;
   states: EnvironmentNodeStates;
 }

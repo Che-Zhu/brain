@@ -10,7 +10,7 @@ const HOVER_HIDE_DELAY_MS = 100;
 const HOVER_ZONE_SELECTOR = [
   '[data-slot="canvas-node-surface"]',
   '[data-slot="canvas-node-expand-button"]',
-  '[data-slot="canvas-node-connection-button"]',
+  '[data-slot="canvas-node-rf-handle"]',
 ].join(",");
 
 type CanvasNodeHoverZone = "connection" | "expand-control" | "surface";
@@ -50,7 +50,7 @@ function getCanvasNodeHoverZone(
   }
 
   switch (hoverEl.dataset.slot) {
-    case "canvas-node-connection-button":
+    case "canvas-node-rf-handle":
       return "connection";
     case "canvas-node-expand-button":
       return "expand-control";

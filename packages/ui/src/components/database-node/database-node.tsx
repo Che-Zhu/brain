@@ -50,7 +50,6 @@ export type {
   DatabaseNodeQuickActionKey,
   DatabaseNodeQuickActions,
   DatabaseNodeRootProps,
-  DatabaseNodeStartConnectionHandler,
   DatabaseNodeState,
   DatabaseNodeStates,
   DatabaseNodeStatus,

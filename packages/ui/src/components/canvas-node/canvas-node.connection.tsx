@@ -1,28 +1,78 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { Handle, type HandleType, Position, useNodeId } from "@xyflow/react";
 import { Plus } from "lucide-react";
 
-import { useCanvasNode } from "./canvas-node.context";
 import type { CanvasNodeConnectionSide } from "./canvas-node.types";
 
-const CONNECTION_SIDES = [
-  "top",
-  "right",
-  "bottom",
-  "left",
-] as const satisfies readonly CanvasNodeConnectionSide[];
+const CONNECTION_SIDE_CONFIG = [
+  { position: Position.Top, side: "top" },
+  { position: Position.Right, side: "right" },
+  { position: Position.Bottom, side: "bottom" },
+  { position: Position.Left, side: "left" },
+] as const satisfies readonly {
+  position: Position;
+  side: CanvasNodeConnectionSide;
+}[];
 
-export function CanvasNodeConnectionLayer() {
+export interface CanvasNodeConnectionAnchorProps {
+  className?: string;
+  type?: HandleType;
+}
+
+export function CanvasNodeConnectionAnchor({
+  className,
+  type = "source",
+}: CanvasNodeConnectionAnchorProps) {
+  const nodeId = useNodeId();
+
   return (
     <div
-      className="canvas-node-connection-layer pointer-events-none absolute"
-      data-slot="canvas-node-connection-layer"
+      className={cn(
+        "canvas-node-connection-anchor pointer-events-none absolute",
+        className
+      )}
+      data-slot="canvas-node-connection-anchor"
     >
-      {CONNECTION_SIDES.map((side) => (
-        <CanvasNodeConnectionButton key={side} side={side} />
-      ))}
+      {CONNECTION_SIDE_CONFIG.map(({ position, side }) =>
+        nodeId ? (
+          <Handle
+            aria-label={`Connect from ${side}`}
+            className="nodrag nopan canvas-node-rf-handle absolute flex cursor-pointer items-center justify-center rounded-full p-0"
+            data-side={side}
+            data-slot="canvas-node-rf-handle"
+            id={side}
+            key={side}
+            onMouseEnter={(event) => {
+              setFrameHoverSide(event.currentTarget, side);
+            }}
+            onMouseLeave={(event) => {
+              setFrameHoverSide(event.currentTarget, null);
+            }}
+            position={position}
+            type={type}
+          >
+            <CanvasNodeConnectionIcon />
+          </Handle>
+        ) : (
+          <span
+            aria-hidden
+            className="nodrag nopan canvas-node-rf-handle absolute flex cursor-pointer items-center justify-center rounded-full p-0"
+            data-side={side}
+            data-slot="canvas-node-rf-handle"
+            key={side}
+            onMouseEnter={(event) => {
+              setFrameHoverSide(event.currentTarget, side);
+            }}
+            onMouseLeave={(event) => {
+              setFrameHoverSide(event.currentTarget, null);
+            }}
+          >
+            <CanvasNodeConnectionIcon />
+          </span>
+        )
+      )}
     </div>
   );
 }
@@ -44,43 +94,12 @@ function setFrameHoverSide(
   }
 }
 
-export function CanvasNodeConnectionButton({
-  className,
-  side,
-}: {
-  className?: string;
-  side: CanvasNodeConnectionSide;
-}) {
-  const { actions } = useCanvasNode();
-
+function CanvasNodeConnectionIcon() {
   return (
-    <Button
-      aria-label={`Connect from ${side}`}
-      className={cn(
-        "nodrag nopan canvas-node-connection-button absolute flex cursor-pointer items-center justify-center rounded-full p-0",
-        className
-      )}
-      data-side={side}
-      data-slot="canvas-node-connection-button"
-      onPointerDown={(event) => {
-        actions.startConnection?.(side, event);
-      }}
-      onPointerEnter={(event) => {
-        setFrameHoverSide(event.currentTarget, side);
-      }}
-      onPointerLeave={(event) => {
-        setFrameHoverSide(event.currentTarget, null);
-      }}
-      size={null}
-      tabIndex={-1}
-      type="button"
-      variant={null}
-    >
-      <Plus
-        aria-hidden
-        className="canvas-node-connection-icon pointer-events-none"
-        size={10}
-      />
-    </Button>
+    <Plus
+      aria-hidden
+      className="canvas-node-connection-icon pointer-events-none"
+      size={10}
+    />
   );
 }

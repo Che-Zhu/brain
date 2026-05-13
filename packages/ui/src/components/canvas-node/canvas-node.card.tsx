@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { CanvasNodeConnectionLayer } from "./canvas-node.connection";
+import { CanvasNodeConnectionAnchor } from "./canvas-node.connection";
 import { CanvasNodeDragStateFrame } from "./canvas-node.drag-frame";
 import { CanvasNodeExpandButton } from "./canvas-node.expand-button";
 import { CanvasNodeFrame } from "./canvas-node.frame";
@@ -21,7 +21,7 @@ export function CanvasNodeCard({
 }: CanvasNodeCardProps) {
   return (
     <CanvasNodeFrame className={className}>
-      <CanvasNodeConnectionLayer />
+      <CanvasNodeConnectionAnchor />
       <CanvasNodeDragStateFrame>
         <CanvasNodeSurface className={surfaceClassName}>
           {children}

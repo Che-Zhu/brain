@@ -460,7 +460,7 @@ export const Index: RegistryIndex = {
       "Entry point node with hero canvas view and state matrix (access-domain header, target rows).",
     state: "done",
     type: "registry:preview",
-    registryDependencies: ["preview", "canvas", "entry-node"],
+    registryDependencies: ["preview", "canvas-alter", "entry-node"],
     files: [
       {
         path: "registry/linear/components/entry-node/entry-node-preview.tsx",
@@ -489,7 +489,7 @@ export const Index: RegistryIndex = {
     type: "registry:preview",
     registryDependencies: [
       "preview",
-      "canvas",
+      "canvas-alter",
       "database-node",
       "button",
       "dropdown-menu",
@@ -523,7 +523,7 @@ export const Index: RegistryIndex = {
     type: "registry:preview",
     registryDependencies: [
       "preview",
-      "canvas",
+      "canvas-alter",
       "environment-node",
       "button",
       "dropdown-menu",

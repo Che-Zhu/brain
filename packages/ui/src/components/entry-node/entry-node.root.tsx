@@ -24,7 +24,6 @@ export function EntryNodeRoot({
   onCopyTarget,
   onExpandedChange,
   onOpenTargetSettings,
-  onStartConnection,
   states,
   targets,
 }: EntryNodeRootProps) {
@@ -34,7 +33,6 @@ export function EntryNodeRoot({
       expanded={expanded}
       interaction={interaction}
       onExpandedChange={onExpandedChange}
-      onStartConnection={onStartConnection}
     >
       <CanvasNodeCopyFeedbackScope
         copiedFeedbackMs={copiedFeedbackMs}

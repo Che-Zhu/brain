@@ -5,8 +5,10 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 
 import {
+  addEdge,
   Background,
   BackgroundVariant,
+  type OnConnect,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -14,7 +16,7 @@ import {
 } from "@xyflow/react";
 import { Provider as JotaiProvider } from "jotai";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasReactFlowProps } from "./canvas.types";
 import { useCanvas } from "./canvas.use";
@@ -33,6 +35,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
+  const onConnect = meta.reactFlowProps?.onConnect;
 
   useEffect(() => {
     setNodes(state.nodes);
@@ -53,6 +56,14 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     ...meta.reactFlowProps,
   };
 
+  const handleConnect = useCallback<OnConnect>(
+    (connection) => {
+      setEdges((currentEdges) => addEdge(connection, currentEdges));
+      onConnect?.(connection);
+    },
+    [onConnect, setEdges]
+  );
+
   return (
     <div className="relative h-full min-h-0 w-full min-w-0">
       <div className="canvas-surface">
@@ -62,6 +73,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
           edgeTypes={meta.edgeTypes}
           nodes={nodes}
           nodeTypes={meta.nodeTypes}
+          onConnect={handleConnect}
           onEdgesChange={onEdgesChange}
           onNodesChange={onNodesChange}
         >

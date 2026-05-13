@@ -20,12 +20,3 @@
 .react-flow__pane.dragging {
   cursor: default;
 }
-
-/* Keeps handles functional but invisible on the canvas surface. */
-.canvas-surface .react-flow__handle {
-  top: auto;
-  bottom: auto;
-  width: 0;
-  height: 0;
-  opacity: 0;
-}

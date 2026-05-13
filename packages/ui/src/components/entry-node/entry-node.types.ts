@@ -1,6 +1,4 @@
 import type {
-  CanvasNodeConnectionEvent,
-  CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
   CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
@@ -49,11 +47,6 @@ export type EntryNodeOpenTargetSettingsHandler = (
   index: number
 ) => void;
 
-export type EntryNodeStartConnectionHandler = (
-  side: CanvasNodeConnectionSide,
-  event: CanvasNodeConnectionEvent
-) => void;
-
 export interface EntryNodeState {
   accessDomain?: EntryNodeAccessDomain;
   copiedTargetKey?: EntryNodeTargetKey | null;
@@ -92,7 +85,6 @@ export interface EntryNodeRootProps {
   onCopyTarget?: EntryNodeCopyTargetHandler;
   onExpandedChange?: (expanded: boolean) => void;
   onOpenTargetSettings?: EntryNodeOpenTargetSettingsHandler;
-  onStartConnection?: EntryNodeStartConnectionHandler;
   states: EntryNodeStates;
   targets?: EntryNodeTarget[];
 }

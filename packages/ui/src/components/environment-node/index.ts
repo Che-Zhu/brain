@@ -12,7 +12,6 @@ export type {
   EnvironmentNodeQuickActionKey,
   EnvironmentNodeQuickActions,
   EnvironmentNodeRootProps,
-  EnvironmentNodeStartConnectionHandler,
   EnvironmentNodeState,
   EnvironmentNodeStates,
   EnvironmentNodeStatus,

@@ -33,7 +33,6 @@ export function EnvironmentNodeRoot({
   lifecycleActions,
   onCopyLaunchCommand,
   onExpandedChange,
-  onStartConnection,
   quickActions,
   states,
 }: EnvironmentNodeRootProps) {
@@ -53,7 +52,6 @@ export function EnvironmentNodeRoot({
       expanded={expanded}
       interaction={interaction}
       onExpandedChange={onExpandedChange}
-      onStartConnection={onStartConnection}
     >
       <CanvasNodeCopyFeedbackScope
         copiedFeedbackMs={copiedFeedbackMs}

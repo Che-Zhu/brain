@@ -145,7 +145,7 @@
   background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
 }
 
-.canvas-node-connection-layer {
+.canvas-node-connection-anchor {
   top: 0;
   bottom: 0;
   left: calc(var(--canvas-node-control-size) + var(--canvas-node-control-gap));
@@ -153,7 +153,13 @@
   width: var(--canvas-node-card-width);
 }
 
-.canvas-node-connection-button {
+/* `[data-side]` bumps specificity to (0,3,0) so we win against
+   `.canvas-surface .react-flow__handle` (0,2,0) from the sibling
+   `canvas/canvas.css`. Turbopack inlines that rule into the root
+   CSS chunk via `preview-registry.ts`, so it ends up on every
+   page regardless of `registryDependencies`. Every anchor handle
+   carries `data-side`, so this attribute selector always matches. */
+.react-flow__handle.canvas-node-rf-handle[data-side] {
   width: var(--canvas-node-connection-size);
   height: var(--canvas-node-connection-size);
   overflow: visible;
@@ -161,20 +167,21 @@
   background: transparent;
   border: 0;
   opacity: 0;
+  transform: none;
   transition: opacity 150ms ease;
 }
 
-.canvas-node-connection-button::before,
-.canvas-node-connection-button::after {
+.react-flow__handle.canvas-node-rf-handle::before,
+.react-flow__handle.canvas-node-rf-handle::after {
   position: absolute;
   content: "";
 }
 
-.canvas-node-connection-button::before {
+.react-flow__handle.canvas-node-rf-handle::before {
   background: transparent;
 }
 
-.canvas-node-connection-button::after {
+.react-flow__handle.canvas-node-rf-handle::after {
   inset: 0;
   z-index: 0;
   background:
@@ -203,12 +210,12 @@
     [data-hover-intent],
     [data-selected]
   )
-  .canvas-node-connection-button {
+  .react-flow__handle.canvas-node-rf-handle {
   pointer-events: auto;
   opacity: 1;
 }
 
-.canvas-node-connection-button:hover::after {
+.react-flow__handle.canvas-node-rf-handle:hover::after {
   background: color-mix(in oklab, var(--color-white) 5%, transparent);
   border: 1px solid var(--color-blue-400);
   scale: 1;
@@ -222,56 +229,56 @@
   transition: opacity 150ms ease;
 }
 
-.canvas-node-connection-button:hover .canvas-node-connection-icon {
+.react-flow__handle.canvas-node-rf-handle:hover .canvas-node-connection-icon {
   opacity: 1;
 }
 
-.canvas-node-connection-button[data-side="top"] {
+.react-flow__handle.canvas-node-rf-handle[data-side="top"] {
   top: 0;
   left: 50%;
   translate: -50% calc(-100% - var(--canvas-node-connection-gap));
 }
 
-.canvas-node-connection-button[data-side="top"]::before {
+.react-flow__handle.canvas-node-rf-handle[data-side="top"]::before {
   top: 100%;
   right: 0;
   left: 0;
   height: var(--canvas-node-connection-gap);
 }
 
-.canvas-node-connection-button[data-side="right"] {
+.react-flow__handle.canvas-node-rf-handle[data-side="right"] {
   top: 50%;
   right: 0;
   translate: calc(100% + var(--canvas-node-connection-gap)) -50%;
 }
 
-.canvas-node-connection-button[data-side="right"]::before {
+.react-flow__handle.canvas-node-rf-handle[data-side="right"]::before {
   top: 0;
   right: 100%;
   bottom: 0;
   width: var(--canvas-node-connection-gap);
 }
 
-.canvas-node-connection-button[data-side="bottom"] {
+.react-flow__handle.canvas-node-rf-handle[data-side="bottom"] {
   bottom: 0;
   left: 50%;
   translate: -50% calc(100% + var(--canvas-node-connection-gap));
 }
 
-.canvas-node-connection-button[data-side="bottom"]::before {
+.react-flow__handle.canvas-node-rf-handle[data-side="bottom"]::before {
   right: 0;
   bottom: 100%;
   left: 0;
   height: var(--canvas-node-connection-gap);
 }
 
-.canvas-node-connection-button[data-side="left"] {
+.react-flow__handle.canvas-node-rf-handle[data-side="left"] {
   top: 50%;
   left: 0;
   translate: calc(-100% - var(--canvas-node-connection-gap)) -50%;
 }
 
-.canvas-node-connection-button[data-side="left"]::before {
+.react-flow__handle.canvas-node-rf-handle[data-side="left"]::before {
   top: 0;
   bottom: 0;
   left: 100%;
