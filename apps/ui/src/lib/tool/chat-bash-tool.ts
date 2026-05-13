@@ -322,7 +322,8 @@ export function createLazyVercelBashSandbox(
         return;
       }
       const sandbox = await sandboxPromise;
-      await sandbox.stop({ blocking: true });
+      // Deduped @vercel/sandbox (e.g. Docker after `rm bun.lock`) can be 1.x typings — only `{ signal }` exists there.
+      await sandbox.stop();
       sandboxPromise = undefined;
       preparePromise = undefined;
     },

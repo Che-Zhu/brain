@@ -119,7 +119,7 @@ async function runSmokeTest(): Promise<void> {
       );
     }
   } finally {
-    await sandbox.stop({ blocking: true });
+    await sandbox.stop();
   }
 }
 
