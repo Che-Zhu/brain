@@ -12,18 +12,27 @@ export interface CanvasPanelBodyProps {
   node: Node;
 }
 
-/** One tab in {@link CanvasMeta.panelTabs}: use either static `component` or `render({ node })`. Tab `name`s should be unique within a list (used for stable React keys). */
+/** Host-controlled panel tab selection (typically backed by `nuqs` in the Next app). */
+export interface CanvasPanelTabSync {
+  /** Persist tab changes (`useQueryState` setter or equivalent). */
+  setTabValue: (value: string) => unknown;
+  /** Current Radix Tabs value — equals the active tab's {@link CanvasPanelTab.name}. */
+  tabValue: string;
+}
+
+/**
+ * One tab in {@link CanvasMeta.panelTabs}.
+ * Tab `name` doubles as the Radix value and URL query param — must be unique within a list.
+ */
 export type CanvasPanelTab =
   | {
       name: string;
-      /** Static fragment (no access to selection). */
       component: ReactNode;
       render?: never;
     }
   | {
       name: string;
       component?: never;
-      /** Body with selected node — for dynamic copy or nested panels. */
       render: (panel: CanvasPanelBodyProps) => ReactNode;
     };
 
@@ -52,27 +61,26 @@ export type CanvasReactFlowProps = Omit<
 export interface CanvasState {
   edges: Edge[];
   nodes: Node[];
-  /** React Flow edge selection; `null` when no edge is selected (exclusive with `selectedNode`). */
   selectedEdge: Edge | null;
-  /** React Flow selection; `null` when nothing is selected. */
   selectedNode: Node | null;
 }
 
-/** Selection slice of {@link CanvasState}. */
 export type CanvasSelectedNode = CanvasState["selectedNode"];
-
-/** Selected edge slice of {@link CanvasState}. */
 export type CanvasSelectedEdge = CanvasState["selectedEdge"];
 
 export interface CanvasActions {
   fitView: () => void;
-  /** Clear side panel selection (invoke from panel close control). */
   onPanelClose: () => void;
 }
 
 export interface CanvasMeta {
   edgeTypes?: EdgeTypes;
   nodeTypes?: NodeTypes;
+  /**
+   * Syncs multi-tab panels to host state / URL (typically backed by `nuqs`).
+   * Omit for uncontrolled default tab (first tab's `name`).
+   */
+  panelTabSync?: CanvasPanelTabSync;
   /**
    * Tabbed panel bodies per node `type`. When the selected type entry is non-empty, it replaces
    * {@link CanvasMeta.panelTypes} for that type (Vercel-style tabs in {@link CanvasPanel}).
@@ -88,7 +96,6 @@ export interface CanvasContextValue {
   state: CanvasState;
 }
 
-/** Right-hand overlay when `state.selectedNode` is set; sits above the React Flow surface. */
 export interface CanvasPanelProps {
   children?: ReactNode;
   className?: string;

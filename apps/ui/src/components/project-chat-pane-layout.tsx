@@ -1,7 +1,10 @@
 "use client";
 
 import { useChat as useAIChat } from "@ai-sdk/react";
-import { Chat } from "@workspace/ui/components/chat/chat";
+import {
+  Chat,
+  downloadChatMessagesJson,
+} from "@workspace/ui/components/chat/chat";
 import type { ChatHeaderThreadHistory } from "@workspace/ui/components/chat/chat.types";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -252,6 +255,10 @@ function ProjectAssistantChatSession({
     setInput("");
   }, [busy, input, sendMessage, stop]);
 
+  const exportTranscript = useCallback(() => {
+    downloadChatMessagesJson(messages, { fileNameStem: threadLabel });
+  }, [messages, threadLabel]);
+
   const transcriptFooter = transcriptDeployerOpen ? (
     <ProjectTranscriptGithubDeployer
       authLoading={authLoading}
@@ -269,7 +276,10 @@ function ProjectAssistantChatSession({
           threadHistory={threadHistory}
           threadName={threadLabel}
         >
-          <Chat.Export onExport={() => undefined} />
+          <Chat.Export
+            disabled={messages.length === 0}
+            onExport={exportTranscript}
+          />
           <Chat.NewThread
             aria-label="Create thread"
             creating={creatingThread}

@@ -22,7 +22,7 @@
     "@workspace/typescript-config": "workspace:*",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
-    "turbo": "^2.8.17",
+    "turbo": "^2.9.12",
     "typescript": "5.9.3",
     "ultracite": "7.5.8"
   },

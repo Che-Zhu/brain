@@ -111,12 +111,21 @@ spec:
             {{- range $endpoints }}
             {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
+            {{- /* Pause/start: AP spec.paused scales Deployment to zero with SealOS pause annotation. */}}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- /* Build an effective spec snapshot with defaults resolved so rollback is self-contained */}}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")
@@ -193,6 +202,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-deployment
                 gotemplating.fn.crossplane.io/ready: "True"
+                {{- if $paused }}
+                deploy.cloud.sealos.io/pause: '{"target":"","value":""}'
+                {{- else }}
+                deploy.cloud.sealos.io/minReplicas: {{ $spec.replicas | default 1 | quote }}
+                deploy.cloud.sealos.io/maxReplicas: {{ $spec.replicas | default 1 | quote }}
+                deploy.cloud.sealos.io/resize: "0Gi"
+                {{- end }}
               labels:
                 crossplane.io/composite: {{ $name }}
                 {{ if ne $projectName "" }}
@@ -207,7 +223,7 @@ spec:
                 name: {{ $name }}
                 uid: {{ $apUid }}
             spec:
-              replicas: {{ $spec.replicas | default 1 }}
+              replicas: {{ $desiredReplicas }}
               revisionHistoryLimit: 1
               selector:
                 matchLabels:
@@ -221,6 +237,7 @@ spec:
                 metadata:
                   labels:
                     app: {{ $name }}
+                    restartNonce: "{{ $restartRequest }}"
                 spec:
                   imagePullSecrets:
                   - name: ghcr-cred
@@ -418,35 +435,29 @@ spec:
                       uid: {{ $projectUid }}
             {{ end }}
 
-            {{- /* Deployment-derived AP status.phase (mirrors kubectl-style rollout semantics). */}}
+            {{- /* AP status.phase: spec.paused wins; else derive from composed Deployment. */}}
             {{- $dep := getComposedResource . "app-deployment" }}
             {{- $phase := "Unknown" }}
-            {{- if $dep }}
-            {{-   $paused := false }}
-            {{-   if and $dep.spec (hasKey $dep.spec "paused") }}
-            {{-     $paused = index $dep.spec "paused" }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}
+            {{- $phase = "Paused" }}
+            {{- else if $dep }}
+            {{-   $avail := "" }}
+            {{-   $prog := "" }}
+            {{-   $progReason := "" }}
+            {{-   if and $dep.status $dep.status.conditions }}
+            {{-     range $c := $dep.status.conditions }}
+            {{-       if eq $c.type "Available" }}{{ $avail = $c.status }}{{ end }}
+            {{-       if eq $c.type "Progressing" }}{{ $prog = $c.status }}{{ $progReason = default "" $c.reason }}{{ end }}
+            {{-     end }}
             {{-   end }}
-            {{-   if $paused }}
-            {{-     $phase = "Paused" }}
-            {{-   else }}
-            {{-     $avail := "" }}
-            {{-     $prog := "" }}
-            {{-     $progReason := "" }}
-            {{-     if and $dep.status $dep.status.conditions }}
-            {{-       range $c := $dep.status.conditions }}
-            {{-         if eq $c.type "Available" }}{{ $avail = $c.status }}{{ end }}
-            {{-         if eq $c.type "Progressing" }}{{ $prog = $c.status }}{{ $progReason = default "" $c.reason }}{{ end }}
-            {{-       end }}
-            {{-     end }}
-            {{-     if and (eq $avail "True") (eq $prog "True") (eq $progReason "NewReplicaSetAvailable") }}
-            {{-       $phase = "Running" }}
-            {{-     else if and (eq $prog "False") (eq $progReason "ProgressDeadlineExceeded") }}
-            {{-       $phase = "Failed" }}
-            {{-     else if eq $prog "True" }}
-            {{-       $phase = "Progressing" }}
-            {{-     else if eq $avail "False" }}
-            {{-       $phase = "Degraded" }}
-            {{-     end }}
+            {{-   if and (eq $avail "True") (eq $prog "True") (eq $progReason "NewReplicaSetAvailable") }}
+            {{-     $phase = "Running" }}
+            {{-   else if and (eq $prog "False") (eq $progReason "ProgressDeadlineExceeded") }}
+            {{-     $phase = "Failed" }}
+            {{-   else if eq $prog "True" }}
+            {{-     $phase = "Progressing" }}
+            {{-   else if eq $avail "False" }}
+            {{-     $phase = "Degraded" }}
             {{-   end }}
             {{- end }}
             {{- $ingObs := getComposedResource . "app-ingress" }}
@@ -583,11 +594,19 @@ spec:
             {{- range $endpoints }}
             {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")
@@ -732,11 +751,19 @@ spec:
             {{- range $endpoints }}
             {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")

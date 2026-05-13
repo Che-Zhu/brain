@@ -20,12 +20,58 @@ import {
 import { Spinner } from "@workspace/ui/components/spinner";
 import { chatScrollbarThinClass } from "@workspace/ui/lib/chat-scrollbar";
 import { cn } from "@workspace/ui/lib/utils";
+import type { UIMessage } from "ai";
 import { ChevronDown, PanelRightClose } from "lucide-react";
 import { type ComponentProps, useMemo } from "react";
 
 import type { ChatHeaderThreadHistory } from "./chat.types";
 
 const headerControlClass = "hoverable rounded-xl";
+
+/** Safe filename stem for downloads (falls back when empty after sanitizing). */
+function chatExportFileStem(raw: string | undefined, fallback: string): string {
+  const trimmed = raw?.trim() ?? "";
+  const stem =
+    trimmed.length === 0
+      ? fallback
+      : trimmed
+          .slice(0, 120)
+          .replace(/[^\p{L}\p{N}\-_]+/gu, "-")
+          .replace(/^-+|-+$/g, "");
+  return stem.length > 0 ? stem : fallback;
+}
+
+/**
+ * Downloads the transcript as formatted JSON (`exportedAt`, `messageCount`, `messages`).
+ * Host typically wires this to `ChatHeaderExport` (`Chat.Export`) `onExport`.
+ */
+export function downloadChatMessagesJson(
+  messages: readonly UIMessage[],
+  options?: { fileNameStem?: string }
+): void {
+  const fileNameStem = chatExportFileStem(
+    options?.fileNameStem,
+    "chat-transcript"
+  );
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    messageCount: messages.length,
+    messages: [...messages],
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileNameStem}.json`;
+    a.rel = "noopener";
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 function formatThreadDropdownTimestamp(source: string | number | Date): string {
   const d = new Date(source);

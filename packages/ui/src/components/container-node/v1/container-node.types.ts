@@ -10,6 +10,11 @@ export interface ContainerNodeStates {
   kind?: string;
   memoryPercent?: number;
   name: string;
+  /**
+   * Kubernetes `metadata.namespace` (or list query fallback) for **AP** lifecycle
+   * API calls; omit when unknown or for non-cluster nodes.
+   */
+  namespace?: string;
   replicas?: number;
   status?: {
     label: string;

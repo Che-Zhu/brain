@@ -85,6 +85,20 @@ spec:
               replicas:
                 type: integer
                 default: 1
+              paused:
+                type: boolean
+                default: false
+                description: >
+                  When true, scales the composed Deployment to 0 replicas and applies SealOS-style
+                  pause annotations (compatible with workloads managed by SealOS Deploy). When false,
+                  the Deployment uses spec.replicas (default 1).
+              restartRequest:
+                type: integer
+                minimum: 0
+                description: >
+                  Bump this integer to trigger a coordinated pod-template change (RollingUpdate) via the
+                  Crossplane composition. Mirrors incrementing workload restart counters in GitOps flows.
+                  The UI/API may instead call POST /api/ap/v1alpha1/restart to annotate the Deployment directly.
               port:
                 type: integer
                 description: >
@@ -225,9 +239,9 @@ spec:
               phase:
                 type: string
                 description: >
-                  For aps-deployment-ingress-go-templating: derived from the composed Deployment
-                  (spec.paused, status.conditions Available/Progressing). Typical values: Running,
-                  Progressing, Failed, Degraded, Paused, Unknown.
+                  For aps-deployment-ingress-go-templating: Running / Progressing / Failed / Degraded / Unknown
+                  from the composed Deployment, and **Paused** when AP **spec.paused** is true (even while
+                  replicas reach zero). When unpaused, rollout state comes from Deployment conditions.
               configVersionHash:
                 type: string
                 description: Hash of current effective config; use to match and display the corresponding ConfigMap

@@ -216,6 +216,7 @@ export function apsToCanvasState(
       ...(tel?.memoryPercent === undefined
         ? {}
         : { memoryPercent: tel.memoryPercent }),
+      ...(ns !== undefined && ns !== "" ? { namespace: ns } : {}),
     };
     const g = grid0 + i;
     return {
@@ -262,6 +263,7 @@ export function dbsToCanvasState(
       ...(tel?.memoryPercent === undefined
         ? {}
         : { memoryPercent: tel.memoryPercent }),
+      ...(ns !== undefined && ns !== "" ? { namespace: ns } : {}),
     };
     const g = grid0 + i;
     return {

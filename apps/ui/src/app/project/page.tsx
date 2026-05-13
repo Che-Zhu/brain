@@ -35,15 +35,21 @@ export default function ProjectIndexPage() {
     [refreshProjects, router]
   );
 
-  const projectCreator = useProjectCreator({
+  const {
+    creatorRootProps,
+    dialogOpen,
+    githubDeployerLoading,
+    onDialogOpenChange,
+    openDialog,
+  } = useProjectCreator({
     kubeconfig,
     namespace: ns,
     onProjectCreated,
   });
 
   const explorerActions = useMemo(
-    () => ({ ...actions, onNewProject: projectCreator.openDialog }),
-    [actions, projectCreator.openDialog]
+    () => ({ ...actions, onNewProject: openDialog }),
+    [actions, openDialog]
   );
 
   return (
@@ -71,14 +77,14 @@ export default function ProjectIndexPage() {
         </ProjectExplorer.Root>
       </div>
 
-      <Dialog
-        onOpenChange={projectCreator.onDialogOpenChange}
-        open={projectCreator.dialogOpen}
-      >
-        <DialogContent className="border-none bg-transparent p-0 ring-0 sm:max-w-lg">
+      <Dialog onOpenChange={onDialogOpenChange} open={dialogOpen}>
+        <DialogContent
+          aria-busy={dialogOpen && githubDeployerLoading}
+          className="border-none bg-transparent p-0 ring-0 sm:max-w-lg"
+        >
           {/* <DialogHeader /> */}
-          {projectCreator.dialogOpen ? (
-            <ProjectCreator.Root {...projectCreator.creatorRootProps}>
+          {dialogOpen ? (
+            <ProjectCreator.Root {...creatorRootProps}>
               <ProjectCreator.Variant1 className="min-w-0 rounded-xl border border-border bg-card p-4" />
             </ProjectCreator.Root>
           ) : null}

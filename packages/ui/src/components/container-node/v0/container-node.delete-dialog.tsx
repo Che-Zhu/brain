@@ -2,7 +2,6 @@
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -13,14 +12,34 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 
-const DELETE_TITLE = "Delete container?";
+const DELETE_TITLE = "Delete workload?";
 
-function deleteDescriptionText(name: string) {
-  return `This will permanently delete "${name}". This action cannot be undone.`;
+function WorkloadDeleteCopy({
+  kind,
+  name,
+}: {
+  kind?: string;
+  name: string;
+}) {
+  const k = kind?.trim();
+  return (
+    <>
+      This will delete{" "}
+      <span className="font-medium text-foreground">{name}</span>
+      {k != null && k !== "" ? (
+        <>
+          {" "}
+          (<span className="font-mono">{k}</span>)
+        </>
+      ) : null}{" "}
+      from the cluster. This cannot be undone.
+    </>
+  );
 }
 
 export interface ContainerNodeDeleteDialogPanelProps {
   className?: string;
+  kind?: string;
   name: string;
   onCancel: () => void;
   onConfirmDelete?: () => void;
@@ -29,6 +48,7 @@ export interface ContainerNodeDeleteDialogPanelProps {
 /** In-flow panel (no portal). Use in previews or custom layouts. */
 export function ContainerNodeDeleteDialogPanel({
   className,
+  kind,
   name,
   onCancel,
   onConfirmDelete,
@@ -36,25 +56,26 @@ export function ContainerNodeDeleteDialogPanel({
   return (
     <div
       className={cn(
-        "grid w-full max-w-xs gap-6 rounded-xl bg-background p-6 ring-1 ring-foreground/10",
+        "grid w-full max-w-md gap-6 rounded-xl bg-background p-6 text-sm ring-1 ring-foreground/10",
         className
       )}
     >
-      <div className="grid grid-rows-[auto_1fr] place-items-center gap-1.5 text-center">
-        <h3 className="font-medium text-lg">{DELETE_TITLE}</h3>
+      <div className="flex flex-col gap-2">
+        <h3 className="font-medium leading-none">{DELETE_TITLE}</h3>
         <p className="text-balance text-muted-foreground text-sm md:text-pretty">
-          {deleteDescriptionText(name)}
+          <WorkloadDeleteCopy kind={kind} name={name} />
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:justify-end">
-        <Button className="text-xs" onClick={onCancel} variant="outline">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button onClick={onCancel} variant="outline">
           Cancel
         </Button>
         <Button
-          className="text-xs"
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           onClick={() => {
             onConfirmDelete?.();
           }}
+          type="button"
           variant="destructive"
         >
           Delete
@@ -69,6 +90,8 @@ ContainerNodeDeleteDialogPanel.displayName = "ContainerNodeDeleteDialogPanel";
 export interface ContainerNodeDeleteDialogProps {
   /** Workload display name shown in the copy. */
   name: string;
+  /** Shown in monospace after the name (e.g. `AP`, `DB`), like project resource id. */
+  kind?: string;
   onConfirmDelete?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -77,31 +100,32 @@ export interface ContainerNodeDeleteDialogProps {
 export function ContainerNodeDeleteDialog({
   open,
   onOpenChange,
+  kind,
   name,
   onConfirmDelete,
 }: ContainerNodeDeleteDialogProps) {
   return (
     <AlertDialog onOpenChange={onOpenChange} open={open}>
-      <AlertDialogContent size="sm">
+      <AlertDialogContent data-slot="container-node-delete-dialog">
         <AlertDialogHeader>
           <AlertDialogTitle>{DELETE_TITLE}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete &quot;{name}&quot;. This action cannot
-            be undone.
+            <WorkloadDeleteCopy kind={kind} name={name} />
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="text-xs"
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {
               onConfirmDelete?.();
               onOpenChange(false);
             }}
+            type="button"
             variant="destructive"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -3,7 +3,6 @@
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -12,23 +11,14 @@ import {
   SidebarRail,
   useSidebar,
 } from "@workspace/ui/components/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
-import { useAtomValue } from "jotai";
-import { Boxes, LayoutGrid } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { namespaceAtom } from "@/store/auth-store";
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isMobile } = useSidebar();
-  const namespace = useAtomValue(namespaceAtom).trim();
-  const namespaceDisplay = namespace === "" ? "—" : namespace;
 
   const projectsHref = "/project";
   const projectsActive =
@@ -76,46 +66,6 @@ export default function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="mt-auto border-sidebar-border border-t bg-background">
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
-              Namespace
-            </div>
-            <div
-              className="truncate font-mono text-[11px] text-sidebar-foreground"
-              title={namespace === "" ? undefined : namespace}
-            >
-              {namespaceDisplay}
-            </div>
-          </div>
-          <div className="hidden justify-center group-data-[collapsible=icon]:flex">
-            <Tooltip>
-              <TooltipTrigger
-                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2"
-                type="button"
-              >
-                <Boxes
-                  aria-hidden
-                  className="size-4 shrink-0"
-                  strokeWidth={2}
-                />
-                <span className="sr-only">Namespace: {namespaceDisplay}</span>
-              </TooltipTrigger>
-              <TooltipContent
-                className="max-w-xs text-left"
-                hidden={isMobile}
-                side="right"
-              >
-                <div className="font-medium text-[10px] uppercase tracking-wide">
-                  Namespace
-                </div>
-                <div className="break-all font-mono text-[11px] text-background">
-                  {namespaceDisplay}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
     </div>

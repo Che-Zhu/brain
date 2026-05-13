@@ -40,6 +40,8 @@ const DEFAULT_DATABASE_OPTIONS: ProjectCreatorDatabaseChoice[] = [
 
 export interface ProjectCreatorRootProps {
   actions?: ProjectCreatorActions;
+  /** Disables Confirm on Docker/database steps during async apply. */
+  confirmApplying?: boolean;
   children: ReactNode;
   /** Options for the database step combobox. */
   databaseOptions?: ProjectCreatorDatabaseChoice[];
@@ -49,6 +51,7 @@ export interface ProjectCreatorRootProps {
 
 export function ProjectCreatorRoot({
   actions: actionsProp,
+  confirmApplying = false,
   children,
   databaseOptions,
   githubDeployer: githubDeployerProp,
@@ -70,7 +73,7 @@ export function ProjectCreatorRoot({
 
   const value = useMemo<ProjectCreatorValue>(
     () => ({
-      states: { step },
+      states: { confirmApplying, step },
       actions: {
         pick,
         reset,
@@ -80,7 +83,15 @@ export function ProjectCreatorRoot({
       },
       meta: { databaseOptions: dbOptions, githubDeployer: githubDeployerProp },
     }),
-    [step, reset, pick, actionsProp, dbOptions, githubDeployerProp]
+    [
+      confirmApplying,
+      step,
+      reset,
+      pick,
+      actionsProp,
+      dbOptions,
+      githubDeployerProp,
+    ]
   );
 
   return (

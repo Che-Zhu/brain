@@ -1,7 +1,11 @@
 /**
  * HTTP pathnames served by `apps/api`, typically reached through the UI app's
  * same-origin `/api/...` proxy in the browser.
- * Use with your API origin, e.g. `new URL(path, baseUrl)` or SWR keys: `['get', API_ROUTES.k8s.get, queryKey]`.
+ *
+ * **Trailing-slash note:** Huma + chi register group-root operations (e.g.
+ * `Path: "/"` under `/api/ap/v1alpha1`) at paths ending with `/`. The Go API
+ * uses a middleware (`appendSlashForGroupRoots`) to accept both variants, so
+ * constants here use clean paths without trailing slashes.
  */
 export const API_ROUTES = {
   /** Main process health (`main.go`). */
@@ -36,7 +40,7 @@ export const API_ROUTES = {
 
   ap: {
     base: "/api/ap/v1alpha1",
-    /** GET list/get, PUT create, PATCH update, DELETE — group root path. */
+    /** GET list/get, PUT create, PATCH update, DELETE — group root. */
     root: "/api/ap/v1alpha1",
     /** Rollout-restart the composed Deployment (same name as the AP). */
     restart: "/api/ap/v1alpha1/restart",
@@ -44,6 +48,7 @@ export const API_ROUTES = {
 
   db: {
     base: "/api/db/v1alpha1",
+    /** GET list/get, PUT create, PATCH update, DELETE — group root. */
     root: "/api/db/v1alpha1",
     backup: "/api/db/v1alpha1/backup",
   },

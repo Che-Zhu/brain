@@ -22,7 +22,10 @@ export interface GithubDeployerStates {
    * (auth CTA unless `isLoading`).
    */
   githubToken?: string | null;
-  /** Optional: show “Authorizing…” in the auth row while the host resolves the token. */
+  /**
+   * Optional: show “Authorizing…” before a token exists, and “Loading repositories…” once
+   * authorized while the host resolves `repos`.
+   */
   isLoading?: boolean;
   repos: readonly GithubDeployerRepo[];
   /**

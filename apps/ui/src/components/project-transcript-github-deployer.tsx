@@ -5,7 +5,7 @@ import type {
   GithubDeployerRepo,
   GithubDeployerStates,
 } from "@workspace/ui/components/github-deployer/github-deployer.types";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useGithubRepos } from "@/hooks/use-github-repos";
 
@@ -25,23 +25,19 @@ export function ProjectTranscriptGithubDeployer({
   onDeployed,
 }: ProjectTranscriptGithubDeployerProps) {
   const { isLoading: reposLoading, repos } = useGithubRepos(githubToken);
-  const [deployedRepo, setDeployedRepo] = useState<GithubDeployerRepo | null>(
-    null
-  );
 
   const states: GithubDeployerStates = useMemo(
     () => ({
-      deployedRepo,
+      deployedRepo: null,
       githubToken: githubToken ?? "",
       isLoading: authLoading || (!!githubToken?.trim() && reposLoading),
       repos,
     }),
-    [authLoading, deployedRepo, githubToken, repos, reposLoading]
+    [authLoading, githubToken, repos, reposLoading]
   );
 
   const handleDeploy = useCallback(
     (repo: GithubDeployerRepo) => {
-      setDeployedRepo(repo);
       onDeployed(repo);
     },
     [onDeployed]

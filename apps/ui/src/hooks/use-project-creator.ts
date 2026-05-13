@@ -8,7 +8,7 @@ import type {
 } from "@workspace/ui/components/project-creator/project-creator.types";
 import { randomNano } from "@workspace/ui/lib/generator";
 import { randomName } from "@workspace/ui/lib/random-name";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useApCompositions } from "@/hooks/compositions/use-ap-composition";
@@ -82,9 +82,11 @@ export interface UseProjectCreatorOptions {
 export function useProjectCreator(options?: UseProjectCreatorOptions): {
   creatorRootProps: Pick<
     ProjectCreatorRootProps,
-    "actions" | "databaseOptions" | "githubDeployer"
+    "actions" | "confirmApplying" | "databaseOptions" | "githubDeployer"
   >;
   dialogOpen: boolean;
+  /** True while GitHub auth or repository list is loading for the deployer. */
+  githubDeployerLoading: boolean;
   lastConfirmedKind: string | null;
   onDialogOpenChange: (open: boolean) => void;
   openDialog: () => void;
@@ -95,6 +97,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const hasKubeconfig = kubeconfig !== "";
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [confirmApplying, setConfirmApplying] = useState(false);
   const [lastConfirmedKind, setLastConfirmedKind] = useState<string | null>(
     null
   );
@@ -121,23 +124,15 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const { isLoading: githubReposLoading, repos: githubRepos } =
     useGithubRepos(githubToken);
 
-  const [githubDeployedRepo, setGithubDeployedRepo] =
-    useState<GithubDeployerRepo | null>(null);
-
-  const prevDialogOpen = useRef(false);
-  useEffect(() => {
-    if (dialogOpen && !prevDialogOpen.current) {
-      setGithubDeployedRepo(null);
-    }
-    prevDialogOpen.current = dialogOpen;
-  }, [dialogOpen]);
-
   const openDialog = useCallback(() => {
     setDialogOpen(true);
   }, []);
 
   const onDialogOpenChange = useCallback((open: boolean) => {
     setDialogOpen(open);
+    if (!open) {
+      setConfirmApplying(false);
+    }
   }, []);
 
   const databaseOptions = useMemo((): ProjectCreatorDatabaseChoice[] => {
@@ -154,15 +149,12 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     );
   }, [dbCompositionRows, hasKubeconfig]);
 
-  const handleGithubDeploy = useCallback((repo: GithubDeployerRepo) => {
-    setGithubDeployedRepo(repo);
-    const label = repo.fullName ?? repo.name;
-    setLastConfirmedKind(`github:${label}`);
-    toast.success("GitHub import selected.", {
-      description: label || undefined,
-    });
-    setDialogOpen(false);
+  const handleGithubDeploy = useCallback((_repo: GithubDeployerRepo) => {
+    toast.info("GitHub deploy isn’t ready yet — this feature is incomplete.");
   }, []);
+
+  const githubDeployerLoading =
+    githubAuthLoading || (!!githubToken?.trim() && githubReposLoading);
 
   const githubDeployer = useMemo(
     () => ({
@@ -171,22 +163,33 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         onDeploy: handleGithubDeploy,
       },
       states: {
-        deployedRepo: githubDeployedRepo,
+        deployedRepo: null,
         githubToken: githubToken ?? "",
-        isLoading:
-          githubAuthLoading || (!!githubToken?.trim() && githubReposLoading),
+        isLoading: githubDeployerLoading,
         repos: githubRepos,
       },
     }),
     [
-      githubAuthLoading,
-      githubDeployedRepo,
+      githubDeployerLoading,
       githubRepos,
-      githubReposLoading,
       githubToken,
       handleGithubDeploy,
       initiateGithubAuth,
     ]
+  );
+
+  const applyWithBusyState = useCallback(
+    async (fn: () => Promise<void>): Promise<void> => {
+      setConfirmApplying(true);
+      try {
+        await fn();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Apply failed");
+      } finally {
+        setConfirmApplying(false);
+      }
+    },
+    []
   );
 
   const actions = useMemo<ProjectCreatorActions>(
@@ -235,7 +238,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           namespace,
         });
 
-        try {
+        await applyWithBusyState(async () => {
           await k8sApplyYaml(
             kubeconfig,
             joinKubeYamlDocuments([projectYaml, apYaml])
@@ -251,9 +254,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             projectClaimName
           );
           await onProjectCreated?.(projectUid);
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Apply failed");
-        }
+        });
       },
       onDatabaseConfirm: async (compositionName) => {
         const choice = databaseOptions.find((d) => d.id === compositionName);
@@ -287,7 +288,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         });
         dbYaml = mergeDbSpecProjectName(dbYaml, projectClaimName);
 
-        try {
+        await applyWithBusyState(async () => {
           await k8sApplyYaml(
             kubeconfig,
             joinKubeYamlDocuments([projectYaml, dbYaml])
@@ -305,12 +306,11 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             projectClaimName
           );
           await onProjectCreated?.(projectUid);
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Apply failed");
-        }
+        });
       },
     }),
     [
+      applyWithBusyState,
       apCompositionRows,
       databaseOptions,
       kubeconfig,
@@ -323,15 +323,17 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const creatorRootProps = useMemo(
     () => ({
       actions,
+      confirmApplying,
       databaseOptions,
       githubDeployer,
     }),
-    [actions, databaseOptions, githubDeployer]
+    [actions, confirmApplying, databaseOptions, githubDeployer]
   );
 
   return {
     creatorRootProps,
     dialogOpen,
+    githubDeployerLoading,
     lastConfirmedKind,
     onDialogOpenChange,
     openDialog,

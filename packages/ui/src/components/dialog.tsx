@@ -1,10 +1,10 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
-import { cn } from "@workspace/ui/lib/utils";
-import { Button } from "@workspace/ui/components/button";
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -24,7 +24,6 @@ function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
 
 function DialogOverlay({
   className,
-  onClick,
   ...props
 }: DialogPrimitive.Backdrop.Props) {
   return (
@@ -34,13 +33,13 @@ function DialogOverlay({
         className
       )}
       data-slot="dialog-overlay"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
       {...props}
     />
   );
+}
+
+function stopPropagation(e: { stopPropagation: () => void }) {
+  e.stopPropagation();
 }
 
 function DialogContent({
@@ -58,32 +57,40 @@ function DialogContent({
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay className={overlayClassName} />
-      <DialogPrimitive.Popup
-        className={cn(
-          "data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-background p-6 text-sm outline-none ring-1 ring-foreground/10 duration-100 data-closed:animate-out data-open:animate-in sm:max-w-md",
-          className
-        )}
-        data-slot="dialog-content"
-        {...props}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: event propagation fence — prevents React portal bubbling to ancestors */}
+      <div
+        onClick={stopPropagation}
+        onPointerDown={stopPropagation}
+        onPointerUp={stopPropagation}
+        role="presentation"
       >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button
-                className={cn("absolute top-4 right-4", closeButtonClassName)}
-                size="icon-sm"
-                variant="ghost"
-              />
-            }
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Popup>
+        <DialogOverlay className={overlayClassName} />
+        <DialogPrimitive.Popup
+          className={cn(
+            "data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-background p-6 text-sm outline-none ring-1 ring-foreground/10 duration-100 data-closed:animate-out data-open:animate-in sm:max-w-md",
+            className
+          )}
+          data-slot="dialog-content"
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              render={
+                <Button
+                  className={cn("absolute top-4 right-4", closeButtonClassName)}
+                  size="icon-sm"
+                  variant="ghost"
+                />
+              }
+            >
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Popup>
+      </div>
     </DialogPortal>
   );
 }
@@ -108,10 +115,7 @@ function DialogFooter({
 }) {
   return (
     <div
-      className={cn(
-        "flex flex-col-reverse gap-2 gap-2 sm:flex-row sm:justify-end",
-        className
-      )}
+      className={cn("flex gap-2 sm:flex-row sm:justify-end", className)}
       data-slot="dialog-footer"
       {...props}
     >

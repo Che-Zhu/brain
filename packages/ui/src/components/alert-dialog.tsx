@@ -1,9 +1,9 @@
 "use client";
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
-import type * as React from "react";
-import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
+import type * as React from "react";
 
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -37,6 +37,10 @@ function AlertDialogOverlay({
   );
 }
 
+function stopPropagation(e: { stopPropagation: () => void }) {
+  e.stopPropagation();
+}
+
 function AlertDialogContent({
   className,
   size = "default",
@@ -46,16 +50,24 @@ function AlertDialogContent({
 }) {
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
-      <AlertDialogPrimitive.Popup
-        className={cn(
-          "data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-background p-6 outline-none ring-1 ring-foreground/10 duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-closed:animate-out data-open:animate-in data-[size=default]:sm:max-w-lg",
-          className
-        )}
-        data-size={size}
-        data-slot="alert-dialog-content"
-        {...props}
-      />
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: event propagation fence — prevents React portal bubbling to ancestors */}
+      <div
+        onClick={stopPropagation}
+        onPointerDown={stopPropagation}
+        onPointerUp={stopPropagation}
+        role="presentation"
+      >
+        <AlertDialogOverlay />
+        <AlertDialogPrimitive.Popup
+          className={cn(
+            "data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-background p-6 outline-none ring-1 ring-foreground/10 duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-closed:animate-out data-open:animate-in data-[size=default]:sm:max-w-lg",
+            className
+          )}
+          data-size={size}
+          data-slot="alert-dialog-content"
+          {...props}
+        />
+      </div>
     </AlertDialogPortal>
   );
 }

@@ -31,6 +31,8 @@ export interface ProjectCreatorActions {
 }
 
 export interface ProjectCreatorStates {
+  /** When true after validation, disables Docker/DB Confirm and shows applying UI. */
+  confirmApplying: boolean;
   /** `null` shows the three-option column. */
   step: ProjectCreatorSourceKind | null;
 }

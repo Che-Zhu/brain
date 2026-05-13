@@ -4,6 +4,11 @@ export {
   type ApTelemetryTarget,
   useApTelemetryMetricsBatch,
 } from "./use-ap-telemetry-metrics";
+export {
+  type ApLifecycleWorkloadRef,
+  useApLifecycleOperations,
+  type UseApLifecycleOptions,
+} from "./use-ap-lifecycle";
 export { useApsK8sList } from "./use-aps-k8s-list";
 export { useDbsK8sList } from "./use-dbs-k8s-list";
 export {

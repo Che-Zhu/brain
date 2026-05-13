@@ -12,6 +12,7 @@ import {
 import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { Spinner } from "@workspace/ui/components/spinner";
 import { useState } from "react";
 
 import { useProjectCreator } from "./project-creator.context";
@@ -53,11 +54,12 @@ function GithubPanel() {
 }
 
 function DockerPanel() {
-  const { actions } = useProjectCreator();
+  const { actions, states } = useProjectCreator();
   const [value, setValue] = useState("");
 
   const trimmed = value.trim();
-  const disabled = trimmed.length === 0;
+  const busy = states.confirmApplying;
+  const disabled = trimmed.length === 0 || busy;
 
   return (
     <div
@@ -75,11 +77,16 @@ function DockerPanel() {
       />
       <div className="flex justify-end">
         <Button
+          aria-busy={busy}
           disabled={disabled}
           onClick={() => actions.onDockerConfirm?.(trimmed)}
           type="button"
         >
-          Confirm
+          {busy ? (
+            <Spinner aria-hidden className="size-4 shrink-0" />
+          ) : (
+            "Confirm"
+          )}
         </Button>
       </div>
     </div>
@@ -91,13 +98,14 @@ function DatabasePanel({
 }: {
   databaseOptions: ProjectCreatorDatabaseChoice[];
 }) {
-  const { actions } = useProjectCreator();
+  const { actions, states } = useProjectCreator();
 
   const [selected, setSelected] = useState<ProjectCreatorDatabaseChoice | null>(
     null
   );
 
   const items = databaseOptions;
+  const busy = states.confirmApplying;
 
   return (
     <div
@@ -149,7 +157,8 @@ function DatabasePanel({
       </div>
       <div className="flex justify-end">
         <Button
-          disabled={selected == null}
+          aria-busy={busy}
+          disabled={selected == null || busy}
           onClick={() => {
             if (selected) {
               actions.onDatabaseConfirm?.(selected.id);
@@ -157,7 +166,11 @@ function DatabasePanel({
           }}
           type="button"
         >
-          Confirm
+          {busy ? (
+            <Spinner aria-hidden className="size-4 shrink-0" />
+          ) : (
+            "Confirm"
+          )}
         </Button>
       </div>
     </div>

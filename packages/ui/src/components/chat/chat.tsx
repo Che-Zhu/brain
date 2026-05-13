@@ -27,6 +27,7 @@ import { ChatTranscript } from "./chat.transcript";
 
 // biome-ignore lint/performance/noBarrelFile: compound API re-exports
 export { ChatRoot } from "./chat.context";
+export { downloadChatMessagesJson } from "./chat.header";
 export type {
   ChatHeaderClosePaneProps,
   ChatHeaderExportProps,

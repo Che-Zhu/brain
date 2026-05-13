@@ -131,8 +131,26 @@ function GithubDeployerRepoSelect({ className }: { className?: string }) {
     [repos, selectedRepoId]
   );
 
-  if (deployedRepo || !hasGithubToken(githubToken) || isLoading) {
+  if (deployedRepo || !hasGithubToken(githubToken)) {
     return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div
+        aria-busy="true"
+        aria-live="polite"
+        className={cn(
+          "flex w-full min-w-0 items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-muted-foreground text-xs",
+          className
+        )}
+        data-slot="github-deployer-repos-loading"
+        role="status"
+      >
+        <Spinner aria-hidden className="size-4 shrink-0" />
+        <span className="min-w-0 truncate">Loading repositories…</span>
+      </div>
+    );
   }
 
   if (repos.length === 0) {

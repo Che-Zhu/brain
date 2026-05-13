@@ -118,6 +118,7 @@ export function ContainerNodeHeaderMenu({ menu }: { menu?: ReactNode }) {
         replicas={states.replicas ?? 0}
       />
       <ContainerNodeDeleteDialog
+        kind={states.kind}
         name={states.name}
         onConfirmDelete={actions.onDelete}
         onOpenChange={setDeleteDialogOpen}

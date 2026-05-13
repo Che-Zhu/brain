@@ -14,7 +14,7 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -41,11 +41,12 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
 
-  useEffect(() => {
+  // Apply upstream graph before paint so React Flow state matches props on first paint.
+  useLayoutEffect(() => {
     setNodes(state.nodes);
   }, [setNodes, state.nodes]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setEdges(state.edges);
   }, [setEdges, state.edges]);
 

@@ -12,7 +12,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import type { Node } from "@xyflow/react";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import type {
   CanvasMeta,
@@ -56,19 +56,28 @@ function panelHeadingFromNode(selected: Node): { kind: string; title: string } {
   };
 }
 
-function panelKeyFromNode(node: Node): string | null {
-  return node.type != null && node.type !== "" ? node.type : null;
-}
-
 function nonEmptyTabs(
   meta: CanvasMeta,
-  key: string | null
+  nodeType: string | null | undefined
 ): CanvasPanelTab[] | null {
-  if (key == null) {
+  if (nodeType == null) {
     return null;
   }
-  const tabs = meta.panelTabs?.[key];
+  const tabs = meta.panelTabs?.[nodeType];
   return tabs != null && tabs.length > 0 ? tabs : null;
+}
+
+/** Resolve a sync value to a valid tab name, falling back to the first tab. */
+function resolveTabValue(
+  syncValue: string | undefined,
+  tabItems: CanvasPanelTab[]
+): string {
+  const first = tabItems[0]?.name ?? "";
+  const v = syncValue?.trim() ?? "";
+  if (v !== "" && tabItems.some((t) => t.name === v)) {
+    return v;
+  }
+  return first;
 }
 
 function panelTabMount(
@@ -90,9 +99,9 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
 
   const selected = state.selectedNode;
   const heading = panelHeadingFromNode(selected);
-  const panelKey = panelKeyFromNode(selected);
-  const tabItems = nonEmptyTabs(meta, panelKey);
-  const PanelBody = panelKey == null ? undefined : meta.panelTypes?.[panelKey];
+  const tabItems = nonEmptyTabs(meta, selected.type);
+  const PanelBody =
+    selected.type == null ? undefined : meta.panelTypes?.[selected.type];
   const panelProps: CanvasPanelBodyProps = { node: selected };
 
   const panelContent =
@@ -101,13 +110,13 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
         {PanelBody == null ? children : <PanelBody node={selected} />}
       </div>
     ) : (
-      <CanvasPanelTabs panelProps={panelProps} tabItems={tabItems} />
+      <CanvasPanelTabs meta={meta} panelProps={panelProps} tabItems={tabItems} />
     );
 
   return (
     <aside
       className={cn(
-        "canvas-panel pointer-events-auto absolute top-0 right-0 bottom-0 z-[20] flex w-full min-w-0 flex-col bg-background/95 shadow-lg backdrop-blur-sm",
+        "canvas-panel pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 flex-col bg-background/95 shadow-lg backdrop-blur-sm",
         className
       )}
     >
@@ -126,29 +135,48 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
 CanvasPanel.displayName = "CanvasPanel";
 
 function CanvasPanelTabs({
+  meta,
   tabItems,
   panelProps,
 }: {
+  meta: CanvasMeta;
   panelProps: CanvasPanelBodyProps;
   tabItems: CanvasPanelTab[];
 }) {
+  const sync = meta.panelTabSync;
+  const value = resolveTabValue(sync?.tabValue, tabItems);
+
+  useEffect(() => {
+    if (sync != null && value !== sync.tabValue) {
+      Promise.resolve(sync.setTabValue(value)).catch(() => undefined);
+    }
+  }, [sync, value]);
+
   return (
-    <Tabs className="flex min-h-0 flex-1 flex-col" defaultValue="0">
+    <Tabs
+      className="flex min-h-0 flex-1 flex-col"
+      key={sync == null ? panelProps.node.id : undefined}
+      {...(sync == null
+        ? { defaultValue: tabItems[0]?.name ?? "" }
+        : {
+            onValueChange: (next: string) => {
+              Promise.resolve(sync.setTabValue(next)).catch(() => undefined);
+            },
+            value,
+          })}
+    >
       <TabsList aria-label="Panel sections" className="shrink-0 flex-wrap">
-        {tabItems.map((tab, i) => (
-          <TabsTrigger
-            key={`${panelProps.node.id}:${tab.name}`}
-            value={String(i)}
-          >
+        {tabItems.map((tab) => (
+          <TabsTrigger key={`${panelProps.node.id}:${tab.name}`} value={tab.name}>
             {tab.name}
           </TabsTrigger>
         ))}
       </TabsList>
-      {tabItems.map((tab, i) => (
+      {tabItems.map((tab) => (
         <TabsContent
           className={tabContentClassName}
           key={`${panelProps.node.id}:${tab.name}:body`}
-          value={String(i)}
+          value={tab.name}
         >
           {panelTabMount(tab, panelProps)}
         </TabsContent>

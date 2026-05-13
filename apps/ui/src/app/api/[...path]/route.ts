@@ -2,36 +2,25 @@ import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function joinPath(...parts: string[]): string {
-  return parts
-    .map((part, index) =>
-      index === 0 ? part.replace(/\/+$/g, "") : part.replace(/^\/+|\/+$/g, "")
-    )
-    .filter(Boolean)
-    .join("/");
-}
+const TRAILING_SLASHES = /\/+$/;
 
-function getUpstreamUrl(path: string[], search: string): URL {
+function getUpstreamUrl(request: NextRequest): URL {
   const base = process.env.API_URL;
   if (!base) {
     throw new Error("API_URL is not configured");
   }
 
   const upstream = new URL(base);
-  upstream.pathname = `/${joinPath(upstream.pathname, "api", ...path)}`;
-  upstream.search = search;
+  const prefix = upstream.pathname.replace(TRAILING_SLASHES, "");
+  upstream.pathname = prefix + request.nextUrl.pathname;
+  upstream.search = request.nextUrl.search;
   return upstream;
 }
 
-async function proxy(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  const { path } = await context.params;
-
+async function proxy(request: NextRequest) {
   let upstreamUrl: URL;
   try {
-    upstreamUrl = getUpstreamUrl(path, request.nextUrl.search);
+    upstreamUrl = getUpstreamUrl(request);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "API proxy is misconfigured";
@@ -66,37 +55,22 @@ async function proxy(
   });
 }
 
-export function GET(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  return proxy(request, context);
+export function GET(request: NextRequest) {
+  return proxy(request);
 }
 
-export function POST(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  return proxy(request, context);
+export function POST(request: NextRequest) {
+  return proxy(request);
 }
 
-export function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  return proxy(request, context);
+export function PUT(request: NextRequest) {
+  return proxy(request);
 }
 
-export function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  return proxy(request, context);
+export function PATCH(request: NextRequest) {
+  return proxy(request);
 }
 
-export function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  return proxy(request, context);
+export function DELETE(request: NextRequest) {
+  return proxy(request);
 }

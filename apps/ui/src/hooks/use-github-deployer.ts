@@ -1,13 +1,14 @@
 "use client";
 
 import type { GithubDeployerRepo } from "@workspace/ui/components/github-deployer/github-deployer.types";
-import {
-  buildGithubDeployerDeployedAguiExecuteInput,
-  githubDeployerDeployedAguiSpec,
-} from "@workspace/ui/lib/agui/github-deployer-spec";
+// import {
+//   buildGithubDeployerDeployedAguiExecuteInput,
+//   githubDeployerDeployedAguiSpec,
+// } from "@workspace/ui/lib/agui/github-deployer-spec";
 import type { UIMessage } from "ai";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { useCallback } from "react";
+import { toast } from "sonner";
 
 import { useGithubAuth } from "@/hooks/use-github-auth";
 
@@ -65,27 +66,30 @@ export function useGithubDeployer({
   }, [setTranscriptDeployerOpen]);
 
   const commitDeployToMessages = useCallback(
-    (repo: GithubDeployerRepo) => {
-      const spec = githubDeployerDeployedAguiSpec(repo);
-      const executeInput = buildGithubDeployerDeployedAguiExecuteInput(repo);
-      const toolPart = {
-        type: "tool-emitGenUISpec" as const,
-        toolCallId: `deploy-${Date.now()}`,
-        state: "output-available" as const,
-        input: executeInput,
-        output: { ok: true as const, spec },
-      } satisfies UIMessage["parts"][number];
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-deploy-${Date.now()}`,
-          role: "assistant" as const,
-          parts: [toolPart],
-        },
-      ]);
+    (_repo: GithubDeployerRepo) => {
+      toast.info("GitHub deploy isn’t ready yet — this feature is incomplete.");
       Promise.resolve(setTranscriptDeployerOpen(false)).catch(() => undefined);
+
+      // const spec = githubDeployerDeployedAguiSpec(repo);
+      // const executeInput = buildGithubDeployerDeployedAguiExecuteInput(repo);
+      // const toolPart = {
+      //   type: "tool-emitGenUISpec" as const,
+      //   toolCallId: `deploy-${Date.now()}`,
+      //   state: "output-available" as const,
+      //   input: executeInput,
+      //   output: { ok: true as const, spec },
+      // } satisfies UIMessage["parts"][number];
+      // setMessages((prev) => [
+      //   ...prev,
+      //   {
+      //     id: `assistant-deploy-${Date.now()}`,
+      //     role: "assistant" as const,
+      //     parts: [toolPart],
+      //   },
+      // ]);
+      // Promise.resolve(setTranscriptDeployerOpen(false)).catch(() => undefined);
     },
-    [setMessages, setTranscriptDeployerOpen]
+    [setTranscriptDeployerOpen]
   );
 
   const resetChatThread = useCallback(() => {

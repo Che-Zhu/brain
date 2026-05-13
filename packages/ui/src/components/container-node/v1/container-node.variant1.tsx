@@ -150,6 +150,7 @@ export function ContainerNodeVariant1({
         </ContainerNodeResourceGroup>
       </ContainerNodeFooter>
       <ContainerNodeDeleteDialog
+        kind={states.kind}
         name={states.name}
         onConfirmDelete={actions.onDelete}
         onOpenChange={setDeleteDialogOpen}

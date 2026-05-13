@@ -8,20 +8,13 @@ import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
 import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
-import { useAtomValue } from "jotai";
 import { useParams, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
-
+import { useCallback, useMemo } from "react";
+import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import {
   apMetricsLookupFromResults,
   apsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
-import {
-  selectedEdgeAtom,
-  useCanvasMeta,
-  useCanvasSelectionActions,
-  useSelectedCanvasNode,
-} from "@/store/canvas-store";
 
 const METRICS_REFRESH_MS = 5000;
 
@@ -34,16 +27,19 @@ function usePreviewProjectCanvas(options: {
   canvasState: CanvasState;
   error: Error | undefined;
   isLoading: boolean;
+  refreshWorkloadLists: () => Promise<unknown>;
 } {
   const { namespace, shareToken, uid } = options;
 
   const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
 
-  const { data, error, isLoading } = useApsK8sList({
+  const { data, error, isLoading, mutate } = useApsK8sList({
     labelSelector,
     namespace,
     shareToken: shareToken.trim() === "" ? undefined : shareToken.trim(),
   });
+
+  const refreshWorkloadLists = useCallback(() => mutate(), [mutate]);
 
   const apMetricsTargets = useMemo(
     () =>
@@ -74,7 +70,7 @@ function usePreviewProjectCanvas(options: {
     return { edges, nodes, selectedEdge: null, selectedNode: null };
   }, [data, namespace, metricsLookup]);
 
-  return { canvasState, error, isLoading };
+  return { canvasState, error, isLoading, refreshWorkloadLists };
 }
 
 /**
@@ -87,17 +83,18 @@ export default function PreviewProjectPage() {
   const ns = (searchParams.get("ns") ?? "").trim();
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 
-  const canvasMeta = useCanvasMeta();
-  const selectedEdge = useAtomValue(selectedEdgeAtom);
-  const { clearSelection } = useCanvasSelectionActions();
+  const { canvasState, error, isLoading, refreshWorkloadLists } =
+    usePreviewProjectCanvas({
+      namespace: ns,
+      shareToken,
+      uid,
+    });
 
-  const { canvasState, error, isLoading } = usePreviewProjectCanvas({
-    namespace: ns,
-    shareToken,
-    uid,
-  });
-
-  const selectedNode = useSelectedCanvasNode(canvasState.nodes);
+  const { clearSelection, meta, nodes, selectedEdge, selectedNode } =
+    useProjectCanvas(canvasState.nodes, {
+      refreshWorkloadLists,
+      shareToken,
+    });
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
@@ -119,8 +116,8 @@ export default function PreviewProjectPage() {
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Canvas.Root
           actions={{ onPanelClose: clearSelection }}
-          meta={canvasMeta}
-          state={{ ...canvasState, selectedEdge, selectedNode }}
+          meta={meta}
+          state={{ ...canvasState, nodes, selectedEdge, selectedNode }}
         >
           <Canvas.Flow>
             <Canvas.Panel />
