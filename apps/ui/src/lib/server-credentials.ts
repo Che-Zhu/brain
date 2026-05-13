@@ -61,6 +61,7 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
   let raw: RegionTokenResponse;
   try {
     raw = (await response.json()) as RegionTokenResponse;
+    console.log("raw response from region token", raw);
   } catch {
     return { serverEncodedKubeconfig: "", serverNamespace: "" };
   }
