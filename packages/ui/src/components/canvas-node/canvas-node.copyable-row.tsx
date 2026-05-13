@@ -301,7 +301,11 @@ export function CanvasNodeCopyableRowIndicator({
 
   if (copied) {
     return (
-      <span className={cn("size-4 shrink-0", className)} {...props}>
+      <span
+        className={cn("size-4 shrink-0", className)}
+        key="copied"
+        {...props}
+      >
         <Check aria-hidden className="size-4" />
       </span>
     );
@@ -313,6 +317,7 @@ export function CanvasNodeCopyableRowIndicator({
         "canvas-node-copyable-row-copy-icon size-4 shrink-0 opacity-0 transition-opacity group-hover/copyable-row:opacity-100",
         className
       )}
+      key="copy"
       {...props}
     >
       <Copy aria-hidden className="size-4" />
