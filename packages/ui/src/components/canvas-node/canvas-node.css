@@ -267,6 +267,62 @@
   width: var(--canvas-node-connection-gap);
 }
 
+.canvas-node-action-button:hover,
+.canvas-node-action-button:focus-visible,
+.canvas-node-action-menu-trigger:hover,
+.canvas-node-action-menu-trigger:focus-visible {
+  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
+}
+
+.canvas-node-action-menu-content {
+  backdrop-filter: blur(calc(var(--spacing) * 5));
+}
+
+.canvas-node-action-menu-item[data-highlighted] {
+  color: var(--color-zinc-50);
+  background: color-mix(in oklab, var(--color-white) 15%, transparent);
+}
+
+.canvas-node-action-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-tone="info"]
+  svg {
+  color: var(--color-blue-400);
+  stroke: var(--color-blue-400);
+}
+
+.canvas-node-action-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-tone="destructive"]
+  svg {
+  color: var(--color-red-500);
+  stroke: var(--color-red-500);
+}
+
+.canvas-node-action-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-tone="muted"]
+  svg {
+  color: var(--muted-foreground);
+  stroke: var(--muted-foreground);
+}
+
+.canvas-node-action-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-tone="success"]
+  svg {
+  color: var(--color-green-500);
+  stroke: var(--color-green-500);
+}
+
 .canvas-node-card-frame {
   position: relative;
   grid-row: 1;

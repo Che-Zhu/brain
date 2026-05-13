@@ -1,15 +1,7 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
-import { Spinner } from "@workspace/ui/components/spinner";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -17,7 +9,6 @@ import {
   Check,
   Copy,
   Cpu,
-  Ellipsis,
   FileText,
   HardDrive,
   MemoryStick,
@@ -37,7 +28,6 @@ import {
   getDatabaseNodeConnectionKey,
 } from "./database-node.root";
 import type {
-  DatabaseNodeAction,
   DatabaseNodeConnection,
   DatabaseNodeLifecycleActionKey,
   DatabaseNodeMetricKey,
@@ -72,21 +62,18 @@ const QUICK_ACTION_ITEMS = [
   label: string;
 }[];
 
-const DATABASE_NODE_MENU_ALIGN_OFFSET = -10;
-const DATABASE_NODE_MENU_SIDE_OFFSET = 14;
-
 interface LifecycleActionItem {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   key: DatabaseNodeLifecycleActionKey;
   label: string;
-  variant?: "destructive";
+  tone?: "destructive" | "info" | "muted" | "success";
 }
 
 const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
-  { icon: RotateCcw, key: "restart", label: "Restart" },
-  { icon: Trash2, key: "delete", label: "Delete", variant: "destructive" },
-  { icon: Pause, key: "stop", label: "Stop" },
-  { icon: Play, key: "start", label: "Start" },
+  { icon: RotateCcw, key: "restart", label: "Restart", tone: "info" },
+  { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
+  { icon: Pause, key: "stop", label: "Stop", tone: "muted" },
+  { icon: Play, key: "start", label: "Start", tone: "success" },
 ] as const;
 
 function stopNodeControlEvent(event: SyntheticEvent) {
@@ -162,14 +149,6 @@ function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
   }
 
   return connection.unavailableMessage ?? "Connection unavailable";
-}
-
-function invokeAction(action: DatabaseNodeAction | undefined) {
-  if (!action?.onClick || action.disabled || action.loading) {
-    return;
-  }
-
-  Promise.resolve(action.onClick()).catch(() => undefined);
 }
 
 function renderConnectionCopyIndicator({
@@ -459,49 +438,23 @@ export function DatabaseNodeActionBar({ className }: { className?: string }) {
   } = useDatabaseNode();
 
   return (
-    <div
-      className={cn(
-        "database-node-action-bar mt-2 flex min-w-0 items-center justify-end gap-1",
-        className
-      )}
-      data-slot="database-node-action-bar"
-    >
+    <CanvasNode.ActionBar className={className}>
       {QUICK_ACTION_ITEMS.map((item) => {
         const action = quickActions?.[item.key];
-        const disabled =
-          action?.disabled || action?.loading || !action?.onClick;
         const Icon = item.icon;
 
         return (
-          <Button
+          <CanvasNode.ActionButton
+            action={action}
             aria-label={item.label}
-            className={cn(
-              RF_CONTROL_CLASS,
-              "database-node-action-button flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
-            )}
-            disabled={disabled}
             key={item.key}
-            onClick={(event) => {
-              event.stopPropagation();
-              invokeAction(action);
-            }}
-            onDoubleClick={stopNodeControlEvent}
-            onKeyDown={stopNodeControlEvent}
-            onPointerDown={stopNodeControlEvent}
-            size={null}
             title={item.label}
-            type="button"
-            variant={null}
           >
-            {action?.loading ? (
-              <Spinner className="size-4" />
-            ) : (
-              <Icon aria-hidden className="size-4" />
-            )}
-          </Button>
+            <Icon aria-hidden className="size-4" />
+          </CanvasNode.ActionButton>
         );
       })}
-    </div>
+    </CanvasNode.ActionBar>
   );
 }
 
@@ -556,65 +509,23 @@ function DatabaseNodeHeaderMenu() {
   } = useDatabaseNode();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label="Open database actions"
-            className={cn(
-              RF_CONTROL_CLASS,
-              "database-node-menu-trigger flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50 aria-expanded:bg-white/15 data-popup-open:bg-white/15"
-            )}
-            onClick={stopNodeControlEvent}
-            size={null}
-            type="button"
-            variant={null}
-          />
-        }
-      >
-        <Ellipsis aria-hidden className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        alignOffset={DATABASE_NODE_MENU_ALIGN_OFFSET}
-        className={cn(
-          RF_CONTROL_CLASS,
-          "database-node-menu-content w-38 min-w-38 rounded-md border-0 bg-white/5 p-1 text-zinc-50 shadow-none ring-1 ring-white/10 ring-inset"
-        )}
-        side="right"
-        sideOffset={DATABASE_NODE_MENU_SIDE_OFFSET}
-      >
-        {LIFECYCLE_ACTION_ITEMS.map((item) => {
-          const action = lifecycleActions?.[item.key];
-          const disabled =
-            action?.disabled || action?.loading || !action?.onClick;
-          const Icon = item.icon;
+    <CanvasNode.ActionMenu aria-label="Open database actions">
+      {LIFECYCLE_ACTION_ITEMS.map((item) => {
+        const action = lifecycleActions?.[item.key];
+        const Icon = item.icon;
 
-          return (
-            <DropdownMenuItem
-              className={cn(
-                "database-node-menu-item h-7 cursor-pointer rounded-md px-2 py-0 font-normal text-sm text-zinc-200 leading-none hover:bg-white/15 hover:text-zinc-50 focus:bg-white/15 focus:text-zinc-50",
-                item.variant === "destructive" &&
-                  "database-node-menu-item-danger"
-              )}
-              data-lifecycle-action={item.key}
-              disabled={disabled}
-              key={item.key}
-              onClick={(event) => {
-                event.stopPropagation();
-                invokeAction(action);
-              }}
-            >
-              {action?.loading ? (
-                <Spinner className="size-4" />
-              ) : (
-                <Icon aria-hidden className="size-4" />
-              )}
-              {item.label}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        return (
+          <CanvasNode.ActionMenuItem
+            action={action}
+            actionKey={item.key}
+            icon={<Icon aria-hidden className="size-4" />}
+            key={item.key}
+            tone={item.tone}
+          >
+            {item.label}
+          </CanvasNode.ActionMenuItem>
+        );
+      })}
+    </CanvasNode.ActionMenu>
   );
 }

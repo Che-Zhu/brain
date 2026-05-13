@@ -26,62 +26,6 @@
   opacity: 1;
 }
 
-.database-node-action-button:hover,
-.database-node-action-button:focus-visible,
-.database-node-menu-trigger:hover,
-.database-node-menu-trigger:focus-visible {
-  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
-}
-
-.database-node-menu-content {
-  backdrop-filter: blur(calc(var(--spacing) * 5));
-}
-
-.database-node-menu-item[data-highlighted] {
-  color: var(--color-zinc-50);
-  background: color-mix(in oklab, var(--color-white) 15%, transparent);
-}
-
-.database-node-menu-item:is(
-    :hover,
-    :focus,
-    [data-highlighted]
-  )[data-lifecycle-action="restart"]
-  svg {
-  color: var(--color-blue-400);
-  stroke: var(--color-blue-400);
-}
-
-.database-node-menu-item:is(
-    :hover,
-    :focus,
-    [data-highlighted]
-  )[data-lifecycle-action="delete"]
-  svg {
-  color: var(--color-red-500);
-  stroke: var(--color-red-500);
-}
-
-.database-node-menu-item:is(
-    :hover,
-    :focus,
-    [data-highlighted]
-  )[data-lifecycle-action="stop"]
-  svg {
-  color: var(--muted-foreground);
-  stroke: var(--muted-foreground);
-}
-
-.database-node-menu-item:is(
-    :hover,
-    :focus,
-    [data-highlighted]
-  )[data-lifecycle-action="start"]
-  svg {
-  color: var(--color-green-500);
-  stroke: var(--color-green-500);
-}
-
 .database-node-connection-empty {
   min-height: calc(var(--spacing) * 11);
 }

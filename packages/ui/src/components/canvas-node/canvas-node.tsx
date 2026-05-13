@@ -2,6 +2,12 @@
 
 import "./canvas-node.css";
 
+import {
+  CanvasNodeActionBar,
+  CanvasNodeActionButton,
+  CanvasNodeActionMenu,
+  CanvasNodeActionMenuItem,
+} from "./canvas-node.actions";
 import { CanvasNodeCard } from "./canvas-node.card";
 import {
   CanvasNodeConnectionButton,
@@ -41,6 +47,10 @@ export type {
 } from "./canvas-node.types";
 
 export const CanvasNode = {
+  ActionBar: CanvasNodeActionBar,
+  ActionButton: CanvasNodeActionButton,
+  ActionMenu: CanvasNodeActionMenu,
+  ActionMenuItem: CanvasNodeActionMenuItem,
   Body: CanvasNodeBody,
   Card: CanvasNodeCard,
   ConnectionButton: CanvasNodeConnectionButton,
@@ -63,6 +73,10 @@ const dn = (component: object, name: string) => {
 };
 
 dn(CanvasNodeRoot, "CanvasNode.Root");
+dn(CanvasNodeActionBar, "CanvasNode.ActionBar");
+dn(CanvasNodeActionButton, "CanvasNode.ActionButton");
+dn(CanvasNodeActionMenu, "CanvasNode.ActionMenu");
+dn(CanvasNodeActionMenuItem, "CanvasNode.ActionMenuItem");
 dn(CanvasNodeFrame, "CanvasNode.Frame");
 dn(CanvasNodeSurface, "CanvasNode.Surface");
 dn(CanvasNodeHeader, "CanvasNode.Header");

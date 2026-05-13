@@ -1,15 +1,7 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
-import { Spinner } from "@workspace/ui/components/spinner";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
@@ -17,7 +9,6 @@ import {
   Code2,
   Copy,
   Cpu,
-  Ellipsis,
   FileText,
   HardDrive,
   MemoryStick,
@@ -32,7 +23,6 @@ import type { ComponentType, SVGProps, SyntheticEvent } from "react";
 import { useEnvironmentNode } from "./environment-node.context";
 import { canCopyEnvironmentLaunchCommand } from "./environment-node.root";
 import type {
-  EnvironmentNodeAction,
   EnvironmentNodeLifecycleActionKey,
   EnvironmentNodeMetricKey,
   EnvironmentNodeQuickActionKey,
@@ -71,21 +61,18 @@ const QUICK_ACTION_ITEMS = [
   label: string;
 }[];
 
-const ENVIRONMENT_NODE_MENU_ALIGN_OFFSET = -10;
-const ENVIRONMENT_NODE_MENU_SIDE_OFFSET = 14;
-
 interface LifecycleActionItem {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   key: EnvironmentNodeLifecycleActionKey;
   label: string;
-  variant?: "destructive";
+  tone?: "destructive" | "info" | "muted" | "success";
 }
 
 const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
-  { icon: Play, key: "start", label: "Start" },
-  { icon: Pause, key: "stop", label: "Stop" },
-  { icon: RotateCcw, key: "restart", label: "Restart" },
-  { icon: Trash2, key: "delete", label: "Delete", variant: "destructive" },
+  { icon: Play, key: "start", label: "Start", tone: "success" },
+  { icon: Pause, key: "stop", label: "Stop", tone: "muted" },
+  { icon: RotateCcw, key: "restart", label: "Restart", tone: "info" },
+  { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
 ] as const;
 
 function stopNodeControlEvent(event: SyntheticEvent) {
@@ -166,14 +153,6 @@ function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
 interface EnvironmentNodeStatus {
   label: string;
   tone?: Parameters<typeof normalizeCanvasNodeStatus>[0];
-}
-
-function invokeAction(action: EnvironmentNodeAction | undefined) {
-  if (!action?.onClick || action.disabled || action.loading) {
-    return;
-  }
-
-  Promise.resolve(action.onClick()).catch(() => undefined);
 }
 
 function renderLaunchCommandCopyIndicator({
@@ -366,49 +345,23 @@ export function EnvironmentNodeActionBar({
   } = useEnvironmentNode();
 
   return (
-    <div
-      className={cn(
-        "environment-node-action-bar mt-2 flex min-w-0 items-center justify-end gap-1",
-        className
-      )}
-      data-slot="environment-node-action-bar"
-    >
+    <CanvasNode.ActionBar className={className}>
       {QUICK_ACTION_ITEMS.map((item) => {
         const action = quickActions?.[item.key];
-        const disabled =
-          action?.disabled || action?.loading || !action?.onClick;
         const Icon = item.icon;
 
         return (
-          <Button
+          <CanvasNode.ActionButton
+            action={action}
             aria-label={item.label}
-            className={cn(
-              RF_CONTROL_CLASS,
-              "environment-node-action-button flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
-            )}
-            disabled={disabled}
             key={item.key}
-            onClick={(event) => {
-              event.stopPropagation();
-              invokeAction(action);
-            }}
-            onDoubleClick={stopNodeControlEvent}
-            onKeyDown={stopNodeControlEvent}
-            onPointerDown={stopNodeControlEvent}
-            size={null}
             title={item.label}
-            type="button"
-            variant={null}
           >
-            {action?.loading ? (
-              <Spinner className="size-4" />
-            ) : (
-              <Icon aria-hidden className="size-4" />
-            )}
-          </Button>
+            <Icon aria-hidden className="size-4" />
+          </CanvasNode.ActionButton>
         );
       })}
-    </div>
+    </CanvasNode.ActionBar>
   );
 }
 
@@ -463,65 +416,23 @@ function EnvironmentNodeHeaderMenu() {
   } = useEnvironmentNode();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label="Open environment actions"
-            className={cn(
-              RF_CONTROL_CLASS,
-              "environment-node-menu-trigger flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50 aria-expanded:bg-white/15 data-popup-open:bg-white/15"
-            )}
-            onClick={stopNodeControlEvent}
-            size={null}
-            type="button"
-            variant={null}
-          />
-        }
-      >
-        <Ellipsis aria-hidden className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        alignOffset={ENVIRONMENT_NODE_MENU_ALIGN_OFFSET}
-        className={cn(
-          RF_CONTROL_CLASS,
-          "environment-node-menu-content w-38 min-w-38 rounded-md border-0 bg-white/5 p-1 text-zinc-50 shadow-none ring-1 ring-white/10 ring-inset"
-        )}
-        side="right"
-        sideOffset={ENVIRONMENT_NODE_MENU_SIDE_OFFSET}
-      >
-        {LIFECYCLE_ACTION_ITEMS.map((item) => {
-          const action = lifecycleActions?.[item.key];
-          const disabled =
-            action?.disabled || action?.loading || !action?.onClick;
-          const Icon = item.icon;
+    <CanvasNode.ActionMenu aria-label="Open environment actions">
+      {LIFECYCLE_ACTION_ITEMS.map((item) => {
+        const action = lifecycleActions?.[item.key];
+        const Icon = item.icon;
 
-          return (
-            <DropdownMenuItem
-              className={cn(
-                "environment-node-menu-item h-7 cursor-pointer rounded-md px-2 py-0 font-normal text-sm text-zinc-200 leading-none hover:bg-white/15 hover:text-zinc-50 focus:bg-white/15 focus:text-zinc-50",
-                item.variant === "destructive" &&
-                  "environment-node-menu-item-danger"
-              )}
-              data-lifecycle-action={item.key}
-              disabled={disabled}
-              key={item.key}
-              onClick={(event) => {
-                event.stopPropagation();
-                invokeAction(action);
-              }}
-            >
-              {action?.loading ? (
-                <Spinner className="size-4" />
-              ) : (
-                <Icon aria-hidden className="size-4" />
-              )}
-              {item.label}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        return (
+          <CanvasNode.ActionMenuItem
+            action={action}
+            actionKey={item.key}
+            icon={<Icon aria-hidden className="size-4" />}
+            key={item.key}
+            tone={item.tone}
+          >
+            {item.label}
+          </CanvasNode.ActionMenuItem>
+        );
+      })}
+    </CanvasNode.ActionMenu>
   );
 }
