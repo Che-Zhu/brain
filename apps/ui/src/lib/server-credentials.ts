@@ -26,50 +26,92 @@ export interface ServerCredentials {
   serverNamespace: string;
 }
 
+const LOG_PREFIX = "[fetchServerCredentials]" as const;
+
 /**
  * Resolve encoded kubeconfig + namespace from {@link SEALOS_AUTH_TOKEN_COOKIE}
  * via POST `API_ROUTES.auth.regionToken` against `API_URL`.
  */
 export async function fetchServerCredentials(): Promise<ServerCredentials> {
-  const apiUrl = process.env.API_URL;
-  if (!apiUrl) {
-    return { serverEncodedKubeconfig: "", serverNamespace: "" };
+  const empty = (): ServerCredentials => ({
+    serverEncodedKubeconfig: "",
+    serverNamespace: "",
+  });
+
+  const apiUrlRaw = process.env.API_URL?.trim();
+  if (!apiUrlRaw) {
+    console.info(`${LOG_PREFIX} skip: API_URL unset`);
+    return empty();
   }
 
   const cookieStore = await cookies();
   const regionToken =
     cookieStore.get(SEALOS_AUTH_TOKEN_COOKIE)?.value?.trim() ?? "";
   if (regionToken === "") {
-    return { serverEncodedKubeconfig: "", serverNamespace: "" };
+    console.info(
+      `${LOG_PREFIX} skip: cookie ${SEALOS_AUTH_TOKEN_COOKIE} missing or empty`
+    );
+    return empty();
   }
+
+  const tokenChars = regionToken.length;
+  const url = new URL(API_ROUTES.auth.regionToken, apiUrlRaw);
+  console.info(
+    `${LOG_PREFIX} POST ${url.pathname} → origin=${url.origin} (regionToken chars=${tokenChars})`
+  );
 
   let response: Response;
   try {
-    response = await fetch(new URL(API_ROUTES.auth.regionToken, apiUrl), {
+    response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ regionToken }),
       cache: "no-store",
     });
-  } catch {
-    return { serverEncodedKubeconfig: "", serverNamespace: "" };
+  } catch (err: unknown) {
+    console.warn(
+      `${LOG_PREFIX} fetch failed:`,
+      err instanceof Error ? err.message : err
+    );
+    return empty();
   }
+
   if (!response.ok) {
-    return { serverEncodedKubeconfig: "", serverNamespace: "" };
+    let bodySnippet = "";
+    try {
+      bodySnippet = (await response.text()).slice(0, 500);
+    } catch {
+      /* ignore */
+    }
+    console.warn(
+      `${LOG_PREFIX} HTTP ${String(response.status)} ${response.statusText}${bodySnippet ? ` body=${bodySnippet}` : ""}`
+    );
+    return empty();
   }
 
   let raw: RegionTokenResponse;
   try {
     raw = (await response.json()) as RegionTokenResponse;
-    console.log("raw response from region token", raw);
-  } catch {
-    return { serverEncodedKubeconfig: "", serverNamespace: "" };
+  } catch (err: unknown) {
+    console.warn(
+      `${LOG_PREFIX} JSON parse failed:`,
+      err instanceof Error ? err.message : err
+    );
+    return empty();
   }
+
+  const serverEncodedKubeconfig = pickString(
+    raw.encodedKubeconfig,
+    raw.body?.encodedKubeconfig
+  );
+  const serverNamespace = pickString(raw.namespace, raw.body?.namespace);
+
+  console.info(
+    `${LOG_PREFIX} ok: encodedKubeconfig chars=${String(serverEncodedKubeconfig.length)} namespace=${JSON.stringify(serverNamespace)}`
+  );
+
   return {
-    serverEncodedKubeconfig: pickString(
-      raw.encodedKubeconfig,
-      raw.body?.encodedKubeconfig
-    ),
-    serverNamespace: pickString(raw.namespace, raw.body?.namespace),
+    serverEncodedKubeconfig,
+    serverNamespace,
   };
 }
