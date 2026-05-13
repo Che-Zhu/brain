@@ -20,19 +20,30 @@ export const CHAT_BASE_SYSTEM_PROMPT = [
   "When you need catalog-driven UI (metrics charts, etc.), call `emitGenUISpec` with a valid spec. You may still reply with normal text before or after.",
 ].join("\n");
 
-const provider = createOpenAICompatible({
-  name: "openai",
-  apiKey: process.env.DEV_OPENAI_API_KEY,
-  baseURL: process.env.DEV_OPENAI_API_BASE_URL ?? "https://api.openai.com/v1",
-  includeUsage: true,
-});
+/** OpenAI-compatible endpoint credentials (typically from the chat API route env). */
+export interface ChatOpenAiConnection {
+  apiKey?: string;
+  /** Defaults to https://api.openai.com/v1 when omitted or empty. */
+  baseURL?: string | undefined;
+}
+
+function createChatProvider(connection: ChatOpenAiConnection) {
+  return createOpenAICompatible({
+    name: "openai",
+    apiKey: connection.apiKey,
+    baseURL: connection.baseURL ?? "https://api.openai.com/v1",
+    includeUsage: true,
+  });
+}
 
 /** Language model used for streamed assistant replies. */
-export function chatLanguageModel(): ChatModel {
-  return provider(CHAT_MODEL_ID);
+export function chatLanguageModel(connection: ChatOpenAiConnection): ChatModel {
+  return createChatProvider(connection)(CHAT_MODEL_ID);
 }
 
 /** Separate, smaller model for one-shot thread titles after the first turn. */
-export function threadTitleLanguageModel(): ChatModel {
-  return provider(CHAT_THREAD_TITLE_MODEL_ID);
+export function threadTitleLanguageModel(
+  connection: ChatOpenAiConnection
+): ChatModel {
+  return createChatProvider(connection)(CHAT_THREAD_TITLE_MODEL_ID);
 }

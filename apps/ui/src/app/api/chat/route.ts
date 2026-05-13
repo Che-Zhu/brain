@@ -1,5 +1,5 @@
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
-
+import { resolveChatOpenAiConnection } from "@/lib/ai-proxy/resolve-chat-open-ai-connection";
 import {
   appendMessage,
   loadThreadMessages,
@@ -59,8 +59,16 @@ export async function POST(req: Request) {
       kubeconfig,
       kubernetesNamespace: namespace,
     });
-    const model = chatLanguageModel();
-    const titleModel = threadTitleLanguageModel();
+
+    const openAi = await resolveChatOpenAiConnection({
+      encodedKubeconfig,
+      kubeconfigText: kubeconfig,
+    });
+    if (!openAi.ok) {
+      return jsonError(openAi.message, openAi.status);
+    }
+    const model = chatLanguageModel(openAi.connection);
+    const titleModel = threadTitleLanguageModel(openAi.connection);
 
     const result = streamText({
       model,
