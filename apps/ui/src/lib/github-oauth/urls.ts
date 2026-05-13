@@ -1,20 +1,16 @@
+import "server-only";
+
+import { GITHUB_OAUTH_CALLBACK_PATH, parseOAuthReturnPathParam } from "./types";
+
 const TRAILING_SLASH_RE = /\/+$/;
 
-/**
- * Canonical app origin (`NEXT_PUBLIC_APP_URL`, no trailing slash). Used so OAuth
- * `redirect_uri` matches the registered GitHub callback when not localhost.
- */
-export function getPublicAppUrlFromEnv(): string | null {
-  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!raw) {
-    return null;
-  }
-  return raw.replace(TRAILING_SLASH_RE, "");
+function stripTrailingSlash(value: string): string {
+  return value.replace(TRAILING_SLASH_RE, "");
 }
 
-function parseOriginUrl(origin: string): URL | null {
+function tryParseUrl(value: string): URL | null {
   try {
-    return new URL(origin);
+    return new URL(value);
   } catch {
     return null;
   }
@@ -24,30 +20,9 @@ function isLoopbackHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
-/**
- * Prefer runtime origin when env is loopback but the user opened a non-loopback host.
- */
-export function resolvePublicAppOriginForOAuth(
-  envOrigin: string | null,
-  runtimeOrigin: string
-): string {
-  const normalizedRuntime = runtimeOrigin.replace(TRAILING_SLASH_RE, "");
-  if (!envOrigin) {
-    return normalizedRuntime;
-  }
-  const normalizedEnv = envOrigin.replace(TRAILING_SLASH_RE, "");
-  const envParsed = parseOriginUrl(normalizedEnv);
-  const runtimeParsed = parseOriginUrl(normalizedRuntime);
-  if (!(envParsed && runtimeParsed)) {
-    return normalizedEnv;
-  }
-  if (
-    isLoopbackHostname(envParsed.hostname) &&
-    !isLoopbackHostname(runtimeParsed.hostname)
-  ) {
-    return `${runtimeParsed.protocol}//${runtimeParsed.host}`;
-  }
-  return normalizedEnv;
+function envPublicAppUrl(): string | null {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  return raw ? stripTrailingSlash(raw) : null;
 }
 
 function originFromRequest(request: Request): string {
@@ -56,30 +31,60 @@ function originFromRequest(request: Request): string {
     request.headers.get("x-forwarded-host") ??
     request.headers.get("host") ??
     "localhost:3000";
-  if (proto) {
-    return `${proto}://${host}`;
+  return proto ? `${proto}://${host}` : `http://${host}`;
+}
+
+/**
+ * Canonical app origin for the OAuth round-trip. Prefers `NEXT_PUBLIC_APP_URL`
+ * so `redirect_uri` matches the registered GitHub callback, but falls back to
+ * the runtime origin when env is loopback and the user opened a non-loopback host.
+ */
+export function getCallbackBaseUrl(request: Request): string {
+  const env = envPublicAppUrl();
+  const runtime = stripTrailingSlash(originFromRequest(request));
+  if (!env) {
+    return runtime;
   }
-  return `http://${host}`;
+  const envParsed = tryParseUrl(env);
+  const runtimeParsed = tryParseUrl(runtime);
+  if (!(envParsed && runtimeParsed)) {
+    return env;
+  }
+  if (
+    isLoopbackHostname(envParsed.hostname) &&
+    !isLoopbackHostname(runtimeParsed.hostname)
+  ) {
+    return `${runtimeParsed.protocol}//${runtimeParsed.host}`;
+  }
+  return env;
 }
 
-export function getGitHubOAuthBaseUrl(request: Request): string {
-  return resolvePublicAppOriginForOAuth(
-    getPublicAppUrlFromEnv(),
-    originFromRequest(request)
-  );
+export function buildCallbackUri(baseUrl: string): string {
+  return `${stripTrailingSlash(baseUrl)}${GITHUB_OAUTH_CALLBACK_PATH}`;
 }
 
-/** Post-OAuth redirect: `GITHUB_OAUTH_NEXT_PATH` (default `/`) + optional `GITHUB_OAUTH_NEXT_SEARCH`. */
-export function buildPostGitHubOAuthRedirectUrl(baseUrl: string): string {
-  const root = baseUrl.replace(TRAILING_SLASH_RE, "");
+function envDefaultRedirectUrl(baseUrl: string): string {
+  const root = stripTrailingSlash(baseUrl);
   const pathRaw = (process.env.GITHUB_OAUTH_NEXT_PATH ?? "/").trim() || "/";
-  const pathSeg = pathRaw.startsWith("/") ? pathRaw : `/${pathRaw}`;
+  const path = pathRaw.startsWith("/") ? pathRaw : `/${pathRaw}`;
   const searchRaw = process.env.GITHUB_OAUTH_NEXT_SEARCH?.trim();
-
   let search = "";
-  if (searchRaw != null && searchRaw !== "") {
+  if (searchRaw) {
     search = searchRaw.startsWith("?") ? searchRaw : `?${searchRaw}`;
   }
+  return `${root}${path}${search}`;
+}
 
-  return `${root}${pathSeg}${search}`;
+/** Prefer the cookie-stored relative return path; fall back to env defaults. */
+export function buildOAuthSuccessRedirectUrl(
+  baseUrl: string,
+  storedReturnRaw: string | undefined
+): string {
+  const returnPath = storedReturnRaw
+    ? parseOAuthReturnPathParam(storedReturnRaw)
+    : null;
+  if (returnPath) {
+    return `${stripTrailingSlash(baseUrl)}${returnPath}`;
+  }
+  return envDefaultRedirectUrl(baseUrl);
 }

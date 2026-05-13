@@ -12,31 +12,39 @@ import type {
   ProjectExplorerProject,
   ProjectExplorerStates,
 } from "@workspace/ui/components/project-explorer/project-explorer";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 
-import { toastCopyableProjectShareLink } from "@/components/sonner";
 import {
-  buildPreviewProjectShareUrl,
-  projectShareResponseFromJson,
-  readNamespaceFromProjectShareJwt,
-} from "@/lib/project-share";
-import { projectsListToExplorerProjects } from "@/lib/projects-to-explorer-projects";
+  PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
+  projectsListToExplorerProjects,
+} from "@/lib/projects-to-explorer-projects";
+import { openRightPane } from "@/store/layout-store";
+
+function projectResourceName(p: ProjectExplorerProject): string {
+  return p.resourceName ?? p.name;
+}
 
 export function useProjectsExplorer(options: {
   /** URL-encoded kubeconfig string (Bearer token body). */
   kubeconfig: string;
-  /** Kubernetes namespace for list / patch / share calls. */
+  /** Kubernetes namespace for list / patch / delete calls. */
   ns: string;
+  /** When set, replaces the default “open assistant pane” handler for New Project. */
+  onNewProject?: () => void;
 }): {
   actions: ProjectExplorerActions;
   states: ProjectExplorerStates;
+  /** Revalidate the projects list (e.g. after creating a project). */
+  refreshProjects: () => Promise<ProjectExplorerProject[] | undefined>;
 } {
   const router = useRouter();
+  const pathname = usePathname();
   const kubeconfig = options.kubeconfig.trim();
   const ns = options.ns;
+  const onNewProjectOverride = options.onNewProject;
   const hasKubeconfig = kubeconfig !== "";
 
   const getParams = useMemo(
@@ -78,83 +86,97 @@ export function useProjectsExplorer(options: {
     [router]
   );
 
-  const onProjectPublicChange = useCallback(
-    async (p: ProjectExplorerProject, isPublic: boolean) => {
+  const onNewProject = useCallback(() => {
+    if (onNewProjectOverride) {
+      onNewProjectOverride();
+      return;
+    }
+    openRightPane();
+  }, [onNewProjectOverride]);
+
+  const onProjectRename = useCallback(
+    async (p: ProjectExplorerProject, newDisplayName: string) => {
       if (!hasKubeconfig) {
         toast.error("Credentials are not ready yet.");
-        return;
+        throw new Error("not ready");
       }
-      await fetcher({
-        base: ApiUrl(),
-        path: API_ROUTES.k8s.patch,
-        query: {
-          kind: "projects",
-          name: p.name,
-          type: "merge",
-          ...(ns === "" ? {} : { namespace: ns }),
-        },
-        method: "PATCH",
-        body: { spec: { public: isPublic } },
-        header: {
-          Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
-        },
-      });
-      await mutate();
-      if (!isPublic) {
-        toast.info(
-          `"${p.name}" has been set as private. Shared preview links for this project no longer work.`
-        );
-        return;
-      }
-      const loading = toast.loading("Preparing share link…");
       try {
-        const raw = await fetcher<unknown>({
+        await fetcher({
           base: ApiUrl(),
-          path: API_ROUTES.projects.share,
-          method: "POST",
+          path: API_ROUTES.k8s.patch,
+          query: {
+            kind: "projects",
+            name: projectResourceName(p),
+            type: "merge",
+            ...(ns === "" ? {} : { namespace: ns }),
+          },
+          method: "PATCH",
           body: {
-            projectName: p.name,
-            projectUid: p.id,
-            permission: "view",
-            ...(ns === "" ? {} : { ns }),
+            metadata: {
+              annotations: {
+                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: newDisplayName,
+              },
+            },
           },
           header: {
             Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
           },
         });
-        const { token } = projectShareResponseFromJson(raw);
-        const fromJwt = readNamespaceFromProjectShareJwt(token);
-        const previewNs = fromJwt ?? ns.trim();
-        if (previewNs === "") {
-          throw new Error(
-            "Could not determine namespace for preview link. Set a namespace, then make the project public again."
-          );
-        }
-        const origin = window.location.origin;
-        const shareUrl = buildPreviewProjectShareUrl({
-          origin,
-          projectUid: p.id,
-          namespace: previewNs,
-          shareToken: token,
-        });
-        toast.dismiss(loading);
-        toastCopyableProjectShareLink(shareUrl, { projectName: p.name });
+        await mutate();
+        toast.success(`Project renamed to "${newDisplayName}".`);
       } catch (e) {
-        toast.dismiss(loading);
-        const msg = e instanceof Error ? e.message : "Share link failed";
+        const msg = e instanceof Error ? e.message : "Rename failed";
         toast.error(msg);
+        throw e;
       }
     },
     [hasKubeconfig, kubeconfig, mutate, ns]
   );
 
-  const actions = useMemo(
-    (): ProjectExplorerActions => ({
-      onProjectClick,
-      onProjectPublicChange,
-    }),
-    [onProjectClick, onProjectPublicChange]
+  const onProjectDelete = useCallback(
+    async (p: ProjectExplorerProject) => {
+      if (!hasKubeconfig) {
+        toast.error("Credentials are not ready yet.");
+        throw new Error("not ready");
+      }
+      try {
+        await fetcher({
+          base: ApiUrl(),
+          path: API_ROUTES.k8s.delete,
+          query: {
+            kind: "projects",
+            name: projectResourceName(p),
+            ...(ns === "" ? {} : { namespace: ns }),
+          },
+          method: "DELETE",
+          header: {
+            Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+          },
+        });
+        await mutate();
+        toast.success(`Deleted "${p.name}".`);
+        const uidEnc = encodeURIComponent(p.id);
+        if (pathname === `/project/${uidEnc}`) {
+          router.push("/project");
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Delete failed";
+        toast.error(msg);
+        throw e;
+      }
+    },
+    [hasKubeconfig, kubeconfig, mutate, ns, pathname, router]
   );
 
-  return { actions, states };
+  const actions = useMemo(
+    (): ProjectExplorerActions => ({
+      onNewProject,
+      onProjectClick,
+      onProjectDelete,
+      onProjectRename,
+    }),
+    [onNewProject, onProjectClick, onProjectDelete, onProjectRename]
+  );
+
+  return { actions, states, refreshProjects: mutate };
 }

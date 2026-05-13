@@ -18,7 +18,10 @@ import (
 
 // ApplyYAML applies YAML manifests to the cluster using the given config.
 // Supports multi-document YAML (documents separated by "---").
-func ApplyYAML(config *rest.Config, yamlBytes []byte) error {
+//
+// implicitNamespace is used when a namespaced object has an empty metadata.namespace
+// (typically the current context namespace from kubeconfig when set at the route layer).
+func ApplyYAML(config *rest.Config, yamlBytes []byte, implicitNamespace string) error {
 	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return err
@@ -57,9 +60,15 @@ func ApplyYAML(config *rest.Config, yamlBytes []byte) error {
 		gvr := restMapping.Resource
 		var ns string
 		if restMapping.Scope.Name() == meta.RESTScopeNameNamespace {
-			ns = obj.GetNamespace()
+			ns = strings.TrimSpace(obj.GetNamespace())
+			if ns == "" {
+				ns = strings.TrimSpace(implicitNamespace)
+			}
 			if ns == "" {
 				ns = "default"
+			}
+			if strings.TrimSpace(obj.GetNamespace()) == "" {
+				obj.SetNamespace(ns)
 			}
 		}
 		applyOpts := metav1.ApplyOptions{FieldManager: "k8s-apply"}

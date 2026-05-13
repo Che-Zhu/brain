@@ -1,10 +1,12 @@
 export interface ProjectExplorerProject {
   createdAt: Date | string;
   id: string;
-  /** Display name shown in the list. */
+  /** Display name (preferred: `metadata.annotations.displayName`, else legacy `spec.title`). */
   name: string;
   /** `spec.public` on the Project claim when known. */
   public?: boolean;
+  /** Kubernetes `metadata.name`; defaults to `name` when omitted (legacy rows). */
+  resourceName?: string;
 }
 
 /** Copy shown when `projects` is empty (list uses defaults when fields are omitted). */
@@ -26,18 +28,23 @@ export interface ProjectExplorerStates {
 
 /** Optional handlers for project rows. */
 export interface ProjectExplorerActions {
+  /** Opens the create-project flow when the header action is used. */
+  onNewProject?: () => void;
   onProjectClick?: (project: ProjectExplorerProject) => void;
+  onProjectDelete?: (project: ProjectExplorerProject) => void | Promise<void>;
   /**
-   * When set, a public/private switch is shown at the end of each row.
-   * Use to PATCH `spec.public` (or your backend); called with the desired next value.
+   * Display rename; typically merge-PATCH `metadata.annotations.displayName` while
+   * keeping `metadata.name` ({@link ProjectExplorerProject.resourceName}).
    */
-  onProjectPublicChange?: (
+  onProjectRename?: (
     project: ProjectExplorerProject,
-    isPublic: boolean
+    newDisplayName: string
   ) => void | Promise<void>;
 }
 
 export interface ProjectExplorerValue {
   actions: ProjectExplorerActions;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   states: ProjectExplorerStates;
 }

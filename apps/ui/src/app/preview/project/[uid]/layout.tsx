@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShellSolo } from "@/components/app-shell";
-import { PREVIEW_QUERY_HEADER } from "@/lib/preview-search-header";
-import { assertPreviewShareAuthorized } from "@/lib/validate-preview-share";
+import { PREVIEW_QUERY_HEADER } from "@/lib/preview/headers";
+import { assertPreviewShareAuthorized } from "@/lib/preview/share";
 
 function searchFromHeader(search: string): {
   namespace: string;

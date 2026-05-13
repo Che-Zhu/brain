@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { Suspense } from "react";
+
 import "@workspace/ui/globals.css";
 import { Toaster } from "@workspace/ui/components/sonner";
 import { ThemeProvider } from "@workspace/ui/components/theme-provider";
@@ -32,12 +35,14 @@ export default function RootLayout({
     >
       <body>
         <JotaiProvider>
-          <ThemeProvider>
-            <TooltipProvider>
-              <Toaster />
-              {children}
-            </TooltipProvider>
-          </ThemeProvider>
+          <NuqsAdapter>
+            <ThemeProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Suspense fallback={null}>{children}</Suspense>
+              </TooltipProvider>
+            </ThemeProvider>
+          </NuqsAdapter>
         </JotaiProvider>
       </body>
     </html>

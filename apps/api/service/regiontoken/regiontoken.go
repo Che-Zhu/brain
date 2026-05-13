@@ -2,11 +2,13 @@ package regiontoken
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +26,25 @@ const (
 	upstreamPath     = "/api/auth/regionToken"
 	httpTimeout      = 45 * time.Second
 )
+
+// SEALOS_DESKTOP_SKIP_TLS_VERIFY=1 disables TLS certificate verification for the
+// outbound GET to sealos-desktop /api/auth/regionToken (staging / private CA clusters only).
+func desktopUpstreamSkipTLSVerify() bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv("SEALOS_DESKTOP_SKIP_TLS_VERIFY")))
+	return v == "1" || v == "true" || v == "yes"
+}
+
+func exchangeHTTPClient() *http.Client {
+	if !desktopUpstreamSkipTLSVerify() {
+		return &http.Client{Timeout: httpTimeout}
+	}
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	if t.TLSClientConfig == nil {
+		t.TLSClientConfig = &tls.Config{}
+	}
+	t.TLSClientConfig.InsecureSkipVerify = true
+	return &http.Client{Timeout: httpTimeout, Transport: t}
+}
 
 // unescapeKubeconfigLiterals turns literal backslash escape sequences into runes.
 // The desktop ingress sometimes returns YAML where newlines were serialized as the
@@ -125,7 +146,7 @@ func Exchange(ctx context.Context, baseURL, regionToken string) (*ExchangeResult
 	// Upstream matches browser/clients: raw JWT in Authorization (no "Bearer" prefix)
 	req.Header.Set("Authorization", regionToken)
 
-	client := &http.Client{Timeout: httpTimeout}
+	client := exchangeHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

@@ -1,19 +1,23 @@
+import { buttonVariants } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 import Link from "next/link";
 
-/** UI for the experimental Next.js `unauthorized()` interrupt (e.g. failed share link). */
+/** UI for Next.js `unauthorized()` — missing auth, invalid preview links, etc. */
 export default function Unauthorized() {
   return (
     <main className="flex h-screen min-h-0 flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="font-semibold text-2xl">401 — Unauthorized</h1>
-      <p className="max-w-sm text-muted-foreground text-sm">
-        This link is invalid, expired, or the project is not shared. Request a
-        new preview link from the project owner.
+      <h1 className="font-semibold text-2xl text-foreground">
+        Sign in required
+      </h1>
+      <p className="max-w-md text-muted-foreground text-sm">
+        Log in with your workspace before you can use this app.
       </p>
-      <p className="text-muted-foreground text-sm">
-        <Link className="text-foreground underline" href="/">
-          Home
-        </Link>
-      </p>
+      <Link
+        className={cn(buttonVariants({ size: "default", variant: "default" }))}
+        href="/"
+      >
+        Refresh
+      </Link>
     </main>
   );
 }

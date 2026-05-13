@@ -48,8 +48,8 @@ func APWithIngressesServicesAndBackups(ap map[string]interface{}, ingresses, ser
 }
 
 // APWithIngressesAndServicesFromList takes an AP resource (as raw map), lists of ingresses and services,
-// and composes status.variables from internal/external addresses per port. Ingresses and services are
-// used only to build variables; they are not added to status. status.endpoints is intentionally removed.
+// and appends status.variables derived from observed ingresses/services (internal/external URLs per port).
+// Cluster-written status (e.g. status.endpoints from composition) is preserved; only variables is set by this transform.
 func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, services []map[string]interface{}) map[string]interface{} {
 	if ap == nil {
 		return nil
@@ -74,7 +74,6 @@ func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, se
 		endpoints = buildEndpointsFromSpec(ap, ingresses, services)
 	}
 	statusCopy["variables"] = buildVariablesFromEndpoints(endpoints)
-	delete(statusCopy, "endpoints")
 	out["status"] = statusCopy
 
 	return out

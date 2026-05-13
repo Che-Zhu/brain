@@ -5,13 +5,14 @@ metadata:
   annotations:
     meta.crossplane.io/display-name: app
     meta.crossplane.io/description: >
-      Generic app with Deployment, Service, and Ingress. Optional spec.projectName observes a
-      Project claim in the same namespace (kubernetes.m Object Observe), adds labels
-      crossplane.io/project-name and crossplane.io/project-uid. Composed workloads
-      (Deployment, Services, Ingress, ConfigMap, etc.) ownerReference the AP claim only; only the
-      AP composite is SSA-patched to add Project ownerReferences/labels. Echoes
-      status.projectName / status.projectUid (Crossplane does not merge composite metadata from
-      composition output for most fields).
+      Generic app with Deployment, Service, and optional Ingress per spec.endpoints[].public (default true).
+      With metadata.labels.region, hostname is {name}-{slug}.{region} for a single public port, or
+      {name}-p{port}-{slug}.{region} when multiple endpoints are public. Optional endpoints.host when region
+      is omitted. Optional spec.projectName observes a Project claim in the same namespace (kubernetes.m
+      Object Observe), adds labels crossplane.io/project-name and crossplane.io/project-uid. Composed workloads
+      (Deployment, Services, Ingress, ConfigMap, etc.) ownerReference the AP claim only; only the AP composite
+      is SSA-patched to add Project ownerReferences/labels. Echoes status.projectName / status.projectUid
+      (Crossplane does not merge composite metadata from composition output for most fields).
     # Lucide rocket as data URI; used when icon-url is omitted (frontend prefers icon-url, then icon-data).
     meta.crossplane.io/icon-data: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXJvY2tldC1pY29uIGx1Y2lkZS1yb2NrZXQiPjxwYXRoIGQ9Ik0xMiAxNXY1czMuMDMtLjU1IDQtMmMxLjA4LTEuNjIgMC01IDAtNSIvPjxwYXRoIGQ9Ik00LjUgMTYuNWMtMS41IDEuMjYtMiA1LTIgNXMzLjc0LS41IDUtMmMuNzEtLjg0LjctMi4xMy0uMDktMi45MWEyLjE4IDIuMTggMCAwIDAtMi45MS0uMDkiLz48cGF0aCBkPSJNOSAxMmEyMiAyMiAwIDAgMSAyLTMuOTVBMTIuODggMTIuODggMCAwIDEgMjIgMmMwIDIuNzItLjc4IDcuNS02IDExYTIyLjQgMjIuNCAwIDAgMS00IDJ6Ii8+PHBhdGggZD0iTTkgMTJINHMuNTUtMy4wMyAyLTRjMS42Mi0xLjA4IDUgLjA1IDUgLjA1Ii8+PC9zdmc+"
     meta.crossplane.io/template: |
@@ -19,6 +20,7 @@ metadata:
       kind: AP
       metadata:
         name: {{ name }}
+        namespace: {{ namespace }}
         labels:
           region: 192.168.12.53.nip.io
       spec:
@@ -31,7 +33,6 @@ metadata:
         replicas: 1
         endpoints:
           - port: 80
-            host: placeholder.example.com
         cpuRequest: 200m
         memoryRequest: 204Mi
         cpuLimit: 2000m
@@ -76,25 +77,55 @@ spec:
             {{- if ne $region "" }}
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
-            {{- $endpoints := list }}
+            {{- $endpointsRaw := list }}
             {{- if hasKey $spec "endpoints" }}
-            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- $endpointsRaw = default (list) $spec.endpoints }}
             {{- else if and $spec.port $spec.host }}
-            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
             {{- end }}
-            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
-            {{- $epMut := list }}
+            {{- $publicOnly := list }}
+            {{- range $endpointsRaw }}
+            {{- $ipub := true }}
+            {{- if hasKey . "public" }}{{ $ipub = .public }}{{ end }}
+            {{- if $ipub }}{{ $publicOnly = concat $publicOnly (list 1) }}{{ end }}
+            {{- end }}
+            {{- $multiPublic := gt (len $publicOnly) 1 }}
+            {{- $endpoints := list }}
+            {{- range $endpointsRaw }}
+            {{- $p := .port }}
+            {{- $hostIn := "" }}
+            {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
+            {{- $isPublic := true }}
+            {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $effHost := "" }}
+            {{- if $isPublic }}
+            {{-   if ne $region "" }}
+            {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
+            {{-   else }}
+            {{-     $effHost = $hostIn }}
+            {{-   end }}
+            {{- end }}
+            {{- $endpoints = concat $endpoints (list (dict "port" $p "host" $effHost "public" $isPublic)) }}
+            {{- end }}
+            {{- $needIngress := false }}
             {{- range $endpoints }}
-            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
-            {{- $endpoints = $epMut }}
-            {{- end }}
+            {{- /* Pause/start: AP spec.paused scales Deployment to zero with SealOS pause annotation. */}}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- /* Build an effective spec snapshot with defaults resolved so rollback is self-contained */}}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")
@@ -171,6 +202,13 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: app-deployment
                 gotemplating.fn.crossplane.io/ready: "True"
+                {{- if $paused }}
+                deploy.cloud.sealos.io/pause: '{"target":"","value":""}'
+                {{- else }}
+                deploy.cloud.sealos.io/minReplicas: {{ $spec.replicas | default 1 | quote }}
+                deploy.cloud.sealos.io/maxReplicas: {{ $spec.replicas | default 1 | quote }}
+                deploy.cloud.sealos.io/resize: "0Gi"
+                {{- end }}
               labels:
                 crossplane.io/composite: {{ $name }}
                 {{ if ne $projectName "" }}
@@ -185,7 +223,7 @@ spec:
                 name: {{ $name }}
                 uid: {{ $apUid }}
             spec:
-              replicas: {{ $spec.replicas | default 1 }}
+              replicas: {{ $desiredReplicas }}
               revisionHistoryLimit: 1
               selector:
                 matchLabels:
@@ -199,6 +237,7 @@ spec:
                 metadata:
                   labels:
                     app: {{ $name }}
+                    restartNonce: "{{ $restartRequest }}"
                 spec:
                   imagePullSecrets:
                   - name: ghcr-cred
@@ -290,7 +329,7 @@ spec:
                 protocol: TCP
             {{- end }}
             {{- end }}
-            {{- if $endpoints }}
+            {{- if $needIngress }}
 
             ---
 
@@ -333,6 +372,7 @@ spec:
               ingressClassName: nginx
               rules:
               {{- range $endpoints }}
+              {{- if and .public (ne (trim (toString (default "" .host))) "") }}
               - host: {{ .host }}
                 http:
                   paths:
@@ -344,10 +384,13 @@ spec:
                         port:
                           number: {{ .port }}
               {{- end }}
+              {{- end }}
               tls:
               - hosts:
                 {{- range $endpoints }}
+                {{- if and .public (ne (trim (toString (default "" .host))) "") }}
                 - {{ .host }}
+                {{- end }}
                 {{- end }}
                 secretName: wildcard-cert
             {{- end }}
@@ -392,36 +435,37 @@ spec:
                       uid: {{ $projectUid }}
             {{ end }}
 
-            {{- /* Deployment-derived AP status.phase (mirrors kubectl-style rollout semantics). */}}
+            {{- /* AP status.phase: spec.paused wins; else derive from composed Deployment. */}}
             {{- $dep := getComposedResource . "app-deployment" }}
             {{- $phase := "Unknown" }}
-            {{- if $dep }}
-            {{-   $paused := false }}
-            {{-   if and $dep.spec (hasKey $dep.spec "paused") }}
-            {{-     $paused = index $dep.spec "paused" }}
-            {{-   end }}
-            {{-   if $paused }}
-            {{-     $phase = "Paused" }}
-            {{-   else }}
-            {{-     $avail := "" }}
-            {{-     $prog := "" }}
-            {{-     $progReason := "" }}
-            {{-     if and $dep.status $dep.status.conditions }}
-            {{-       range $c := $dep.status.conditions }}
-            {{-         if eq $c.type "Available" }}{{ $avail = $c.status }}{{ end }}
-            {{-         if eq $c.type "Progressing" }}{{ $prog = $c.status }}{{ $progReason = default "" $c.reason }}{{ end }}
-            {{-       end }}
-            {{-     end }}
-            {{-     if and (eq $avail "True") (eq $prog "True") (eq $progReason "NewReplicaSetAvailable") }}
-            {{-       $phase = "Running" }}
-            {{-     else if and (eq $prog "False") (eq $progReason "ProgressDeadlineExceeded") }}
-            {{-       $phase = "Failed" }}
-            {{-     else if eq $prog "True" }}
-            {{-       $phase = "Progressing" }}
-            {{-     else if eq $avail "False" }}
-            {{-       $phase = "Degraded" }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}
+            {{- $phase = "Paused" }}
+            {{- else if $dep }}
+            {{-   $avail := "" }}
+            {{-   $prog := "" }}
+            {{-   $progReason := "" }}
+            {{-   if and $dep.status $dep.status.conditions }}
+            {{-     range $c := $dep.status.conditions }}
+            {{-       if eq $c.type "Available" }}{{ $avail = $c.status }}{{ end }}
+            {{-       if eq $c.type "Progressing" }}{{ $prog = $c.status }}{{ $progReason = default "" $c.reason }}{{ end }}
             {{-     end }}
             {{-   end }}
+            {{-   if and (eq $avail "True") (eq $prog "True") (eq $progReason "NewReplicaSetAvailable") }}
+            {{-     $phase = "Running" }}
+            {{-   else if and (eq $prog "False") (eq $progReason "ProgressDeadlineExceeded") }}
+            {{-     $phase = "Failed" }}
+            {{-   else if eq $prog "True" }}
+            {{-     $phase = "Progressing" }}
+            {{-   else if eq $avail "False" }}
+            {{-     $phase = "Degraded" }}
+            {{-   end }}
+            {{- end }}
+            {{- $ingObs := getComposedResource . "app-ingress" }}
+            {{- $pubScheme := "http" }}
+            {{- if and $ingObs $ingObs.spec $ingObs.spec.tls }}
+            {{- if gt (len $ingObs.spec.tls) 0 }}
+            {{- $pubScheme = "https" }}
+            {{- end }}
             {{- end }}
 
             ---
@@ -439,6 +483,48 @@ spec:
               {{ end }}
               {{ if ne $projectUid "" }}
               projectUid: {{ $projectUid | quote }}
+              {{ end }}
+              {{ if gt (len $endpoints) 0 }}
+              endpoints:
+              {{ range $endpoints }}
+              {{- $p := .port }}
+              {{- $isPublic := .public }}
+              {{- $svcKey := printf "app-service-port-%d" $p }}
+              {{- $svcObs := getComposedResource $ $svcKey }}
+              {{- $svcDns := printf "%s-service-port-%d" $name $p }}
+              {{- $priv := printf "http://%s.%s.svc:%v" $svcDns $ns $p }}
+              {{- if and $svcObs $svcObs.spec $svcObs.spec.clusterIP }}
+              {{- $cip := $svcObs.spec.clusterIP | toString }}
+              {{- if and $cip (ne $cip "None") (ne $cip "") }}
+              {{- $priv = printf "http://%s:%v" $cip $p }}
+              {{- end }}
+              {{- end }}
+              {{- $pub := "" }}
+              {{- if and $isPublic (ne (trim (toString (default "" .host))) "") }}
+              {{- $pubHost := trim (toString (default "" .host)) }}
+              {{- if and $ingObs $ingObs.spec $ingObs.spec.rules }}
+              {{- $wantSvc := $svcDns }}
+              {{- range $rule := $ingObs.spec.rules }}
+              {{- if and $rule.http $rule.host }}
+              {{- range $rule.http.paths }}
+              {{- if and .backend .backend.service .backend.service.name (eq .backend.service.name $wantSvc) }}
+              {{- $pn := 0 }}{{ if .backend.service.port.number }}{{ $pn = .backend.service.port.number }}{{ end }}
+              {{- if eq $pn $p }}
+              {{- $pubHost = $rule.host }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- $pub = printf "%s://%s/" $pubScheme $pubHost }}
+              {{- end }}
+                - number: {{ $p }}
+                  privateAddress: {{ $priv | quote }}
+              {{- if ne $pub "" }}
+                  publicAddress: {{ $pub | quote }}
+              {{- end }}
+              {{ end }}
               {{ end }}
     - step: create-orphaned-config-snapshot-rbac
       functionRef:
@@ -474,24 +560,53 @@ spec:
             {{- if ne $region "" }}
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
-            {{- $endpoints := list }}
+            {{- $endpointsRaw := list }}
             {{- if hasKey $spec "endpoints" }}
-            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- $endpointsRaw = default (list) $spec.endpoints }}
             {{- else if and $spec.port $spec.host }}
-            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
             {{- end }}
-            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
-            {{- $epMut := list }}
+            {{- $publicOnly := list }}
+            {{- range $endpointsRaw }}
+            {{- $ipub := true }}
+            {{- if hasKey . "public" }}{{ $ipub = .public }}{{ end }}
+            {{- if $ipub }}{{ $publicOnly = concat $publicOnly (list 1) }}{{ end }}
+            {{- end }}
+            {{- $multiPublic := gt (len $publicOnly) 1 }}
+            {{- $endpoints := list }}
+            {{- range $endpointsRaw }}
+            {{- $p := .port }}
+            {{- $hostIn := "" }}
+            {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
+            {{- $isPublic := true }}
+            {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $effHost := "" }}
+            {{- if $isPublic }}
+            {{-   if ne $region "" }}
+            {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
+            {{-   else }}
+            {{-     $effHost = $hostIn }}
+            {{-   end }}
+            {{- end }}
+            {{- $endpoints = concat $endpoints (list (dict "port" $p "host" $effHost "public" $isPublic)) }}
+            {{- end }}
+            {{- $needIngress := false }}
             {{- range $endpoints }}
-            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
-            {{- $endpoints = $epMut }}
-            {{- end }}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")
@@ -602,24 +717,53 @@ spec:
             {{- if ne $region "" }}
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
-            {{- $endpoints := list }}
+            {{- $endpointsRaw := list }}
             {{- if hasKey $spec "endpoints" }}
-            {{- $endpoints = default (list) $spec.endpoints }}
+            {{- $endpointsRaw = default (list) $spec.endpoints }}
             {{- else if and $spec.port $spec.host }}
-            {{- $endpoints = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
             {{- end }}
-            {{- if and (ne $region "") (ne $computedHost "") (gt (len $endpoints) 0) }}
-            {{- $epMut := list }}
+            {{- $publicOnly := list }}
+            {{- range $endpointsRaw }}
+            {{- $ipub := true }}
+            {{- if hasKey . "public" }}{{ $ipub = .public }}{{ end }}
+            {{- if $ipub }}{{ $publicOnly = concat $publicOnly (list 1) }}{{ end }}
+            {{- end }}
+            {{- $multiPublic := gt (len $publicOnly) 1 }}
+            {{- $endpoints := list }}
+            {{- range $endpointsRaw }}
+            {{- $p := .port }}
+            {{- $hostIn := "" }}
+            {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
+            {{- $isPublic := true }}
+            {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $effHost := "" }}
+            {{- if $isPublic }}
+            {{-   if ne $region "" }}
+            {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
+            {{-   else }}
+            {{-     $effHost = $hostIn }}
+            {{-   end }}
+            {{- end }}
+            {{- $endpoints = concat $endpoints (list (dict "port" $p "host" $effHost "public" $isPublic)) }}
+            {{- end }}
+            {{- $needIngress := false }}
             {{- range $endpoints }}
-            {{- $epMut = concat $epMut (list (dict "port" .port "host" $computedHost)) }}
+            {{- if and .public (ne (trim (toString (default "" .host))) "") }}{{ $needIngress = true }}{{ end }}
             {{- end }}
-            {{- $endpoints = $epMut }}
-            {{- end }}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "image" $spec.image
                   "replicas" ($spec.replicas | default 1)
+                  "paused" $paused
+                  "restartRequest" $restartRequest
                   "endpoints" $endpoints
                   "cpuRequest" ($spec.cpuRequest | default "200m")
                   "memoryRequest" ($spec.memoryRequest | default "204Mi")

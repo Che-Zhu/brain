@@ -1,0 +1,52 @@
+import type { AssistantContextPayload } from "@/lib/chat-persistence/types";
+
+/**
+ * Human-readable snippet appended to the model system prompt with project / workload
+ * context supplied by the client (informational — not authoritative for cluster state).
+ */
+export function buildAssistantWorkspaceContextPrompt(opts: {
+  kubernetesNamespace: string;
+  assistantContext?: AssistantContextPayload;
+}): string {
+  const { kubernetesNamespace, assistantContext } = opts;
+  const ns = kubernetesNamespace.trim();
+  const uid = assistantContext?.projectUid?.trim() ?? "";
+
+  const lines: string[] = [
+    "## Current workspace (Seal UI)",
+    ns === ""
+      ? "- Primary Kubernetes namespace for this chat session: (not specified)"
+      : `- Primary Kubernetes namespace for this chat session (thread bucket): \`${escapeBackticks(ns)}\``,
+  ];
+
+  if (uid !== "") {
+    lines.push(
+      `- Project UID (claims label scope): \`${escapeBackticks(uid)}\``
+    );
+  }
+
+  const wl = assistantContext?.selectedWorkload;
+  if (wl?.kubernetesUid != null && wl.kubernetesUid !== "") {
+    lines.push("", "### Selected workload in the canvas / URL");
+    lines.push(
+      `- Kubernetes \`metadata.uid\`: \`${escapeBackticks(wl.kubernetesUid)}\``
+    );
+    if (wl.name != null && wl.name.trim() !== "") {
+      lines.push(`- Display name / resource identity: ${wl.name}`);
+    }
+    if (wl.kind != null && wl.kind.trim() !== "") {
+      lines.push(`- Kind hint: ${wl.kind}`);
+    }
+  }
+
+  lines.push("");
+  lines.push(
+    "The user sees this workspace in the product UI (canvas, namespace, selection). Prefer this context when answering about “this project” or “the selected service”. Use tools when you need authoritative cluster state."
+  );
+
+  return lines.join("\n");
+}
+
+function escapeBackticks(s: string): string {
+  return s.replaceAll("`", "\\`");
+}

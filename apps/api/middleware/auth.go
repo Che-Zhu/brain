@@ -148,8 +148,12 @@ func ResolveContext(cfg *clientcmdapi.Config, opts ResolveOptions) (*ResolvedCon
 				ns = opts.DefaultNamespace
 			}
 		} else {
-			// Not admin: use namespace from kc directly, ignore opts.Namespace
-			if userNS != "" {
+			// Not cluster-admin: target namespace is enforced by Kubernetes RBAC.
+			// Prefer an explicit opts.Namespace when the route passes one (matches list/get UX
+			// where the UI selects a namespace independently of kubeconfig context).
+			if opts.Namespace != "" {
+				ns = opts.Namespace
+			} else if userNS != "" {
 				ns = userNS
 			} else if opts.AllNamespaces {
 				ns = corev1.NamespaceAll

@@ -3,6 +3,7 @@
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
 
+/** Outer chrome for the explorer (opinionated shadow + column flex). */
 export function ProjectExplorerShell({
   className,
   ...props
@@ -18,6 +19,7 @@ export function ProjectExplorerShell({
   );
 }
 
+/** Region shell: padding only; compose {@link ProjectExplorerHeaderBrand}, toolbar leaves, etc. as `children`. */
 export function ProjectExplorerHeader({
   className,
   children,
@@ -25,11 +27,7 @@ export function ProjectExplorerHeader({
 }: ComponentProps<"div"> & { children?: ReactNode }) {
   return (
     <div className={cn("px-4 py-3", className)} {...props}>
-      {children ?? (
-        <div className="text-start font-mono text-base leading-none">
-          Projects
-        </div>
-      )}
+      {children}
     </div>
   );
 }

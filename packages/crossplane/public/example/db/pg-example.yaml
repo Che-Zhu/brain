@@ -1,8 +1,8 @@
 apiVersion: example.crossplane.io/v1
 kind: DB
 metadata:
-  name: db-postgresql
-  namespace: ns-admin
+  name: brain-pg
+  namespace: brain-system
   labels:
     region: 192.168.12.53.nip.io
 spec:
@@ -10,5 +10,5 @@ spec:
     compositionRef:
       name: dbs-postgresql-kubeblocks-go-templating
   engine: postgresql
-  # exposeNodePort: true
+  exposeNodePort: true
   quota: xs

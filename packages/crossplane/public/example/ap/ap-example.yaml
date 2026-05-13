@@ -3,6 +3,8 @@ kind: AP
 metadata:
   name: nginx
   namespace: ns-admin
+  labels:
+    region: 192.168.12.53.nip.io
 spec:
   crossplane:
     compositionRef:
@@ -11,10 +13,9 @@ spec:
   # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
   projectName: demo-project
   replicas: 1
-  # Multiple services and ingress - one per endpoint (legacy port/host still supported)
+  # One Service per port; Ingress for public ports (default). With metadata.labels.region, host optional.
   endpoints:
     - port: 80
-      host: nginx-axas.192.168.12.53.nip.io
   cpuRequest: 250m
   memoryRequest: 512Mi
   cpuLimit: 500m

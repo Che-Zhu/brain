@@ -4,10 +4,7 @@
   "overrides": [
     {
       // Compound-component dot-notation per apps/ui frontend architecture §4.1.
-      "includes": [
-        "apps/ui/src/features/**/*.tsx",
-        "apps/ui/src/app/**/*.tsx"
-      ],
+      "includes": ["apps/ui/src/features/**/*.tsx", "apps/ui/src/app/**/*.tsx"],
       "linter": {
         "rules": {
           "style": { "useFilenamingConvention": "off" }
@@ -20,6 +17,15 @@
         "apps/ui/src/features/*/index.ts",
         "apps/ui/src/shared/*/index.ts"
       ],
+      "linter": {
+        "rules": {
+          "performance": { "noBarrelFile": "off" }
+        }
+      }
+    },
+    {
+      // Compound facade for `@workspace/ui` ports-table module (dot-notation API).
+      "includes": ["packages/ui/src/components/ports-table/ports-table.tsx"],
       "linter": {
         "rules": {
           "performance": { "noBarrelFile": "off" }

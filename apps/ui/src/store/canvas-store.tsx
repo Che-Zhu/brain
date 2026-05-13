@@ -1,170 +1,65 @@
 "use client";
 
 import type {
-  CanvasMeta,
-  CanvasPanelBodyProps,
-  CanvasPanelTypes,
+  CanvasPanelTab,
   CanvasSelectedEdge,
-  CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
-import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
-import type {
-  ContainerNodeActions,
-  ContainerNodeStates,
-} from "@workspace/ui/components/container-node/container-node";
-import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
-import { cn } from "@workspace/ui/lib/utils";
-import {
-  type Edge,
-  Handle,
-  type Node,
-  type NodeProps,
-  type NodeTypes,
-  Position,
-} from "@xyflow/react";
-import { atom, getDefaultStore } from "jotai";
-import { memo } from "react";
+import type { Node, NodeTypes } from "@xyflow/react";
+import { atom } from "jotai";
 
-/** React Flow `type` for AP / workload container cards on the app canvas. */
-export const CANVAS_CONTAINER_NODE_TYPE = "containerNode" as const;
+import { CanvasContainerNode } from "@/lib/project-canvas/nodes/canvas-container-node";
+import { CANVAS_CONTAINER_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
+import { WorkloadLogsCanvasPanel } from "@/lib/project-canvas/panels/workload-logs-panel";
+import { WorkloadMetricsCanvasPanel } from "@/lib/project-canvas/panels/workload-metrics-panel";
+import { WorkloadSettingsCanvasPanel } from "@/lib/project-canvas/panels/workload-settings-panel";
 
-export interface CanvasContainerNodeData extends Record<string, unknown> {
-  actions?: ContainerNodeActions;
-  states: ContainerNodeStates;
+/** nuqs key for the selected workload card (Kubernetes `metadata.uid`). */
+export const CANVAS_SERVICE_QUERY_KEY = "service" as const;
+
+/** nuqs key for the workload panel tab (`?tab=…`); value matches panel tab {@link CanvasPanelTab.name}. */
+export const CANVAS_TAB_QUERY_KEY = "tab" as const;
+
+/** Tab `name` values — doubles as Radix tab value and URL `?tab=…` value. */
+export const WORKLOAD_PANEL_TAB = {
+  settings: "Settings",
+  metrics: "Metrics",
+  logs: "Logs",
+} as const;
+
+/**
+ * Bounds for AP `spec.replicas` in the workload Settings panel (`ContainerSettingsPane`).
+ * Matches `packages/crossplane/public/service/ap/ap.yaml` (`minimum` / `maximum`).
+ */
+export const WORKLOAD_PANEL_REPLICAS = { min: 1, max: 20 } as const;
+
+export function projectCanvasNodeServiceUid(node: Node): string | null {
+  const data = node.data as { states?: { uid?: unknown } } | undefined;
+  const uid = data?.states?.uid;
+  return typeof uid === "string" && uid !== "" ? uid : null;
 }
 
-export type CanvasContainerRfNode = Node<
-  CanvasContainerNodeData,
-  typeof CANVAS_CONTAINER_NODE_TYPE
->;
-
-export const CanvasContainerNode = memo(function CanvasContainerNode({
-  data,
-  id,
-}: NodeProps<CanvasContainerRfNode>) {
-  const { actions = {}, states } = data;
-  const { state } = useCanvas();
-  const edge = state.selectedEdge;
-  const isEndpointOfSelectedEdge =
-    edge != null && (edge.source === id || edge.target === id);
-  const isOutlined =
-    (state.selectedNode != null && state.selectedNode.id === id) ||
-    isEndpointOfSelectedEdge;
-
-  return (
-    <div
-      className={cn(
-        "h-full w-full rounded-xl border border-dashed",
-        isOutlined ? "border-primary" : "border-transparent"
-      )}
-    >
-      <Handle position={Position.Top} type="target" />
-      <ContainerNode.Root actions={actions} states={states}>
-        <ContainerNode.Variant0 className="h-40 w-60" />
-      </ContainerNode.Root>
-      <Handle position={Position.Bottom} type="source" />
-    </div>
-  );
-});
-
-CanvasContainerNode.displayName = "CanvasContainerNode";
-
-/** Default `meta.nodeTypes` for `Canvas.Root` in this app. */
-export const canvasDefaultNodeTypes = {
+export const projectCanvasFlowNodeTypes = {
   [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNode,
 } as const satisfies NodeTypes;
 
-function containerStatesFromNode(node: Node): ContainerNodeStates | null {
-  if (
-    node.type !== CANVAS_CONTAINER_NODE_TYPE ||
-    node.data === null ||
-    typeof node.data !== "object" ||
-    !("states" in node.data)
-  ) {
-    return null;
-  }
-  return (node.data as { states: ContainerNodeStates }).states;
-}
-
-export const CanvasContainerNodePanel = memo(function CanvasContainerNodePanel({
-  node,
-}: CanvasPanelBodyProps) {
-  const states = containerStatesFromNode(node);
-  if (states == null) {
-    return (
-      <p className="text-muted-foreground text-sm">No workload details.</p>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-3 text-sm">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-muted-foreground text-xs">Image</span>
-        <span className="break-all font-mono text-xs">{states.image}</span>
-      </div>
-      <div className="flex flex-row flex-wrap gap-x-6 gap-y-2">
-        {states.cpuPercent != null && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground text-xs">CPU</span>
-            <span>{states.cpuPercent}%</span>
-          </div>
-        )}
-        {states.memoryPercent != null && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground text-xs">Memory</span>
-            <span>{states.memoryPercent}%</span>
-          </div>
-        )}
-        {states.replicas != null && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground text-xs">Replicas</span>
-            <span>{states.replicas}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
-
-CanvasContainerNodePanel.displayName = "CanvasContainerNodePanel";
-
-/** Default `meta.panelTypes` — keys match {@link canvasDefaultNodeTypes}. */
-export const canvasDefaultPanelTypes = {
-  [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNodePanel,
-} as const satisfies CanvasPanelTypes;
-
-/** Selected canvas node; `canvasMetaAtom` click handlers write via `getDefaultStore()` matching the app root `JotaiProvider` store. */
-export const selectedNodeAtom = atom<CanvasSelectedNode>(null);
-
-/** Selected canvas edge; mutually exclusive with {@link selectedNodeAtom}. */
-export const selectedEdgeAtom = atom<CanvasSelectedEdge>(null);
-
-function setCanvasSelection(
-  node: CanvasSelectedNode,
-  edge: CanvasSelectedEdge
-) {
-  const store = getDefaultStore();
-  store.set(selectedNodeAtom, node);
-  store.set(selectedEdgeAtom, edge);
-}
-
-/** Clears node and edge selection (e.g. closing the canvas panel). */
-export function closeCanvasSelection() {
-  setCanvasSelection(null, null);
-}
-
-/** Canvas `meta` (`nodeTypes`, `panelTypes`, `edgeTypes`, `reactFlowProps`) — not fetch-derived `state`. */
-export const canvasMetaAtom = atom<CanvasMeta>({
-  nodeTypes: canvasDefaultNodeTypes,
-  panelTypes: canvasDefaultPanelTypes,
-  reactFlowProps: {
-    onNodeClick: (_event, node: Node) => {
-      setCanvasSelection(node, null);
-    },
-    onEdgeClick: (_event, edge: Edge) => {
-      setCanvasSelection(null, edge);
-    },
-    onPaneClick: () => {
-      setCanvasSelection(null, null);
-    },
+/** Side-panel tabs for the project canvas workload inspector (Settings uses {@link WORKLOAD_PANEL_REPLICAS}). */
+export const projectCanvasWorkloadPanelTabs: CanvasPanelTab[] = [
+  {
+    name: WORKLOAD_PANEL_TAB.settings,
+    render: ({ node }) => (
+      <WorkloadSettingsCanvasPanel key={node.id} node={node} />
+    ),
   },
-});
+  {
+    name: WORKLOAD_PANEL_TAB.metrics,
+    render: ({ node }) => (
+      <WorkloadMetricsCanvasPanel key={node.id} node={node} />
+    ),
+  },
+  {
+    name: WORKLOAD_PANEL_TAB.logs,
+    render: () => <WorkloadLogsCanvasPanel />,
+  },
+];
+
+export const selectedEdgeAtom = atom<CanvasSelectedEdge>(null);

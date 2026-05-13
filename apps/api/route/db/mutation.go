@@ -88,7 +88,7 @@ spec:
 			input.Body.YAML = string(yamlBytes)
 		}
 
-		if err := k8ssvc.ApplyYAML(restConfig, []byte(input.Body.YAML)); err != nil {
+		if err := k8ssvc.ApplyYAML(restConfig, []byte(input.Body.YAML), ns); err != nil {
 			return nil, huma.Error500InternalServerError("failed to create DB", err)
 		}
 

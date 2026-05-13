@@ -21,21 +21,35 @@ func registerApply(grp huma.API) {
 		Body applyBody
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-apply",
+		OperationID: "k8s-apply",
 		Method:      http.MethodPost,
 		Path:        "/apply",
 		Summary:     "Apply manifest",
 		Description: "Apply Kubernetes YAML manifest(s). Send JSON body with yaml field.",
 		Tags:        []string{"K8s"},
 	}, func(ctx context.Context, input *applyInput) (*struct{}, error) {
-		restConfig, _, err := middleware.RestConfigFromAuth(input.Authorization)
+		restConfig, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
 		if err != nil {
 			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
 		}
 		if input.Body.YAML == "" {
 			return nil, huma.Error400BadRequest("body.yaml is required", nil)
 		}
-		if err := k8ssvc.ApplyYAML(restConfig, []byte(input.Body.YAML)); err != nil {
+		gvr := middleware.PodsGVR()
+		resolved, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        "",
+			AllNamespaces:    false,
+			DefaultNamespace: "default",
+			AdminCheckGVR:    &gvr,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to resolve namespace from kubeconfig", err)
+		}
+		implicitNS := resolved.Namespace
+		if implicitNS == "" {
+			implicitNS = "default"
+		}
+		if err := k8ssvc.ApplyYAML(restConfig, []byte(input.Body.YAML), implicitNS); err != nil {
 			return nil, huma.Error500InternalServerError("failed to apply", err)
 		}
 		return nil, nil
@@ -85,12 +99,12 @@ func registerDelete(grp huma.API) {
 		return &deleteOutput{Body: json.RawMessage(jsonBytes)}, nil
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-delete",
-		Method:       http.MethodDelete,
-		Path:         "/delete",
-		Summary:      "Delete resources",
-		Description:  "Delete Kubernetes resources. Supports both DELETE and POST methods.",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-delete",
+		Method:      http.MethodDelete,
+		Path:        "/delete",
+		Summary:     "Delete resources",
+		Description: "Delete Kubernetes resources. Supports both DELETE and POST methods.",
+		Tags:        []string{"K8s"},
 	}, handler)
 	huma.Register(grp, huma.Operation{
 		OperationID: "k8s-delete-post", Method: http.MethodPost, Path: "/delete",
@@ -139,12 +153,12 @@ func registerPatch(grp huma.API) {
 		return &patchOutput{Body: json.RawMessage(jsonBytes)}, nil
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-patch",
-		Method:       http.MethodPatch,
-		Path:         "/patch",
-		Summary:      "Patch resource",
-		Description:  "Patch a Kubernetes resource. Supports PATCH and POST methods.",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-patch",
+		Method:      http.MethodPatch,
+		Path:        "/patch",
+		Summary:     "Patch resource",
+		Description: "Patch a Kubernetes resource. Supports PATCH and POST methods.",
+		Tags:        []string{"K8s"},
 	}, handler)
 	huma.Register(grp, huma.Operation{
 		OperationID: "k8s-patch-post", Method: http.MethodPost, Path: "/patch",
@@ -196,12 +210,12 @@ func registerScale(grp huma.API) {
 		return &scaleOutput{Body: json.RawMessage(jsonBytes)}, nil
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-scale",
-		Method:       http.MethodPut,
-		Path:         "/scale",
-		Summary:      "Scale resource",
-		Description:  "Scale deployment, replicaset, or statefulset. Supports PUT and POST.",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-scale",
+		Method:      http.MethodPut,
+		Path:        "/scale",
+		Summary:     "Scale resource",
+		Description: "Scale deployment, replicaset, or statefulset. Supports PUT and POST.",
+		Tags:        []string{"K8s"},
 	}, handler)
 	huma.Register(grp, huma.Operation{
 		OperationID: "k8s-scale-post", Method: http.MethodPost, Path: "/scale",
@@ -256,12 +270,12 @@ func registerAutoscale(grp huma.API) {
 		return &autoscaleOutput{Body: json.RawMessage(jsonBytes)}, nil
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-autoscale",
-		Method:       http.MethodPut,
-		Path:         "/autoscale",
-		Summary:      "Create/update HPA",
-		Description:  "Create or update HorizontalPodAutoscaler. Supports PUT and POST.",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-autoscale",
+		Method:      http.MethodPut,
+		Path:        "/autoscale",
+		Summary:     "Create/update HPA",
+		Description: "Create or update HorizontalPodAutoscaler. Supports PUT and POST.",
+		Tags:        []string{"K8s"},
 	}, handler)
 	huma.Register(grp, huma.Operation{
 		OperationID: "k8s-autoscale-post", Method: http.MethodPost, Path: "/autoscale",
@@ -320,12 +334,12 @@ func registerRollout(grp huma.API) {
 		return &rolloutOutput{Body: json.RawMessage(jsonBytes)}, nil
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-rollout",
-		Method:       http.MethodPost,
-		Path:         "/rollout",
-		Summary:      "Rollout restart/status",
-		Description:  "Restart rollout or get rollout status. Action: restart (default) or status.",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-rollout",
+		Method:      http.MethodPost,
+		Path:        "/rollout",
+		Summary:     "Rollout restart/status",
+		Description: "Restart rollout or get rollout status. Action: restart (default) or status.",
+		Tags:        []string{"K8s"},
 	}, handler)
 	huma.Register(grp, huma.Operation{
 		OperationID: "k8s-rollout-get", Method: http.MethodGet, Path: "/rollout",
@@ -343,7 +357,7 @@ func registerNsconfig(grp huma.API) {
 		Body string `contentType:"application/x-yaml"`
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-nsconfig",
+		OperationID: "k8s-nsconfig",
 		Method:      http.MethodGet,
 		Path:        "/nsconfig",
 		Summary:     "Namespace kubeconfig",

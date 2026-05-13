@@ -1,6 +1,6 @@
 import { atom } from "jotai";
 
-export const encodedKubeconfigAtom = atom(
+export const kubeconfigAtom = atom(
   decodeURIComponent(process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG ?? "")
 );
 

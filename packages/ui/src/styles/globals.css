@@ -23,6 +23,8 @@
     var(--color-theme-gray) 55%,
     transparent
   );
+  /** `.scrollbar-chat-thin` WebKit scrollbar width (matches prior `w-1`). */
+  --scrollbar-chat-width: 0.25rem;
 }
 
 @theme inline {
@@ -173,6 +175,22 @@
   }
   .hoverable:hover:not(:disabled) {
     @apply text-foreground !bg-background-selected/80;
+  }
+
+  /** Chat scroll surfaces (transcript, thread picker): thin track, themed thumb — Firefox + WebKit. */
+  .scrollbar-chat-thin {
+    scrollbar-color: var(--border) transparent;
+    scrollbar-width: thin;
+  }
+  .scrollbar-chat-thin::-webkit-scrollbar {
+    width: var(--scrollbar-chat-width);
+  }
+  .scrollbar-chat-thin::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--border) 80%, transparent);
+    border-radius: calc(infinity * 1px);
+  }
+  .scrollbar-chat-thin:hover::-webkit-scrollbar-thumb {
+    background-color: var(--border);
   }
 }
 

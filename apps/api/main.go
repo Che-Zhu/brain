@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -33,6 +34,7 @@ func main() {
 		_ = godotenv.Load(filepath.Join("apps", "api", ".env"))
 	}
 	router := chi.NewMux()
+	router.Use(appendSlashForGroupRoots)
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -263,6 +265,37 @@ func addLogsQueryExamples(_ *huma.OpenAPI, op *huma.Operation) {
 			},
 		},
 	}
+}
+
+// appendSlashForGroupRoots normalises requests so that `/api/ap/v1alpha1` is
+// served identically to `/api/ap/v1alpha1/`.
+//
+// Huma registers group-root operations (Path: "/") under a chi group, which
+// yields effective paths with a trailing slash (e.g. `/api/ap/v1alpha1/`).
+// Upstream proxies (Next.js) strip trailing slashes before forwarding, so the
+// request arrives without one and chi returns 404.  This middleware detects
+// those paths and internally appends the slash so chi can match.
+func appendSlashForGroupRoots(next http.Handler) http.Handler {
+	roots := map[string]bool{
+		"/api/ap/v1alpha1":  true,
+		"/api/db/v1alpha1":  true,
+		"/api/k8s/v1alpha1": true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if roots[r.URL.Path] {
+			r2 := new(http.Request)
+			*r2 = *r
+			r2.URL = new(url.URL)
+			*r2.URL = *r.URL
+			r2.URL.Path += "/"
+			if r2.URL.RawPath != "" {
+				r2.URL.RawPath += "/"
+			}
+			next.ServeHTTP(w, r2)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func docsHandler(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,145 @@
+import "server-only";
+
+import { generateId, type generateText, type UIMessage } from "ai";
+
+import {
+  insertThread,
+  selectMessagesByThread,
+  selectThreadById,
+  selectThreadsByNamespace,
+  type ThreadRow,
+  updateThreadAiTitleOnce,
+  upsertMessage,
+} from "./repository";
+import { deriveThreadTitle, placeholderThreadTitle } from "./title";
+import {
+  type AssistantSessionPayload,
+  type AssistantThreadDTO,
+  normalizeAssistantNamespace,
+} from "./types";
+
+type ChatTitleModel = Parameters<typeof generateText>[0]["model"];
+
+function toThreadDTO(row: ThreadRow): AssistantThreadDTO {
+  return {
+    id: row.id,
+    namespace: row.namespace,
+    title: row.title,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toThreadDTOs(rows: ThreadRow[]): AssistantThreadDTO[] {
+  return rows.map(toThreadDTO);
+}
+
+/** List threads in a namespace bucket newest-first. */
+export async function listThreadsForNamespace(
+  namespaceRaw: string
+): Promise<AssistantThreadDTO[]> {
+  const key = normalizeAssistantNamespace(namespaceRaw);
+  return toThreadDTOs(await selectThreadsByNamespace(key));
+}
+
+/** Create an empty thread; returns the new id and the refreshed thread list. */
+export async function createThreadForNamespace(namespaceRaw: string): Promise<{
+  chatId: string;
+  threads: AssistantThreadDTO[];
+}> {
+  const key = normalizeAssistantNamespace(namespaceRaw);
+  const chatId = generateId();
+  await insertThread({
+    id: chatId,
+    namespaceKey: key,
+    title: placeholderThreadTitle(),
+  });
+  return {
+    chatId,
+    threads: toThreadDTOs(await selectThreadsByNamespace(key)),
+  };
+}
+
+/** Latest thread + messages + thread list; bootstraps a first thread when none exists. */
+export async function bootstrapAssistantSession(
+  namespaceRaw: string
+): Promise<AssistantSessionPayload> {
+  const key = normalizeAssistantNamespace(namespaceRaw);
+  let rows = await selectThreadsByNamespace(key);
+  if (rows.length === 0) {
+    await insertThread({
+      id: generateId(),
+      namespaceKey: key,
+      title: placeholderThreadTitle(),
+    });
+    rows = await selectThreadsByNamespace(key);
+  }
+  const latest = rows[0];
+  if (!latest) {
+    throw new Error("Failed to bootstrap assistant chat thread");
+  }
+  return {
+    chatId: latest.id,
+    messages: await selectMessagesByThread(latest.id),
+    threads: toThreadDTOs(rows),
+  };
+}
+
+/** Returns messages, or `null` when the thread does not exist in the namespace. */
+export async function loadMessagesInNamespace(
+  chatId: string,
+  namespaceRaw: string
+): Promise<UIMessage[] | null> {
+  const thread = await selectThreadById(chatId);
+  if (
+    thread == null ||
+    thread.namespace !== normalizeAssistantNamespace(namespaceRaw)
+  ) {
+    return null;
+  }
+  return selectMessagesByThread(chatId);
+}
+
+/** Returns true iff the thread exists *and* belongs to the namespace bucket. */
+export async function threadBelongsToNamespace(
+  chatId: string,
+  namespaceRaw: string
+): Promise<boolean> {
+  const thread = await selectThreadById(chatId);
+  return (
+    thread != null &&
+    thread.namespace === normalizeAssistantNamespace(namespaceRaw)
+  );
+}
+
+/** Persist any UI message (user-inbound or assistant-completion) and bump the thread. */
+export function appendMessage(
+  chatId: string,
+  message: UIMessage
+): Promise<void> {
+  return upsertMessage(chatId, message);
+}
+
+/** Load the full ordered history for one thread (no namespace check). */
+export function loadThreadMessages(chatId: string): Promise<UIMessage[]> {
+  return selectMessagesByThread(chatId);
+}
+
+/**
+ * After the assistant's first reply finishes, derive a real title with the LLM
+ * and persist it (race-safe single-write). No-op if a title was already set.
+ */
+export async function maybeAutoTitleThread(input: {
+  chatId: string;
+  languageModel: ChatTitleModel;
+}): Promise<void> {
+  const thread = await selectThreadById(input.chatId);
+  if (thread == null || thread.titleAiGenerated) {
+    return;
+  }
+  const messages = await selectMessagesByThread(input.chatId);
+  const title = await deriveThreadTitle({
+    languageModel: input.languageModel,
+    messages,
+  });
+  await updateThreadAiTitleOnce(input.chatId, title);
+}

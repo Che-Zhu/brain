@@ -3,8 +3,12 @@ import {
   AppShellSidebar,
   AppShellView,
 } from "@/components/app-shell";
-import AuthBootstrap from "@/components/auth-bootstrap";
-import { fetchServerCredentials } from "@/lib/server-credentials";
+import AuthBootstrap, { SandboxBootstrap } from "@/components/auth-bootstrap";
+import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
+import { fetchProjectCredentialsOrUnauthorized } from "@/lib/server-credentials";
+
+/** Request-bound (`cookies()`, env); avoids Full Route Cache skipping credentials on refresh. */
+export const dynamic = "force-dynamic";
 
 export default async function ProjectLayout({
   children,
@@ -12,7 +16,7 @@ export default async function ProjectLayout({
   children: React.ReactNode;
 }>) {
   const { serverEncodedKubeconfig, serverNamespace } =
-    await fetchServerCredentials();
+    await fetchProjectCredentialsOrUnauthorized();
 
   return (
     <AppShellChrome>
@@ -20,8 +24,11 @@ export default async function ProjectLayout({
         serverEncodedKubeconfig={serverEncodedKubeconfig}
         serverNamespace={serverNamespace}
       />
+      <SandboxBootstrap />
       <AppShellSidebar />
-      <AppShellView>{children}</AppShellView>
+      <AppShellView className="min-w-0 flex-1 basis-0">
+        <ProjectChatPaneLayout>{children}</ProjectChatPaneLayout>
+      </AppShellView>
     </AppShellChrome>
   );
 }

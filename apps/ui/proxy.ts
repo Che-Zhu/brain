@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { PREVIEW_QUERY_HEADER } from "@/lib/preview-search-header";
+import { PREVIEW_QUERY_HEADER } from "@/lib/preview/headers";
 
 /**
  * `layout` cannot read `searchParams` (Next.js: layouts are not re-run on search changes).

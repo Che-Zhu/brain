@@ -1,19 +1,80 @@
 "use client";
 
-import { Canvas } from "@workspace/ui/components/canvas/canvas";
-import { useAtomValue } from "jotai";
-import { useParams, useSearchParams } from "next/navigation";
-
-import { useProjectServices } from "@/hooks/use-project-services";
 import {
-  canvasMetaAtom,
-  closeCanvasSelection,
-  selectedEdgeAtom,
-  selectedNodeAtom,
-} from "@/store/canvas-store";
+  useApsK8sList,
+  useApTelemetryMetricsBatch,
+} from "@workspace/api/hooks";
+import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
+import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
+import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
+import { useParams, useSearchParams } from "next/navigation";
+import { useCallback, useMemo } from "react";
+import { useProjectCanvas } from "@/hooks/use-project-canvas";
+import {
+  apMetricsLookupFromResults,
+  apsToCanvasState,
+} from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+
+const METRICS_REFRESH_MS = 5000;
+
+/** Share-token preview only (kubeconfig path uses `useProjectServices` on `/project/[uid]`). */
+function usePreviewProjectCanvas(options: {
+  namespace: string;
+  shareToken: string;
+  uid: string;
+}): {
+  canvasState: CanvasState;
+  error: Error | undefined;
+  isLoading: boolean;
+  refreshWorkloadLists: () => Promise<unknown>;
+} {
+  const { namespace, shareToken, uid } = options;
+
+  const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
+
+  const { data, error, isLoading, mutate } = useApsK8sList({
+    labelSelector,
+    namespace,
+    shareToken: shareToken.trim() === "" ? undefined : shareToken.trim(),
+  });
+
+  const refreshWorkloadLists = useCallback(() => mutate(), [mutate]);
+
+  const apMetricsTargets = useMemo(
+    () =>
+      apNamespaceNameTargetsFromList(data, namespace).map((t) => ({
+        ...t,
+        kind: "ap" as const,
+      })),
+    [data, namespace]
+  );
+
+  const st = shareToken.trim();
+  const { data: apMetrics } = useApTelemetryMetricsBatch({
+    refreshInterval: METRICS_REFRESH_MS,
+    shareToken: st === "" ? undefined : st,
+    targets: apMetricsTargets,
+  });
+
+  const metricsLookup = useMemo(
+    () => apMetricsLookupFromResults(apMetrics),
+    [apMetrics]
+  );
+
+  const canvasState = useMemo((): CanvasState => {
+    const { edges, nodes } = apsToCanvasState(data, {
+      metricsLookup,
+      namespaceFallback: namespace,
+    });
+    return { edges, nodes, selectedEdge: null, selectedNode: null };
+  }, [data, namespace, metricsLookup]);
+
+  return { canvasState, error, isLoading, refreshWorkloadLists };
+}
 
 /**
- * Client-only: fetches AP list + metrics. Share access is checked in `layout.tsx`.
+ * Client-only: fetches AP list + metrics via share token. Share access is checked in `layout.tsx`.
  */
 export default function PreviewProjectPage() {
   const params = useParams<{ uid: string }>();
@@ -22,15 +83,18 @@ export default function PreviewProjectPage() {
   const ns = (searchParams.get("ns") ?? "").trim();
   const shareToken = (searchParams.get("shareToken") ?? "").trim();
 
-  const canvasMeta = useAtomValue(canvasMetaAtom);
-  const selectedEdge = useAtomValue(selectedEdgeAtom);
-  const selectedNode = useAtomValue(selectedNodeAtom);
+  const { canvasState, error, isLoading, refreshWorkloadLists } =
+    usePreviewProjectCanvas({
+      namespace: ns,
+      shareToken,
+      uid,
+    });
 
-  const { canvasState, error, isLoading } = useProjectServices({
-    auth: { shareToken, type: "share" },
-    namespace: ns,
-    uid,
-  });
+  const { clearSelection, meta, nodes, selectedEdge, selectedNode } =
+    useProjectCanvas(canvasState.nodes, {
+      refreshWorkloadLists,
+      shareToken,
+    });
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
@@ -51,9 +115,9 @@ export default function PreviewProjectPage() {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Canvas.Root
-          actions={{ onPanelClose: closeCanvasSelection }}
-          meta={canvasMeta}
-          state={{ ...canvasState, selectedEdge, selectedNode }}
+          actions={{ onPanelClose: clearSelection }}
+          meta={meta}
+          state={{ ...canvasState, nodes, selectedEdge, selectedNode }}
         >
           <Canvas.Flow>
             <Canvas.Panel />

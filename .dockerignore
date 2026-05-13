@@ -1,0 +1,118 @@
+# Node - all node_modules everywhere
+**/node_modules
+node_modules
+node_modules/.bun
+**/node_modules/.bun
+apps/*/node_modules
+apps/ui/node_modules
+apps/hub/node_modules
+apps/ai/node_modules
+packages/*/node_modules
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+package-lock.json
+yarn.lock
+
+# Build outputs - all build artifacts everywhere
+**/.next
+.next
+apps/*/.next
+apps/ui/.next
+apps/hub/.next
+apps/ai/.next
+**/dist
+dist
+**/out
+out
+**/build
+build
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Turbo / cache
+.turbo
+**/.turbo
+
+# Git
+.git
+.gitignore
+.gitattributes
+.gitkeep
+
+# OS / Editor
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+.vscode
+**/.vscode
+.idea
+**/.idea
+*.swp
+*.swo
+*~
+
+# Large dirs
+data/
+**/data/
+uploads/
+**/uploads/
+temp/
+**/temp/
+cache/
+**/cache/
+tmp/
+**/tmp/
+
+# Local env
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+**/__mocks__/
+coverage/
+**/coverage/
+.nyc_output/
+**/.nyc_output/
+
+# Documentation
+README.md
+**/README.md
+!package.json
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# IDE
+*.code-workspace
+.project
+.classpath
+.settings/
+
+# Misc
+*.pem
+*.key
+*.crt
+*.cert
+
+.langgraph_api

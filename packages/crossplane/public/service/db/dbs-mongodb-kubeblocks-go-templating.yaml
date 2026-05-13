@@ -21,7 +21,7 @@ metadata:
       kind: DB
       metadata:
         name: {{ name }}
-        namespace: default
+        namespace: {{ namespace }}
         labels:
           region: 192.168.12.53.nip.io
       spec:
