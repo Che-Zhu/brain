@@ -5,7 +5,7 @@
     transparent
   );
   --canvas-node-surface-active-bg: transparent;
-  --canvas-node-card-width: calc(var(--spacing) * 66.75);
+  --canvas-node-card-width: calc(var(--spacing) * 68);
   --canvas-node-card-height-collapsed: calc(var(--spacing) * 15.5);
   --canvas-node-control-size: calc(var(--spacing) * 8);
   --canvas-node-control-gap: calc(var(--spacing) * 1.5);
