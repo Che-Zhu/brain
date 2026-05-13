@@ -109,6 +109,11 @@ function CanvasPreviewContainerSettingsTab({ node }: CanvasPanelBodyProps) {
   ]);
   const [cpuCores, setCpuCores] = useState(cpuInit);
   const [memoryMib, setMemoryMib] = useState(memInit);
+  const [replicas, setReplicas] = useState(
+    typeof states?.replicas === "number" && Number.isFinite(states.replicas)
+      ? Math.min(20, Math.max(1, Math.round(states.replicas)))
+      : 2
+  );
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -134,6 +139,13 @@ function CanvasPreviewContainerSettingsTab({ node }: CanvasPanelBodyProps) {
         onImageChange={setImage}
         onPortsChange={setPorts}
         ports={ports}
+        replicasQuota={{
+          max: 20,
+          min: 1,
+          onValueChange: setReplicas,
+          step: 1,
+          value: replicas,
+        }}
       />
     </div>
   );

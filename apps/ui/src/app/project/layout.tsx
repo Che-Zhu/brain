@@ -5,7 +5,7 @@ import {
 } from "@/components/app-shell";
 import AuthBootstrap, { SandboxBootstrap } from "@/components/auth-bootstrap";
 import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
-import { fetchServerCredentials } from "@/lib/server-credentials";
+import { fetchProjectCredentialsOrUnauthorized } from "@/lib/server-credentials";
 
 /** Request-bound (`cookies()`, env); avoids Full Route Cache skipping credentials on refresh. */
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function ProjectLayout({
   children: React.ReactNode;
 }>) {
   const { serverEncodedKubeconfig, serverNamespace } =
-    await fetchServerCredentials();
+    await fetchProjectCredentialsOrUnauthorized();
 
   return (
     <AppShellChrome>

@@ -12,6 +12,7 @@ import {
 import { k8sGetClaimBody } from "@/lib/project-canvas/k8s/claim-mapper";
 import { useWorkloadClaimSettings } from "@/lib/project-canvas/panels/use-workload-claim-settings";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+import { WORKLOAD_PANEL_REPLICAS } from "@/store/canvas-store";
 
 export const WorkloadSettingsCanvasPanel = memo(
   function WorkloadSettingsCanvasPanel({ node }: CanvasPanelBodyProps) {
@@ -29,6 +30,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       ignoreImage,
       ignorePorts,
       ignoreQuota,
+      ignoreReplicas,
       isApWorkload,
       isLoading,
       onEnvChange,
@@ -99,6 +101,16 @@ export const WorkloadSettingsCanvasPanel = memo(
           }
           ports={display.ports}
           readOnly={!isApWorkload}
+          replicasQuota={
+            isApWorkload
+              ? {
+                  ...WORKLOAD_PANEL_REPLICAS,
+                  onValueChange: ignoreReplicas,
+                  step: 1,
+                  value: display.replicas,
+                }
+              : undefined
+          }
         />
       </div>
     );

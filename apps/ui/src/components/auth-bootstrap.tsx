@@ -6,6 +6,15 @@ import { useEffect } from "react";
 import { scheduleChatSandboxWarmup } from "@/lib/vercel-sandbox.actions";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
+/**
+ * Hydrates kubeconfig / namespace into Jotai from server props or dev env overrides.
+ *
+ * Access control: {@link fetchProjectCredentialsOrUnauthorized} in `app/project/layout.tsx`
+ * calls `unauthorized()` from `next/navigation` when SealOS credentials are empty and there is
+ * no dev bypass (`NEXT_PUBLIC_DEV_*`). That must stay on the server — `unauthorized()` cannot be
+ * invoked from this client module.
+ */
+
 interface AuthBootstrapProps {
   serverEncodedKubeconfig: string;
   serverNamespace: string;

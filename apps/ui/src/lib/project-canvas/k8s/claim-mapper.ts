@@ -310,12 +310,27 @@ export interface ClaimContainerSettings {
   image: string;
   memoryMib: number;
   ports: ContainerPort[];
+  /** AP `spec.replicas` (1–20 in UI); omitted meaning uses default for DB mapping. */
+  replicas: number;
 }
 
 const CPU_MIN = 0.25;
 const CPU_MAX = 16;
 const MEM_MIN = 512;
 const MEM_MAX = 8192;
+const REPLICAS_MIN = 1;
+const REPLICAS_MAX = 20;
+
+function clampReplicas(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return 1;
+  }
+  const n = Math.round(raw);
+  if (n <= 0) {
+    return 1;
+  }
+  return clampScale(n, REPLICAS_MIN, REPLICAS_MAX);
+}
 
 function mapApClaim(
   spec: Record<string, unknown>,
@@ -329,12 +344,14 @@ function mapApClaim(
   const memRaw = parseMemoryToMib(spec.memoryLimit);
   const cpuCores = clampScale(cpuRaw ?? 1, CPU_MIN, CPU_MAX);
   const memoryMib = clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX);
+  const replicas = clampReplicas(spec.replicas);
   return {
     cpuCores,
     env: envFromSpec(spec),
     image,
     memoryMib,
     ports: mergeApPorts(spec, status),
+    replicas,
   };
 }
 
@@ -351,6 +368,7 @@ function mapDbSpec(spec: Record<string, unknown>): ClaimContainerSettings {
     image: engine,
     memoryMib: clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX),
     ports: [],
+    replicas: 1,
   };
 }
 
@@ -365,6 +383,7 @@ export function claimToContainerSettings(
       image: "",
       memoryMib: 512,
       ports: [],
+      replicas: 1,
     };
   }
   const spec = asRecord(claim.spec) ?? {};

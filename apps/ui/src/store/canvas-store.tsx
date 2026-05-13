@@ -26,6 +26,12 @@ export const WORKLOAD_PANEL_TAB = {
   logs: "Logs",
 } as const;
 
+/**
+ * Bounds for AP `spec.replicas` in the workload Settings panel (`ContainerSettingsPane`).
+ * Matches `packages/crossplane/public/service/ap/ap.yaml` (`minimum` / `maximum`).
+ */
+export const WORKLOAD_PANEL_REPLICAS = { min: 1, max: 20 } as const;
+
 export function projectCanvasNodeServiceUid(node: Node): string | null {
   const data = node.data as { states?: { uid?: unknown } } | undefined;
   const uid = data?.states?.uid;
@@ -36,6 +42,7 @@ export const projectCanvasFlowNodeTypes = {
   [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNode,
 } as const satisfies NodeTypes;
 
+/** Side-panel tabs for the project canvas workload inspector (Settings uses {@link WORKLOAD_PANEL_REPLICAS}). */
 export const projectCanvasWorkloadPanelTabs: CanvasPanelTab[] = [
   {
     name: WORKLOAD_PANEL_TAB.settings,

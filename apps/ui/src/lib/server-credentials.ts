@@ -2,6 +2,7 @@ import "server-only";
 
 import { API_ROUTES } from "@workspace/api/constants";
 import { cookies } from "next/headers";
+import { unauthorized } from "next/navigation";
 
 /** Region JWT cookie (desktop / cluster auth). */
 export const SEALOS_AUTH_TOKEN_COOKIE = "sealos_auth_token" as const;
@@ -24,6 +25,40 @@ function pickString(...values: unknown[]): string {
 export interface ServerCredentials {
   serverEncodedKubeconfig: string;
   serverNamespace: string;
+}
+
+function envTrimDecoded(raw: string | undefined): string {
+  try {
+    return decodeURIComponent(raw ?? "").trim();
+  } catch {
+    return (raw ?? "").trim();
+  }
+}
+
+/**
+ * Matches client {@link AuthBootstrap}: local dev can skip SealOS cookies when
+ * `NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG` or `NEXT_PUBLIC_DEV_NS` is set.
+ */
+export function hasDevCredentialBypass(): boolean {
+  return (
+    envTrimDecoded(process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG) !== "" ||
+    (process.env.NEXT_PUBLIC_DEV_NS ?? "").trim() !== ""
+  );
+}
+
+/**
+ * Loads cluster credentials or invokes Next.js {@link unauthorized} when there is
+ * no kubeconfig from the region token API and no dev env bypass.
+ */
+export async function fetchProjectCredentialsOrUnauthorized(): Promise<ServerCredentials> {
+  const creds = await fetchServerCredentials();
+  if (
+    creds.serverEncodedKubeconfig.trim() !== "" ||
+    hasDevCredentialBypass()
+  ) {
+    return creds;
+  }
+  unauthorized();
 }
 
 /**

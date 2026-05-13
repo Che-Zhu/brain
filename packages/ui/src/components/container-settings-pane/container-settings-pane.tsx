@@ -25,7 +25,7 @@ import {
   parseEnvText,
 } from "@workspace/ui/lib/parse-env-text";
 import { cn } from "@workspace/ui/lib/utils";
-import { Cpu, MemoryStick, SquarePen } from "lucide-react";
+import { Cpu, Layers, MemoryStick, SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useMemo, useState } from "react";
 
@@ -35,11 +35,18 @@ function resourceQuotasDirty(
   draftCpu: number,
   draftMem: number,
   committedCpu: number,
-  committedMem: number
+  committedMem: number,
+  replicas?: { committed: number; draft: number }
 ): boolean {
-  return (
+  const cpuMemDirty =
     Math.abs(draftCpu - committedCpu) > CPU_QUOTA_DIRTY_EPS ||
-    Math.round(draftMem) !== Math.round(committedMem)
+    Math.round(draftMem) !== Math.round(committedMem);
+  if (replicas == null) {
+    return cpuMemDirty;
+  }
+  return (
+    cpuMemDirty ||
+    Math.round(replicas.draft) !== Math.round(replicas.committed)
   );
 }
 
@@ -110,12 +117,14 @@ export interface ContainerSettingsPaneProps {
   onImageChange: (image: string) => void;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
-   * When set (and not `readOnly`), CPU/memory sliders keep local drafts until Save; Cancel reverts.
-   * Omit for live slider updates via `cpuQuota.onValueChange` / `memoryQuota.onValueChange`.
+   * When set (and not `readOnly`), CPU/memory/replicas sliders keep local drafts until Save; Cancel reverts.
+   * Omit for live slider updates via `cpuQuota` / `memoryQuota` / `replicasQuota` `onValueChange`.
+   * When `replicasQuota` is set, `replicas` is included on Save.
    */
   onResourceQuotasCommit?: (next: {
     cpu: number;
     memory: number;
+    replicas?: number;
   }) => void | Promise<void>;
   /** Exposed container ports + protocol labels. */
   ports: ContainerPort[];
@@ -124,6 +133,10 @@ export interface ContainerSettingsPaneProps {
    * Host may pass no-op callbacks.
    */
   readOnly?: boolean;
+  /**
+   * Deployment replica count (AP `spec.replicas`). Omit to hide the control (e.g. DB workloads).
+   */
+  replicasQuota?: ContainerSettingsControlledQuotaProps;
 }
 
 function SectionTitle({
@@ -175,7 +188,8 @@ function containerPortsToTableRows(
 
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
- * environment variables, and exposed ports (`PortsTable`). All fields are controlled by the host.
+ * optional replica count, environment variables, and exposed ports (`PortsTable`).
+ * All fields are controlled by the host.
  */
 export function ContainerSettingsPane({
   className,
@@ -187,6 +201,7 @@ export function ContainerSettingsPane({
   memoryQuota,
   env,
   ports,
+  replicasQuota,
   onResourceQuotasCommit,
   readOnly = false,
 }: ContainerSettingsPaneProps) {
@@ -201,22 +216,36 @@ export function ContainerSettingsPane({
 
   const [draftCpu, setDraftCpu] = useState(cpuQuota.value);
   const [draftMem, setDraftMem] = useState(memoryQuota.value);
+  const [draftReplicas, setDraftReplicas] = useState(
+    () => replicasQuota?.value ?? 1
+  );
 
   useEffect(() => {
     setDraftCpu(cpuQuota.value);
     setDraftMem(memoryQuota.value);
-  }, [cpuQuota.value, memoryQuota.value]);
+    if (replicasQuota == null) {
+      return;
+    }
+    setDraftReplicas(replicasQuota.value);
+  }, [cpuQuota.value, memoryQuota.value, replicasQuota]);
 
   const quotasDirty = resourceQuotasDirty(
     draftCpu,
     draftMem,
     cpuQuota.value,
-    memoryQuota.value
+    memoryQuota.value,
+    replicasQuota == null
+      ? undefined
+      : { committed: replicasQuota.value, draft: draftReplicas }
   );
 
   const handleQuotaCancel = () => {
     setDraftCpu(cpuQuota.value);
     setDraftMem(memoryQuota.value);
+    if (replicasQuota == null) {
+      return;
+    }
+    setDraftReplicas(replicasQuota.value);
   };
 
   const handleQuotaSave = async () => {
@@ -225,7 +254,11 @@ export function ContainerSettingsPane({
     }
     setQuotaSavePending(true);
     try {
-      await onResourceQuotasCommit({ cpu: draftCpu, memory: draftMem });
+      await onResourceQuotasCommit({
+        cpu: draftCpu,
+        memory: draftMem,
+        ...(replicasQuota == null ? {} : { replicas: draftReplicas }),
+      });
     } finally {
       setQuotaSavePending(false);
     }
@@ -277,6 +310,47 @@ export function ContainerSettingsPane({
     }
     return base;
   }, [draftMem, memoryQuota, quotaCommitMode, readOnly]);
+
+  const replicasSlider = useMemo(() => {
+    if (replicasQuota == null) {
+      return null;
+    }
+    const base = {
+      min: 1,
+      max: 20,
+      step: 1,
+      ...replicasQuota,
+      ...(readOnly ? { disabled: true } : {}),
+    };
+    if (quotaCommitMode) {
+      return {
+        ...base,
+        onValueChange: setDraftReplicas,
+        value: draftReplicas,
+      };
+    }
+    return base;
+  }, [draftReplicas, quotaCommitMode, readOnly, replicasQuota]);
+
+  const replicasSliderParts = useMemo(() => {
+    if (replicasSlider == null) {
+      return null;
+    }
+    const {
+      value: replicasValueRaw,
+      onValueChange: onReplicasQuotaChange,
+      ...rest
+    } = replicasSlider;
+    return {
+      onReplicasQuotaChange,
+      replicasValue: clampScale(
+        replicasValueRaw,
+        replicasSlider.min,
+        replicasSlider.max
+      ),
+      rest,
+    };
+  }, [replicasSlider]);
 
   const {
     value: cpuValueRaw,
@@ -466,6 +540,36 @@ export function ContainerSettingsPane({
                 </ScaleSlider.Control>
               </ScaleSlider.Stack>
             </ScaleSlider.Root>
+
+            {replicasSliderParts == null ? null : (
+              <ScaleSlider.Root
+                {...replicasSliderParts.rest}
+                maxDecimals={0}
+                onValueChange={replicasSliderParts.onReplicasQuotaChange}
+                value={replicasSliderParts.replicasValue}
+                valueDisplay="number"
+              >
+                <ScaleSlider.Stack className="w-full">
+                  <ScaleSlider.Header className="min-h-6">
+                    <ScaleSlider.Group className="min-w-0 gap-2">
+                      <ScaleSlider.Icon className="shrink-0" icon={Layers} />
+                      <ScaleSlider.Label className="text-foreground">
+                        Replicas
+                      </ScaleSlider.Label>
+                    </ScaleSlider.Group>
+                    <div className="flex h-6 min-w-0 items-center justify-end">
+                      <ScaleSlider.Value />
+                    </div>
+                  </ScaleSlider.Header>
+                  <ScaleSlider.Control aria-label="Replica count">
+                    <ScaleSlider.Track>
+                      <ScaleSlider.Range />
+                    </ScaleSlider.Track>
+                    <ScaleSlider.Thumb />
+                  </ScaleSlider.Control>
+                </ScaleSlider.Stack>
+              </ScaleSlider.Root>
+            )}
           </div>
         </section>
 

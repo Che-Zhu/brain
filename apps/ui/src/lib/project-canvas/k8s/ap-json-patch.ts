@@ -206,17 +206,25 @@ export async function applyApMemoryLimit(
   ]);
 }
 
-/** One JSON Patch for CPU and/or memory when both may change (avoids parallel PATCH races). */
+/** One JSON Patch for CPU, memory, and/or replicas (avoids parallel PATCH races). */
 export async function applyApResourceQuotas(
   kubeconfig: string,
   claim: Record<string, unknown>,
-  next: { cpuCores: number; memoryMib: number },
-  previous: { cpuCores: number; memoryMib: number }
+  next: { cpuCores: number; memoryMib: number; replicas?: number },
+  previous: { cpuCores: number; memoryMib: number; replicas?: number }
 ): Promise<void> {
   const cpuChanged = Math.abs(next.cpuCores - previous.cpuCores) > 1e-9;
   const memChanged =
     Math.round(next.memoryMib) !== Math.round(previous.memoryMib);
-  if (!(cpuChanged || memChanged)) {
+
+  const repNext = next.replicas;
+  const repPrev = previous.replicas;
+  const replicasChanged =
+    repNext !== undefined &&
+    repPrev !== undefined &&
+    Math.round(repNext) !== Math.round(repPrev);
+
+  if (!(cpuChanged || memChanged || replicasChanged)) {
     return;
   }
   const ops: K8sJsonPatchOp[] = [];
@@ -230,6 +238,13 @@ export async function applyApResourceQuotas(
     ops.push(
       specReplaceOrAdd(spec, "memoryLimit", mibToMemoryLimit(next.memoryMib))
     );
+  }
+  if (replicasChanged && repNext !== undefined) {
+    const n = Math.round(Number(repNext));
+    if (!Number.isFinite(n) || n < 1 || n > 20) {
+      throw new Error("Replicas must be between 1 and 20.");
+    }
+    ops.push(specReplaceOrAdd(spec, "replicas", n));
   }
   await patchAp(kubeconfig, claim, ops);
 }
@@ -261,4 +276,19 @@ export async function applyApPorts(
   }
   ops.push(specReplaceOrAdd(spec, "endpoints", endpoints));
   await patchAp(kubeconfig, claim, ops);
+}
+
+export async function applyApReplicas(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  replicas: number
+): Promise<void> {
+  const n = Math.round(Number(replicas));
+  if (!Number.isFinite(n) || n < 1 || n > 20) {
+    throw new Error("Replicas must be between 1 and 20.");
+  }
+  const spec = asRecord(claim.spec);
+  await patchAp(kubeconfig, claim, [
+    specReplaceOrAdd(spec, "replicas", n),
+  ]);
 }

@@ -22,6 +22,7 @@ const DEMO_PORTS = [
 export default function ContainerSettingsPanePreview() {
   const [cpuCores, setCpuCores] = useState(2);
   const [memoryMib, setMemoryMib] = useState(2048);
+  const [replicas, setReplicas] = useState(3);
   const [image, setImage] = useState(DEMO_IMAGE);
   const [env, setEnv] = useState(DEMO_ENV);
   const [ports, setPorts] = useState(DEMO_PORTS);
@@ -50,6 +51,13 @@ export default function ContainerSettingsPanePreview() {
           onImageChange={setImage}
           onPortsChange={setPorts}
           ports={ports}
+          replicasQuota={{
+            max: 20,
+            min: 1,
+            onValueChange: setReplicas,
+            step: 1,
+            value: replicas,
+          }}
         />
       </Preview>
     </PreviewWrapper>

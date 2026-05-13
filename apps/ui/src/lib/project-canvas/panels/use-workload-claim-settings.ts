@@ -107,6 +107,9 @@ export function useWorkloadClaimSettings(
   const ignoreQuota = useCallback((_n: number) => {
     /* read-only */
   }, []);
+  const ignoreReplicas = useCallback((_n: number) => {
+    /* read-only */
+  }, []);
 
   const onImageChange = useCallback(
     async (image: string) => {
@@ -181,7 +184,7 @@ export function useWorkloadClaimSettings(
   );
 
   const onResourceQuotasCommit = useCallback(
-    async (next: { cpu: number; memory: number }) => {
+    async (next: { cpu: number; memory: number; replicas?: number }) => {
       if (!isApWorkload) {
         return;
       }
@@ -193,17 +196,30 @@ export function useWorkloadClaimSettings(
       }
       const prevCpu = display.cpuCores;
       const prevMem = display.memoryMib;
+      const prevReplicas = display.replicas;
+      const nextRep =
+        next.replicas === undefined ? undefined : Math.round(next.replicas);
+
       setLocalOverride((prev) => ({
         ...(prev ?? {}),
         cpuCores: next.cpu,
         memoryMib: next.memory,
+        ...(nextRep === undefined ? {} : { replicas: nextRep }),
       }));
       try {
         await applyApResourceQuotas(
           kc,
           body,
-          { cpuCores: next.cpu, memoryMib: next.memory },
-          { cpuCores: prevCpu, memoryMib: prevMem }
+          {
+            cpuCores: next.cpu,
+            memoryMib: next.memory,
+            ...(nextRep === undefined ? {} : { replicas: nextRep }),
+          },
+          {
+            cpuCores: prevCpu,
+            memoryMib: prevMem,
+            ...(nextRep === undefined ? {} : { replicas: prevReplicas }),
+          }
         );
         toast.success("Resource quota applied.");
         await revalidateClaim();
@@ -215,6 +231,7 @@ export function useWorkloadClaimSettings(
     [
       display.cpuCores,
       display.memoryMib,
+      display.replicas,
       isApWorkload,
       kubeconfig,
       revalidateClaim,
@@ -229,6 +246,7 @@ export function useWorkloadClaimSettings(
     ignoreImage,
     ignorePorts,
     ignoreQuota,
+    ignoreReplicas,
     isApWorkload,
     isLoading,
     onEnvChange,
