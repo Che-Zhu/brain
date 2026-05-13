@@ -84,6 +84,16 @@ function formatDatabaseSubtitle({
   return `Database ${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
+function formatDatabaseMetricValue(value: number | string | undefined) {
+  if (typeof value === "number") {
+    return `${value}%`;
+  }
+
+  const trimmed = value?.trim();
+
+  return trimmed || "--";
+}
+
 function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
   if (connection.kind === "public" && !connection.publicAccess.enabled) {
     return null;
@@ -437,7 +447,7 @@ export function DatabaseNodeFooterContent({
             <CanvasNode.Metric
               key={item.key}
               label={item.label}
-              value={metrics?.[item.key]}
+              value={formatDatabaseMetricValue(metrics?.[item.key])}
             >
               <Icon aria-hidden className="size-3.5 shrink-0" />
             </CanvasNode.Metric>

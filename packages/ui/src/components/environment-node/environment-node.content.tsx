@@ -85,6 +85,16 @@ function formatEnvironmentSubtitle({
   return `Environment ${runtime}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
+function formatEnvironmentMetricValue(value: number | string | undefined) {
+  if (typeof value === "number") {
+    return `${value}%`;
+  }
+
+  const trimmed = value?.trim();
+
+  return trimmed || "--";
+}
+
 function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
   switch (tone) {
     case "blue":
@@ -344,7 +354,7 @@ export function EnvironmentNodeFooterContent({
             <CanvasNode.Metric
               key={item.key}
               label={item.label}
-              value={metrics?.[item.key]}
+              value={formatEnvironmentMetricValue(metrics?.[item.key])}
             >
               <Icon aria-hidden className="size-3.5 shrink-0" />
             </CanvasNode.Metric>

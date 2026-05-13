@@ -13,7 +13,7 @@ export type CanvasNodeMetricValue = number | string | undefined;
 
 function formatCanvasNodeMetricValue(value: CanvasNodeMetricValue) {
   if (typeof value === "number") {
-    return `${value}%`;
+    return String(value);
   }
 
   const trimmed = value?.trim();
