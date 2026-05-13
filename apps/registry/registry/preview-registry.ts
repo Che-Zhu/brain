@@ -255,6 +255,54 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/environment-node": {
+    style: "linear",
+    group: "components",
+    name: "environment-node",
+    title: "Environment Node",
+    description:
+      "Development environment canvas node states with launch command, lifecycle actions, quick actions, and footer metrics.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "button", "dropdown-menu"],
+    files: [
+      {
+        path: "registry/linear/components/environment-node/environment-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/environment-node/environment-node-preview"
+      ),
+  },
+
+  "linear/components/environment-node-canvas": {
+    style: "linear",
+    group: "components",
+    name: "environment-node-canvas",
+    title: "Environment Node Canvas",
+    description:
+      "Dedicated React Flow canvas preview for the environment node.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "canvas", "environment-node"],
+    files: [
+      {
+        path: "registry/linear/components/environment-node-canvas/environment-node-canvas-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/environment-node-canvas/environment-node-canvas-preview"
+      ),
+  },
+
   "linear/components/project-explorer": {
     style: "linear",
     group: "components",

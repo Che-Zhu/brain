@@ -63,10 +63,12 @@
     "./components/container-node/*": "./src/components/container-node/*",
     "./components/database-node/*": "./src/components/database-node/*",
     "./components/entry-node/*": "./src/components/entry-node/*",
+    "./components/environment-node/*": "./src/components/environment-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
     "./components/project-explorer/*": "./src/components/project-explorer/*",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
-    "./assets/db-icons": "./src/assets/db-icons/index.ts"
+    "./assets/db-icons": "./src/assets/db-icons/index.ts",
+    "./assets/runtime-icons": "./src/assets/runtime-icons/index.ts"
   }
 }

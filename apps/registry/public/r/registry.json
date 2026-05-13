@@ -267,6 +267,116 @@
       ]
     },
     {
+      "name": "environment-node",
+      "type": "registry:ui",
+      "title": "Environment Node",
+      "description": "Development environment canvas node with launch command, lifecycle actions, quick actions, runtime icons, and footer metrics",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["button", "canvas-node", "dropdown-menu"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/types.ts",
+          "type": "registry:lib",
+          "target": "assets/runtime-icons/types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/nodejs.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/nodejs.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/go.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/go.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/python.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/python.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/java.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/java.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/rust.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/rust.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/php.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/php.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/ruby.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/ruby.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/cplusplus.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/cplusplus.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/dotnet.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/dotnet.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/index.ts",
+          "type": "registry:lib",
+          "target": "assets/runtime-icons/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/environment-node/environment-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.context.ts",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-runtime-icons.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-runtime-icons.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.content.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.content.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.css",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/index.ts",
+          "type": "registry:component",
+          "target": "components/environment-node/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.tsx"
+        }
+      ]
+    },
+    {
       "name": "project-explorer",
       "type": "registry:ui",
       "title": "Project Explorer",

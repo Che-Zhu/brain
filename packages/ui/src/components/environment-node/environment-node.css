@@ -1,0 +1,73 @@
+.environment-node-launch-command-row[data-copyable]:hover,
+.environment-node-launch-command-row:has(
+    .environment-node-launch-command-copy-hitarea:focus-visible
+  ) {
+  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
+}
+
+.environment-node-launch-command-row:has(
+    .environment-node-launch-command-copy-hitarea:focus-visible
+  )
+  .environment-node-launch-command-copy-icon {
+  opacity: 1;
+}
+
+.environment-node-action-button:hover,
+.environment-node-action-button:focus-visible,
+.environment-node-menu-trigger:hover,
+.environment-node-menu-trigger:focus-visible {
+  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
+}
+
+.environment-node-menu-content {
+  backdrop-filter: blur(calc(var(--spacing) * 5));
+}
+
+.environment-node-menu-item[data-highlighted] {
+  color: var(--color-zinc-50);
+  background: color-mix(in oklab, var(--color-white) 15%, transparent);
+}
+
+.environment-node-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-lifecycle-action="start"]
+  svg {
+  color: var(--color-green-500);
+  stroke: var(--color-green-500);
+}
+
+.environment-node-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-lifecycle-action="stop"]
+  svg {
+  color: var(--muted-foreground);
+  stroke: var(--muted-foreground);
+}
+
+.environment-node-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-lifecycle-action="restart"]
+  svg {
+  color: var(--color-blue-400);
+  stroke: var(--color-blue-400);
+}
+
+.environment-node-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-lifecycle-action="delete"]
+  svg {
+  color: var(--color-red-500);
+  stroke: var(--color-red-500);
+}
+
+.environment-node-launch-command-row {
+  min-height: calc(var(--spacing) * 18);
+}
