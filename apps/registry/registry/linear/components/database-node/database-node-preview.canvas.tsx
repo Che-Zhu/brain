@@ -5,18 +5,16 @@ import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.ty
 import type {
   DatabaseNodeConnection,
   DatabaseNodeLifecycleActions,
+  DatabaseNodeQuickActions,
   DatabaseNodeStates,
-  DatabaseNodeTogglePublicConnectionHandler,
 } from "@workspace/ui/components/database-node/database-node";
 import { DatabaseNode } from "@workspace/ui/components/database-node/database-node";
-import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 
 interface CanvasDatabaseNodeData extends Record<string, unknown> {
   connections: DatabaseNodeConnection[];
-  defaultExpanded?: boolean;
-  onTogglePublicConnection?: DatabaseNodeTogglePublicConnectionHandler;
+  defaultExpanded: boolean;
   states: DatabaseNodeStates;
 }
 
@@ -26,6 +24,12 @@ const PREVIEW_LIFECYCLE_ACTIONS = {
   start: { onClick: () => undefined },
   stop: { onClick: () => undefined },
 } as const satisfies DatabaseNodeLifecycleActions;
+
+const PREVIEW_QUICK_ACTIONS = {
+  console: { onClick: () => undefined },
+  logs: { onClick: () => undefined },
+  metrics: { onClick: () => undefined },
+} as const satisfies DatabaseNodeQuickActions;
 
 const PreviewCanvasDatabaseNode = memo(function PreviewCanvasDatabaseNode({
   data,
@@ -38,12 +42,7 @@ const PreviewCanvasDatabaseNode = memo(function PreviewCanvasDatabaseNode({
       defaultExpanded={data.defaultExpanded}
       interaction={{ dragging, selected }}
       lifecycleActions={PREVIEW_LIFECYCLE_ACTIONS}
-      onTogglePublicConnection={data.onTogglePublicConnection}
-      quickActions={{
-        console: { onClick: () => undefined },
-        logs: { onClick: () => undefined },
-        metrics: { onClick: () => undefined },
-      }}
+      quickActions={PREVIEW_QUICK_ACTIONS}
       states={data.states}
     >
       <DatabaseNode.Content />
@@ -89,21 +88,13 @@ const DATABASE_NODE_CANVAS_NODES: Node<
   "databaseNode"
 >[] = [
   {
-    data: { connections, states },
+    data: { connections, defaultExpanded: false, states },
     id: "database-node-collapsed",
     position: { x: 180, y: 130 },
-    selected: true,
     type: "databaseNode",
   },
   {
-    data: {
-      connections,
-      defaultExpanded: true,
-      states: {
-        ...states,
-        name: "orders-reporting",
-      },
-    },
+    data: { connections, defaultExpanded: true, states },
     id: "database-node-expanded",
     position: { x: 560, y: 120 },
     type: "databaseNode",
@@ -116,11 +107,7 @@ const DATABASE_NODE_CANVAS_NODE_TYPES = {
   databaseNode: PreviewCanvasDatabaseNode,
 } as const satisfies NodeTypes;
 
-export default function DatabaseNodeCanvasPreview() {
-  const [publicConnectionEnabled, setPublicConnectionEnabled] = useState<
-    Record<string, boolean>
-  >({});
-
+export function DatabaseNodeCanvasHero() {
   const canvasMeta = useMemo(
     (): CanvasMeta => ({
       nodeTypes: DATABASE_NODE_CANVAS_NODE_TYPES,
@@ -134,48 +121,16 @@ export default function DatabaseNodeCanvasPreview() {
   const canvasState = useMemo(
     () => ({
       edges: DATABASE_NODE_CANVAS_EDGES,
-      nodes: DATABASE_NODE_CANVAS_NODES.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          connections: node.data.connections.map((connection) => {
-            if (connection.kind !== "public") {
-              return connection;
-            }
-
-            const enabled =
-              publicConnectionEnabled[node.id] ??
-              connection.publicAccess.enabled;
-
-            return {
-              ...connection,
-              publicAccess: {
-                ...connection.publicAccess,
-                enabled,
-              },
-            };
-          }),
-          onTogglePublicConnection: (_connection, _index, nextEnabled) => {
-            setPublicConnectionEnabled((current) => ({
-              ...current,
-              [node.id]: nextEnabled,
-            }));
-          },
-        },
-      })),
+      nodes: DATABASE_NODE_CANVAS_NODES,
     }),
-    [publicConnectionEnabled]
+    []
   );
 
   return (
-    <PreviewWrapper className="lg:grid-cols-1">
-      <Preview className="h-96" showMaximize title="Database node canvas">
-        <div className="relative size-full overflow-hidden rounded-xl border border-border">
-          <Canvas.Root meta={canvasMeta} state={canvasState}>
-            <Canvas.Flow />
-          </Canvas.Root>
-        </div>
-      </Preview>
-    </PreviewWrapper>
+    <div className="relative size-full overflow-hidden rounded-xl border border-border">
+      <Canvas.Root meta={canvasMeta} state={canvasState}>
+        <Canvas.Flow />
+      </Canvas.Root>
+    </div>
   );
 }

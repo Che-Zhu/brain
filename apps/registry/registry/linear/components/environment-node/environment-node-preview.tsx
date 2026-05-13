@@ -10,6 +10,8 @@ import { EnvironmentNode } from "@workspace/ui/components/environment-node/envir
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
 
+import { EnvironmentNodeCanvasHero } from "./environment-node-preview.canvas";
+
 const launchCommand = "pnpm dev --host 0.0.0.0 --port 3000";
 
 const baseStates: EnvironmentNodeStates = {
@@ -83,8 +85,9 @@ const runtimeSamples = [
 
 function PreviewSurface({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-44 items-center justify-center bg-canvas-surface p-6">
-      {children}
+    <div className="relative flex min-h-44 items-center justify-center overflow-hidden p-6">
+      <div aria-hidden className="canvas-surface" />
+      <div className="relative">{children}</div>
     </div>
   );
 }
@@ -126,6 +129,14 @@ function EnvironmentNodeSample({
 export default function EnvironmentNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
+      <Preview
+        className="h-96"
+        containerClassName="lg:col-span-2"
+        showMaximize
+        title="In canvas"
+      >
+        <EnvironmentNodeCanvasHero />
+      </Preview>
       <Preview title="Collapsed default">
         <PreviewSurface>
           <EnvironmentNodeSample />
@@ -139,6 +150,11 @@ export default function EnvironmentNodePreview() {
       <Preview title="Expanded default">
         <PreviewSurface>
           <EnvironmentNodeSample defaultExpanded />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Expanded selected">
+        <PreviewSurface>
+          <EnvironmentNodeSample defaultExpanded selected />
         </PreviewSurface>
       </Preview>
       <Preview title="Copied launch command">
@@ -185,9 +201,12 @@ export default function EnvironmentNodePreview() {
           />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Footer metric coverage">
+      <Preview
+        containerClassName="lg:col-span-2"
+        title="Footer metric coverage"
+      >
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             <EnvironmentNodeSample />
             <EnvironmentNodeSample
               states={{
@@ -207,9 +226,9 @@ export default function EnvironmentNodePreview() {
           </div>
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Runtime icon coverage">
+      <Preview containerClassName="lg:col-span-2" title="Runtime icon coverage">
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             {runtimeSamples.map((runtime) => (
               <EnvironmentNodeSample
                 key={runtime.runtimeKey}
@@ -225,9 +244,12 @@ export default function EnvironmentNodePreview() {
           </div>
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Status adapter coverage">
+      <Preview
+        containerClassName="lg:col-span-2"
+        title="Status adapter coverage"
+      >
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             {statusSamples.map((sample) => (
               <div className="flex flex-col gap-2" key={sample.title}>
                 <EnvironmentNodeSample

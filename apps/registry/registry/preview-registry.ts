@@ -165,41 +165,24 @@ export const Index: RegistryIndex = {
       ),
   },
 
-  "linear/components/canvas-node": {
-    style: "linear",
-    group: "components",
-    name: "canvas-node",
-    title: "Canvas Node",
-    description:
-      "Shared canvas node chrome with visual status dots, pills, collapsed status, and footer status.",
-    state: "done",
-    type: "registry:preview",
-    registryDependencies: ["preview", "canvas-node"],
-    files: [
-      {
-        path: "registry/linear/components/canvas-node/canvas-node-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      previewUiFile,
-    ],
-    load: () =>
-      import("@registry/linear/components/canvas-node/canvas-node-preview"),
-  },
-
   "linear/components/entry-node": {
     style: "linear",
     group: "components",
     name: "entry-node",
     title: "Entry Node",
     description:
-      "Entry point node canvas states with access-domain header and target rows.",
+      "Entry point node with hero canvas view and state matrix (access-domain header, target rows).",
     state: "done",
     type: "registry:preview",
-    registryDependencies: ["preview"],
+    registryDependencies: ["preview", "canvas", "entry-node"],
     files: [
       {
         path: "registry/linear/components/entry-node/entry-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/entry-node/entry-node-preview.canvas.tsx",
         type: "registry:preview",
         target: "",
       },
@@ -209,42 +192,31 @@ export const Index: RegistryIndex = {
       import("@registry/linear/components/entry-node/entry-node-preview"),
   },
 
-  "linear/components/entry-node-canvas": {
-    style: "linear",
-    group: "components",
-    name: "entry-node-canvas",
-    title: "Entry Node Canvas",
-    description: "Dedicated React Flow canvas preview for the entry node.",
-    state: "done",
-    type: "registry:preview",
-    registryDependencies: ["preview", "canvas", "entry-node"],
-    files: [
-      {
-        path: "registry/linear/components/entry-node-canvas/entry-node-canvas-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      previewUiFile,
-    ],
-    load: () =>
-      import(
-        "@registry/linear/components/entry-node-canvas/entry-node-canvas-preview"
-      ),
-  },
-
   "linear/components/database-node": {
     style: "linear",
     group: "components",
     name: "database-node",
     title: "Database Node",
     description:
-      "Managed database canvas node states with connection controls, quick actions, and footer metrics.",
+      "Managed database node with hero canvas view and state matrix (connection controls, quick actions, footer metrics).",
     state: "done",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "dropdown-menu", "switch"],
+    registryDependencies: [
+      "preview",
+      "canvas",
+      "database-node",
+      "button",
+      "dropdown-menu",
+      "switch",
+    ],
     files: [
       {
         path: "registry/linear/components/database-node/database-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/database-node/database-node-preview.canvas.tsx",
         type: "registry:preview",
         target: "",
       },
@@ -254,42 +226,30 @@ export const Index: RegistryIndex = {
       import("@registry/linear/components/database-node/database-node-preview"),
   },
 
-  "linear/components/database-node-canvas": {
-    style: "linear",
-    group: "components",
-    name: "database-node-canvas",
-    title: "Database Node Canvas",
-    description: "Dedicated React Flow canvas preview for the database node.",
-    state: "done",
-    type: "registry:preview",
-    registryDependencies: ["preview", "canvas", "database-node"],
-    files: [
-      {
-        path: "registry/linear/components/database-node-canvas/database-node-canvas-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      previewUiFile,
-    ],
-    load: () =>
-      import(
-        "@registry/linear/components/database-node-canvas/database-node-canvas-preview"
-      ),
-  },
-
   "linear/components/environment-node": {
     style: "linear",
     group: "components",
     name: "environment-node",
     title: "Environment Node",
     description:
-      "Development environment canvas node states with launch command, lifecycle actions, quick actions, and footer metrics.",
+      "Development environment node with hero canvas view and state matrix (launch command, lifecycle actions, quick actions, footer metrics).",
     state: "done",
     type: "registry:preview",
-    registryDependencies: ["preview", "button", "dropdown-menu"],
+    registryDependencies: [
+      "preview",
+      "canvas",
+      "environment-node",
+      "button",
+      "dropdown-menu",
+    ],
     files: [
       {
         path: "registry/linear/components/environment-node/environment-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/environment-node/environment-node-preview.canvas.tsx",
         type: "registry:preview",
         target: "",
       },
@@ -298,30 +258,6 @@ export const Index: RegistryIndex = {
     load: () =>
       import(
         "@registry/linear/components/environment-node/environment-node-preview"
-      ),
-  },
-
-  "linear/components/environment-node-canvas": {
-    style: "linear",
-    group: "components",
-    name: "environment-node-canvas",
-    title: "Environment Node Canvas",
-    description:
-      "Dedicated React Flow canvas preview for the environment node.",
-    state: "done",
-    type: "registry:preview",
-    registryDependencies: ["preview", "canvas", "environment-node"],
-    files: [
-      {
-        path: "registry/linear/components/environment-node-canvas/environment-node-canvas-preview.tsx",
-        type: "registry:preview",
-        target: "",
-      },
-      previewUiFile,
-    ],
-    load: () =>
-      import(
-        "@registry/linear/components/environment-node-canvas/environment-node-canvas-preview"
       ),
   },
 

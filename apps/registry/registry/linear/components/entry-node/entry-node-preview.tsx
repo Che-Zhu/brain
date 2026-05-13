@@ -10,6 +10,8 @@ import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
 
+import { EntryNodeCanvasHero } from "./entry-node-preview.canvas";
+
 const entryNodeStates: EntryNodeStates = {
   name: "orders.demo.sealos.run",
 };
@@ -78,8 +80,9 @@ const aggregateSamples: {
 
 function PreviewSurface({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-36 items-center justify-center bg-canvas-surface p-6">
-      {children}
+    <div className="relative flex min-h-36 items-center justify-center overflow-hidden p-6">
+      <div aria-hidden className="canvas-surface" />
+      <div className="relative">{children}</div>
     </div>
   );
 }
@@ -117,6 +120,14 @@ function EntryNodeSample({
 export default function EntryNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
+      <Preview
+        className="h-96"
+        containerClassName="lg:col-span-2"
+        showMaximize
+        title="In canvas"
+      >
+        <EntryNodeCanvasHero />
+      </Preview>
       <Preview title="Collapsed default">
         <PreviewSurface>
           <EntryNodeSample />
@@ -186,9 +197,9 @@ export default function EntryNodePreview() {
           />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Aggregate status">
+      <Preview containerClassName="lg:col-span-2" title="Aggregate status">
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             {aggregateSamples.map((sample) => (
               <div className="flex flex-col gap-2" key={sample.title}>
                 <EntryNodeSample targets={sample.targets} />

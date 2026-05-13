@@ -8,12 +8,12 @@ import type {
   EntryNodeTarget,
 } from "@workspace/ui/components/entry-node/entry-node";
 import { EntryNode } from "@workspace/ui/components/entry-node/entry-node";
-import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
 import { memo, useMemo } from "react";
 
 interface CanvasEntryNodeData extends Record<string, unknown> {
   accessDomain: EntryNodeAccessDomain;
+  defaultExpanded: boolean;
   states: EntryNodeStates;
   targets: EntryNodeTarget[];
 }
@@ -26,6 +26,7 @@ const PreviewCanvasEntryNode = memo(function PreviewCanvasEntryNode({
   return (
     <EntryNode.Root
       accessDomain={data.accessDomain}
+      defaultExpanded={data.defaultExpanded}
       interaction={{ dragging, selected }}
       states={data.states}
       targets={data.targets}
@@ -56,9 +57,25 @@ const targets: EntryNodeTarget[] = [
 
 const ENTRY_NODE_CANVAS_NODES: Node<CanvasEntryNodeData, "entryNode">[] = [
   {
-    data: { accessDomain, states: entryNodeStates, targets },
-    id: "entry-node-1",
-    position: { x: 220, y: 160 },
+    data: {
+      accessDomain,
+      defaultExpanded: false,
+      states: entryNodeStates,
+      targets,
+    },
+    id: "entry-node-collapsed",
+    position: { x: 180, y: 140 },
+    type: "entryNode",
+  },
+  {
+    data: {
+      accessDomain,
+      defaultExpanded: true,
+      states: entryNodeStates,
+      targets,
+    },
+    id: "entry-node-expanded",
+    position: { x: 560, y: 130 },
     type: "entryNode",
   },
 ];
@@ -69,7 +86,7 @@ const ENTRY_NODE_CANVAS_NODE_TYPES = {
   entryNode: PreviewCanvasEntryNode,
 } as const satisfies NodeTypes;
 
-export default function EntryNodeCanvasPreview() {
+export function EntryNodeCanvasHero() {
   const canvasMeta = useMemo(
     (): CanvasMeta => ({
       nodeTypes: ENTRY_NODE_CANVAS_NODE_TYPES,
@@ -89,14 +106,10 @@ export default function EntryNodeCanvasPreview() {
   );
 
   return (
-    <PreviewWrapper className="lg:grid-cols-1">
-      <Preview className="h-96" showMaximize title="Entry node canvas">
-        <div className="relative size-full overflow-hidden rounded-xl border border-border">
-          <Canvas.Root meta={canvasMeta} state={canvasState}>
-            <Canvas.Flow />
-          </Canvas.Root>
-        </div>
-      </Preview>
-    </PreviewWrapper>
+    <div className="relative size-full overflow-hidden rounded-xl border border-border">
+      <Canvas.Root meta={canvasMeta} state={canvasState}>
+        <Canvas.Flow />
+      </Canvas.Root>
+    </div>
   );
 }

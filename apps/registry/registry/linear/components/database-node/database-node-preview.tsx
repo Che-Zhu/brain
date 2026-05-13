@@ -14,6 +14,8 @@ import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { DatabaseNodeCanvasHero } from "./database-node-preview.canvas";
+
 const privateConnection =
   "postgresql://postgres:super-secret-password@pg-orders.internal-db-fkn129-postgresql.ns-mz0dmtig.svc.cluster.local:5432/postgresql-db-fkn129";
 
@@ -148,8 +150,9 @@ const loadingLifecycleActions = {
 
 function PreviewSurface({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-44 items-center justify-center bg-canvas-surface p-6">
-      {children}
+    <div className="relative flex min-h-44 items-center justify-center overflow-hidden p-6">
+      <div aria-hidden className="canvas-surface" />
+      <div className="relative">{children}</div>
     </div>
   );
 }
@@ -229,6 +232,14 @@ function PublicToggleSample() {
 export default function DatabaseNodePreview() {
   return (
     <PreviewWrapper className="lg:grid-cols-2">
+      <Preview
+        className="h-96"
+        containerClassName="lg:col-span-2"
+        showMaximize
+        title="In canvas"
+      >
+        <DatabaseNodeCanvasHero />
+      </Preview>
       <Preview title="Collapsed default">
         <PreviewSurface>
           <DatabaseNodeSample />
@@ -248,6 +259,19 @@ export default function DatabaseNodePreview() {
               logs: { onClick: () => undefined },
               metrics: { onClick: () => undefined },
             }}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Expanded selected">
+        <PreviewSurface>
+          <DatabaseNodeSample
+            defaultExpanded
+            quickActions={{
+              console: { onClick: () => undefined },
+              logs: { onClick: () => undefined },
+              metrics: { onClick: () => undefined },
+            }}
+            selected
           />
         </PreviewSurface>
       </Preview>
@@ -306,6 +330,15 @@ export default function DatabaseNodePreview() {
           <DatabaseNodeSample connections={scrollConnections} defaultExpanded />
         </PreviewSurface>
       </Preview>
+      <Preview title="Drag visual">
+        <PreviewSurface>
+          <DatabaseNodeSample
+            connections={publicEnabledConnections}
+            defaultExpanded
+            dragging
+          />
+        </PreviewSurface>
+      </Preview>
       <Preview title="Action loading">
         <PreviewSurface>
           <DatabaseNodeSample
@@ -333,9 +366,12 @@ export default function DatabaseNodePreview() {
           <PublicToggleSample />
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Footer metric coverage">
+      <Preview
+        containerClassName="lg:col-span-2"
+        title="Footer metric coverage"
+      >
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             <DatabaseNodeSample />
             <DatabaseNodeSample
               states={{
@@ -355,9 +391,12 @@ export default function DatabaseNodePreview() {
           </div>
         </PreviewSurface>
       </Preview>
-      <Preview className="lg:col-span-2" title="Status adapter coverage">
+      <Preview
+        containerClassName="lg:col-span-2"
+        title="Status adapter coverage"
+      >
         <PreviewSurface>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap items-start gap-3">
             {statusSamples.map((sample) => (
               <div className="flex flex-col gap-2" key={sample.title}>
                 <DatabaseNodeSample

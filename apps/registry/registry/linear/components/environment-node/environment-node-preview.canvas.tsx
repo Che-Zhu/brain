@@ -8,14 +8,12 @@ import type {
   EnvironmentNodeStates,
 } from "@workspace/ui/components/environment-node/environment-node";
 import { EnvironmentNode } from "@workspace/ui/components/environment-node/environment-node";
-import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
 import { memo, useMemo } from "react";
 
 interface CanvasEnvironmentNodeData extends Record<string, unknown> {
-  defaultExpanded?: boolean;
-  forceDragging?: boolean;
-  launchCommand?: string;
+  defaultExpanded: boolean;
+  launchCommand: string;
   states: EnvironmentNodeStates;
 }
 
@@ -42,7 +40,7 @@ const PreviewCanvasEnvironmentNode = memo(
     return (
       <EnvironmentNode.Root
         defaultExpanded={data.defaultExpanded}
-        interaction={{ dragging: dragging || data.forceDragging, selected }}
+        interaction={{ dragging, selected }}
         launchCommand={data.launchCommand}
         lifecycleActions={PREVIEW_LIFECYCLE_ACTIONS}
         quickActions={PREVIEW_QUICK_ACTIONS}
@@ -69,53 +67,22 @@ const states: EnvironmentNodeStates = {
   status: { label: "Running", tone: "running" },
 };
 
+const launchCommand = "pnpm dev --host 0.0.0.0 --port 3000";
+
 const ENVIRONMENT_NODE_CANVAS_NODES: Node<
   CanvasEnvironmentNodeData,
   "environmentNode"
 >[] = [
   {
-    data: {
-      launchCommand: "pnpm dev --host 0.0.0.0 --port 3000",
-      states,
-    },
+    data: { defaultExpanded: false, launchCommand, states },
     id: "environment-node-collapsed",
     position: { x: 170, y: 120 },
-    selected: true,
     type: "environmentNode",
   },
   {
-    data: {
-      defaultExpanded: true,
-      launchCommand: "go run ./cmd/api --host 0.0.0.0 --port 8080",
-      states: {
-        ...states,
-        displayRuntime: "Go",
-        formattedVersion: "1.23",
-        name: "api-devbox",
-        runtimeKey: "go",
-      },
-    },
+    data: { defaultExpanded: true, launchCommand, states },
     id: "environment-node-expanded",
     position: { x: 540, y: 104 },
-    type: "environmentNode",
-  },
-  {
-    data: {
-      defaultExpanded: true,
-      forceDragging: true,
-      launchCommand: "",
-      states: {
-        ...states,
-        displayRuntime: "Python",
-        formattedVersion: "3.12",
-        metrics: { cpu: 9 },
-        name: "worker-shell",
-        runtimeKey: "python",
-        status: { label: "Pending", tone: "pending" },
-      },
-    },
-    id: "environment-node-dragging",
-    position: { x: 900, y: 138 },
     type: "environmentNode",
   },
 ];
@@ -126,7 +93,7 @@ const ENVIRONMENT_NODE_CANVAS_NODE_TYPES = {
   environmentNode: PreviewCanvasEnvironmentNode,
 } as const satisfies NodeTypes;
 
-export default function EnvironmentNodeCanvasPreview() {
+export function EnvironmentNodeCanvasHero() {
   const canvasMeta = useMemo(
     (): CanvasMeta => ({
       nodeTypes: ENVIRONMENT_NODE_CANVAS_NODE_TYPES,
@@ -146,14 +113,10 @@ export default function EnvironmentNodeCanvasPreview() {
   );
 
   return (
-    <PreviewWrapper className="lg:grid-cols-1">
-      <Preview className="h-96" showMaximize title="Environment node canvas">
-        <div className="relative size-full overflow-hidden rounded-xl border border-border">
-          <Canvas.Root meta={canvasMeta} state={canvasState}>
-            <Canvas.Flow />
-          </Canvas.Root>
-        </div>
-      </Preview>
-    </PreviewWrapper>
+    <div className="relative size-full overflow-hidden rounded-xl border border-border">
+      <Canvas.Root meta={canvasMeta} state={canvasState}>
+        <Canvas.Flow />
+      </Canvas.Root>
+    </div>
   );
 }
