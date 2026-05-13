@@ -226,12 +226,7 @@ export function DatabaseNodeConnectionRow({
   const rowKey = getDatabaseNodeConnectionKey(connection, index);
   const publicSwitch =
     connection.kind === "public" ? (
-      <CanvasNode.CopyableRowControl
-        className={cn(
-          "pointer-events-auto z-20 flex",
-          copyable ? "absolute top-2.5 right-2.5" : "relative"
-        )}
-      >
+      <CanvasNode.CopyableRowControl className="pointer-events-auto relative z-20 flex shrink-0 items-center">
         <DatabaseNodePublicSwitch connection={connection} index={index} />
       </CanvasNode.CopyableRowControl>
     ) : null;
@@ -264,17 +259,11 @@ export function DatabaseNodeConnectionRow({
               rowCopyable ? "pointer-events-none" : "pointer-events-auto"
             )}
           >
-            <span
-              className={cn(
-                "min-w-0 truncate font-normal text-muted-foreground text-xs leading-4",
-                rowCopyable && publicSwitch && "pr-12"
-              )}
-            >
+            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
               {connection.label}
             </span>
-            {rowCopyable ? null : publicSwitch}
+            {publicSwitch}
           </div>
-          {rowCopyable ? publicSwitch : null}
           {displayValue ? (
             <div
               aria-hidden={rowCopyable ? true : undefined}

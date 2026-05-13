@@ -1,15 +1,14 @@
 .database-node-connection-list {
+  scrollbar-width: none;
+}
+
+.database-node-connection-list[data-scrollable] {
   max-height: calc((var(--spacing) * 18 * 2) + (var(--spacing) * 2));
   overflow-y: auto;
-  scrollbar-width: none;
 }
 
 .database-node-connection-list::-webkit-scrollbar {
   display: none;
-}
-
-.database-node-connection-list:not([data-scrollable]) {
-  overflow: hidden;
 }
 
 .database-node-connection-empty {
