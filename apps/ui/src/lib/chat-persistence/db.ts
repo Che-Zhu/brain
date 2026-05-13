@@ -1,9 +1,16 @@
 import "server-only";
 
-import { drizzle } from "drizzle-orm/node-postgres";
+import { type NodePgDatabase, drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { assistantChatMessages, assistantChats } from "./schema";
+
+const assistantSchema = {
+  assistantChatMessages,
+  assistantChats,
+};
+
+export type AssistantPgDatabase = NodePgDatabase<typeof assistantSchema>;
 
 const POOL_MAX = 15;
 const POOL_IDLE_MS = 30_000;
@@ -35,6 +42,13 @@ function getPool(): Pool {
   return pool;
 }
 
-export const assistantDb = drizzle(getPool(), {
-  schema: { assistantChatMessages, assistantChats },
-});
+let assistantDbInstance: AssistantPgDatabase | undefined;
+
+/**
+ * Lazily creates the Drizzle client on first use so `next build` does not need
+ * `DATABASE_URL` (static analysis / route collection must not open the pool).
+ */
+export function getAssistantDb(): AssistantPgDatabase {
+  assistantDbInstance ??= drizzle(getPool(), { schema: assistantSchema });
+  return assistantDbInstance;
+}

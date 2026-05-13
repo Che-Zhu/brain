@@ -4,7 +4,7 @@ import type { UIMessage } from "ai";
 import { generateId } from "ai";
 import { and, asc, desc, eq } from "drizzle-orm";
 
-import { assistantDb } from "./db";
+import { getAssistantDb } from "./db";
 import {
   type AssistantChatRow,
   assistantChatMessages,
@@ -35,7 +35,7 @@ function withPersistableId(message: UIMessage): UIMessage {
 export async function selectThreadById(
   chatId: string
 ): Promise<ThreadRow | null> {
-  const [row] = await assistantDb
+  const [row] = await getAssistantDb()
     .select()
     .from(assistantChats)
     .where(eq(assistantChats.id, chatId))
@@ -46,7 +46,7 @@ export async function selectThreadById(
 export function selectThreadsByNamespace(
   namespaceKey: string
 ): Promise<ThreadRow[]> {
-  return assistantDb
+  return getAssistantDb()
     .select()
     .from(assistantChats)
     .where(eq(assistantChats.namespace, namespaceKey))
@@ -58,7 +58,7 @@ export async function insertThread(input: {
   namespaceKey: string;
   title: string;
 }): Promise<void> {
-  await assistantDb.insert(assistantChats).values({
+  await getAssistantDb().insert(assistantChats).values({
     id: input.id,
     namespace: input.namespaceKey,
     title: input.title,
@@ -78,7 +78,7 @@ export async function updateThreadAiTitleOnce(
   if (safe === "") {
     return false;
   }
-  const result = await assistantDb
+  const result = await getAssistantDb()
     .update(assistantChats)
     .set({
       title: safe,
@@ -98,7 +98,7 @@ export async function updateThreadAiTitleOnce(
 export async function selectMessagesByThread(
   chatId: string
 ): Promise<UIMessage[]> {
-  const rows = await assistantDb
+  const rows = await getAssistantDb()
     .select()
     .from(assistantChatMessages)
     .where(eq(assistantChatMessages.chatId, chatId))
@@ -121,7 +121,7 @@ export async function upsertMessage(
   const row = withPersistableId(message);
   const insertedAt = new Date();
   const now = insertedAt;
-  await assistantDb.transaction(async (tx) => {
+  await getAssistantDb().transaction(async (tx) => {
     await tx
       .insert(assistantChatMessages)
       .values({
