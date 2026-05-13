@@ -6,6 +6,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Ellipsis } from "lucide-react";
 
 import { useEntryNode } from "./entry-node.context";
+import { resolveEntryNodeTargetVisualStatus } from "./entry-node.status";
 import type { EntryNodeTarget } from "./entry-node.types";
 
 function getTargetKey(target: EntryNodeTarget, index: number) {
@@ -63,6 +64,7 @@ export function EntryNodeTargetRow({
 }) {
   const { actions } = useEntryNode();
   const rowKey = getTargetKey(target, index);
+  const visualStatus = resolveEntryNodeTargetVisualStatus(target.status);
 
   return (
     <CanvasNode.CopyableRow
@@ -88,7 +90,7 @@ export function EntryNodeTargetRow({
             className="entry-node-target-content pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-2"
           >
             <div className="flex min-w-0 items-center gap-1.5">
-              <CanvasNode.StatusDot size="small" status={target.status} />
+              <CanvasNode.StatusDot size="small" status={visualStatus} />
               <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
                 {target.label}
               </span>

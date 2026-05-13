@@ -22,6 +22,7 @@ import {
   canCopyEnvironmentLaunchCommand,
   ENVIRONMENT_NODE_LAUNCH_COMMAND_COPY_KEY,
 } from "./environment-node.root";
+import { resolveEnvironmentNodeStatus } from "./environment-node.status";
 import type {
   EnvironmentNodeLifecycleActionKey,
   EnvironmentNodeMetricKey,
@@ -289,6 +290,7 @@ export function EnvironmentNodeFooterContent({
       states: { metrics, status },
     },
   } = useEnvironmentNode();
+  const visualStatus = resolveEnvironmentNodeStatus(status);
 
   return (
     <div
@@ -298,7 +300,7 @@ export function EnvironmentNodeFooterContent({
       )}
       data-slot="environment-node-footer-content"
     >
-      <CanvasNode.FooterStatus status={status} />
+      <CanvasNode.FooterStatus status={visualStatus} />
       <CanvasNode.Metrics>
         {METRIC_ITEMS.map((item) => {
           const Icon = item.icon;

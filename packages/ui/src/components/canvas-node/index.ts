@@ -13,7 +13,7 @@ export type {
   CanvasNodeRootProps,
   CanvasNodeState,
   CanvasNodeStatus,
-  CanvasNodeStatusTone,
+  CanvasNodeVisualStatusTone,
 } from "./canvas-node";
 // biome-ignore lint/performance/noBarrelFile: canvas-node public package surface
 export { CanvasNode } from "./canvas-node";

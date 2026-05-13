@@ -27,6 +27,10 @@ export {
   canCopyDatabaseNodeConnection,
   getDatabaseNodeConnectionKey,
 } from "./database-node.root";
+export {
+  resolveDatabaseNodeStatus,
+  resolveDatabaseNodeVisualTone,
+} from "./database-node.status";
 export type {
   DatabaseEngineKey,
   DatabaseNodeAction,
@@ -49,6 +53,8 @@ export type {
   DatabaseNodeStartConnectionHandler,
   DatabaseNodeState,
   DatabaseNodeStates,
+  DatabaseNodeStatus,
+  DatabaseNodeStatusTone,
   DatabaseNodeTogglePublicConnectionHandler,
 } from "./database-node.types";
 

@@ -36,6 +36,17 @@ const baseStates: DatabaseNodeStates = {
   status: { label: "Running", tone: "running" },
 };
 
+const statusSamples: {
+  status: DatabaseNodeStates["status"];
+  title: string;
+}[] = [
+  { status: { label: "Running", tone: "running" }, title: "Running" },
+  { status: { label: "Pending", tone: "pending" }, title: "Pending" },
+  { status: { label: "Deleting", tone: "deleting" }, title: "Deleting" },
+  { status: { label: "Failed", tone: "failed" }, title: "Failed" },
+  { status: undefined, title: "Unknown" },
+];
+
 const baseConnections: DatabaseNodeConnection[] = [
   {
     id: "private",
@@ -341,6 +352,26 @@ export default function DatabaseNodePreview() {
                 status: { label: "Unknown", tone: "unknown" },
               }}
             />
+          </div>
+        </PreviewSurface>
+      </Preview>
+      <Preview className="lg:col-span-2" title="Status adapter coverage">
+        <PreviewSurface>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {statusSamples.map((sample) => (
+              <div className="flex flex-col gap-2" key={sample.title}>
+                <DatabaseNodeSample
+                  states={{
+                    ...baseStates,
+                    name: `orders-${sample.title.toLowerCase()}`,
+                    status: sample.status,
+                  }}
+                />
+                <span className="text-muted-foreground text-xs">
+                  {sample.title}
+                </span>
+              </div>
+            ))}
           </div>
         </PreviewSurface>
       </Preview>

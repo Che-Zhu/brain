@@ -13,7 +13,10 @@ import { EntryNodeTargetList, EntryNodeTargetRow } from "./entry-node.target";
 
 // biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useEntryNode }`
 export { useEntryNode } from "./entry-node.context";
-export { resolveEntryNodeTargetStatus } from "./entry-node.status";
+export {
+  resolveEntryNodeTargetStatus,
+  resolveEntryNodeTargetVisualStatus,
+} from "./entry-node.status";
 export type {
   EntryNodeAccessDomain,
   EntryNodeActions,
@@ -28,6 +31,8 @@ export type {
   EntryNodeStates,
   EntryNodeTarget,
   EntryNodeTargetKey,
+  EntryNodeTargetStatus,
+  EntryNodeTargetStatusTone,
 } from "./entry-node.types";
 
 export const EntryNode = {

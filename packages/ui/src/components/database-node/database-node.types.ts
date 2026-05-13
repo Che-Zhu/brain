@@ -2,7 +2,7 @@ import type {
   CanvasNodeConnectionEvent,
   CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
-  CanvasNodeStatus,
+  CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
 import type { ReactNode } from "react";
 
@@ -17,13 +17,46 @@ export type DatabaseNodeMetricKey = "cpu" | "memory" | "storage";
 
 export type DatabaseNodeMetricValue = number | string;
 
+export type DatabaseNodeStatusTone =
+  | "available"
+  | "binding"
+  | "bound"
+  | "complete"
+  | "creating"
+  | "degraded"
+  | "deleting"
+  | "error"
+  | "failed"
+  | "inaccessible"
+  | "not-configured"
+  | "pending"
+  | "progressing"
+  | "ready"
+  | "reconciling"
+  | "running"
+  | "shutdown"
+  | "stopped"
+  | "stopping"
+  | "succeeded"
+  | "suspended"
+  | "unconfigured"
+  | "unhealthy"
+  | "unknown"
+  | (string & {});
+
+export interface DatabaseNodeStatus {
+  label: string;
+  tone?: DatabaseNodeStatusTone;
+  visualTone?: CanvasNodeVisualStatusTone;
+}
+
 export interface DatabaseNodeStates {
   displayEngine: string;
   engineKey?: DatabaseEngineKey;
   formattedVersion?: string;
   metrics?: Partial<Record<DatabaseNodeMetricKey, DatabaseNodeMetricValue>>;
   name: string;
-  status?: CanvasNodeStatus;
+  status?: DatabaseNodeStatus;
 }
 
 interface DatabaseNodeConnectionBase {

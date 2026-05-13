@@ -5,7 +5,9 @@ import type { ComponentProps, ReactNode } from "react";
 
 import {
   CanvasNodeStatusDot,
-  normalizeCanvasNodeStatus,
+  DEFAULT_CANVAS_NODE_STATUS,
+  getCanvasNodeStatusTextClassName,
+  resolveCanvasNodeStatus,
 } from "./canvas-node.status";
 import type { CanvasNodeStatus } from "./canvas-node.types";
 
@@ -21,47 +23,14 @@ function formatCanvasNodeMetricValue(value: CanvasNodeMetricValue) {
   return trimmed || "--";
 }
 
-function getCanvasNodeStatusTextClassName(status: CanvasNodeStatus) {
-  switch (normalizeCanvasNodeStatus(status.tone ?? status.label)) {
-    case "accessible":
-    case "available":
-    case "bound":
-    case "complete":
-    case "ready":
-    case "running":
-    case "succeeded":
-      return "text-green-500";
-    case "binding":
-    case "creating":
-    case "pending":
-    case "progressing":
-      return "text-blue-500";
-    case "deleting":
-    case "degraded":
-      return "text-yellow-500";
-    case "error":
-    case "failed":
-    case "inaccessible":
-    case "unhealthy":
-      return "text-red-500";
-    default:
-      return "text-neutral-400";
-  }
-}
-
-const DEFAULT_STATUS = {
-  label: "Unknown",
-  tone: "unknown",
-} as const satisfies CanvasNodeStatus;
-
 export function CanvasNodeFooterStatus({
   className,
-  status = DEFAULT_STATUS,
+  status = DEFAULT_CANVAS_NODE_STATUS,
 }: {
   className?: string;
   status?: CanvasNodeStatus;
 }) {
-  const statusLabel = status.label.trim() || DEFAULT_STATUS.label;
+  const resolvedStatus = resolveCanvasNodeStatus(status);
 
   return (
     <span
@@ -70,11 +39,11 @@ export function CanvasNodeFooterStatus({
         className
       )}
     >
-      <CanvasNodeStatusDot size="small" status={status} />
+      <CanvasNodeStatusDot size="small" status={resolvedStatus} />
       <span
         className={cn("truncate", getCanvasNodeStatusTextClassName(status))}
       >
-        {statusLabel}
+        {resolvedStatus.label}
       </span>
     </span>
   );

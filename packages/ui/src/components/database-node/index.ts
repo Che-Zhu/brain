@@ -20,6 +20,8 @@ export type {
   DatabaseNodeStartConnectionHandler,
   DatabaseNodeState,
   DatabaseNodeStates,
+  DatabaseNodeStatus,
+  DatabaseNodeStatusTone,
   DatabaseNodeTogglePublicConnectionHandler,
 } from "./database-node";
 // biome-ignore lint/performance/noBarrelFile: database-node public package surface
@@ -34,4 +36,6 @@ export {
   maskDatabaseConnectionString,
   PostgreSQLIcon,
   RedisIcon,
+  resolveDatabaseNodeStatus,
+  resolveDatabaseNodeVisualTone,
 } from "./database-node";

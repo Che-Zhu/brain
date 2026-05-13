@@ -165,6 +165,28 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/canvas-node": {
+    style: "linear",
+    group: "components",
+    name: "canvas-node",
+    title: "Canvas Node",
+    description:
+      "Shared canvas node chrome with visual status dots, pills, collapsed status, and footer status.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "canvas-node"],
+    files: [
+      {
+        path: "registry/linear/components/canvas-node/canvas-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/canvas-node/canvas-node-preview"),
+  },
+
   "linear/components/entry-node": {
     style: "linear",
     group: "components",

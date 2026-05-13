@@ -2,7 +2,7 @@ import type {
   CanvasNodeConnectionEvent,
   CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
-  CanvasNodeStatus,
+  CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
 import type { ReactNode } from "react";
 
@@ -22,6 +22,39 @@ export type EnvironmentNodeMetricKey = "cpu" | "memory" | "storage";
 
 export type EnvironmentNodeMetricValue = number | string;
 
+export type EnvironmentNodeStatusTone =
+  | "available"
+  | "binding"
+  | "bound"
+  | "complete"
+  | "creating"
+  | "degraded"
+  | "deleting"
+  | "error"
+  | "failed"
+  | "inaccessible"
+  | "not-configured"
+  | "pending"
+  | "progressing"
+  | "ready"
+  | "reconciling"
+  | "running"
+  | "shutdown"
+  | "stopped"
+  | "stopping"
+  | "succeeded"
+  | "suspended"
+  | "unconfigured"
+  | "unhealthy"
+  | "unknown"
+  | (string & {});
+
+export interface EnvironmentNodeStatus {
+  label: string;
+  tone?: EnvironmentNodeStatusTone;
+  visualTone?: CanvasNodeVisualStatusTone;
+}
+
 export interface EnvironmentNodeStates {
   displayRuntime: string;
   formattedVersion?: string;
@@ -30,7 +63,7 @@ export interface EnvironmentNodeStates {
   >;
   name: string;
   runtimeKey?: EnvironmentRuntimeKey;
-  status?: CanvasNodeStatus;
+  status?: EnvironmentNodeStatus;
 }
 
 export type EnvironmentNodeQuickActionKey =

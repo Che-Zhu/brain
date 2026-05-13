@@ -2,7 +2,7 @@ import type {
   CanvasNodeConnectionEvent,
   CanvasNodeConnectionSide,
   CanvasNodeInteractionState,
-  CanvasNodeStatus,
+  CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
 import type { ReactNode } from "react";
 
@@ -15,10 +15,25 @@ export interface EntryNodeAccessDomain {
   value: string;
 }
 
+export type EntryNodeTargetStatusTone =
+  | "accessible"
+  | "degraded"
+  | "inaccessible"
+  | "not-configured"
+  | "progressing"
+  | "unknown"
+  | (string & {});
+
+export interface EntryNodeTargetStatus {
+  label: string;
+  tone?: EntryNodeTargetStatusTone;
+  visualTone?: CanvasNodeVisualStatusTone;
+}
+
 export interface EntryNodeTarget {
   id?: string;
   label: string;
-  status?: CanvasNodeStatus;
+  status?: EntryNodeTargetStatus;
   value: string;
 }
 

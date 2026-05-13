@@ -1,31 +1,15 @@
 import type { PointerEvent, ReactNode } from "react";
 
-export type CanvasNodeStatusTone =
-  | "accessible"
-  | "available"
-  | "binding"
-  | "bound"
-  | "complete"
-  | "creating"
-  | "degraded"
-  | "deleting"
-  | "error"
-  | "failed"
-  | "inaccessible"
-  | "pending"
-  | "progressing"
-  | "ready"
-  | "running"
-  | "shutdown"
-  | "stopped"
-  | "stopping"
-  | "succeeded"
-  | "unhealthy"
-  | "unknown";
+export type CanvasNodeVisualStatusTone =
+  | "negative"
+  | "neutral"
+  | "positive"
+  | "progress"
+  | "warning";
 
 export interface CanvasNodeStatus {
   label: string;
-  tone?: CanvasNodeStatusTone;
+  visualTone?: CanvasNodeVisualStatusTone;
 }
 
 export interface CanvasNodeInteractionState {

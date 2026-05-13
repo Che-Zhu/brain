@@ -24,6 +24,7 @@ import {
   canCopyDatabaseNodeConnection,
   getDatabaseNodeConnectionKey,
 } from "./database-node.root";
+import { resolveDatabaseNodeStatus } from "./database-node.status";
 import type {
   DatabaseNodeConnection,
   DatabaseNodeLifecycleActionKey,
@@ -369,6 +370,7 @@ export function DatabaseNodeFooterContent({
       states: { metrics, status },
     },
   } = useDatabaseNode();
+  const visualStatus = resolveDatabaseNodeStatus(status);
 
   return (
     <div
@@ -378,7 +380,7 @@ export function DatabaseNodeFooterContent({
       )}
       data-slot="database-node-footer-content"
     >
-      <CanvasNode.FooterStatus status={status} />
+      <CanvasNode.FooterStatus status={visualStatus} />
       <CanvasNode.Metrics>
         {METRIC_ITEMS.map((item) => {
           const Icon = item.icon;

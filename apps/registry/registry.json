@@ -355,6 +355,11 @@
           "target": "components/environment-node/environment-runtime-icons.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/environment-node/environment-node.status.ts"
+        },
+        {
           "path": "../../packages/ui/src/components/environment-node/environment-node.content.tsx",
           "type": "registry:component",
           "target": "components/environment-node/environment-node.content.tsx"

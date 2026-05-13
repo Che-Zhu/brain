@@ -1,12 +1,21 @@
 import type {
   CanvasNodeStatus,
-  CanvasNodeStatusTone,
+  CanvasNodeVisualStatusTone,
 } from "@workspace/ui/components/canvas-node/canvas-node";
-import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
 
-import type { EntryNodeTarget } from "./entry-node.types";
+import type {
+  EntryNodeTarget,
+  EntryNodeTargetStatus,
+} from "./entry-node.types";
 
-const ACCESSIBLE_TONES = new Set<CanvasNodeStatusTone>([
+type EntryNodeTargetStatusBucket =
+  | "accessible"
+  | "failed"
+  | "neutral"
+  | "progressing"
+  | "warning";
+
+const ACCESSIBLE_TONES = new Set([
   "accessible",
   "available",
   "bound",
@@ -16,55 +25,145 @@ const ACCESSIBLE_TONES = new Set<CanvasNodeStatusTone>([
   "succeeded",
 ]);
 
-const PROGRESSING_TONES = new Set<CanvasNodeStatusTone>([
+const PROGRESSING_TONES = new Set([
   "binding",
   "creating",
   "pending",
   "progressing",
 ]);
 
-const FAILED_TONES = new Set<CanvasNodeStatusTone>([
-  "error",
-  "failed",
-  "inaccessible",
-  "unhealthy",
+const WARNING_TONES = new Set(["degraded", "deleting", "stopping"]);
+
+const FAILED_TONES = new Set(["error", "failed", "inaccessible", "unhealthy"]);
+
+const NEUTRAL_TONES = new Set([
+  "not-configured",
+  "shutdown",
+  "stopped",
+  "unknown",
 ]);
 
-function resolveTargetTone(status: CanvasNodeStatus | undefined) {
-  return status?.tone ?? normalizeCanvasNodeStatus(status?.label);
+function normalizeEntryNodeTargetTone(input: string | undefined) {
+  return input
+    ?.trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+}
+
+function getBucketForVisualTone(
+  visualTone: CanvasNodeVisualStatusTone | undefined
+): EntryNodeTargetStatusBucket | undefined {
+  switch (visualTone) {
+    case "positive":
+      return "accessible";
+    case "progress":
+      return "progressing";
+    case "warning":
+      return "warning";
+    case "negative":
+      return "failed";
+    case "neutral":
+      return "neutral";
+    default:
+      return undefined;
+  }
+}
+
+function getVisualToneForBucket(
+  bucket: EntryNodeTargetStatusBucket
+): CanvasNodeVisualStatusTone {
+  switch (bucket) {
+    case "accessible":
+      return "positive";
+    case "progressing":
+      return "progress";
+    case "warning":
+      return "warning";
+    case "failed":
+      return "negative";
+    case "neutral":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+}
+
+function resolveTargetBucket(
+  status: EntryNodeTargetStatus | undefined
+): EntryNodeTargetStatusBucket {
+  const visualBucket = getBucketForVisualTone(status?.visualTone);
+
+  if (visualBucket) {
+    return visualBucket;
+  }
+
+  const tone = normalizeEntryNodeTargetTone(status?.tone ?? status?.label);
+
+  if (tone && ACCESSIBLE_TONES.has(tone)) {
+    return "accessible";
+  }
+
+  if (tone && PROGRESSING_TONES.has(tone)) {
+    return "progressing";
+  }
+
+  if (tone && WARNING_TONES.has(tone)) {
+    return "warning";
+  }
+
+  if (tone && FAILED_TONES.has(tone)) {
+    return "failed";
+  }
+
+  if (tone && NEUTRAL_TONES.has(tone)) {
+    return "neutral";
+  }
+
+  return "neutral";
+}
+
+export function resolveEntryNodeTargetVisualStatus(
+  status: EntryNodeTargetStatus | undefined
+): CanvasNodeStatus {
+  const bucket = resolveTargetBucket(status);
+
+  return {
+    label: status?.label?.trim() || "Unknown",
+    visualTone: getVisualToneForBucket(bucket),
+  };
 }
 
 function everyTone(
-  tones: CanvasNodeStatusTone[],
-  bucket: Set<CanvasNodeStatusTone>
+  buckets: EntryNodeTargetStatusBucket[],
+  bucket: EntryNodeTargetStatusBucket
 ) {
-  return tones.every((tone) => bucket.has(tone));
+  return buckets.every((item) => item === bucket);
 }
 
 export function resolveEntryNodeTargetStatus(
   targets: readonly EntryNodeTarget[] | undefined
 ): CanvasNodeStatus {
   if (!targets || targets.length === 0) {
-    return { label: "Not configured", tone: "unknown" };
+    return { label: "Not configured", visualTone: "neutral" };
   }
 
-  const tones = targets.map((target) => resolveTargetTone(target.status));
+  const buckets = targets.map((target) => resolveTargetBucket(target.status));
 
-  if (everyTone(tones, ACCESSIBLE_TONES)) {
-    return { label: "Accessible", tone: "accessible" };
+  if (everyTone(buckets, "accessible")) {
+    return { label: "Accessible", visualTone: "positive" };
   }
 
-  if (everyTone(tones, PROGRESSING_TONES)) {
-    return { label: "Progressing", tone: "progressing" };
+  if (everyTone(buckets, "progressing")) {
+    return { label: "Progressing", visualTone: "progress" };
   }
 
-  if (everyTone(tones, FAILED_TONES)) {
-    return { label: "Inaccessible", tone: "inaccessible" };
+  if (everyTone(buckets, "failed")) {
+    return { label: "Inaccessible", visualTone: "negative" };
   }
 
-  if (tones.every((tone) => tone === "unknown")) {
-    return { label: "Not configured", tone: "unknown" };
+  if (everyTone(buckets, "neutral")) {
+    return { label: "Not configured", visualTone: "neutral" };
   }
 
-  return { label: "Degraded", tone: "degraded" };
+  return { label: "Degraded", visualTone: "warning" };
 }

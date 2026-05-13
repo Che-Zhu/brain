@@ -61,7 +61,7 @@ export type {
   CanvasNodeRootProps,
   CanvasNodeState,
   CanvasNodeStatus,
-  CanvasNodeStatusTone,
+  CanvasNodeVisualStatusTone,
 } from "./canvas-node.types";
 
 export const CanvasNode = {

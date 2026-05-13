@@ -2,6 +2,7 @@
 export {
   EntryNode,
   resolveEntryNodeTargetStatus,
+  resolveEntryNodeTargetVisualStatus,
   useEntryNode,
 } from "./entry-node";
 export type {
@@ -18,4 +19,6 @@ export type {
   EntryNodeStates,
   EntryNodeTarget,
   EntryNodeTargetKey,
+  EntryNodeTargetStatus,
+  EntryNodeTargetStatusTone,
 } from "./entry-node.types";

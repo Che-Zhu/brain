@@ -25,6 +25,17 @@ const baseStates: EnvironmentNodeStates = {
   status: { label: "Running", tone: "running" },
 };
 
+const statusSamples: {
+  status: EnvironmentNodeStates["status"];
+  title: string;
+}[] = [
+  { status: { label: "Running", tone: "running" }, title: "Running" },
+  { status: { label: "Pending", tone: "pending" }, title: "Pending" },
+  { status: { label: "Stopping", tone: "stopping" }, title: "Stopping" },
+  { status: { label: "Failed", tone: "failed" }, title: "Failed" },
+  { status: undefined, title: "Unknown" },
+];
+
 const quickActions = {
   ide: { onClick: () => undefined },
   logs: { onClick: () => undefined },
@@ -210,6 +221,26 @@ export default function EnvironmentNodePreview() {
                   runtimeKey: runtime.runtimeKey,
                 }}
               />
+            ))}
+          </div>
+        </PreviewSurface>
+      </Preview>
+      <Preview className="lg:col-span-2" title="Status adapter coverage">
+        <PreviewSurface>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {statusSamples.map((sample) => (
+              <div className="flex flex-col gap-2" key={sample.title}>
+                <EnvironmentNodeSample
+                  states={{
+                    ...baseStates,
+                    name: `workspace-${sample.title.toLowerCase()}`,
+                    status: sample.status,
+                  }}
+                />
+                <span className="text-muted-foreground text-xs">
+                  {sample.title}
+                </span>
+              </div>
             ))}
           </div>
         </PreviewSurface>

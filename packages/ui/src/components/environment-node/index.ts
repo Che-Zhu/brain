@@ -15,6 +15,8 @@ export type {
   EnvironmentNodeStartConnectionHandler,
   EnvironmentNodeState,
   EnvironmentNodeStates,
+  EnvironmentNodeStatus,
+  EnvironmentNodeStatusTone,
   EnvironmentRuntimeKey,
 } from "./environment-node";
 // biome-ignore lint/performance/noBarrelFile: environment-node public package surface
@@ -33,5 +35,7 @@ export {
   PythonRuntimeIcon,
   RubyRuntimeIcon,
   RustRuntimeIcon,
+  resolveEnvironmentNodeStatus,
+  resolveEnvironmentNodeVisualTone,
   useEnvironmentNode,
 } from "./environment-node";

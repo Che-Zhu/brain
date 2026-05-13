@@ -18,6 +18,10 @@ export {
   canCopyEnvironmentLaunchCommand,
   EnvironmentNodeRoot,
 } from "./environment-node.root";
+export {
+  resolveEnvironmentNodeStatus,
+  resolveEnvironmentNodeVisualTone,
+} from "./environment-node.status";
 export type {
   EnvironmentNodeAction,
   EnvironmentNodeActions,
@@ -35,6 +39,8 @@ export type {
   EnvironmentNodeStartConnectionHandler,
   EnvironmentNodeState,
   EnvironmentNodeStates,
+  EnvironmentNodeStatus,
+  EnvironmentNodeStatusTone,
   EnvironmentRuntimeKey,
 } from "./environment-node.types";
 export {
