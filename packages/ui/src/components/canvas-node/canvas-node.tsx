@@ -2,6 +2,7 @@
 
 import "./canvas-node.css";
 
+import { CanvasNodeCard } from "./canvas-node.card";
 import {
   CanvasNodeConnectionButton,
   CanvasNodeConnectionLayer,
@@ -41,6 +42,7 @@ export type {
 
 export const CanvasNode = {
   Body: CanvasNodeBody,
+  Card: CanvasNodeCard,
   ConnectionButton: CanvasNodeConnectionButton,
   ConnectionLayer: CanvasNodeConnectionLayer,
   DragFrame: CanvasNodeDragFrame,
@@ -65,6 +67,7 @@ dn(CanvasNodeFrame, "CanvasNode.Frame");
 dn(CanvasNodeSurface, "CanvasNode.Surface");
 dn(CanvasNodeHeader, "CanvasNode.Header");
 dn(CanvasNodeBody, "CanvasNode.Body");
+dn(CanvasNodeCard, "CanvasNode.Card");
 dn(CanvasNodeFooter, "CanvasNode.Footer");
 dn(CanvasNodeConnectionLayer, "CanvasNode.ConnectionLayer");
 dn(CanvasNodeConnectionButton, "CanvasNode.ConnectionButton");

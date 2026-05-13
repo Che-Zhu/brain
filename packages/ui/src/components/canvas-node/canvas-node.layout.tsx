@@ -3,6 +3,8 @@
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps } from "react";
 
+import { useCanvasNode } from "./canvas-node.context";
+
 export function CanvasNodeHeader({
   className,
   ...props
@@ -24,10 +26,16 @@ export function CanvasNodeBody({
   className,
   ...props
 }: ComponentProps<"div">) {
+  const {
+    meta: { expanded },
+  } = useCanvasNode();
+
   return (
     <div
+      aria-hidden={expanded ? undefined : true}
       className={cn("canvas-node-body", className)}
       data-slot="canvas-node-body"
+      inert={expanded ? undefined : true}
       {...props}
     >
       <div className="canvas-node-body-clip">{children}</div>

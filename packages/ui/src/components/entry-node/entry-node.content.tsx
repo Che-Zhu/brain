@@ -39,20 +39,14 @@ function useEntryNodeResolvedStatus() {
 
 export function EntryNodeContent() {
   return (
-    <CanvasNode.Frame>
-      <CanvasNode.ConnectionLayer />
-      <CanvasNode.DragStateFrame>
-        <CanvasNode.Surface>
-          <CanvasNode.Header>
-            <EntryNodeHeaderContent />
-          </CanvasNode.Header>
-          <CanvasNode.Body>
-            <EntryNodeTargetList />
-          </CanvasNode.Body>
-        </CanvasNode.Surface>
-      </CanvasNode.DragStateFrame>
-      <CanvasNode.ExpandButton />
-    </CanvasNode.Frame>
+    <CanvasNode.Card>
+      <CanvasNode.Header>
+        <EntryNodeHeaderContent />
+      </CanvasNode.Header>
+      <CanvasNode.Body>
+        <EntryNodeTargetList />
+      </CanvasNode.Body>
+    </CanvasNode.Card>
   );
 }
 

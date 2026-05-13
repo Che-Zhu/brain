@@ -2,7 +2,6 @@
 
 import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
-import { useCanvasNode } from "@workspace/ui/components/canvas-node/canvas-node.context";
 import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
 import {
   DropdownMenu,
@@ -202,23 +201,17 @@ function renderLaunchCommandCopyIndicator({
 
 export function EnvironmentNodeContent() {
   return (
-    <CanvasNode.Frame>
-      <CanvasNode.ConnectionLayer />
-      <CanvasNode.DragStateFrame>
-        <CanvasNode.Surface className="environment-node-surface">
-          <CanvasNode.Header>
-            <EnvironmentNodeHeaderContent />
-          </CanvasNode.Header>
-          <CanvasNode.Body>
-            <EnvironmentNodeBodyContent />
-          </CanvasNode.Body>
-          <CanvasNode.Footer>
-            <EnvironmentNodeFooterContent />
-          </CanvasNode.Footer>
-        </CanvasNode.Surface>
-      </CanvasNode.DragStateFrame>
-      <CanvasNode.ExpandButton />
-    </CanvasNode.Frame>
+    <CanvasNode.Card surfaceClassName="environment-node-surface">
+      <CanvasNode.Header>
+        <EnvironmentNodeHeaderContent />
+      </CanvasNode.Header>
+      <CanvasNode.Body>
+        <EnvironmentNodeBodyContent />
+      </CanvasNode.Body>
+      <CanvasNode.Footer>
+        <EnvironmentNodeFooterContent />
+      </CanvasNode.Footer>
+    </CanvasNode.Card>
   );
 }
 
@@ -270,14 +263,6 @@ export function EnvironmentNodeBodyContent({
 }: {
   className?: string;
 }) {
-  const {
-    meta: { expanded },
-  } = useCanvasNode();
-
-  if (!expanded) {
-    return null;
-  }
-
   return (
     <div className={cn("environment-node-body-content pt-2.5", className)}>
       <EnvironmentNodeLaunchCommand />

@@ -2,7 +2,6 @@
 
 import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
-import { useCanvasNode } from "@workspace/ui/components/canvas-node/canvas-node.context";
 import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
 import {
   DropdownMenu,
@@ -198,23 +197,17 @@ function renderConnectionCopyIndicator({
 
 export function DatabaseNodeContent() {
   return (
-    <CanvasNode.Frame>
-      <CanvasNode.ConnectionLayer />
-      <CanvasNode.DragStateFrame>
-        <CanvasNode.Surface className="database-node-surface">
-          <CanvasNode.Header>
-            <DatabaseNodeHeaderContent />
-          </CanvasNode.Header>
-          <CanvasNode.Body>
-            <DatabaseNodeBodyContent />
-          </CanvasNode.Body>
-          <CanvasNode.Footer>
-            <DatabaseNodeFooterContent />
-          </CanvasNode.Footer>
-        </CanvasNode.Surface>
-      </CanvasNode.DragStateFrame>
-      <CanvasNode.ExpandButton />
-    </CanvasNode.Frame>
+    <CanvasNode.Card surfaceClassName="database-node-surface">
+      <CanvasNode.Header>
+        <DatabaseNodeHeaderContent />
+      </CanvasNode.Header>
+      <CanvasNode.Body>
+        <DatabaseNodeBodyContent />
+      </CanvasNode.Body>
+      <CanvasNode.Footer>
+        <DatabaseNodeFooterContent />
+      </CanvasNode.Footer>
+    </CanvasNode.Card>
   );
 }
 
@@ -256,14 +249,6 @@ export function DatabaseNodeHeaderContent({
 }
 
 export function DatabaseNodeBodyContent({ className }: { className?: string }) {
-  const {
-    meta: { expanded },
-  } = useCanvasNode();
-
-  if (!expanded) {
-    return null;
-  }
-
   return (
     <div className={cn("database-node-body-content pt-2.5", className)}>
       <DatabaseNodeConnectionList />
