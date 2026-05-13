@@ -94,7 +94,7 @@ export type DatabaseNodeLifecycleActions = Partial<
 >;
 
 export interface DatabaseNodeActions {
-  copyConnection: DatabaseNodeCopyConnectionHandler;
+  copyConnection?: DatabaseNodeCopyConnectionHandler;
   lifecycleActions?: DatabaseNodeLifecycleActions;
   quickActions?: DatabaseNodeQuickActions;
   togglePublicConnection?: DatabaseNodeTogglePublicConnectionHandler;

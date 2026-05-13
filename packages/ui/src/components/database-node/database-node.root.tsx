@@ -1,7 +1,10 @@
 "use client";
 
+import {
+  CANVAS_NODE_DEFAULT_COPIED_FEEDBACK_MS,
+  CanvasNodeCopyFeedbackScope,
+} from "@workspace/ui/components/canvas-node/canvas-node.copyable-row";
 import { CanvasNodeRoot } from "@workspace/ui/components/canvas-node/canvas-node.root";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DatabaseNodeProvider } from "./database-node.provider";
 import type {
@@ -10,16 +13,6 @@ import type {
   DatabaseNodeContextValue,
   DatabaseNodeRootProps,
 } from "./database-node.types";
-
-const DEFAULT_COPIED_FEEDBACK_MS = 1200;
-
-async function copyTextToClipboard(value: string) {
-  if (typeof navigator === "undefined" || !navigator.clipboard) {
-    return;
-  }
-
-  await navigator.clipboard.writeText(value);
-}
 
 export function getDatabaseNodeConnectionKey(
   connection: DatabaseNodeConnection,
@@ -46,7 +39,7 @@ export function DatabaseNodeRoot({
   children,
   connections,
   copiedConnectionKey,
-  copiedFeedbackMs = DEFAULT_COPIED_FEEDBACK_MS,
+  copiedFeedbackMs = CANVAS_NODE_DEFAULT_COPIED_FEEDBACK_MS,
   defaultExpanded,
   expanded,
   interaction,
@@ -58,92 +51,6 @@ export function DatabaseNodeRoot({
   quickActions,
   states,
 }: DatabaseNodeRootProps) {
-  const [internalCopiedConnectionKey, setInternalCopiedConnectionKey] =
-    useState<DatabaseNodeConnectionKey | null>(null);
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const copiedConnectionControlled = copiedConnectionKey !== undefined;
-
-  useEffect(
-    () => () => {
-      if (resetTimerRef.current) {
-        clearTimeout(resetTimerRef.current);
-      }
-    },
-    []
-  );
-
-  const showCopiedFeedback = useCallback(
-    (connection: DatabaseNodeConnection, index: number) => {
-      if (copiedConnectionControlled) {
-        return;
-      }
-
-      setInternalCopiedConnectionKey(
-        getDatabaseNodeConnectionKey(connection, index)
-      );
-
-      if (resetTimerRef.current) {
-        clearTimeout(resetTimerRef.current);
-      }
-
-      resetTimerRef.current = setTimeout(() => {
-        setInternalCopiedConnectionKey(null);
-        resetTimerRef.current = null;
-      }, copiedFeedbackMs);
-    },
-    [copiedConnectionControlled, copiedFeedbackMs]
-  );
-
-  const copyConnection = useCallback(
-    async (connection: DatabaseNodeConnection, index: number) => {
-      if (!(canCopyDatabaseNodeConnection(connection) && connection.value)) {
-        return;
-      }
-
-      showCopiedFeedback(connection, index);
-
-      if (onCopyConnection) {
-        await onCopyConnection(connection, index);
-      } else {
-        await copyTextToClipboard(connection.value);
-      }
-    },
-    [onCopyConnection, showCopiedFeedback]
-  );
-
-  const value = useMemo(
-    (): DatabaseNodeContextValue => ({
-      actions: {
-        copyConnection,
-        lifecycleActions,
-        quickActions,
-        togglePublicConnection: onTogglePublicConnection,
-      },
-      meta: {
-        copiedFeedbackMs,
-      },
-      state: {
-        connections,
-        copiedConnectionKey: copiedConnectionControlled
-          ? copiedConnectionKey
-          : internalCopiedConnectionKey,
-        states,
-      },
-    }),
-    [
-      connections,
-      copiedConnectionControlled,
-      copiedConnectionKey,
-      copiedFeedbackMs,
-      copyConnection,
-      internalCopiedConnectionKey,
-      lifecycleActions,
-      onTogglePublicConnection,
-      quickActions,
-      states,
-    ]
-  );
-
   return (
     <CanvasNodeRoot
       defaultExpanded={defaultExpanded}
@@ -152,7 +59,36 @@ export function DatabaseNodeRoot({
       onExpandedChange={onExpandedChange}
       onStartConnection={onStartConnection}
     >
-      <DatabaseNodeProvider value={value}>{children}</DatabaseNodeProvider>
+      <CanvasNodeCopyFeedbackScope
+        copiedFeedbackMs={copiedFeedbackMs}
+        copiedKey={copiedConnectionKey}
+      >
+        {({ copiedKey }) => {
+          const value: DatabaseNodeContextValue = {
+            actions: {
+              copyConnection: onCopyConnection,
+              lifecycleActions,
+              quickActions,
+              togglePublicConnection: onTogglePublicConnection,
+            },
+            meta: {
+              copiedFeedbackMs,
+            },
+            state: {
+              connections,
+              copiedConnectionKey:
+                copiedKey as DatabaseNodeConnectionKey | null,
+              states,
+            },
+          };
+
+          return (
+            <DatabaseNodeProvider value={value}>
+              {children}
+            </DatabaseNodeProvider>
+          );
+        }}
+      </CanvasNodeCopyFeedbackScope>
     </CanvasNodeRoot>
   );
 }

@@ -47,7 +47,7 @@ export interface EntryNodeState {
 }
 
 export interface EntryNodeActions {
-  copyTarget: EntryNodeCopyTargetHandler;
+  copyTarget?: EntryNodeCopyTargetHandler;
   openTargetSettings?: EntryNodeOpenTargetSettingsHandler;
 }
 

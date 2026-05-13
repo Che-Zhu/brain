@@ -12,20 +12,6 @@
   overflow: hidden;
 }
 
-.database-node-connection-row[data-copyable]:hover,
-.database-node-connection-row:has(
-    .database-node-connection-copy-hitarea:focus-visible
-  ) {
-  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
-}
-
-.database-node-connection-row:has(
-    .database-node-connection-copy-hitarea:focus-visible
-  )
-  .database-node-connection-copy-icon {
-  opacity: 1;
-}
-
 .database-node-connection-empty {
   min-height: calc(var(--spacing) * 11);
 }

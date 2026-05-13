@@ -1,17 +1,3 @@
-.environment-node-launch-command-row[data-copyable]:hover,
-.environment-node-launch-command-row:has(
-    .environment-node-launch-command-copy-hitarea:focus-visible
-  ) {
-  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
-}
-
-.environment-node-launch-command-row:has(
-    .environment-node-launch-command-copy-hitarea:focus-visible
-  )
-  .environment-node-launch-command-copy-icon {
-  opacity: 1;
-}
-
 .environment-node-launch-command-row {
   min-height: calc(var(--spacing) * 18);
 }

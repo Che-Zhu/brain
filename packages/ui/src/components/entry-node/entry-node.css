@@ -12,16 +12,6 @@
   overflow: hidden;
 }
 
-.entry-node-target-row:hover,
-.entry-node-target-row:has(.entry-node-target-copy-hitarea:focus-visible) {
-  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
-}
-
-.entry-node-target-row:has(.entry-node-target-copy-hitarea:focus-visible)
-  .entry-node-target-copy-icon {
-  opacity: 1;
-}
-
 .entry-node-target-settings:hover,
 .entry-node-target-settings:focus-visible {
   background: color-mix(in oklab, var(--color-white) 4.5%, transparent);

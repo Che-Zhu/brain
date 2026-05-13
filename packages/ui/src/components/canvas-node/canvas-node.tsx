@@ -14,6 +14,12 @@ import {
   CanvasNodeConnectionLayer,
 } from "./canvas-node.connection";
 import {
+  CanvasNodeCopyableRow,
+  CanvasNodeCopyableRowControl,
+  CanvasNodeCopyableRowIndicator,
+  CanvasNodeCopyFeedbackScope,
+} from "./canvas-node.copyable-row";
+import {
   CanvasNodeDragFrame,
   CanvasNodeDragStateFrame,
 } from "./canvas-node.drag-frame";
@@ -38,6 +44,13 @@ import {
 import { CanvasNodeSurface } from "./canvas-node.surface";
 
 export type {
+  CanvasNodeCopyableRowKey,
+  CanvasNodeCopyableRowProps,
+  CanvasNodeCopyableRowState,
+  CanvasNodeCopyFeedbackScopeProps,
+  CanvasNodeCopyFeedbackValue,
+} from "./canvas-node.copyable-row";
+export type {
   CanvasNodeActions,
   CanvasNodeConnectionEvent,
   CanvasNodeConnectionSide,
@@ -60,6 +73,10 @@ export const CanvasNode = {
   Card: CanvasNodeCard,
   ConnectionButton: CanvasNodeConnectionButton,
   ConnectionLayer: CanvasNodeConnectionLayer,
+  CopyableRow: CanvasNodeCopyableRow,
+  CopyableRowControl: CanvasNodeCopyableRowControl,
+  CopyableRowIndicator: CanvasNodeCopyableRowIndicator,
+  CopyFeedbackScope: CanvasNodeCopyFeedbackScope,
   DragFrame: CanvasNodeDragFrame,
   DragStateFrame: CanvasNodeDragStateFrame,
   ExpandButton: CanvasNodeExpandButton,
@@ -96,6 +113,10 @@ dn(CanvasNodeMetric, "CanvasNode.Metric");
 dn(CanvasNodeMetrics, "CanvasNode.Metrics");
 dn(CanvasNodeConnectionLayer, "CanvasNode.ConnectionLayer");
 dn(CanvasNodeConnectionButton, "CanvasNode.ConnectionButton");
+dn(CanvasNodeCopyFeedbackScope, "CanvasNode.CopyFeedbackScope");
+dn(CanvasNodeCopyableRow, "CanvasNode.CopyableRow");
+dn(CanvasNodeCopyableRowControl, "CanvasNode.CopyableRowControl");
+dn(CanvasNodeCopyableRowIndicator, "CanvasNode.CopyableRowIndicator");
 dn(CanvasNodeExpandButton, "CanvasNode.ExpandButton");
 dn(CanvasNodeDragFrame, "CanvasNode.DragFrame");
 dn(CanvasNodeDragStateFrame, "CanvasNode.DragStateFrame");

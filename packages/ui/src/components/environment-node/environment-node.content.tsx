@@ -4,9 +4,7 @@ import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
-  Check,
   Code2,
-  Copy,
   Cpu,
   FileText,
   HardDrive,
@@ -17,10 +15,13 @@ import {
   SquareTerminal,
   Trash2,
 } from "lucide-react";
-import type { ComponentType, SVGProps, SyntheticEvent } from "react";
+import type { ComponentType, SVGProps } from "react";
 
 import { useEnvironmentNode } from "./environment-node.context";
-import { canCopyEnvironmentLaunchCommand } from "./environment-node.root";
+import {
+  canCopyEnvironmentLaunchCommand,
+  ENVIRONMENT_NODE_LAUNCH_COMMAND_COPY_KEY,
+} from "./environment-node.root";
 import type {
   EnvironmentNodeLifecycleActionKey,
   EnvironmentNodeMetricKey,
@@ -31,8 +32,6 @@ import {
   getEnvironmentRuntimeIcon,
   getEnvironmentRuntimeTone,
 } from "./environment-runtime-icons";
-
-const RF_CONTROL_CLASS = "nodrag nopan";
 
 const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
@@ -68,10 +67,6 @@ const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
   { icon: RotateCcw, key: "restart", label: "Restart", tone: "info" },
   { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
 ] as const;
-
-function stopNodeControlEvent(event: SyntheticEvent) {
-  event.stopPropagation();
-}
 
 function formatEnvironmentSubtitle({
   displayRuntime,
@@ -114,29 +109,6 @@ function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
     default:
       return "text-zinc-50";
   }
-}
-
-function renderLaunchCommandCopyIndicator({
-  copied,
-  copyable,
-}: {
-  copied: boolean;
-  copyable: boolean;
-}) {
-  if (!copyable) {
-    return null;
-  }
-
-  if (copied) {
-    return <Check aria-hidden className="size-4 shrink-0" />;
-  }
-
-  return (
-    <Copy
-      aria-hidden
-      className="environment-node-launch-command-copy-icon size-4 shrink-0 opacity-0 transition-opacity group-hover/launch-command:opacity-100"
-    />
-  );
 }
 
 export function EnvironmentNodeContent() {
@@ -218,81 +190,62 @@ export function EnvironmentNodeLaunchCommand({
 }) {
   const {
     actions,
-    state: { copiedLaunchCommand = false, launchCommand },
+    state: { launchCommand },
   } = useEnvironmentNode();
   const copyable = canCopyEnvironmentLaunchCommand(launchCommand);
   const displayValue = copyable
     ? launchCommand
     : "No launch command configured";
 
-  const copyLaunchCommand = () => {
-    if (!(copyable && launchCommand)) {
-      return;
-    }
-
-    Promise.resolve(actions.copyLaunchCommand(launchCommand)).catch(
-      () => undefined
-    );
-  };
-
   return (
-    <section
+    <CanvasNode.CopyableRow
       className={cn(
-        "group/launch-command environment-node-launch-command-row relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
+        "environment-node-launch-command-row relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
         !copyable && "environment-node-launch-command-row-static",
         className
       )}
-      data-copyable={copyable || undefined}
+      copyAriaLabel="Copy launch command"
+      copyable={copyable}
+      copyValue={launchCommand}
       data-slot="environment-node-launch-command-row"
+      onCopy={
+        actions.copyLaunchCommand
+          ? (value) => actions.copyLaunchCommand?.(value)
+          : undefined
+      }
+      rowKey={ENVIRONMENT_NODE_LAUNCH_COMMAND_COPY_KEY}
+      title={launchCommand}
     >
-      {copyable ? (
-        <button
-          aria-label="Copy launch command"
-          className={cn(
-            RF_CONTROL_CLASS,
-            "environment-node-launch-command-copy-hitarea absolute inset-0 z-0 cursor-pointer rounded-lg focus-visible:outline-none"
-          )}
-          data-slot="environment-node-launch-command-copy"
-          onClick={(event) => {
-            event.stopPropagation();
-            copyLaunchCommand();
-          }}
-          onDoubleClick={stopNodeControlEvent}
-          onKeyDown={stopNodeControlEvent}
-          onPointerDown={stopNodeControlEvent}
-          title={launchCommand}
-          type="button"
-        />
-      ) : null}
-      <div
-        className={cn(
-          "relative z-10 flex min-w-0 items-center justify-between gap-2",
-          copyable ? "pointer-events-none" : "pointer-events-auto"
-        )}
-      >
-        <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
-          Launch command
-        </span>
-      </div>
-      <div
-        aria-hidden={copyable ? true : undefined}
-        className={cn(
-          "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
-          copyable
-            ? "pointer-events-none text-zinc-50"
-            : "text-muted-foreground"
-        )}
-        data-copied={copiedLaunchCommand ? "true" : undefined}
-        data-slot="environment-node-launch-command-value"
-        title={launchCommand ?? displayValue}
-      >
-        <span className="min-w-0 truncate">{displayValue}</span>
-        {renderLaunchCommandCopyIndicator({
-          copied: copiedLaunchCommand,
-          copyable,
-        })}
-      </div>
-    </section>
+      {({ copied, copyable: rowCopyable }) => (
+        <>
+          <div
+            className={cn(
+              "relative z-10 flex min-w-0 items-center justify-between gap-2",
+              rowCopyable ? "pointer-events-none" : "pointer-events-auto"
+            )}
+          >
+            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+              Launch command
+            </span>
+          </div>
+          <div
+            aria-hidden={rowCopyable ? true : undefined}
+            className={cn(
+              "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
+              rowCopyable
+                ? "pointer-events-none text-zinc-50"
+                : "text-muted-foreground"
+            )}
+            data-copied={copied ? "true" : undefined}
+            data-slot="environment-node-launch-command-value"
+            title={launchCommand ?? displayValue}
+          >
+            <span className="min-w-0 truncate">{displayValue}</span>
+            <CanvasNode.CopyableRowIndicator />
+          </div>
+        </>
+      )}
+    </CanvasNode.CopyableRow>
   );
 }
 

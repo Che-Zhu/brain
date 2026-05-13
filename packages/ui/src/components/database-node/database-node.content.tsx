@@ -5,8 +5,6 @@ import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
-  Check,
-  Copy,
   Cpu,
   FileText,
   HardDrive,
@@ -17,7 +15,7 @@ import {
   SquareTerminal,
   Trash2,
 } from "lucide-react";
-import type { ComponentType, SVGProps, SyntheticEvent } from "react";
+import type { ComponentType, SVGProps } from "react";
 
 import { getDatabaseEngineIcon } from "./database-engine-icons";
 import { useDatabaseNode } from "./database-node.context";
@@ -33,8 +31,6 @@ import type {
   DatabaseNodePublicConnection,
   DatabaseNodeQuickActionKey,
 } from "./database-node.types";
-
-const RF_CONTROL_CLASS = "nodrag nopan";
 
 const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
@@ -69,10 +65,6 @@ const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
   { icon: Pause, key: "stop", label: "Stop", tone: "muted" },
   { icon: Play, key: "start", label: "Start", tone: "success" },
 ] as const;
-
-function stopNodeControlEvent(event: SyntheticEvent) {
-  event.stopPropagation();
-}
 
 function formatDatabaseSubtitle({
   displayEngine,
@@ -110,29 +102,6 @@ function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
   }
 
   return connection.unavailableMessage ?? "Connection unavailable";
-}
-
-function renderConnectionCopyIndicator({
-  copied,
-  copyable,
-}: {
-  copied: boolean;
-  copyable: boolean;
-}) {
-  if (!copyable) {
-    return null;
-  }
-
-  if (copied) {
-    return <Check aria-hidden className="size-4 shrink-0" />;
-  }
-
-  return (
-    <Copy
-      aria-hidden
-      className="database-node-connection-copy-icon size-4 shrink-0 opacity-0 transition-opacity group-hover/connection:opacity-100"
-    />
-  );
 }
 
 export function DatabaseNodeContent() {
@@ -250,103 +219,81 @@ export function DatabaseNodeConnectionRow({
   connection: DatabaseNodeConnection;
   index: number;
 }) {
-  const {
-    actions,
-    state: { copiedConnectionKey },
-  } = useDatabaseNode();
+  const { actions } = useDatabaseNode();
   const copyable = canCopyDatabaseNodeConnection(connection);
-  const copied =
-    copiedConnectionKey === getDatabaseNodeConnectionKey(connection, index);
   const displayValue = getConnectionDisplayValue(connection);
+  const rowKey = getDatabaseNodeConnectionKey(connection, index);
   const publicSwitch =
     connection.kind === "public" ? (
-      <DatabaseNodePublicSwitch connection={connection} index={index} />
+      <CanvasNode.CopyableRowControl
+        className={cn(
+          "pointer-events-auto z-20 flex",
+          copyable ? "absolute top-2.5 right-2.5" : "relative"
+        )}
+      >
+        <DatabaseNodePublicSwitch connection={connection} index={index} />
+      </CanvasNode.CopyableRowControl>
     ) : null;
 
-  const copyConnection = () => {
-    if (!copyable) {
-      return;
-    }
-
-    Promise.resolve(actions.copyConnection(connection, index)).catch(
-      () => undefined
-    );
-  };
-
   return (
-    <section
+    <CanvasNode.CopyableRow
       className={cn(
-        "group/connection database-node-connection-row relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
+        "database-node-connection-row relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
         displayValue ? "min-h-18" : "min-h-11",
         !copyable && "database-node-connection-row-static",
         className
       )}
-      data-copyable={copyable || undefined}
+      copyAriaLabel={`Copy ${connection.label}`}
+      copyable={copyable}
+      copyValue={connection.value}
       data-slot="database-node-connection-row"
+      onCopy={
+        actions.copyConnection
+          ? () => actions.copyConnection?.(connection, index)
+          : undefined
+      }
+      rowKey={rowKey}
+      title={connection.value}
     >
-      {copyable ? (
-        <button
-          aria-label={`Copy ${connection.label}`}
-          className={cn(
-            RF_CONTROL_CLASS,
-            "database-node-connection-copy-hitarea absolute inset-0 z-0 cursor-pointer rounded-lg focus-visible:outline-none"
-          )}
-          data-slot="database-node-connection-copy"
-          onClick={(event) => {
-            event.stopPropagation();
-            copyConnection();
-          }}
-          onDoubleClick={stopNodeControlEvent}
-          onKeyDown={stopNodeControlEvent}
-          onPointerDown={stopNodeControlEvent}
-          title={connection.value}
-          type="button"
-        />
-      ) : null}
-      <div
-        className={cn(
-          "relative z-10 flex min-w-0 items-center justify-between gap-2",
-          copyable ? "pointer-events-none" : "pointer-events-auto"
-        )}
-      >
-        <span
-          className={cn(
-            "min-w-0 truncate font-normal text-muted-foreground text-xs leading-4",
-            copyable && publicSwitch && "pr-12"
-          )}
-        >
-          {connection.label}
-        </span>
-        {copyable ? null : publicSwitch}
-      </div>
-      {copyable && publicSwitch ? (
-        <div
-          className={cn(
-            RF_CONTROL_CLASS,
-            "pointer-events-auto absolute top-2.5 right-2.5 z-20 flex"
-          )}
-        >
-          {publicSwitch}
-        </div>
-      ) : null}
-      {displayValue ? (
-        <div
-          aria-hidden={copyable ? true : undefined}
-          className={cn(
-            "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
-            copyable
-              ? "pointer-events-none text-zinc-50"
-              : "text-muted-foreground"
-          )}
-          data-copied={copied ? "true" : undefined}
-          data-slot="database-node-connection-value"
-          title={connection.value ?? displayValue}
-        >
-          <span className="min-w-0 truncate">{displayValue}</span>
-          {renderConnectionCopyIndicator({ copied, copyable })}
-        </div>
-      ) : null}
-    </section>
+      {({ copied, copyable: rowCopyable }) => (
+        <>
+          <div
+            className={cn(
+              "relative z-10 flex min-w-0 items-center justify-between gap-2",
+              rowCopyable ? "pointer-events-none" : "pointer-events-auto"
+            )}
+          >
+            <span
+              className={cn(
+                "min-w-0 truncate font-normal text-muted-foreground text-xs leading-4",
+                rowCopyable && publicSwitch && "pr-12"
+              )}
+            >
+              {connection.label}
+            </span>
+            {rowCopyable ? null : publicSwitch}
+          </div>
+          {rowCopyable ? publicSwitch : null}
+          {displayValue ? (
+            <div
+              aria-hidden={rowCopyable ? true : undefined}
+              className={cn(
+                "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
+                rowCopyable
+                  ? "pointer-events-none text-zinc-50"
+                  : "text-muted-foreground"
+              )}
+              data-copied={copied ? "true" : undefined}
+              data-slot="database-node-connection-value"
+              title={connection.value ?? displayValue}
+            >
+              <span className="min-w-0 truncate">{displayValue}</span>
+              <CanvasNode.CopyableRowIndicator />
+            </div>
+          ) : null}
+        </>
+      )}
+    </CanvasNode.CopyableRow>
   );
 }
 
@@ -369,10 +316,7 @@ function DatabaseNodePublicSwitch({
           : "Enable public connection"
       }
       checked={connection.publicAccess.enabled}
-      className={cn(
-        RF_CONTROL_CLASS,
-        "database-node-public-switch pointer-events-auto relative z-20 cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-70"
-      )}
+      className="database-node-public-switch pointer-events-auto relative z-20 cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-70"
       disabled={disabled}
       onCheckedChange={(nextEnabled) => {
         if (!actions.togglePublicConnection) {
@@ -383,10 +327,6 @@ function DatabaseNodePublicSwitch({
           actions.togglePublicConnection(connection, index, nextEnabled)
         ).catch(() => undefined);
       }}
-      onClick={stopNodeControlEvent}
-      onDoubleClick={stopNodeControlEvent}
-      onKeyDown={stopNodeControlEvent}
-      onPointerDown={stopNodeControlEvent}
       size="lg"
       variant="brand"
     />

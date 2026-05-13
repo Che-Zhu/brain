@@ -69,7 +69,7 @@ export type EnvironmentNodeStartConnectionHandler = (
 ) => void;
 
 export interface EnvironmentNodeActions {
-  copyLaunchCommand: EnvironmentNodeCopyLaunchCommandHandler;
+  copyLaunchCommand?: EnvironmentNodeCopyLaunchCommandHandler;
   lifecycleActions?: EnvironmentNodeLifecycleActions;
   quickActions?: EnvironmentNodeQuickActions;
 }
