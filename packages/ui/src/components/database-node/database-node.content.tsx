@@ -1,7 +1,6 @@
 "use client";
 
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
-import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -36,11 +35,6 @@ import type {
 } from "./database-node.types";
 
 const RF_CONTROL_CLASS = "nodrag nopan";
-
-const DEFAULT_STATUS = {
-  label: "Unknown",
-  tone: "unknown",
-} as const;
 
 const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
@@ -88,49 +82,6 @@ function formatDatabaseSubtitle({
   formattedVersion?: string;
 }) {
   return `Database ${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
-}
-
-function formatMetricValue(value: number | string | undefined) {
-  if (typeof value === "number") {
-    return `${value}%`;
-  }
-
-  const trimmed = value?.trim();
-
-  return trimmed || "--";
-}
-
-function getStatusTextClassName(status: DatabaseNodeConnectionStatus) {
-  switch (normalizeCanvasNodeStatus(status.tone ?? status.label)) {
-    case "accessible":
-    case "available":
-    case "bound":
-    case "complete":
-    case "ready":
-    case "running":
-    case "succeeded":
-      return "text-green-500";
-    case "binding":
-    case "creating":
-    case "pending":
-    case "progressing":
-      return "text-blue-500";
-    case "deleting":
-    case "degraded":
-      return "text-yellow-500";
-    case "error":
-    case "failed":
-    case "inaccessible":
-    case "unhealthy":
-      return "text-red-500";
-    default:
-      return "text-neutral-400";
-  }
-}
-
-interface DatabaseNodeConnectionStatus {
-  label: string;
-  tone?: Parameters<typeof normalizeCanvasNodeStatus>[0];
 }
 
 function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
@@ -465,10 +416,9 @@ export function DatabaseNodeFooterContent({
 }) {
   const {
     state: {
-      states: { metrics, status = DEFAULT_STATUS },
+      states: { metrics, status },
     },
   } = useDatabaseNode();
-  const statusLabel = status.label.trim() || DEFAULT_STATUS.label;
 
   return (
     <div
@@ -478,27 +428,22 @@ export function DatabaseNodeFooterContent({
       )}
       data-slot="database-node-footer-content"
     >
-      <span className="flex h-5 min-w-0 shrink-0 items-center gap-1.5 rounded-full">
-        <CanvasNode.StatusDot size="small" status={status} />
-        <span className={cn("truncate", getStatusTextClassName(status))}>
-          {statusLabel}
-        </span>
-      </span>
-      {METRIC_ITEMS.map((item) => {
-        const Icon = item.icon;
-        const value = formatMetricValue(metrics?.[item.key]);
+      <CanvasNode.FooterStatus status={status} />
+      <CanvasNode.Metrics>
+        {METRIC_ITEMS.map((item) => {
+          const Icon = item.icon;
 
-        return (
-          <span
-            className="flex h-5 min-w-0 shrink-0 items-center gap-1.5 rounded-full text-zinc-50"
-            key={item.key}
-            title={`${item.label}: ${value}`}
-          >
-            <Icon aria-hidden className="size-3.5 shrink-0" />
-            <span className="truncate tabular-nums">{value}</span>
-          </span>
-        );
-      })}
+          return (
+            <CanvasNode.Metric
+              key={item.key}
+              label={item.label}
+              value={metrics?.[item.key]}
+            >
+              <Icon aria-hidden className="size-3.5 shrink-0" />
+            </CanvasNode.Metric>
+          );
+        })}
+      </CanvasNode.Metrics>
     </div>
   );
 }

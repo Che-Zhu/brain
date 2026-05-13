@@ -1,7 +1,6 @@
 "use client";
 
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
-import { normalizeCanvasNodeStatus } from "@workspace/ui/components/canvas-node/canvas-node.status";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
@@ -34,11 +33,6 @@ import {
 } from "./environment-runtime-icons";
 
 const RF_CONTROL_CLASS = "nodrag nopan";
-
-const DEFAULT_STATUS = {
-  label: "Unknown",
-  tone: "unknown",
-} as const;
 
 const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
@@ -91,44 +85,6 @@ function formatEnvironmentSubtitle({
   return `Environment ${runtime}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
-function formatMetricValue(value: number | string | undefined) {
-  if (typeof value === "number") {
-    return `${value}%`;
-  }
-
-  const trimmed = value?.trim();
-
-  return trimmed || "--";
-}
-
-function getStatusTextClassName(status: EnvironmentNodeStatus) {
-  switch (normalizeCanvasNodeStatus(status.tone ?? status.label)) {
-    case "accessible":
-    case "available":
-    case "bound":
-    case "complete":
-    case "ready":
-    case "running":
-    case "succeeded":
-      return "text-green-500";
-    case "binding":
-    case "creating":
-    case "pending":
-    case "progressing":
-      return "text-blue-500";
-    case "deleting":
-    case "degraded":
-      return "text-yellow-500";
-    case "error":
-    case "failed":
-    case "inaccessible":
-    case "unhealthy":
-      return "text-red-500";
-    default:
-      return "text-neutral-400";
-  }
-}
-
 function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
   switch (tone) {
     case "blue":
@@ -148,11 +104,6 @@ function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
     default:
       return "text-zinc-50";
   }
-}
-
-interface EnvironmentNodeStatus {
-  label: string;
-  tone?: Parameters<typeof normalizeCanvasNodeStatus>[0];
 }
 
 function renderLaunchCommandCopyIndicator({
@@ -372,10 +323,9 @@ export function EnvironmentNodeFooterContent({
 }) {
   const {
     state: {
-      states: { metrics, status = DEFAULT_STATUS },
+      states: { metrics, status },
     },
   } = useEnvironmentNode();
-  const statusLabel = status.label.trim() || DEFAULT_STATUS.label;
 
   return (
     <div
@@ -385,27 +335,22 @@ export function EnvironmentNodeFooterContent({
       )}
       data-slot="environment-node-footer-content"
     >
-      <span className="flex h-5 min-w-0 shrink-0 items-center gap-1.5 rounded-full">
-        <CanvasNode.StatusDot size="small" status={status} />
-        <span className={cn("truncate", getStatusTextClassName(status))}>
-          {statusLabel}
-        </span>
-      </span>
-      {METRIC_ITEMS.map((item) => {
-        const Icon = item.icon;
-        const value = formatMetricValue(metrics?.[item.key]);
+      <CanvasNode.FooterStatus status={status} />
+      <CanvasNode.Metrics>
+        {METRIC_ITEMS.map((item) => {
+          const Icon = item.icon;
 
-        return (
-          <span
-            className="flex h-5 min-w-0 shrink-0 items-center gap-1.5 rounded-full text-zinc-50"
-            key={item.key}
-            title={`${item.label}: ${value}`}
-          >
-            <Icon aria-hidden className="size-3.5 shrink-0" />
-            <span className="truncate tabular-nums">{value}</span>
-          </span>
-        );
-      })}
+          return (
+            <CanvasNode.Metric
+              key={item.key}
+              label={item.label}
+              value={metrics?.[item.key]}
+            >
+              <Icon aria-hidden className="size-3.5 shrink-0" />
+            </CanvasNode.Metric>
+          );
+        })}
+      </CanvasNode.Metrics>
     </div>
   );
 }

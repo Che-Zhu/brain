@@ -24,6 +24,11 @@ import {
   CanvasNodeFooter,
   CanvasNodeHeader,
 } from "./canvas-node.layout";
+import {
+  CanvasNodeFooterStatus,
+  CanvasNodeMetric,
+  CanvasNodeMetrics,
+} from "./canvas-node.metrics";
 import { CanvasNodeRoot } from "./canvas-node.root";
 import {
   CanvasNodeStatus,
@@ -60,7 +65,10 @@ export const CanvasNode = {
   ExpandButton: CanvasNodeExpandButton,
   Frame: CanvasNodeFrame,
   Footer: CanvasNodeFooter,
+  FooterStatus: CanvasNodeFooterStatus,
   Header: CanvasNodeHeader,
+  Metric: CanvasNodeMetric,
+  Metrics: CanvasNodeMetrics,
   Root: CanvasNodeRoot,
   Status: CanvasNodeStatus,
   StatusDot: CanvasNodeStatusDot,
@@ -83,6 +91,9 @@ dn(CanvasNodeHeader, "CanvasNode.Header");
 dn(CanvasNodeBody, "CanvasNode.Body");
 dn(CanvasNodeCard, "CanvasNode.Card");
 dn(CanvasNodeFooter, "CanvasNode.Footer");
+dn(CanvasNodeFooterStatus, "CanvasNode.FooterStatus");
+dn(CanvasNodeMetric, "CanvasNode.Metric");
+dn(CanvasNodeMetrics, "CanvasNode.Metrics");
 dn(CanvasNodeConnectionLayer, "CanvasNode.ConnectionLayer");
 dn(CanvasNodeConnectionButton, "CanvasNode.ConnectionButton");
 dn(CanvasNodeExpandButton, "CanvasNode.ExpandButton");
