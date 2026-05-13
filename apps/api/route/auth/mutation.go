@@ -2,9 +2,7 @@ package auth
 
 import (
 	"context"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -35,27 +33,14 @@ func registerRegionToken(grp huma.API) {
 			"derived from the returned kubeconfig.",
 		Tags: []string{"Auth"},
 	}, func(ctx context.Context, input *regionTokenInput) (*regionTokenOutput, error) {
-		tokenLen := len(strings.TrimSpace(input.Body.RegionToken))
-		log.Printf("[auth-region-token] start: resolving sealos desktop base URL (regionToken chars=%d)", tokenLen)
-
 		base, err := regiontoken.SealosDesktopBaseURL(ctx)
 		if err != nil {
-			log.Printf("[auth-region-token] SealosDesktopBaseURL failed: %v", err)
 			return nil, huma.Error500InternalServerError("sealos desktop base URL (ingress or ENCODED_ADMIN_KUBECONFIG)", err)
 		}
-		log.Printf("[auth-region-token] desktop base URL: %s", base)
-
-		log.Printf("[auth-region-token] calling upstream GET %s/api/auth/regionToken with Authorization (region JWT)", base)
 		out, err := regiontoken.Exchange(ctx, base, input.Body.RegionToken)
 		if err != nil {
-			log.Printf("[auth-region-token] Exchange failed: %v", err)
 			return nil, huma.Error502BadGateway("region token exchange failed", err)
 		}
-
-		kcLen := len(out.EncodedKubeconfig)
-		ns := out.Namespace
-		log.Printf("[auth-region-token] ok: encodedKubeconfig chars=%d, namespace=%q", kcLen, ns)
-
 		resp := &regionTokenOutput{}
 		resp.Body.EncodedKubeconfig = out.EncodedKubeconfig
 		resp.Body.Namespace = out.Namespace
