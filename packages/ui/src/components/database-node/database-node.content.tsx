@@ -353,6 +353,10 @@ export function DatabaseNodeConnectionRow({
   const copied =
     copiedConnectionKey === getDatabaseNodeConnectionKey(connection, index);
   const displayValue = getConnectionDisplayValue(connection);
+  const publicSwitch =
+    connection.kind === "public" ? (
+      <DatabaseNodePublicSwitch connection={connection} index={index} />
+    ) : null;
 
   const copyConnection = () => {
     if (!copyable) {
@@ -400,13 +404,26 @@ export function DatabaseNodeConnectionRow({
           copyable ? "pointer-events-none" : "pointer-events-auto"
         )}
       >
-        <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+        <span
+          className={cn(
+            "min-w-0 truncate font-normal text-muted-foreground text-xs leading-4",
+            copyable && publicSwitch && "pr-12"
+          )}
+        >
           {connection.label}
         </span>
-        {connection.kind === "public" ? (
-          <DatabaseNodePublicSwitch connection={connection} index={index} />
-        ) : null}
+        {copyable ? null : publicSwitch}
       </div>
+      {copyable && publicSwitch ? (
+        <div
+          className={cn(
+            RF_CONTROL_CLASS,
+            "pointer-events-auto absolute top-2.5 right-2.5 z-20 flex"
+          )}
+        >
+          {publicSwitch}
+        </div>
+      ) : null}
       {displayValue ? (
         <div
           aria-hidden={copyable ? true : undefined}
@@ -447,7 +464,10 @@ function DatabaseNodePublicSwitch({
           : "Enable public connection"
       }
       checked={connection.publicAccess.enabled}
-      className={cn(RF_CONTROL_CLASS, "relative z-20 data-disabled:opacity-70")}
+      className={cn(
+        RF_CONTROL_CLASS,
+        "database-node-public-switch pointer-events-auto relative z-20 cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-70"
+      )}
       disabled={disabled}
       onCheckedChange={(nextEnabled) => {
         if (!actions.togglePublicConnection) {
@@ -463,6 +483,7 @@ function DatabaseNodePublicSwitch({
       onKeyDown={stopNodeControlEvent}
       onPointerDown={stopNodeControlEvent}
       size="lg"
+      variant="brand"
     />
   );
 }
@@ -491,7 +512,7 @@ export function DatabaseNodeActionBar({ className }: { className?: string }) {
             aria-label={item.label}
             className={cn(
               RF_CONTROL_CLASS,
-              "database-node-action-button flex size-8 shrink-0 items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
+              "database-node-action-button flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
             )}
             disabled={disabled}
             key={item.key}
@@ -577,7 +598,7 @@ function DatabaseNodeHeaderMenu() {
             aria-label="Open database actions"
             className={cn(
               RF_CONTROL_CLASS,
-              "database-node-menu-trigger flex size-8 shrink-0 items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50 aria-expanded:bg-white/15 data-popup-open:bg-white/15"
+              "database-node-menu-trigger flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50 aria-expanded:bg-white/15 data-popup-open:bg-white/15"
             )}
             onClick={stopNodeControlEvent}
             size={null}

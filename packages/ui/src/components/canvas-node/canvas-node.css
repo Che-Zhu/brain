@@ -58,7 +58,7 @@
 }
 
 .react-flow__node.draggable .canvas-node-surface {
-  cursor: grab;
+  cursor: default;
 }
 
 .react-flow__node.draggable.dragging .canvas-node-surface {

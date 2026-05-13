@@ -1,18 +1,25 @@
 import { Database } from "lucide-react";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType } from "react";
+import {
+  type DbIconProps,
+  MongoDbIcon,
+  MySqlIcon,
+  PostgreSqlIcon,
+  RedisIcon as RedisAssetIcon,
+} from "../../assets/db-icons";
 
 import type { DatabaseEngineKey } from "./database-node.types";
 
-export type DatabaseEngineIcon = ComponentType<SVGProps<SVGSVGElement>>;
+export type DatabaseEngineIcon = ComponentType<DbIconProps>;
 
-export function DatabaseFallbackIcon(props: SVGProps<SVGSVGElement>) {
-  return <Database {...props} />;
+export function DatabaseFallbackIcon({ size = 24, ...props }: DbIconProps) {
+  return <Database size={size} {...props} />;
 }
 
-export const PostgreSQLIcon = DatabaseFallbackIcon;
-export const MySQLIcon = DatabaseFallbackIcon;
-export const RedisIcon = DatabaseFallbackIcon;
-export const MongoDBIcon = DatabaseFallbackIcon;
+export const PostgreSQLIcon = PostgreSqlIcon;
+export const MySQLIcon = MySqlIcon;
+export const RedisIcon = RedisAssetIcon;
+export const MongoDBIcon = MongoDbIcon;
 
 const DATABASE_ENGINE_ICONS = {
   mongodb: MongoDBIcon,

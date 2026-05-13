@@ -6,15 +6,17 @@ import type {
   DatabaseNodeConnection,
   DatabaseNodeLifecycleActions,
   DatabaseNodeStates,
+  DatabaseNodeTogglePublicConnectionHandler,
 } from "@workspace/ui/components/database-node/database-node";
 import { DatabaseNode } from "@workspace/ui/components/database-node/database-node";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 
 interface CanvasDatabaseNodeData extends Record<string, unknown> {
   connections: DatabaseNodeConnection[];
   defaultExpanded?: boolean;
+  onTogglePublicConnection?: DatabaseNodeTogglePublicConnectionHandler;
   states: DatabaseNodeStates;
 }
 
@@ -36,6 +38,7 @@ const PreviewCanvasDatabaseNode = memo(function PreviewCanvasDatabaseNode({
       defaultExpanded={data.defaultExpanded}
       interaction={{ dragging, selected }}
       lifecycleActions={PREVIEW_LIFECYCLE_ACTIONS}
+      onTogglePublicConnection={data.onTogglePublicConnection}
       quickActions={{
         console: { onClick: () => undefined },
         logs: { onClick: () => undefined },
@@ -114,6 +117,10 @@ const DATABASE_NODE_CANVAS_NODE_TYPES = {
 } as const satisfies NodeTypes;
 
 export default function DatabaseNodeCanvasPreview() {
+  const [publicConnectionEnabled, setPublicConnectionEnabled] = useState<
+    Record<string, boolean>
+  >({});
+
   const canvasMeta = useMemo(
     (): CanvasMeta => ({
       nodeTypes: DATABASE_NODE_CANVAS_NODE_TYPES,
@@ -127,9 +134,37 @@ export default function DatabaseNodeCanvasPreview() {
   const canvasState = useMemo(
     () => ({
       edges: DATABASE_NODE_CANVAS_EDGES,
-      nodes: DATABASE_NODE_CANVAS_NODES,
+      nodes: DATABASE_NODE_CANVAS_NODES.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          connections: node.data.connections.map((connection) => {
+            if (connection.kind !== "public") {
+              return connection;
+            }
+
+            const enabled =
+              publicConnectionEnabled[node.id] ??
+              connection.publicAccess.enabled;
+
+            return {
+              ...connection,
+              publicAccess: {
+                ...connection.publicAccess,
+                enabled,
+              },
+            };
+          }),
+          onTogglePublicConnection: (_connection, _index, nextEnabled) => {
+            setPublicConnectionEnabled((current) => ({
+              ...current,
+              [node.id]: nextEnabled,
+            }));
+          },
+        },
+      })),
     }),
-    []
+    [publicConnectionEnabled]
   );
 
   return (

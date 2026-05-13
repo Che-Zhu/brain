@@ -169,7 +169,6 @@ function DatabaseNodeSample({
       defaultExpanded={defaultExpanded}
       interaction={{ dragging, selected }}
       lifecycleActions={lifecycleActions}
-      onCopyConnection={() => undefined}
       onTogglePublicConnection={() => undefined}
       quickActions={quickActions}
       states={states}
