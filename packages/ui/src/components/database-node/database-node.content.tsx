@@ -90,23 +90,8 @@ const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
   { icon: Play, key: "start", label: "Start" },
 ] as const;
 
-const ENGINE_ICON_TONES: Record<string, string> = {
-  mongodb: "text-green-400",
-  mysql: "text-blue-400",
-  postgresql: "text-sky-400",
-  redis: "text-red-400",
-};
-
 function stopNodeControlEvent(event: SyntheticEvent) {
   event.stopPropagation();
-}
-
-function getEngineIconClassName(engineKey: string | undefined) {
-  if (!engineKey) {
-    return "text-zinc-50";
-  }
-
-  return ENGINE_ICON_TONES[engineKey.trim().toLowerCase()] ?? "text-zinc-50";
 }
 
 function formatDatabaseSubtitle({
@@ -242,18 +227,13 @@ export function DatabaseNodeHeaderContent({
     state: { states },
   } = useDatabaseNode();
   const Icon = getDatabaseEngineIcon(states.engineKey);
-  const iconClassName = getEngineIconClassName(states.engineKey);
   const subtitle = formatDatabaseSubtitle(states);
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <Icon
-            aria-hidden
-            className={cn("size-4", iconClassName)}
-            strokeWidth={2}
-          />
+          <Icon aria-hidden className="size-4" strokeWidth={2} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span
