@@ -4,6 +4,7 @@ import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
 import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
 import type {
   DatabaseNodeConnection,
+  DatabaseNodeLifecycleActions,
   DatabaseNodeStates,
 } from "@workspace/ui/components/database-node/database-node";
 import { DatabaseNode } from "@workspace/ui/components/database-node/database-node";
@@ -17,6 +18,13 @@ interface CanvasDatabaseNodeData extends Record<string, unknown> {
   states: DatabaseNodeStates;
 }
 
+const PREVIEW_LIFECYCLE_ACTIONS = {
+  delete: { onClick: () => undefined },
+  restart: { onClick: () => undefined },
+  start: { onClick: () => undefined },
+  stop: { onClick: () => undefined },
+} as const satisfies DatabaseNodeLifecycleActions;
+
 const PreviewCanvasDatabaseNode = memo(function PreviewCanvasDatabaseNode({
   data,
   dragging,
@@ -27,6 +35,7 @@ const PreviewCanvasDatabaseNode = memo(function PreviewCanvasDatabaseNode({
       connections={data.connections}
       defaultExpanded={data.defaultExpanded}
       interaction={{ dragging, selected }}
+      lifecycleActions={PREVIEW_LIFECYCLE_ACTIONS}
       quickActions={{
         console: { onClick: () => undefined },
         logs: { onClick: () => undefined },
