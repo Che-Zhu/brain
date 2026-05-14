@@ -39,15 +39,26 @@ const DISPLAY_ENGINE_BY_KEY: Record<string, string> = {
 
 const VERSION_NUMBER_PATTERN = /\d+(?:\.\d+)+/;
 
-export interface CpuMemoryPercents {
+export interface WorkloadMetricPercents {
   cpuPercent?: number;
   memoryPercent?: number;
+  storagePercent?: number;
+}
+
+function roundedMetricPercent(
+  value: number | string | undefined
+): number | undefined {
+  if (value == null || value === "") {
+    return undefined;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : undefined;
 }
 
 /** Latest sample by `time` (max); falls back to last row if `time` is missing. */
 export function telemetryLatestPercents(
   series: Record<string, number | string>[]
-): CpuMemoryPercents {
+): WorkloadMetricPercents {
   if (series.length === 0) {
     return {};
   }
@@ -64,22 +75,15 @@ export function telemetryLatestPercents(
       best = row;
     }
   }
-  const out: CpuMemoryPercents = {};
-  const cpu = best.cpu;
-  const mem = best.memory;
-  if (cpu != null && cpu !== "") {
-    const n = typeof cpu === "number" ? cpu : Number(cpu);
-    if (Number.isFinite(n)) {
-      out.cpuPercent = Math.round(n * 100) / 100;
-    }
-  }
-  if (mem != null && mem !== "") {
-    const n = typeof mem === "number" ? mem : Number(mem);
-    if (Number.isFinite(n)) {
-      out.memoryPercent = Math.round(n * 100) / 100;
-    }
-  }
-  return out;
+  const cpuPercent = roundedMetricPercent(best.cpu);
+  const memoryPercent = roundedMetricPercent(best.memory);
+  const storagePercent = roundedMetricPercent(best.disk);
+
+  return {
+    ...(cpuPercent === undefined ? {} : { cpuPercent }),
+    ...(memoryPercent === undefined ? {} : { memoryPercent }),
+    ...(storagePercent === undefined ? {} : { storagePercent }),
+  };
 }
 
 /** Map key for merging telemetry into AP/DB workload nodes (`kind:ns:name`). */
@@ -93,8 +97,8 @@ export function telemetryWorkloadKey(
 
 export function apMetricsLookupFromResults(
   results: ApTelemetryMetricsRow[] | undefined
-): Map<string, CpuMemoryPercents> {
-  const map = new Map<string, CpuMemoryPercents>();
+): Map<string, WorkloadMetricPercents> {
+  const map = new Map<string, WorkloadMetricPercents>();
   if (results == null) {
     return map;
   }
@@ -223,8 +227,8 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
 export interface ApsToCanvasStateOptions {
   /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
-  /** Key from {@link telemetryWorkloadKey} → latest CPU/memory % from telemetry. */
-  metricsLookup?: Map<string, CpuMemoryPercents>;
+  /** Key from {@link telemetryWorkloadKey} -> latest workload metric % from telemetry. */
+  metricsLookup?: Map<string, WorkloadMetricPercents>;
   /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
   namespaceFallback?: string;
 }
@@ -232,8 +236,8 @@ export interface ApsToCanvasStateOptions {
 export interface DbsToCanvasStateOptions {
   /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
-  /** Key from {@link telemetryWorkloadKey} -> latest CPU/memory % from telemetry. */
-  metricsLookup?: Map<string, CpuMemoryPercents>;
+  /** Key from {@link telemetryWorkloadKey} -> latest workload metric % from telemetry. */
+  metricsLookup?: Map<string, WorkloadMetricPercents>;
   /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
   namespaceFallback?: string;
 }
@@ -318,6 +322,9 @@ export function dbToDatabaseNodeData(
     ...(telemetry?.memoryPercent === undefined
       ? {}
       : { memory: telemetry.memoryPercent }),
+    ...(telemetry?.storagePercent === undefined
+      ? {}
+      : { storage: telemetry.storagePercent }),
   };
   const formattedVersion = databaseVersionFromResource({
     engineKey,
