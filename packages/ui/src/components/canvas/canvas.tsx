@@ -38,6 +38,11 @@ export interface CanvasRootProps {
   state: Parameters<typeof CanvasProvider>[0]["state"];
 }
 
+const CANVAS_DEFAULT_EDGE_STYLE = {
+  stroke: "var(--color-blue-400)",
+  strokeDasharray: "6 6",
+};
+
 function mergeNodes(prev: Node[], next: Node[]): Node[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
   const merged = next.map((incoming) => {
@@ -83,13 +88,16 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       return {
         ...edge,
         style: {
+          ...CANVAS_DEFAULT_EDGE_STYLE,
           ...prev,
-          stroke: "var(--color-theme-blue)",
+          stroke: CANVAS_DEFAULT_EDGE_STYLE.stroke,
         },
       };
     });
   }, [edges, state.selectedEdge]);
 
+  const userDefaultEdgeOptions = meta.reactFlowProps?.defaultEdgeOptions;
+  const userConnectionLineStyle = meta.reactFlowProps?.connectionLineStyle;
   const passThrough: CanvasReactFlowProps = {
     fitView: true,
     connectionMode: ConnectionMode.Loose,
@@ -100,6 +108,17 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     proOptions: { hideAttribution: true },
     selectNodesOnDrag: false,
     ...meta.reactFlowProps,
+    connectionLineStyle: {
+      ...CANVAS_DEFAULT_EDGE_STYLE,
+      ...(userConnectionLineStyle ?? {}),
+    },
+    defaultEdgeOptions: {
+      ...userDefaultEdgeOptions,
+      style: {
+        ...CANVAS_DEFAULT_EDGE_STYLE,
+        ...(userDefaultEdgeOptions?.style ?? {}),
+      },
+    },
   };
 
   return (
