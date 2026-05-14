@@ -488,6 +488,7 @@ spec:
               namespace: {{ $ns }}
             status:
               phase: {{ $kbCluster.status.phase | default "Unknown" }}
+              clusterVersionRef: {{ $redisVersion | quote }}
               observedReplicas: {{ $kbCluster.status.observedReplicas | default 0 }}
               availableReplicas: {{ $kbCluster.status.availableReplicas | default 0 }}
               kubeblocksServices:

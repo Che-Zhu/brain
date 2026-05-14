@@ -158,6 +158,9 @@ spec:
             properties:
               phase:
                 type: string
+              clusterVersionRef:
+                type: string
+                description: Observed KubeBlocks Cluster version reference used by the composed database Cluster.
               observedReplicas:
                 type: integer
               availableReplicas:

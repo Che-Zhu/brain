@@ -37,6 +37,8 @@ const DISPLAY_ENGINE_BY_KEY: Record<string, string> = {
   redis: "Redis",
 };
 
+const VERSION_NUMBER_PATTERN = /\d+(?:\.\d+)+/;
+
 export interface CpuMemoryPercents {
   cpuPercent?: number;
   memoryPercent?: number;
@@ -138,6 +140,39 @@ function displayEngineFromKey(engineKey: string | undefined): string {
   }
   const normalized = engineKey.toLowerCase();
   return DISPLAY_ENGINE_BY_KEY[normalized] ?? engineKey;
+}
+
+function formatDatabaseVersion(
+  rawVersion: string | undefined,
+  engineKey: string | undefined
+): string | undefined {
+  const version = nonEmptyString(rawVersion);
+  if (version === undefined) {
+    return undefined;
+  }
+
+  const numericVersion = version.match(VERSION_NUMBER_PATTERN)?.[0] ?? version;
+  if (
+    engineKey?.toLowerCase() === "postgresql" &&
+    numericVersion.endsWith(".0")
+  ) {
+    return numericVersion.slice(0, -2);
+  }
+
+  return numericVersion;
+}
+
+function databaseVersionFromResource({
+  engineKey,
+  status,
+}: {
+  engineKey: string | undefined;
+  status: Record<string, unknown>;
+}): string | undefined {
+  return formatDatabaseVersion(
+    nonEmptyString(status.clusterVersionRef),
+    engineKey
+  );
 }
 
 /**
@@ -284,12 +319,17 @@ export function dbToDatabaseNodeData(
       ? {}
       : { memory: telemetry.memoryPercent }),
   };
+  const formattedVersion = databaseVersionFromResource({
+    engineKey,
+    status,
+  });
 
   const states: DatabaseNodeStates = {
     displayEngine: displayEngineFromKey(engineKey),
     ...(engineKey === undefined
       ? {}
       : { engineKey: engineKey as DatabaseEngineKey }),
+    ...(formattedVersion === undefined ? {} : { formattedVersion }),
     metrics,
     name,
     status: { label, tone },
