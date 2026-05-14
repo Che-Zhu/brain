@@ -540,6 +540,9 @@ spec:
                   name: {{ $name }}
                   namespace: {{ $ns }}
                   labels:
+                    {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+                    region: {{ index .observed.composite.resource.metadata.labels "region" | quote }}
+                    {{- end }}
                     crossplane.io/project-name: {{ $projectName | quote }}
                     crossplane.io/project-uid: {{ $projectUid | quote }}
                   ownerReferences:

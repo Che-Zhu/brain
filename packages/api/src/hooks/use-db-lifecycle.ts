@@ -25,6 +25,8 @@ export type DbLifecycleActionKey =
   | "start"
   | "stop";
 
+export type DbPublicAccessPendingTarget = boolean | undefined;
+
 function workloadKey(workload: DbLifecycleWorkloadRef): string {
   return `${workload.namespace.trim()}/${workload.name.trim()}`;
 }
@@ -83,6 +85,9 @@ export function useDbLifecycleOperations(options: UseDbLifecycleOptions) {
   const kubeconfig = options.kubeconfig ?? "";
   const shareToken = options.shareToken ?? "";
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
+  const [publicAccessPendingTargets, setPublicAccessPendingTargets] = useState<
+    Map<string, boolean>
+  >(() => new Map());
 
   const headers = useMemo((): Record<string, string> => {
     const st = shareToken.trim();
@@ -132,8 +137,30 @@ export function useDbLifecycleOperations(options: UseDbLifecycleOptions) {
 
   const isToggling = useCallback(
     (workload: DbLifecycleWorkloadRef) =>
-      loadingKeys.has(workloadActionKey(workload, "public-access")),
-    [loadingKeys]
+      loadingKeys.has(workloadActionKey(workload, "public-access")) ||
+      publicAccessPendingTargets.has(workloadKey(workload)),
+    [loadingKeys, publicAccessPendingTargets]
+  );
+
+  const getPublicAccessPendingTarget = useCallback(
+    (workload: DbLifecycleWorkloadRef): DbPublicAccessPendingTarget =>
+      publicAccessPendingTargets.get(workloadKey(workload)),
+    [publicAccessPendingTargets]
+  );
+
+  const clearPublicAccessPendingTarget = useCallback(
+    (workload: DbLifecycleWorkloadRef) => {
+      const key = workloadKey(workload);
+      setPublicAccessPendingTargets((prev) => {
+        if (!prev.has(key)) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    },
+    []
   );
 
   const assertAuthReady = useCallback(() => {
@@ -214,18 +241,41 @@ export function useDbLifecycleOperations(options: UseDbLifecycleOptions) {
     async (workload: DbLifecycleWorkloadRef, nextEnabled: boolean) => {
       assertAuthReady();
       validateWorkload(workload);
-      await runWithLoading(workload, "public-access", async () => {
-        await mergePatchDb(base, headers, workload, {
-          spec: { exposeNodePort: nextEnabled },
-        });
+      setPublicAccessPendingTargets((prev) => {
+        const key = workloadKey(workload);
+        if (prev.get(key) === nextEnabled) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.set(key, nextEnabled);
+        return next;
       });
+
+      try {
+        await runWithLoading(workload, "public-access", async () => {
+          await mergePatchDb(base, headers, workload, {
+            spec: { exposeNodePort: nextEnabled },
+          });
+        });
+      } catch (error) {
+        clearPublicAccessPendingTarget(workload);
+        throw error;
+      }
     },
-    [assertAuthReady, base, headers, runWithLoading]
+    [
+      assertAuthReady,
+      base,
+      clearPublicAccessPendingTarget,
+      headers,
+      runWithLoading,
+    ]
   );
 
   return {
     authReady,
+    clearPublicAccessPendingTarget,
     deleteWorkload,
+    getPublicAccessPendingTarget,
     isLoading,
     isToggling,
     restartWorkload,

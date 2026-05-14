@@ -14,6 +14,7 @@ export { useApsK8sList } from "./use-aps-k8s-list";
 export {
   type DbLifecycleActionKey,
   type DbLifecycleWorkloadRef,
+  type DbPublicAccessPendingTarget,
   type UseDbLifecycleOptions,
   useDbLifecycleOperations,
 } from "./use-db-lifecycle";

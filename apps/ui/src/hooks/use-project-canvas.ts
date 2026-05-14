@@ -19,6 +19,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
+import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
@@ -75,9 +76,10 @@ export function useProjectCanvas(
   });
   const {
     authReady: dbAuthReady,
+    clearPublicAccessPendingTarget,
     deleteWorkload: deleteDbWorkload,
+    getPublicAccessPendingTarget,
     isLoading: isDbLifecycleLoading,
-    isToggling: isDbPublicAccessToggling,
     restartWorkload: restartDbWorkload,
     startWorkload: startDbWorkload,
     stopWorkload: stopDbWorkload,
@@ -100,15 +102,20 @@ export function useProjectCanvas(
   const runMutationThenRefresh = useCallback(
     (
       mutation: () => Promise<unknown>,
-      copy: { loading: string; success: string }
+      copy: { loading: string; success: string },
+      options?: { onSettled?: () => void }
     ) => {
       toast.promise(
         (async (): Promise<void> => {
-          await mutation();
           try {
-            await afterLifecycle();
-          } catch {
-            //
+            await mutation();
+            try {
+              await afterLifecycle();
+            } catch {
+              //
+            }
+          } finally {
+            options?.onSettled?.();
           }
         })(),
         {
@@ -147,20 +154,11 @@ export function useProjectCanvas(
       const canTogglePublicAccess =
         dbAuthReady && name !== "" && namespace !== "";
       const canUseLifecycle = dbAuthReady && name !== "" && namespace !== "";
-      const publicAccessLoading = isDbPublicAccessToggling(workload);
-      const connections = publicAccessLoading
-        ? data.connections.map((connection) =>
-            connection.kind === "public"
-              ? {
-                  ...connection,
-                  publicAccess: {
-                    ...connection.publicAccess,
-                    loading: true,
-                  },
-                }
-              : connection
-          )
-        : data.connections;
+      const publicAccessPendingTarget = getPublicAccessPendingTarget(workload);
+      const connections = resolveDatabasePublicConnections(
+        data.connections,
+        publicAccessPendingTarget
+      );
       const togglePublicConnection:
         | DatabaseNodeTogglePublicConnectionHandler
         | undefined = canTogglePublicAccess
@@ -174,6 +172,9 @@ export function useProjectCanvas(
                 success: nextEnabled
                   ? `Enabled public access for "${name}"`
                   : `Disabled public access for "${name}"`,
+              },
+              {
+                onSettled: () => clearPublicAccessPendingTarget(workload),
               }
             );
           }
@@ -234,10 +235,11 @@ export function useProjectCanvas(
     },
     [
       copyDatabaseConnection,
+      clearPublicAccessPendingTarget,
       dbAuthReady,
       deleteDbWorkload,
+      getPublicAccessPendingTarget,
       isDbLifecycleLoading,
-      isDbPublicAccessToggling,
       restartDbWorkload,
       runMutationThenRefresh,
       startDbWorkload,

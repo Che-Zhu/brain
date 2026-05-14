@@ -245,6 +245,10 @@ export function DatabaseNodeConnectionRow({
   const { actions } = useDatabaseNode();
   const copyable = canCopyDatabaseNodeConnection(connection);
   const displayValue = getConnectionDisplayValue(connection);
+  const connectionTitle =
+    connection.kind === "public"
+      ? (displayValue ?? undefined)
+      : (connection.value ?? displayValue ?? undefined);
   const rowKey = getDatabaseNodeConnectionKey(connection, index);
   const publicSwitch =
     connection.kind === "public" ? (
@@ -271,7 +275,7 @@ export function DatabaseNodeConnectionRow({
           : undefined
       }
       rowKey={rowKey}
-      title={connection.value}
+      title={connectionTitle}
     >
       {({ copied, copyable: rowCopyable }) => (
         <>
@@ -297,7 +301,7 @@ export function DatabaseNodeConnectionRow({
               )}
               data-copied={copied ? "true" : undefined}
               data-slot="database-node-connection-value"
-              title={connection.value ?? displayValue}
+              title={connectionTitle}
             >
               <span className="min-w-0 truncate">{displayValue}</span>
               <CanvasNode.CopyableRowIndicator />
