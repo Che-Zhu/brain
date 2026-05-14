@@ -10,6 +10,7 @@ import type {
 } from "@workspace/ui/components/canvas/canvas.types";
 import type {
   DatabaseNodeCopyConnectionHandler,
+  DatabaseNodeLifecycleActionKey,
   DatabaseNodeTogglePublicConnectionHandler,
 } from "@workspace/ui/components/database-node/database-node";
 import type { Edge, Node } from "@xyflow/react";
@@ -74,7 +75,12 @@ export function useProjectCanvas(
   });
   const {
     authReady: dbAuthReady,
+    deleteWorkload: deleteDbWorkload,
+    isLoading: isDbLifecycleLoading,
     isToggling: isDbPublicAccessToggling,
+    restartWorkload: restartDbWorkload,
+    startWorkload: startDbWorkload,
+    stopWorkload: stopDbWorkload,
     togglePublicAccess,
   } = useDbLifecycleOperations({
     kubeconfig: options?.kubeconfig,
@@ -140,6 +146,7 @@ export function useProjectCanvas(
       const namespace = workload.namespace.trim();
       const canTogglePublicAccess =
         dbAuthReady && name !== "" && namespace !== "";
+      const canUseLifecycle = dbAuthReady && name !== "" && namespace !== "";
       const publicAccessLoading = isDbPublicAccessToggling(workload);
       const connections = publicAccessLoading
         ? data.connections.map((connection) =>
@@ -171,6 +178,43 @@ export function useProjectCanvas(
             );
           }
         : undefined;
+      const dbLifecycleAction = (
+        action: DatabaseNodeLifecycleActionKey,
+        mutation: () => Promise<unknown>,
+        copy: { loading: string; success: string }
+      ) => ({
+        loading: isDbLifecycleLoading(workload, action),
+        onClick: () => runMutationThenRefresh(mutation, copy),
+      });
+      const displayName = data.states.name || name;
+      const lifecycleActions = canUseLifecycle
+        ? {
+            delete: dbLifecycleAction(
+              "delete",
+              () => deleteDbWorkload(workload),
+              {
+                loading: `Deleting "${displayName}"...`,
+                success: `Deleted "${displayName}"`,
+              }
+            ),
+            restart: dbLifecycleAction(
+              "restart",
+              () => restartDbWorkload(workload),
+              {
+                loading: `Restarting "${displayName}"...`,
+                success: `Restart requested for "${displayName}"`,
+              }
+            ),
+            start: dbLifecycleAction("start", () => startDbWorkload(workload), {
+              loading: `Starting "${displayName}"...`,
+              success: `Started "${displayName}"`,
+            }),
+            stop: dbLifecycleAction("stop", () => stopDbWorkload(workload), {
+              loading: `Stopping "${displayName}"...`,
+              success: `Stopped "${displayName}"`,
+            }),
+          }
+        : undefined;
 
       return {
         ...node,
@@ -182,6 +226,7 @@ export function useProjectCanvas(
             ...(togglePublicConnection === undefined
               ? {}
               : { togglePublicConnection }),
+            ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
           },
           connections,
         },
@@ -190,8 +235,13 @@ export function useProjectCanvas(
     [
       copyDatabaseConnection,
       dbAuthReady,
+      deleteDbWorkload,
+      isDbLifecycleLoading,
       isDbPublicAccessToggling,
+      restartDbWorkload,
       runMutationThenRefresh,
+      startDbWorkload,
+      stopDbWorkload,
       togglePublicAccess,
     ]
   );

@@ -27,6 +27,7 @@ export type DatabaseNodeStatusTone =
   | "failed"
   | "inaccessible"
   | "not-configured"
+  | "paused"
   | "pending"
   | "progressing"
   | "ready"

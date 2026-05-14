@@ -43,6 +43,7 @@ const statusSamples: {
   title: string;
 }[] = [
   { status: { label: "Running", tone: "running" }, title: "Running" },
+  { status: { label: "Paused", tone: "paused" }, title: "Paused" },
   { status: { label: "Pending", tone: "pending" }, title: "Pending" },
   { status: { label: "Deleting", tone: "deleting" }, title: "Deleting" },
   { status: { label: "Failed", tone: "failed" }, title: "Failed" },
@@ -146,6 +147,20 @@ const loadingLifecycleActions = {
   restart: { loading: true, onClick: () => undefined },
   start: { onClick: () => undefined },
   stop: { onClick: () => undefined },
+} satisfies Record<string, DatabaseNodeAction>;
+
+const enabledLifecycleActions = {
+  delete: { onClick: () => undefined },
+  restart: { onClick: () => undefined },
+  start: { onClick: () => undefined },
+  stop: { onClick: () => undefined },
+} satisfies Record<string, DatabaseNodeAction>;
+
+const disabledLifecycleActions = {
+  delete: { disabled: true, onClick: () => undefined },
+  restart: { disabled: true, onClick: () => undefined },
+  start: { disabled: true, onClick: () => undefined },
+  stop: { disabled: true, onClick: () => undefined },
 } satisfies Record<string, DatabaseNodeAction>;
 
 function PreviewSurface({ children }: { children: ReactNode }) {
@@ -345,6 +360,49 @@ export default function DatabaseNodePreview() {
             defaultExpanded
             lifecycleActions={loadingLifecycleActions}
             quickActions={loadingQuickActions}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Lifecycle disabled">
+        <PreviewSurface>
+          <DatabaseNodeSample
+            defaultExpanded
+            lifecycleActions={disabledLifecycleActions}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Lifecycle paused">
+        <PreviewSurface>
+          <DatabaseNodeSample
+            defaultExpanded
+            lifecycleActions={enabledLifecycleActions}
+            states={{
+              ...baseStates,
+              name: "orders-paused",
+              status: { label: "Paused", tone: "paused" },
+            }}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Lifecycle failed">
+        <PreviewSurface>
+          <DatabaseNodeSample
+            defaultExpanded
+            lifecycleActions={enabledLifecycleActions}
+            states={{
+              ...baseStates,
+              name: "orders-failed",
+              status: { label: "Failed", tone: "failed" },
+            }}
+          />
+        </PreviewSurface>
+      </Preview>
+      <Preview title="Delete confirmation">
+        <PreviewSurface>
+          <DatabaseNode.DeleteDialogPanel
+            name="orders-api"
+            onCancel={() => undefined}
+            onConfirmDelete={() => undefined}
           />
         </PreviewSurface>
       </Preview>

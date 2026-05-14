@@ -15,11 +15,13 @@ import {
   SquareTerminal,
   Trash2,
 } from "lucide-react";
-import type { ComponentType, SVGProps } from "react";
+import { type ComponentType, type SVGProps, useState } from "react";
 
 import { getDatabaseEngineIcon } from "./database-engine-icons";
 import { useDatabaseNode } from "./database-node.context";
+import { DatabaseNodeDeleteDialog } from "./database-node.delete-dialog";
 import { maskDatabaseConnectionString } from "./database-node.mask";
+import { databaseNodeLifecycleMenuVisibility } from "./database-node.menu-visibility";
 import {
   canCopyDatabaseNodeConnection,
   getDatabaseNodeConnectionKey,
@@ -61,11 +63,16 @@ interface LifecycleActionItem {
 }
 
 const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
+  { icon: Play, key: "start", label: "Start", tone: "success" },
+  { icon: Pause, key: "stop", label: "Stop", tone: "muted" },
   { icon: RotateCcw, key: "restart", label: "Restart", tone: "info" },
   { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
-  { icon: Pause, key: "stop", label: "Stop", tone: "muted" },
-  { icon: Play, key: "start", label: "Start", tone: "success" },
 ] as const;
+
+const DATABASE_METRIC_PERCENT_FORMATTER = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+const DATABASE_METRIC_PERCENT_PATTERN = /^(-?\d+(?:\.\d+)?)\s*%$/;
 
 function formatDatabaseSubtitle({
   displayEngine,
@@ -77,14 +84,29 @@ function formatDatabaseSubtitle({
   return `Database ${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
+function formatDatabaseMetricPercent(value: number) {
+  return Number.isFinite(value)
+    ? `${DATABASE_METRIC_PERCENT_FORMATTER.format(value)}%`
+    : "--";
+}
+
 function formatDatabaseMetricValue(value: number | string | undefined) {
   if (typeof value === "number") {
-    return `${value}%`;
+    return formatDatabaseMetricPercent(value);
   }
 
   const trimmed = value?.trim();
 
-  return trimmed || "--";
+  if (!trimmed) {
+    return "--";
+  }
+
+  const percentMatch = DATABASE_METRIC_PERCENT_PATTERN.exec(trimmed);
+  if (percentMatch) {
+    return formatDatabaseMetricPercent(Number(percentMatch[1]));
+  }
+
+  return trimmed;
 }
 
 function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
@@ -392,26 +414,55 @@ export function DatabaseNodeFooterContent({
 function DatabaseNodeHeaderMenu() {
   const {
     actions: { lifecycleActions },
+    state: {
+      states: { name, status },
+    },
   } = useDatabaseNode();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const { showRestart, showStart, showStop } =
+    databaseNodeLifecycleMenuVisibility(status?.tone ?? status?.label);
+  const deleteAction = lifecycleActions?.delete;
 
   return (
-    <CanvasNode.ActionMenu aria-label="Open database actions">
-      {LIFECYCLE_ACTION_ITEMS.map((item) => {
-        const action = lifecycleActions?.[item.key];
-        const Icon = item.icon;
+    <>
+      <CanvasNode.ActionMenu aria-label="Open database actions">
+        {LIFECYCLE_ACTION_ITEMS.map((item) => {
+          if (item.key === "start" && !showStart) {
+            return null;
+          }
+          if (item.key === "stop" && !showStop) {
+            return null;
+          }
+          if (item.key === "restart" && !showRestart) {
+            return null;
+          }
 
-        return (
-          <CanvasNode.ActionMenuItem
-            action={action}
-            actionKey={item.key}
-            icon={<Icon aria-hidden className="size-4" />}
-            key={item.key}
-            tone={item.tone}
-          >
-            {item.label}
-          </CanvasNode.ActionMenuItem>
-        );
-      })}
-    </CanvasNode.ActionMenu>
+          const action = lifecycleActions?.[item.key];
+          const menuAction =
+            item.key === "delete" && action != null
+              ? { ...action, onClick: () => setDeleteDialogOpen(true) }
+              : action;
+          const Icon = item.icon;
+
+          return (
+            <CanvasNode.ActionMenuItem
+              action={menuAction}
+              actionKey={item.key}
+              icon={<Icon aria-hidden className="size-4" />}
+              key={item.key}
+              tone={item.tone}
+            >
+              {item.label}
+            </CanvasNode.ActionMenuItem>
+          );
+        })}
+      </CanvasNode.ActionMenu>
+      <DatabaseNodeDeleteDialog
+        name={name}
+        onConfirmDelete={deleteAction?.onClick}
+        onOpenChange={setDeleteDialogOpen}
+        open={deleteDialogOpen}
+      />
+    </>
   );
 }

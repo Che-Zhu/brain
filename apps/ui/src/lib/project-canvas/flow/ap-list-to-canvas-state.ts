@@ -302,7 +302,8 @@ export function dbToDatabaseNodeData(
   const namespace = metadataNamespace(db) ?? options?.namespaceFallback ?? "";
   const uid = metadataUid(db);
   const engineKey = nonEmptyString(spec.engine);
-  const phaseRaw = nonEmptyString(status.phase) ?? "";
+  const phaseRaw =
+    spec.paused === true ? "Paused" : (nonEmptyString(status.phase) ?? "");
   const label = phaseRaw === "" ? "Unknown" : phaseRaw;
   const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
   const tone = getToneForStatus(phaseForTone) ?? "pending";

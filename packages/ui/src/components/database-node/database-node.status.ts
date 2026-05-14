@@ -34,6 +34,7 @@ const NEGATIVE_STATUSES = new Set([
 
 const NEUTRAL_STATUSES = new Set([
   "not-configured",
+  "paused",
   "shutdown",
   "stopped",
   "suspended",

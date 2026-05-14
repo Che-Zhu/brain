@@ -51,6 +51,9 @@ export const API_ROUTES = {
     /** GET list/get, PUT create, PATCH update, DELETE — group root. */
     root: "/api/db/v1alpha1",
     backup: "/api/db/v1alpha1/backup",
+    restart: "/api/db/v1alpha1/restart",
+    start: "/api/db/v1alpha1/start",
+    stop: "/api/db/v1alpha1/stop",
   },
 
   task: {

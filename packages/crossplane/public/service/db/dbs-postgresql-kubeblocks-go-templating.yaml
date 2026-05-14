@@ -242,6 +242,12 @@ spec:
             {{ if hasKey .observed.composite.resource.spec "exposeNodePort" }}
             {{ $exposeNodePort = .observed.composite.resource.spec.exposeNodePort }}
             {{ end }}
+            {{ $paused := false }}
+            {{ if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
+            {{ $desiredReplicas := $spec.replicas | default 1 }}
+            {{ if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
+            {{ $restartRequest := 0 }}
+            {{ if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
 
             metadata:
               namespace: {{ $ns }}
@@ -299,7 +305,7 @@ spec:
               - name: postgresql
                 componentDefRef: postgresql
                 monitor: true
-                replicas: {{ .observed.composite.resource.spec.replicas | default 1 }}
+                replicas: {{ $desiredReplicas }}
 
                 resources:
                   requests:
@@ -328,6 +334,37 @@ spec:
 
               terminationPolicy: {{ .observed.composite.resource.spec.terminationPolicy | default "Delete" | replace "Wipeout" "WipeOut" }}
               tolerations: []
+
+            {{ if gt $restartRequest 0 }}
+            ---
+
+            apiVersion: apps.kubeblocks.io/v1alpha1
+            kind: OpsRequest
+            metadata:
+              name: {{ printf "%s-restart-%d" $name $restartRequest }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kubeblocks-restart-opsrequest
+              labels:
+                crossplane.io/composite: {{ $name }}
+                {{ if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ end }}
+                {{ if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: DB
+                name: {{ $name }}
+                uid: {{ $dbUid }}
+            spec:
+              clusterName: {{ $name }}
+              type: Restart
+              restart:
+              - componentName: postgresql
+              ttlSecondsAfterSucceed: 30
+            {{ end }}
 
             {{ if $exposeNodePort }}
             ---
@@ -466,7 +503,7 @@ spec:
               name: {{ $name }}
               namespace: {{ $ns }}
             status:
-              phase: {{ $kbCluster.status.phase | default "Unknown" }}
+              phase: {{ if $paused }}Paused{{ else }}{{ $kbCluster.status.phase | default "Unknown" }}{{ end }}
               clusterVersionRef: {{ $clusterVersion | quote }}
               observedReplicas: {{ $kbCluster.status.observedReplicas | default 0 }}
               availableReplicas: {{ $kbCluster.status.availableReplicas | default 0 }}
@@ -496,7 +533,7 @@ spec:
               {{ end }}
               conditions:
                 - type: Ready
-                  status: {{ if eq $kbCluster.status.phase "Running" }}"True"{{ else }}"False"{{ end }}
-                  reason: {{ $kbCluster.status.phase | default "Waiting" }}
-                  message: 'KubeBlocks Cluster phase is {{ $kbCluster.status.phase | default "Unknown" }}'
+                  status: {{ if $paused }}"False"{{ else if eq $kbCluster.status.phase "Running" }}"True"{{ else }}"False"{{ end }}
+                  reason: {{ if $paused }}Paused{{ else }}{{ $kbCluster.status.phase | default "Waiting" }}{{ end }}
+                  message: {{ if $paused }}'DB is paused by spec.paused'{{ else }}'KubeBlocks Cluster phase is {{ $kbCluster.status.phase | default "Unknown" }}'{{ end }}
                   lastTransitionTime: {{ $lastTransition }}

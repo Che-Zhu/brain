@@ -66,7 +66,23 @@ spec:
                 replicas:
                   type: integer
                   default: 1
-                  description: KubeBlocks Cluster replica count for the primary component (default 1).
+                  description: KubeBlocks Cluster replica count for the primary component when running (default 1). Preserved while spec.paused is true.
+                paused:
+                  type: boolean
+                  default: false
+                  description: >
+                    Lifecycle flag for Start/Stop. When true, the active composition scales database
+                    compute components to zero while preserving data, configuration, and spec.replicas.
+                    When false, the composition renders the configured spec.replicas value.
+                restartRequest:
+                  type: integer
+                  default: 0
+                  minimum: 0
+                  description: >
+                    Non-negative declarative restart request counter. Incrementing the value causes
+                    the active composition to render a KubeBlocks Restart OpsRequest for the database
+                    component. API clients should prefer POST /api/db/v1alpha1/restart so the server
+                    reads and increments the current value.
                 storageSize:
                   type: string
                   description: >

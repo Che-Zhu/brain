@@ -12,6 +12,7 @@ export {
 } from "./use-ap-telemetry-metrics";
 export { useApsK8sList } from "./use-aps-k8s-list";
 export {
+  type DbLifecycleActionKey,
   type DbLifecycleWorkloadRef,
   type UseDbLifecycleOptions,
   useDbLifecycleOperations,

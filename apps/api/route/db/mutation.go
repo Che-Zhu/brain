@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/yaml"
 
 	"sealos/api/middleware"
@@ -170,12 +172,152 @@ func registerBackup(grp huma.API) {
 	})
 }
 
+type dbLifecycleBody struct {
+	Name      string `json:"name" required:"true" doc:"DB claim metadata.name."`
+	Namespace string `json:"namespace" doc:"Namespace of the DB (default from kubeconfig; admin can override)."`
+}
+
+type dbLifecycleInput struct {
+	middleware.AuthInput
+	Body dbLifecycleBody
+}
+
+type dbLifecycleOutput struct {
+	Body json.RawMessage
+}
+
+func registerStart(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-start",
+		Method:      http.MethodPost,
+		Path:        "/start",
+		Summary:     "Start DB workload",
+		Description: "Starts a DB by patching only `spec.paused=false` on the DB claim. The configured `spec.replicas` value is preserved and used by the composition when unpaused.",
+		Tags:        []string{"DB"},
+	}, func(ctx context.Context, input *dbLifecycleInput) (*dbLifecycleOutput, error) {
+		patch, err := dbsvc.DBPausedPatch(false)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to build DB start patch", err)
+		}
+		return patchLifecycleDB(input, patch, "start")
+	})
+}
+
+func registerStop(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-stop",
+		Method:      http.MethodPost,
+		Path:        "/stop",
+		Summary:     "Stop DB workload",
+		Description: "Stops a DB by patching only `spec.paused=true` on the DB claim. Data, configuration, and the configured `spec.replicas` value are preserved.",
+		Tags:        []string{"DB"},
+	}, func(ctx context.Context, input *dbLifecycleInput) (*dbLifecycleOutput, error) {
+		patch, err := dbsvc.DBPausedPatch(true)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to build DB stop patch", err)
+		}
+		return patchLifecycleDB(input, patch, "stop")
+	})
+}
+
+func registerRestart(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "db-restart",
+		Method:      http.MethodPost,
+		Path:        "/restart",
+		Summary:     "Restart DB workload",
+		Description: "Requests a declarative DB restart by reading the current DB claim, incrementing `spec.restartRequest` server-side, and patching the next counter value. The DB composition turns counter changes into a KubeBlocks Restart OpsRequest.",
+		Tags:        []string{"DB"},
+	}, func(ctx context.Context, input *dbLifecycleInput) (*dbLifecycleOutput, error) {
+		cfg, name, namespace, err := lifecycleDBContext(input)
+		if err != nil {
+			return nil, err
+		}
+
+		current, err := k8ssvc.Get(cfg, k8ssvc.GetOptions{
+			Resource:  "dbs",
+			Name:      name,
+			Namespace: namespace,
+		})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, huma.Error404NotFound("DB not found", err)
+			}
+			return nil, huma.Error500InternalServerError("failed to read DB for restart", err)
+		}
+
+		patch, err := dbsvc.DBRestartPatch(current)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid DB restartRequest", err)
+		}
+		jsonBytes, err := k8ssvc.Patch(cfg, k8ssvc.PatchOptions{
+			Resource:  "dbs",
+			Name:      name,
+			Namespace: namespace,
+			PatchType: k8ssvc.PatchTypeMerge,
+			Patch:     patch,
+		})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, huma.Error404NotFound("DB not found", err)
+			}
+			return nil, huma.Error500InternalServerError("failed to restart DB", err)
+		}
+		return &dbLifecycleOutput{Body: json.RawMessage(jsonBytes)}, nil
+	})
+}
+
+func patchLifecycleDB(input *dbLifecycleInput, patch []byte, action string) (*dbLifecycleOutput, error) {
+	cfg, name, namespace, err := lifecycleDBContext(input)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBytes, err := k8ssvc.Patch(cfg, k8ssvc.PatchOptions{
+		Resource:  "dbs",
+		Name:      name,
+		Namespace: namespace,
+		PatchType: k8ssvc.PatchTypeMerge,
+		Patch:     patch,
+	})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, huma.Error404NotFound("DB not found", err)
+		}
+		return nil, huma.Error500InternalServerError("failed to "+action+" DB", err)
+	}
+	return &dbLifecycleOutput{Body: json.RawMessage(jsonBytes)}, nil
+}
+
+func lifecycleDBContext(input *dbLifecycleInput) (*clientcmdapi.Config, string, string, error) {
+	_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
+	if err != nil {
+		return nil, "", "", huma.Error400BadRequest("invalid kubeconfig", err)
+	}
+	name := strings.TrimSpace(input.Body.Name)
+	if name == "" {
+		return nil, "", "", huma.Error400BadRequest("name is required", nil)
+	}
+
+	gvr := middleware.PodsGVR()
+	resolved, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+		Namespace:        input.Body.Namespace,
+		AllNamespaces:    false,
+		DefaultNamespace: "",
+		AdminCheckGVR:    &gvr,
+	})
+	if err != nil {
+		return nil, "", "", huma.Error500InternalServerError("failed to resolve request context", err)
+	}
+	return cfg, name, resolved.Namespace, nil
+}
+
 func registerUpdate(grp huma.API) {
 	type dbUpdateInput struct {
 		middleware.AuthInput
 		Name      string          `query:"name" required:"true" doc:"DB instance name to patch"`
 		Namespace string          `query:"namespace" doc:"Namespace (default from kubeconfig; admin can override)"`
-		Body      json.RawMessage `contentType:"application/json" required:"true" doc:"JSON merge patch body applied to the DB resource.\n\nWhat to patch:\n- spec.quota: switch preset xs|s|m|l (recomputes quota preset defaults unless overridden fields remain).\n- spec.replicas: scale the database cluster.\n- spec.storageSize: change PVC storage (may require expansion support).\n- spec.cpuRequest / spec.memoryRequest: resource requests.\n- spec.cpuLimit / spec.memoryLimit: resource limits.\n- spec.storageClassName: StorageClass for PVCs.\n- spec.terminationPolicy: Delete or WipeOut.\n- spec.exposeNodePort: enable or disable NodePort Service {name}-export (boolean).\n- spec.scheduledBackup: cron, enabled, retentionPeriod, repoName (MongoDB) for KubeBlocks automated backups.\n\nPatch examples:\n- Scale replicas: {\"spec\":{\"replicas\":2}}\n- Larger quota: {\"spec\":{\"quota\":\"m\"}}\n- Expose via NodePort: {\"spec\":{\"exposeNodePort\":true}}\n- Update resources: {\"spec\":{\"cpuLimit\":\"2000m\",\"memoryLimit\":\"4Gi\"}}\n- Change storage: {\"spec\":{\"storageSize\":\"20Gi\"}}\n- Backup schedule: {\"spec\":{\"scheduledBackup\":{\"cronExpression\":\"0 2 * * *\",\"retentionPeriod\":\"7d\"}}}\n\nPatch semantics:\n- Only the fields you send are changed.\n- For nested objects like spec, send the subtree you want to modify."`
+		Body      json.RawMessage `contentType:"application/json" required:"true" doc:"JSON merge patch body applied to the DB resource.\n\nWhat to patch:\n- spec.quota: switch preset xs|s|m|l (recomputes quota preset defaults unless overridden fields remain).\n- spec.replicas: desired database replica count when running; preserved while spec.paused is true.\n- spec.paused: lifecycle flag; true stops DB compute, false resumes using spec.replicas.\n- spec.restartRequest: non-negative lifecycle counter; prefer POST /restart so the server increments it.\n- spec.storageSize: change PVC storage (may require expansion support).\n- spec.cpuRequest / spec.memoryRequest: resource requests.\n- spec.cpuLimit / spec.memoryLimit: resource limits.\n- spec.storageClassName: StorageClass for PVCs.\n- spec.terminationPolicy: Delete or WipeOut.\n- spec.exposeNodePort: enable or disable NodePort Service {name}-export (boolean).\n- spec.scheduledBackup: cron, enabled, retentionPeriod, repoName (MongoDB) for KubeBlocks automated backups.\n\nPatch examples:\n- Stop: {\"spec\":{\"paused\":true}}\n- Start: {\"spec\":{\"paused\":false}}\n- Scale replicas: {\"spec\":{\"replicas\":2}}\n- Larger quota: {\"spec\":{\"quota\":\"m\"}}\n- Expose via NodePort: {\"spec\":{\"exposeNodePort\":true}}\n- Update resources: {\"spec\":{\"cpuLimit\":\"2000m\",\"memoryLimit\":\"4Gi\"}}\n- Change storage: {\"spec\":{\"storageSize\":\"20Gi\"}}\n- Backup schedule: {\"spec\":{\"scheduledBackup\":{\"cronExpression\":\"0 2 * * *\",\"retentionPeriod\":\"7d\"}}}\n\nPatch semantics:\n- Only the fields you send are changed.\n- For nested objects like spec, send the subtree you want to modify."`
 	}
 	type dbUpdateOutput struct {
 		Body json.RawMessage
@@ -186,7 +328,7 @@ func registerUpdate(grp huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/",
 		Summary:     "Update DB",
-		Description: "Patch a DB instance by name.\n\nRequest parameter usage:\n- `name` is required and selects the DB to patch.\n- `namespace` is optional; admins can use it to target a different namespace.\n- The request body must be a JSON merge patch fragment for the DB resource.\n\nPatch semantics:\n- Only the fields present in the patch body are changed.\n- Nested objects are merged at the subtree you provide.\n\nCommon patch targets:\n- `spec.quota`: resource preset xs|s|m|l.\n- `spec.replicas`: scale the database cluster.\n- `spec.storageSize`: change PVC storage.\n- `spec.cpuRequest` / `spec.memoryRequest`: resource requests.\n- `spec.cpuLimit` / `spec.memoryLimit`: resource limits.\n- `spec.storageClassName`: StorageClass for PVCs.\n- `spec.terminationPolicy`: Delete or WipeOut.\n- `spec.exposeNodePort`: toggle NodePort Service `{metadata.name}-export`.\n- `spec.scheduledBackup`: automated backup cron/retention/repo (KubeBlocks).",
+		Description: "Patch a DB instance by name.\n\nRequest parameter usage:\n- `name` is required and selects the DB to patch.\n- `namespace` is optional; admins can use it to target a different namespace.\n- The request body must be a JSON merge patch fragment for the DB resource.\n\nPatch semantics:\n- Only the fields present in the patch body are changed.\n- Nested objects are merged at the subtree you provide.\n\nCommon patch targets:\n- `spec.quota`: resource preset xs|s|m|l.\n- `spec.replicas`: desired database replica count when running; preserved while `spec.paused` is true.\n- `spec.paused`: lifecycle flag; true stops DB compute, false resumes using `spec.replicas`.\n- `spec.restartRequest`: non-negative restart counter; prefer `POST /api/db/v1alpha1/restart` so the server increments it.\n- `spec.storageSize`: change PVC storage.\n- `spec.cpuRequest` / `spec.memoryRequest`: resource requests.\n- `spec.cpuLimit` / `spec.memoryLimit`: resource limits.\n- `spec.storageClassName`: StorageClass for PVCs.\n- `spec.terminationPolicy`: Delete or WipeOut.\n- `spec.exposeNodePort`: toggle NodePort Service `{metadata.name}-export`.\n- `spec.scheduledBackup`: automated backup cron/retention/repo (KubeBlocks).",
 		Tags:        []string{"DB"},
 	}, func(ctx context.Context, input *dbUpdateInput) (*dbUpdateOutput, error) {
 		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)

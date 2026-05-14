@@ -10,6 +10,8 @@ import (
 // The DB spec is the API contract for the KubeBlocks Cluster (PostgreSQL, MySQL, Redis, MongoDB, etc.):
 // - engine: database engine (postgresql, mysql, redis, mongodb).
 // - replicas: optional replica count (XRD default 1).
+// - paused: optional lifecycle flag; true stops DB compute without rewriting replicas.
+// - restartRequest: optional non-negative restart counter for declarative KubeBlocks restart requests.
 // - quota: resource preset xs|s|m|l (default xs); compositions map to CPU/memory/storage.
 // - storageSize / cpu* / memory*: optional overrides for quota preset defaults.
 // - storageClassName: StorageClass for PVCs; omit to use cluster default.
@@ -27,6 +29,9 @@ func Register(api huma.API) {
 	registerAccessExport(grp)
 	registerCreate(grp)
 	registerBackup(grp)
+	registerStart(grp)
+	registerStop(grp)
+	registerRestart(grp)
 	registerUpdate(grp)
 	registerDelete(grp)
 }
