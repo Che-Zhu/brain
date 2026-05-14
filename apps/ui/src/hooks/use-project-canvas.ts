@@ -207,11 +207,11 @@ export function useProjectCanvas(
             ),
             start: dbLifecycleAction("start", () => startDbWorkload(workload), {
               loading: `Starting "${displayName}"...`,
-              success: `Started "${displayName}"`,
+              success: `Start requested for "${displayName}"`,
             }),
             stop: dbLifecycleAction("stop", () => stopDbWorkload(workload), {
               loading: `Stopping "${displayName}"...`,
-              success: `Stopped "${displayName}"`,
+              success: `Stop requested for "${displayName}"`,
             }),
           }
         : undefined;
