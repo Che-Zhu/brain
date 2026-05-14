@@ -15,14 +15,6 @@
   --color-theme-purple: #a78afa;
   --color-theme-gray: #a1a1aa;
   --color-theme-darkblue: #3c5f89;
-  /** Workspace canvas (packages/ui canvas) — explicit tokens; avoid `blue-700` / `neutral-950` utilities that may not emit `--color-*` in all builds. */
-  --color-canvas-surface: oklch(0.09 0.006 264);
-  --color-canvas-glow: var(--color-theme-blue);
-  --color-canvas-dot: color-mix(
-    in oklab,
-    var(--color-theme-gray) 55%,
-    transparent
-  );
   /** `.scrollbar-chat-thin` WebKit scrollbar width (matches prior `w-1`). */
   --scrollbar-chat-width: 0.25rem;
 }
@@ -110,6 +102,14 @@
   --background-secondary: oklch(0.97 0 0);
   --background-selected: oklch(0.94 0 0);
   --background-tertiary: oklch(0.955 0 0);
+  /** Runtime tokens consumed directly by `packages/ui` canvas CSS. */
+  --color-canvas-surface: oklch(0.09 0.006 264);
+  --color-canvas-glow: var(--color-theme-blue);
+  --color-canvas-dot: color-mix(
+    in oklab,
+    var(--color-theme-gray) 55%,
+    transparent
+  );
 }
 
 .dark {
