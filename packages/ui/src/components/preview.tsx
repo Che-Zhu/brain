@@ -35,6 +35,8 @@ function Preview({
   children,
   className,
   containerClassName,
+  /** Merged into fullscreen preview content only — use to override embedded `className` sizing. */
+  maximizedClassName,
   showMaximize = false,
   showReset = false,
   onReset,
@@ -43,6 +45,7 @@ function Preview({
   children: ReactNode;
   className?: string;
   containerClassName?: string;
+  maximizedClassName?: string;
   /** When true, shows a control that opens this preview in a full-screen overlay. */
   showMaximize?: boolean;
   showReset?: boolean;
@@ -94,7 +97,8 @@ function Preview({
 
   const maximizedContentClassName = cn(
     "flex min-h-0 min-w-0 flex-1 flex-col items-stretch gap-6 bg-background p-2 text-foreground *:[div:not([class*='w-'])]:w-full",
-    className
+    className,
+    maximizedClassName
   );
 
   return (

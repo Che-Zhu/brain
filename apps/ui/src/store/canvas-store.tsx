@@ -9,6 +9,7 @@ import { atom } from "jotai";
 
 import { CanvasContainerNode } from "@/lib/project-canvas/nodes/canvas-container-node";
 import { CANVAS_CONTAINER_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
+import { WorkloadHistoryCanvasPanel } from "@/lib/project-canvas/panels/workload-history-panel";
 import { WorkloadLogsCanvasPanel } from "@/lib/project-canvas/panels/workload-logs-panel";
 import { WorkloadMetricsCanvasPanel } from "@/lib/project-canvas/panels/workload-metrics-panel";
 import { WorkloadSettingsCanvasPanel } from "@/lib/project-canvas/panels/workload-settings-panel";
@@ -24,6 +25,7 @@ export const WORKLOAD_PANEL_TAB = {
   settings: "Settings",
   metrics: "Metrics",
   logs: "Logs",
+  history: "History",
 } as const;
 
 /**
@@ -59,6 +61,12 @@ export const projectCanvasWorkloadPanelTabs: CanvasPanelTab[] = [
   {
     name: WORKLOAD_PANEL_TAB.logs,
     render: () => <WorkloadLogsCanvasPanel />,
+  },
+  {
+    name: WORKLOAD_PANEL_TAB.history,
+    render: ({ node }) => (
+      <WorkloadHistoryCanvasPanel key={node.id} node={node} />
+    ),
   },
 ];
 
