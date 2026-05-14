@@ -153,12 +153,6 @@
   width: var(--canvas-node-card-width);
 }
 
-/* `[data-side]` bumps specificity to (0,3,0) so we win against
-   `.canvas-surface .react-flow__handle` (0,2,0) from the sibling
-   `canvas/canvas.css`. Turbopack inlines that rule into the root
-   CSS chunk via `preview-registry.ts`, so it ends up on every
-   page regardless of `registryDependencies`. Every anchor handle
-   carries `data-side`, so this attribute selector always matches. */
 .react-flow__handle.canvas-node-rf-handle[data-side] {
   width: var(--canvas-node-connection-size);
   height: var(--canvas-node-connection-size);

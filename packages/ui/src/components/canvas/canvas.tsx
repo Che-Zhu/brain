@@ -78,8 +78,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     panOnDrag: true,
     panOnScroll: true,
     proOptions: { hideAttribution: true },
-    snapGrid: [20, 20],
-    snapToGrid: true,
+    selectNodesOnDrag: false,
     ...meta.reactFlowProps,
   };
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
-import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
+import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
 import type {
   EntryNodeAccessDomain,
   EntryNodeStates,
@@ -101,6 +101,8 @@ export function EntryNodeCanvasHero() {
     () => ({
       edges: ENTRY_NODE_CANVAS_EDGES,
       nodes: ENTRY_NODE_CANVAS_NODES,
+      selectedEdge: null,
+      selectedNode: null,
     }),
     []
   );

@@ -1,7 +1,7 @@
 "use client";
 
-import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
-import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
+import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
 import type {
   DatabaseNodeConnection,
   DatabaseNodeLifecycleActions,
@@ -122,6 +122,8 @@ export function DatabaseNodeCanvasHero() {
     () => ({
       edges: DATABASE_NODE_CANVAS_EDGES,
       nodes: DATABASE_NODE_CANVAS_NODES,
+      selectedEdge: null,
+      selectedNode: null,
     }),
     []
   );

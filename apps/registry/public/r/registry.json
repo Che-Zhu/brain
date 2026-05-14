@@ -589,51 +589,6 @@
       ]
     },
     {
-      "name": "canvas-alter",
-      "type": "registry:ui",
-      "title": "Canvas Alter",
-      "description": "Minimal React Flow workspace surface with Jotai provider; pairs with canvas-node primitive nodes (no panel/upper-right slots)",
-      "dependencies": ["@xyflow/react", "jotai"],
-      "registryDependencies": [],
-      "files": [
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.types.ts",
-          "type": "registry:lib",
-          "target": "components/canvas-alter/canvas.types.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.context.ts",
-          "type": "registry:lib",
-          "target": "components/canvas-alter/canvas.context.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.use.ts",
-          "type": "registry:lib",
-          "target": "components/canvas-alter/canvas.use.ts"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.provider.tsx",
-          "type": "registry:component",
-          "target": "components/canvas-alter/canvas.provider.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.error-fallback.tsx",
-          "type": "registry:component",
-          "target": "components/canvas-alter/canvas.error-fallback.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.css",
-          "type": "registry:component",
-          "target": "components/canvas-alter/canvas.css"
-        },
-        {
-          "path": "../../packages/ui/src/components/canvas-alter/canvas.tsx",
-          "type": "registry:component",
-          "target": "components/canvas-alter/canvas.tsx"
-        }
-      ]
-    },
-    {
       "name": "metrics-chart",
       "type": "registry:ui",
       "title": "Metrics chart",

@@ -1,7 +1,7 @@
 "use client";
 
-import { Canvas } from "@workspace/ui/components/canvas-alter/canvas";
-import type { CanvasMeta } from "@workspace/ui/components/canvas-alter/canvas.types";
+import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import type { CanvasMeta } from "@workspace/ui/components/canvas/canvas.types";
 import type {
   EnvironmentNodeLifecycleActions,
   EnvironmentNodeQuickActions,
@@ -108,6 +108,8 @@ export function EnvironmentNodeCanvasHero() {
     () => ({
       edges: ENVIRONMENT_NODE_CANVAS_EDGES,
       nodes: ENVIRONMENT_NODE_CANVAS_NODES,
+      selectedEdge: null,
+      selectedNode: null,
     }),
     []
   );
