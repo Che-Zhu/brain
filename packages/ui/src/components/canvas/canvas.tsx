@@ -9,13 +9,14 @@ import {
   BackgroundVariant,
   ConnectionMode,
   type Edge,
+  type Node,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -37,14 +38,31 @@ export interface CanvasRootProps {
   state: Parameters<typeof CanvasProvider>[0]["state"];
 }
 
+function mergeNodes(prev: Node[], next: Node[]): Node[] {
+  const prevById = new Map(prev.map((n) => [n.id, n]));
+  const merged = next.map((incoming) => {
+    const existing = prevById.get(incoming.id);
+    if (existing) {
+      return { ...incoming, position: existing.position };
+    }
+    return incoming;
+  });
+  return merged;
+}
+
 function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
+  const initializedRef = useRef(false);
 
-  // Apply upstream graph before paint so React Flow state matches props on first paint.
   useLayoutEffect(() => {
-    setNodes(state.nodes);
+    if (initializedRef.current) {
+      setNodes((prev) => mergeNodes(prev, state.nodes));
+    } else {
+      initializedRef.current = true;
+      setNodes(state.nodes);
+    }
   }, [setNodes, state.nodes]);
 
   useLayoutEffect(() => {

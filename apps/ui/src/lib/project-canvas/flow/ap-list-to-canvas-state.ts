@@ -20,8 +20,8 @@ import {
 import type { CanvasDatabaseNodeData } from "../nodes/types";
 
 const FALLBACK_COLUMNS = 3;
-const FALLBACK_COL_GAP = 280;
-const FALLBACK_ROW_GAP = 220;
+const FALLBACK_COL_GAP = 340;
+const FALLBACK_ROW_GAP = 280;
 
 function fallbackCanvasPosition(index: number): { x: number; y: number } {
   return {
