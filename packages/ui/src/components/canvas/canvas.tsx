@@ -7,6 +7,7 @@ import "./canvas.css";
 import {
   Background,
   BackgroundVariant,
+  ConnectionMode,
   type Edge,
   ReactFlow,
   ReactFlowProvider,
@@ -73,6 +74,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
 
   const passThrough: CanvasReactFlowProps = {
     fitView: true,
+    connectionMode: ConnectionMode.Loose,
     maxZoom: 1.2,
     minZoom: 0.2,
     panOnDrag: true,

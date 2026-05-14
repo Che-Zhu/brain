@@ -103,6 +103,11 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
   const PanelBody =
     selected.type == null ? undefined : meta.panelTypes?.[selected.type];
   const panelProps: CanvasPanelBodyProps = { node: selected };
+  const hasFallbackChildren = children !== undefined && children !== null;
+
+  if (tabItems == null && PanelBody == null && !hasFallbackChildren) {
+    return null;
+  }
 
   const panelContent =
     tabItems == null ? (
@@ -110,7 +115,11 @@ export function CanvasPanel({ children, className }: CanvasPanelProps) {
         {PanelBody == null ? children : <PanelBody node={selected} />}
       </div>
     ) : (
-      <CanvasPanelTabs meta={meta} panelProps={panelProps} tabItems={tabItems} />
+      <CanvasPanelTabs
+        meta={meta}
+        panelProps={panelProps}
+        tabItems={tabItems}
+      />
     );
 
   return (
@@ -167,7 +176,10 @@ function CanvasPanelTabs({
     >
       <TabsList aria-label="Panel sections" className="shrink-0 flex-wrap">
         {tabItems.map((tab) => (
-          <TabsTrigger key={`${panelProps.node.id}:${tab.name}`} value={tab.name}>
+          <TabsTrigger
+            key={`${panelProps.node.id}:${tab.name}`}
+            value={tab.name}
+          >
             {tab.name}
           </TabsTrigger>
         ))}

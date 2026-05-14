@@ -1,18 +1,31 @@
 "use client";
 
-import { useApLifecycleOperations } from "@workspace/api/hooks";
+import {
+  useApLifecycleOperations,
+  useDbLifecycleOperations,
+} from "@workspace/api/hooks";
 import type {
   CanvasMeta,
   CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
+import type {
+  DatabaseNodeCopyConnectionHandler,
+  DatabaseNodeTogglePublicConnectionHandler,
+} from "@workspace/ui/components/database-node/database-node";
 import type { Edge, Node } from "@xyflow/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
-import { CANVAS_CONTAINER_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
-import type { CanvasContainerNodeData } from "@/lib/project-canvas/nodes/types";
+import {
+  CANVAS_CONTAINER_NODE_TYPE,
+  CANVAS_DATABASE_NODE_TYPE,
+} from "@/lib/project-canvas/nodes/constants";
+import type {
+  CanvasContainerNodeData,
+  CanvasDatabaseNodeData,
+} from "@/lib/project-canvas/nodes/types";
 import {
   CANVAS_SERVICE_QUERY_KEY,
   CANVAS_TAB_QUERY_KEY,
@@ -50,12 +63,20 @@ export function useProjectCanvas(
   const selectedEdge = useAtomValue(selectedEdgeAtom);
 
   const {
-    authReady,
+    authReady: apAuthReady,
     deleteWorkload,
     pauseWorkload,
     restartWorkload,
     startWorkload,
   } = useApLifecycleOperations({
+    kubeconfig: options?.kubeconfig,
+    shareToken: options?.shareToken,
+  });
+  const {
+    authReady: dbAuthReady,
+    isToggling: isDbPublicAccessToggling,
+    togglePublicAccess,
+  } = useDbLifecycleOperations({
     kubeconfig: options?.kubeconfig,
     shareToken: options?.shareToken,
   });
@@ -95,89 +116,180 @@ export function useProjectCanvas(
     [afterLifecycle]
   );
 
-  const nodes = useMemo(
-    () =>
-      rawNodes.map((node): Node => {
-        if (node.type !== CANVAS_CONTAINER_NODE_TYPE) {
-          return node;
-        }
-        const data = node.data as CanvasContainerNodeData;
-        const states = data.states;
-        const uid = states.uid?.trim();
-        const ns = states.namespace?.trim() ?? "";
-        const name = states.name.trim();
+  const copyDatabaseConnection = useCallback<DatabaseNodeCopyConnectionHandler>(
+    async (connection) => {
+      const value = connection.value;
+      if (!value || typeof navigator === "undefined" || !navigator.clipboard) {
+        return;
+      }
 
-        const isApLifecycle =
-          authReady && states.kind === "AP" && ns !== "" && name !== "";
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch {
+        // Copy feedback is handled by the row; clipboard failures should not break canvas interactions.
+      }
+    },
+    []
+  );
 
-        const hasUrlActions = uid != null && uid !== "";
+  const decorateDatabaseNode = useCallback(
+    (node: Node): Node => {
+      const data = node.data as CanvasDatabaseNodeData;
+      const workload = data.workload;
+      const name = workload.name.trim();
+      const namespace = workload.namespace.trim();
+      const canTogglePublicAccess =
+        dbAuthReady && name !== "" && namespace !== "";
+      const publicAccessLoading = isDbPublicAccessToggling(workload);
+      const connections = publicAccessLoading
+        ? data.connections.map((connection) =>
+            connection.kind === "public"
+              ? {
+                  ...connection,
+                  publicAccess: {
+                    ...connection.publicAccess,
+                    loading: true,
+                  },
+                }
+              : connection
+          )
+        : data.connections;
+      const togglePublicConnection:
+        | DatabaseNodeTogglePublicConnectionHandler
+        | undefined = canTogglePublicAccess
+        ? (_connection, _index, nextEnabled) => {
+            runMutationThenRefresh(
+              () => togglePublicAccess(workload, nextEnabled),
+              {
+                loading: nextEnabled
+                  ? `Enabling public access for "${name}"...`
+                  : `Disabling public access for "${name}"...`,
+                success: nextEnabled
+                  ? `Enabled public access for "${name}"`
+                  : `Disabled public access for "${name}"`,
+              }
+            );
+          }
+        : undefined;
 
-        if (!(hasUrlActions || isApLifecycle)) {
-          return node;
-        }
-
-        const select = (tab: string) => {
-          setPanelTab(tab).catch(() => undefined);
-          setSelectedEdge(null);
-          setServiceUid(uid ?? "").catch(() => undefined);
-        };
-
-        const ref = { name: states.name, namespace: ns };
-        const displayName = states.name;
-        const lifecycleActions = isApLifecycle
-          ? {
-              onDelete: () =>
-                runMutationThenRefresh(() => deleteWorkload(ref), {
-                  loading: `Deleting "${displayName}"…`,
-                  success: `Deleted "${displayName}"`,
-                }),
-              onPause: () =>
-                runMutationThenRefresh(() => pauseWorkload(ref), {
-                  loading: `Pausing "${displayName}"…`,
-                  success: `Paused "${displayName}"`,
-                }),
-              onRestart: () =>
-                runMutationThenRefresh(() => restartWorkload(ref), {
-                  loading: `Restarting "${displayName}"…`,
-                  success: `Restarted "${displayName}"`,
-                }),
-              onStart: () =>
-                runMutationThenRefresh(() => startWorkload(ref), {
-                  loading: `Starting "${displayName}"…`,
-                  success: `Started "${displayName}"`,
-                }),
-            }
-          : {};
-
-        return {
-          ...node,
-          data: {
-            ...data,
-            actions: {
-              ...(data.actions ?? {}),
-              ...(hasUrlActions
-                ? {
-                    onViewActivity: () => select(WORKLOAD_PANEL_TAB.metrics),
-                    onViewLogs: () => select(WORKLOAD_PANEL_TAB.logs),
-                  }
-                : {}),
-              ...lifecycleActions,
-            },
+      return {
+        ...node,
+        data: {
+          ...data,
+          actions: {
+            ...(data.actions ?? {}),
+            copyConnection: copyDatabaseConnection,
+            ...(togglePublicConnection === undefined
+              ? {}
+              : { togglePublicConnection }),
           },
-        };
-      }),
+          connections,
+        },
+      };
+    },
     [
-      authReady,
+      copyDatabaseConnection,
+      dbAuthReady,
+      isDbPublicAccessToggling,
       runMutationThenRefresh,
+      togglePublicAccess,
+    ]
+  );
+
+  const decorateContainerNode = useCallback(
+    (node: Node): Node => {
+      const data = node.data as CanvasContainerNodeData;
+      const states = data.states;
+      const uid = states.uid?.trim();
+      const ns = states.namespace?.trim() ?? "";
+      const name = states.name.trim();
+
+      const isApLifecycle =
+        apAuthReady && states.kind === "AP" && ns !== "" && name !== "";
+
+      const hasUrlActions = uid != null && uid !== "";
+
+      if (!(hasUrlActions || isApLifecycle)) {
+        return node;
+      }
+
+      const select = (tab: string) => {
+        setPanelTab(tab).catch(() => undefined);
+        setSelectedEdge(null);
+        setServiceUid(uid ?? "").catch(() => undefined);
+      };
+
+      const ref = { name: states.name, namespace: ns };
+      const displayName = states.name;
+      const lifecycleActions = isApLifecycle
+        ? {
+            onDelete: () =>
+              runMutationThenRefresh(() => deleteWorkload(ref), {
+                loading: `Deleting "${displayName}"…`,
+                success: `Deleted "${displayName}"`,
+              }),
+            onPause: () =>
+              runMutationThenRefresh(() => pauseWorkload(ref), {
+                loading: `Pausing "${displayName}"…`,
+                success: `Paused "${displayName}"`,
+              }),
+            onRestart: () =>
+              runMutationThenRefresh(() => restartWorkload(ref), {
+                loading: `Restarting "${displayName}"…`,
+                success: `Restarted "${displayName}"`,
+              }),
+            onStart: () =>
+              runMutationThenRefresh(() => startWorkload(ref), {
+                loading: `Starting "${displayName}"…`,
+                success: `Started "${displayName}"`,
+              }),
+          }
+        : {};
+
+      return {
+        ...node,
+        data: {
+          ...data,
+          actions: {
+            ...(data.actions ?? {}),
+            ...(hasUrlActions
+              ? {
+                  onViewActivity: () => select(WORKLOAD_PANEL_TAB.metrics),
+                  onViewLogs: () => select(WORKLOAD_PANEL_TAB.logs),
+                }
+              : {}),
+            ...lifecycleActions,
+          },
+        },
+      };
+    },
+    [
+      apAuthReady,
       deleteWorkload,
       pauseWorkload,
-      rawNodes,
       restartWorkload,
+      runMutationThenRefresh,
       setPanelTab,
       setSelectedEdge,
       setServiceUid,
       startWorkload,
     ]
+  );
+
+  const nodes = useMemo(
+    () =>
+      rawNodes.map((node): Node => {
+        if (node.type === CANVAS_DATABASE_NODE_TYPE) {
+          return decorateDatabaseNode(node);
+        }
+
+        if (node.type === CANVAS_CONTAINER_NODE_TYPE) {
+          return decorateContainerNode(node);
+        }
+
+        return node;
+      }),
+    [decorateContainerNode, decorateDatabaseNode, rawNodes]
   );
 
   const selectedNode = useMemo<CanvasSelectedNode>(() => {

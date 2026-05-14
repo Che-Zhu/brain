@@ -21,6 +21,12 @@ export interface CanvasNodeConnectionAnchorProps {
   type?: HandleType;
 }
 
+/**
+ * Visual per-side connection affordance for CanvasNode.
+ *
+ * Canvas owns graph behavior (connection mode, draft edge creation, persistence);
+ * this component only owns handle placement and hover feedback inside a node shell.
+ */
 export function CanvasNodeConnectionAnchor({
   className,
   type = "source",
@@ -38,7 +44,7 @@ export function CanvasNodeConnectionAnchor({
       {CONNECTION_SIDE_CONFIG.map(({ position, side }) =>
         nodeId ? (
           <Handle
-            aria-label={`Connect from ${side}`}
+            aria-label={`Connect at ${side}`}
             className="nodrag nopan canvas-node-rf-handle absolute flex cursor-pointer items-center justify-center rounded-full p-0"
             data-side={side}
             data-slot="canvas-node-rf-handle"

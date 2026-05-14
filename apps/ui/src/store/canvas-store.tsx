@@ -8,7 +8,11 @@ import type { Node, NodeTypes } from "@xyflow/react";
 import { atom } from "jotai";
 
 import { CanvasContainerNode } from "@/lib/project-canvas/nodes/canvas-container-node";
-import { CANVAS_CONTAINER_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
+import { CanvasDatabaseNode } from "@/lib/project-canvas/nodes/canvas-database-node";
+import {
+  CANVAS_CONTAINER_NODE_TYPE,
+  CANVAS_DATABASE_NODE_TYPE,
+} from "@/lib/project-canvas/nodes/constants";
 import { WorkloadLogsCanvasPanel } from "@/lib/project-canvas/panels/workload-logs-panel";
 import { WorkloadMetricsCanvasPanel } from "@/lib/project-canvas/panels/workload-metrics-panel";
 import { WorkloadSettingsCanvasPanel } from "@/lib/project-canvas/panels/workload-settings-panel";
@@ -33,13 +37,19 @@ export const WORKLOAD_PANEL_TAB = {
 export const WORKLOAD_PANEL_REPLICAS = { min: 1, max: 20 } as const;
 
 export function projectCanvasNodeServiceUid(node: Node): string | null {
-  const data = node.data as { states?: { uid?: unknown } } | undefined;
-  const uid = data?.states?.uid;
+  const data =
+    node.data === null || typeof node.data !== "object" ? undefined : node.data;
+  const topLevelUid = (data as { uid?: unknown } | undefined)?.uid;
+  if (typeof topLevelUid === "string" && topLevelUid !== "") {
+    return topLevelUid;
+  }
+  const uid = (data as { states?: { uid?: unknown } } | undefined)?.states?.uid;
   return typeof uid === "string" && uid !== "" ? uid : null;
 }
 
 export const projectCanvasFlowNodeTypes = {
   [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNode,
+  [CANVAS_DATABASE_NODE_TYPE]: CanvasDatabaseNode,
 } as const satisfies NodeTypes;
 
 /** Side-panel tabs for the project canvas workload inspector (Settings uses {@link WORKLOAD_PANEL_REPLICAS}). */
