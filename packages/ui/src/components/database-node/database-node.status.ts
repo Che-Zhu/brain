@@ -21,6 +21,9 @@ const PROGRESS_STATUSES = new Set([
   "pending",
   "progressing",
   "reconciling",
+  "restarting",
+  "starting",
+  "updating",
 ]);
 
 const WARNING_STATUSES = new Set(["degraded", "deleting", "stopping"]);
@@ -29,6 +32,7 @@ const NEGATIVE_STATUSES = new Set([
   "error",
   "failed",
   "inaccessible",
+  "unavailable",
   "unhealthy",
 ]);
 

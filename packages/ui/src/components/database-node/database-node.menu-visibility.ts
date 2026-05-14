@@ -2,10 +2,10 @@ import type { DatabaseNodeStatusTone } from "./database-node.types";
 
 const FAILED_PHASES = new Set<DatabaseNodeStatusTone>([
   "degraded",
-  "deleting",
   "error",
   "failed",
   "inaccessible",
+  "unavailable",
   "unhealthy",
 ]);
 
@@ -23,6 +23,19 @@ const PAUSED_STOPPED_PHASES = new Set<DatabaseNodeStatusTone>([
   "shutdown",
   "stopped",
   "suspended",
+]);
+
+const TRANSIENT_PHASES = new Set<DatabaseNodeStatusTone>([
+  "binding",
+  "creating",
+  "deleting",
+  "pending",
+  "progressing",
+  "reconciling",
+  "restarting",
+  "starting",
+  "stopping",
+  "updating",
 ]);
 
 function normalizeDatabaseStatusTone(input: string | undefined) {
@@ -44,6 +57,9 @@ export function databaseNodeLifecycleMenuVisibility(
   showStop: boolean;
 } {
   const normalized = normalizeDatabaseStatusTone(tone);
+  if (normalized != null && TRANSIENT_PHASES.has(normalized)) {
+    return { showStart: false, showStop: false, showRestart: false };
+  }
   if (normalized != null && FAILED_PHASES.has(normalized)) {
     return { showStart: false, showStop: false, showRestart: true };
   }
@@ -51,7 +67,7 @@ export function databaseNodeLifecycleMenuVisibility(
     return { showStart: false, showStop: true, showRestart: true };
   }
   if (normalized != null && PAUSED_STOPPED_PHASES.has(normalized)) {
-    return { showStart: true, showStop: false, showRestart: true };
+    return { showStart: true, showStop: false, showRestart: false };
   }
-  return { showStart: true, showStop: true, showRestart: true };
+  return { showStart: false, showStop: false, showRestart: false };
 }

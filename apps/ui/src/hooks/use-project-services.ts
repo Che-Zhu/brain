@@ -21,6 +21,43 @@ import {
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 
 const METRICS_REFRESH_MS = 5000;
+const WORKLOAD_RECONCILE_POLL_MS = 1000;
+const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
+const WORKLOAD_TRANSIENT_PHASES = new Set([
+  "binding",
+  "creating",
+  "deleting",
+  "pending",
+  "progressing",
+  "reconciling",
+  "restarting",
+  "starting",
+  "stopping",
+  "updating",
+]);
+
+function normalizeWorkloadPhase(input: unknown) {
+  return typeof input === "string"
+    ? input
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_]+/g, "-")
+    : "";
+}
+
+function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
+  return apItemsFromList(data).some((item) => {
+    const status =
+      item != null && typeof item === "object" && "status" in item
+        ? item.status
+        : undefined;
+    const phase =
+      status != null && typeof status === "object" && "phase" in status
+        ? status.phase
+        : undefined;
+    return WORKLOAD_TRANSIENT_PHASES.has(normalizeWorkloadPhase(phase));
+  });
+}
 
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
@@ -49,6 +86,20 @@ export function useProjectServices(options: {
 
   const apsListRef = useRef<K8sGetResponse | undefined>(undefined);
   const dbsListRef = useRef<K8sGetResponse | undefined>(undefined);
+  const [workloadReconcilePollUntil, setWorkloadReconcilePollUntil] =
+    useState(0);
+  const workloadReconcileRefreshInterval = useCallback(
+    (latestData: K8sGetResponse | undefined) => {
+      if (
+        workloadReconcilePollUntil > Date.now() ||
+        hasTransientWorkloadPhase(latestData)
+      ) {
+        return WORKLOAD_RECONCILE_POLL_MS;
+      }
+      return 0;
+    },
+    [workloadReconcilePollUntil]
+  );
 
   const peerDbsEmpty = useCallback(
     () => apItemsFromList(dbsListRef.current).length === 0,
@@ -70,6 +121,7 @@ export function useProjectServices(options: {
     namespace,
     peerEmpty: peerDbsEmpty,
     pollWhileEmpty: true,
+    refreshInterval: workloadReconcileRefreshInterval,
   });
 
   const {
@@ -83,15 +135,18 @@ export function useProjectServices(options: {
     namespace,
     peerEmpty: peerApsEmpty,
     pollWhileEmpty: true,
+    refreshInterval: workloadReconcileRefreshInterval,
   });
 
   apsListRef.current = apsData;
   dbsListRef.current = dbsData;
 
-  const refreshWorkloadLists = useCallback(
-    () => Promise.all([mutateAps(), mutateDbs()]),
-    [mutateAps, mutateDbs]
-  );
+  const refreshWorkloadLists = useCallback(() => {
+    setWorkloadReconcilePollUntil(
+      Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS
+    );
+    return Promise.all([mutateAps(), mutateDbs()]);
+  }, [mutateAps, mutateDbs]);
 
   const data = useMemo(
     () => ({ aps: apsData, dbs: dbsData }),

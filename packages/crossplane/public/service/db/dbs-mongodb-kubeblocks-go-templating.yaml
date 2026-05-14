@@ -97,6 +97,58 @@ spec:
           {{- if $paused }}{{- $desiredReplicas = 0 }}{{- end }}
           {{- $restartRequest := 0 }}
           {{- if hasKey $spec "restartRequest" }}{{- $restartRequest = int ($spec.restartRequest | default 0) }}{{- end }}
+          {{ $kbPhase := "Unknown" }}
+          {{ if and $kbCluster $kbCluster.status $kbCluster.status.phase }}{{ $kbPhase = toString $kbCluster.status.phase }}{{ end }}
+          {{ $observedReplicas := 0 }}
+          {{ if and $kbCluster $kbCluster.status $kbCluster.status.observedReplicas }}{{ $observedReplicas = int ($kbCluster.status.observedReplicas | default 0) }}{{ end }}
+          {{ $availableReplicas := 0 }}
+          {{ if and $kbCluster $kbCluster.status $kbCluster.status.availableReplicas }}{{ $availableReplicas = int ($kbCluster.status.availableReplicas | default 0) }}{{ end }}
+          {{ $everReady := false }}
+          {{ if and .observed.composite.resource.status .observed.composite.resource.status.lifecycle .observed.composite.resource.status.lifecycle.everReady }}{{ $everReady = true }}{{ end }}
+          {{ if eq $kbPhase "Running" }}{{ $everReady = true }}{{ end }}
+          {{ $lastReadyTime := "" }}
+          {{ if and .observed.composite.resource.status .observed.composite.resource.status.lifecycle .observed.composite.resource.status.lifecycle.lastReadyTime }}{{ $lastReadyTime = toString .observed.composite.resource.status.lifecycle.lastReadyTime }}{{ end }}
+          {{ if and (eq $kbPhase "Running") (eq $lastReadyTime "") }}{{ $lastReadyTime = $lastTransition }}{{ end }}
+          {{ $restartOps := getComposedResource . "kubeblocks-restart-opsrequest" }}
+          {{ $restartOpsName := "" }}
+          {{ $restartOpsPhase := "" }}
+          {{ $restartOpsType := "" }}
+          {{ if and $restartOps $restartOps.metadata $restartOps.metadata.name }}{{ $restartOpsName = toString $restartOps.metadata.name }}{{ end }}
+          {{ if and $restartOps $restartOps.status $restartOps.status.phase }}{{ $restartOpsPhase = toString $restartOps.status.phase }}{{ end }}
+          {{ $restartOpsDone := or (eq $restartOpsPhase "Succeed") (eq $restartOpsPhase "Succeeded") (eq $restartOpsPhase "Failed") }}
+          {{ if and $restartOps $restartOps.spec $restartOps.spec.type (not $restartOpsDone) }}{{ $restartOpsType = toString $restartOps.spec.type }}{{ end }}
+          {{ $deleting := false }}
+          {{ if .observed.composite.resource.metadata.deletionTimestamp }}{{ $deleting = true }}{{ end }}
+          {{ $productPhase := "Unknown" }}
+          {{ $reason := $kbPhase | default "Waiting" }}
+          {{ if $deleting }}
+          {{ $productPhase = "Deleting" }}
+          {{ $reason = "Deleting" }}
+          {{ else if eq $restartOpsType "Restart" }}
+          {{ $productPhase = "Restarting" }}
+          {{ if ne $restartOpsPhase "" }}{{ $reason = printf "Restart:%s" $restartOpsPhase }}{{ else }}{{ $reason = "Restart" }}{{ end }}
+          {{ else if or (eq $restartOpsPhase "Failed") (eq $kbPhase "Failed") (eq $kbPhase "Abnormal") (eq $kbPhase "Degraded") }}
+          {{ $productPhase = "Failed" }}
+          {{ else if and $paused (gt $availableReplicas 0) }}
+          {{ $productPhase = "Stopping" }}
+          {{ $reason = "Stopping" }}
+          {{ else if and $paused (gt $observedReplicas 0) }}
+          {{ $productPhase = "Stopping" }}
+          {{ $reason = "Stopping" }}
+          {{ else if $paused }}
+          {{ $productPhase = "Paused" }}
+          {{ $reason = "Paused" }}
+          {{ else if or (eq $kbPhase "Updating") (eq $kbPhase "SpecUpdating") (eq $kbPhase "Upgrade") (eq $kbPhase "VerticalScaling") (eq $kbPhase "VolumeExpanding") }}
+          {{ $productPhase = "Updating" }}
+          {{ else if eq $kbPhase "Running" }}
+          {{ $productPhase = "Running" }}
+          {{ else if $everReady }}
+          {{ $productPhase = "Starting" }}
+          {{ $reason = "Starting" }}
+          {{ else }}
+          {{ $productPhase = "Creating" }}
+          {{ $reason = "Creating" }}
+          {{ end }}
           {{- if ne $projectName "" }}
           ---
 
@@ -505,10 +557,26 @@ spec:
             name: {{ $name }}
             namespace: {{ $ns }}
           status:
-            phase: {{ if $paused }}Paused{{ else }}{{ $kbCluster.status.phase | default "Unknown" }}{{ end }}
+            phase: {{ $productPhase }}
+            reason: {{ $reason | quote }}
             clusterVersionRef: {{ $clusterVersion | quote }}
-            observedReplicas: {{ $kbCluster.status.observedReplicas | default 0 }}
-            availableReplicas: {{ $kbCluster.status.availableReplicas | default 0 }}
+            observedReplicas: {{ $observedReplicas }}
+            availableReplicas: {{ $availableReplicas }}
+            observed:
+              kubeblocksPhase: {{ $kbPhase | quote }}
+              observedReplicas: {{ $observedReplicas }}
+              availableReplicas: {{ $availableReplicas }}
+              {{ if ne $restartOpsName "" }}
+              operation:
+                type: "Restart"
+                phase: {{ $restartOpsPhase | quote }}
+                name: {{ $restartOpsName | quote }}
+              {{ end }}
+            lifecycle:
+              everReady: {{ $everReady }}
+              {{ if ne $lastReadyTime "" }}
+              lastReadyTime: {{ $lastReadyTime | quote }}
+              {{ end }}
             kubeblocksServices:
               - name: {{ printf "%s-mongodb" $name | quote }}
                 type: ClusterIP
@@ -541,7 +609,7 @@ spec:
             {{- end }}
             conditions:
               - type: Ready
-                status: {{ if $paused -}} "False" {{- else if eq $kbCluster.status.phase "Running" -}} "True" {{- else -}} "False" {{- end }}
-                reason: {{ if $paused }}Paused{{ else }}{{ $kbCluster.status.phase | default "Waiting" }}{{ end }}
-                message: {{ if $paused }}'DB is paused by spec.paused'{{ else }}'KubeBlocks Cluster phase is {{ $kbCluster.status.phase | default "Unknown" }}'{{ end }}
+                status: {{ if eq $productPhase "Running" -}} "True" {{- else -}} "False" {{- end }}
+                reason: {{ $reason | quote }}
+                message: 'DB product phase is {{ $productPhase }}; KubeBlocks Cluster phase is {{ $kbPhase }}'
                 lastTransitionTime: {{ $lastTransition }}

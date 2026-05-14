@@ -12,6 +12,27 @@ import {
 } from "../schemas/k8s-get";
 import { ApiUrl } from "../utils";
 
+export type K8sNamespacedListRefreshInterval =
+  | number
+  | ((latestData: K8sGetResponse | undefined) => number);
+
+function resolveRefreshInterval(
+  refreshInterval: K8sNamespacedListRefreshInterval | undefined,
+  latestData: K8sGetResponse | undefined
+) {
+  if (typeof refreshInterval === "function") {
+    return refreshInterval(latestData);
+  }
+  return refreshInterval ?? 0;
+}
+
+function minPositiveInterval(a: number, b: number) {
+  if (a > 0 && b > 0) {
+    return Math.min(a, b);
+  }
+  return a > 0 ? a : b;
+}
+
 /** Plural k8s resource short name as accepted by `GET /api/k8s/.../get` (e.g. `aps`, `dbs`). */
 export function useK8sNamespacedList(options: {
   kind: string;
@@ -25,8 +46,11 @@ export function useK8sNamespacedList(options: {
    * `peerEmpty()` is true (e.g. 1s interval only while both AP and DB lists are still empty).
    */
   peerEmpty?: () => boolean;
+  /** Additional SWR refresh cadence. Combined with empty-list polling by choosing the faster active interval. */
+  refreshInterval?: K8sNamespacedListRefreshInterval;
 }) {
-  const { kind, labelSelector, namespace, shareToken } = options;
+  const { kind, labelSelector, namespace, refreshInterval, shareToken } =
+    options;
   const pollWhileEmpty = options.pollWhileEmpty === true;
   const peerEmpty = options.peerEmpty;
   const kubeconfig = options.kubeconfig ?? "";
@@ -83,16 +107,21 @@ export function useK8sNamespacedList(options: {
       }),
     {
       refreshInterval: (latestData) => {
+        const configuredInterval = resolveRefreshInterval(
+          refreshInterval,
+          latestData
+        );
         if (!pollWhileEmpty) {
-          return 0;
+          return configuredInterval;
         }
+        let emptyInterval = 0;
         if (apItemsFromList(latestData).length > 0) {
-          return 0;
+          return configuredInterval;
         }
-        if (peerEmpty != null) {
-          return peerEmpty() ? 1000 : 0;
+        if (peerEmpty == null || peerEmpty()) {
+          emptyInterval = 1000;
         }
-        return 1000;
+        return minPositiveInterval(configuredInterval, emptyInterval);
       },
     }
   );

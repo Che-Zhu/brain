@@ -32,15 +32,19 @@ export type DatabaseNodeStatusTone =
   | "progressing"
   | "ready"
   | "reconciling"
+  | "restarting"
   | "running"
   | "shutdown"
+  | "starting"
   | "stopped"
   | "stopping"
   | "succeeded"
   | "suspended"
   | "unconfigured"
+  | "unavailable"
   | "unhealthy"
   | "unknown"
+  | "updating"
   | (string & {});
 
 export interface DatabaseNodeStatus {
