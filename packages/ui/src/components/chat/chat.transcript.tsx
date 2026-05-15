@@ -13,12 +13,27 @@ import { Shimmer } from "@workspace/ui/components/ai-elements/shimmer";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { cn } from "@workspace/ui/lib/utils";
 import type { ChatStatus, UIMessage } from "ai";
+import { isToolUIPart } from "ai";
 import type { ComponentProps } from "react";
-import { renderChatPart } from "./chat.part";
+import { renderChatMessageParts } from "./chat.part";
+import { isChatToolPartStateInFlight } from "./chat.tool-group";
 import type { ChatTranscriptProps } from "./chat.types";
 
 const userBubbleClassName =
   "group-[.is-user]:rounded-3xl group-[.is-user]:rounded-br-md group-[.is-user]:border group-[.is-user]:bg-background-selected group-[.is-user]:px-3 group-[.is-user]:py-1.5";
+
+/** Tool activity is already shown in the transcript; avoid a duplicate loading row. */
+function assistantHasInFlightToolCalls(message: UIMessage): boolean {
+  for (const part of message.parts) {
+    if (!(isToolUIPart(part) && part.type !== "tool-emitGenUISpec")) {
+      continue;
+    }
+    if (isChatToolPartStateInFlight(part.state)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** True while streaming and the in-flight assistant turn has no non-empty `text` part yet. */
 function streamingAwaitingAssistantText(
@@ -39,6 +54,9 @@ function streamingAwaitingAssistantText(
     if (part.type === "text" && part.text.trim() !== "") {
       return false;
     }
+  }
+  if (assistantHasInFlightToolCalls(last)) {
+    return false;
   }
   return true;
 }
@@ -67,13 +85,10 @@ export function ChatTranscript({
           {messages.map((message) => (
             <Message from={message.role} key={message.id}>
               <MessageContent className={userBubbleClassName}>
-                {message.parts.map((part, i) =>
-                  renderChatPart({
-                    addToolApprovalResponse,
-                    part,
-                    partKeyPrefix: `${message.id}-p-${i}`,
-                  })
-                )}
+                {renderChatMessageParts({
+                  addToolApprovalResponse,
+                  message,
+                })}
               </MessageContent>
             </Message>
           ))}

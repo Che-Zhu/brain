@@ -22,6 +22,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSWRConfig } from "swr";
 import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
 import { useGithubDeployer } from "@/hooks/use-github-deployer";
 import {
@@ -40,12 +41,29 @@ import {
   type NavigateAppToolOutput,
   runNavigateAppTool,
 } from "@/lib/tool/chat-navigate-app-tool";
+import {
+  REFRESH_FRONTEND_SWR_TOOL_NAME,
+  type RefreshFrontendSwrCachesToolOutput,
+  runRefreshFrontendSwrCachesTool,
+} from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
 import {
   rightPaneOpenAtom,
   toggleRightPaneVisibility,
 } from "@/store/layout-store";
+
+type AssistantClientToolSubmission =
+  | {
+      tool: typeof NAVIGATE_APP_TOOL_NAME;
+      toolCallId: string;
+      output: NavigateAppToolOutput;
+    }
+  | {
+      tool: typeof REFRESH_FRONTEND_SWR_TOOL_NAME;
+      toolCallId: string;
+      output: RefreshFrontendSwrCachesToolOutput;
+    };
 
 function buildAssistantContextPayload(
   projectUid: string,
@@ -82,15 +100,11 @@ function ProjectAssistantChatSession({
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
   const router = useRouter();
+  const { mutate: revalidateScopeSwr } = useSWRConfig();
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const chatId = bootstrap.chatId;
   const addToolOutputRef = useRef<
-    | ((args: {
-        tool: typeof NAVIGATE_APP_TOOL_NAME;
-        toolCallId: string;
-        output: NavigateAppToolOutput;
-      }) => void | PromiseLike<void>)
-    | null
+    ((args: AssistantClientToolSubmission) => void | PromiseLike<void>) | null
   >(null);
 
   const params = useParams<{ uid?: string }>();
@@ -162,23 +176,49 @@ function ProjectAssistantChatSession({
         await onAssistantStreamFinished?.();
       },
       onToolCall({ toolCall }) {
-        if (toolCall.toolName !== NAVIGATE_APP_TOOL_NAME) {
+        if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
+          const result = runNavigateAppTool(toolCall.input, router.push);
+          const submit = addToolOutputRef.current;
+          if (submit == null) {
+            return;
+          }
+          Promise.resolve(
+            submit({
+              tool: NAVIGATE_APP_TOOL_NAME,
+              toolCallId: toolCall.toolCallId,
+              output: result,
+            })
+          ).catch((err: unknown) => {
+            console.error("[navigateApp] addToolOutput failed:", err);
+          });
           return;
         }
-        const result = runNavigateAppTool(toolCall.input, router.push);
-        const submit = addToolOutputRef.current;
-        if (submit == null) {
+
+        if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
           return;
         }
-        Promise.resolve(
-          submit({
-            tool: NAVIGATE_APP_TOOL_NAME,
-            toolCallId: toolCall.toolCallId,
-            output: result,
+        const submitRefresh = addToolOutputRef.current;
+        runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
+          .then((output) => {
+            if (submitRefresh == null) {
+              return;
+            }
+            Promise.resolve(
+              submitRefresh({
+                tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
+                toolCallId: toolCall.toolCallId,
+                output,
+              })
+            ).catch((err: unknown) => {
+              console.error(
+                "[refreshFrontendSwrCaches] addToolOutput failed:",
+                err
+              );
+            });
           })
-        ).catch((err: unknown) => {
-          console.error("[navigateApp] addToolOutput failed:", err);
-        });
+          .catch((err: unknown) => {
+            console.error("[refreshFrontendSwrCaches] mutation failed:", err);
+          });
       },
     });
 

@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { tool } from "ai";
 import { z } from "zod";
-
+import {
+  chatToolIntentionField,
+  logChatToolIntention,
+} from "@/lib/tool/chat-tool-intention";
 import { type PublicSkillMeta, stripSkillFrontmatter } from "./public-skills";
 
 // biome-ignore lint/performance/noBarrelFile: single import surface for chat route (discovery + tool)
@@ -9,6 +12,7 @@ export { discoverPublicSkills, type PublicSkillMeta } from "./public-skills";
 
 /** Input for `loadSkill` — skill `name` from SKILL.md frontmatter. */
 export const loadSkillInputSchema = z.object({
+  intention: chatToolIntentionField,
   name: z
     .string()
     .describe("Skill `name` from YAML frontmatter / Available skills list"),
@@ -19,6 +23,7 @@ export function buildLoadSkillDescription(): string {
     "Load full markdown instructions for a named skill.",
     "Skills live under `public/skills/<folder>/SKILL.md` with YAML frontmatter (`name`, `description`).",
     "Call when the user's task matches a skill listed in the system prompt. Returns body text without frontmatter.",
+    "Always set `intention`: which user goal this skill satisfies.",
   ].join(" ");
 }
 
@@ -51,7 +56,8 @@ export function createLoadSkillTool(skillIndex: PublicSkillMeta[]) {
   return tool({
     description: buildLoadSkillDescription(),
     inputSchema: loadSkillInputSchema,
-    execute: async ({ name }) => {
+    execute: async ({ intention, name }) => {
+      logChatToolIntention("loadSkill", intention);
       const key = name.trim().toLowerCase();
       const skill = skillIndex.find((s) => s.name.toLowerCase() === key);
       if (skill == null) {

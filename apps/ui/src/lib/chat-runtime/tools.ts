@@ -9,19 +9,33 @@ import { type ToolSet, tool } from "ai";
 import type { AssistantContextPayload } from "@/lib/chat-persistence/types";
 import { createChatBashTool } from "@/lib/tool/chat-bash-tool";
 import { navigateAppTool } from "@/lib/tool/chat-navigate-app-tool";
+import { refreshFrontendSwrCachesTool } from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import {
   buildChatSkillsDiscoveryPrompt,
   createLoadSkillTool,
   discoverPublicSkills,
 } from "@/lib/tool/chat-skill-tool";
+import {
+  chatToolIntentionField,
+  logChatToolIntention,
+} from "@/lib/tool/chat-tool-intention";
+import { sliceOpenApiDocsTool } from "@/lib/tool/openapi-doc-slice-tool";
+import { readApiOpenApiDocsTool } from "@/lib/tool/read-api-openapi-docs-tool";
 
 import { CHAT_BASE_SYSTEM_PROMPT } from "./model";
 import { buildAssistantWorkspaceContextPrompt } from "./workspace-context-prompt";
 
+const emitGenUISpecInputSchema = genUISpecInputSchema.extend({
+  intention: chatToolIntentionField,
+});
+
 const emitGenUISpec = tool({
   description: buildEmitGenUISpecDescription(),
-  inputSchema: genUISpecInputSchema,
-  execute: executeEmitGenUISpec,
+  inputSchema: emitGenUISpecInputSchema,
+  execute: (input) => {
+    logChatToolIntention("emitGenUISpec", input.intention);
+    return executeEmitGenUISpec({ spec: input.spec });
+  },
 });
 
 export interface ChatToolset {
@@ -53,6 +67,9 @@ export async function buildChatToolset({
   const tools = {
     emitGenUISpec,
     navigateApp: navigateAppTool,
+    refreshFrontendSwrCaches: refreshFrontendSwrCachesTool,
+    readApiOpenApiDocs: readApiOpenApiDocsTool,
+    sliceOpenApiDocs: sliceOpenApiDocsTool,
     loadSkill: createLoadSkillTool(skillIndex),
     ...bashTools,
   } as unknown as ToolSet;
