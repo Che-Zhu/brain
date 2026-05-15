@@ -192,6 +192,23 @@ spec:
               clusterVersionRef:
                 type: string
                 description: Observed KubeBlocks Cluster version reference used by the composed database Cluster.
+              mountPath:
+                type: string
+                description: Observed primary data volume mount path used by the database workload.
+              effectiveResources:
+                type: object
+                description: Effective database resource values after quota defaults and explicit spec overrides are resolved by the active Composition.
+                properties:
+                  cpuRequest:
+                    type: string
+                  memoryRequest:
+                    type: string
+                  cpuLimit:
+                    type: string
+                  memoryLimit:
+                    type: string
+                  storageSize:
+                    type: string
               observedReplicas:
                 type: integer
               availableReplicas:

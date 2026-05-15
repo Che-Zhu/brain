@@ -627,6 +627,11 @@
           "target": "components/metrics-chart/metrics-chart.area.tsx"
         },
         {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.compact.tsx",
+          "type": "registry:component",
+          "target": "components/metrics-chart/metrics-chart.compact.tsx"
+        },
+        {
           "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.tsx",
           "type": "registry:component",
           "target": "components/metrics-chart/metrics-chart.tsx"

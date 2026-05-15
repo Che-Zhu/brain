@@ -62,6 +62,21 @@ func TestDBXRDIncludesLifecycleFields(t *testing.T) {
 	if got := reason["type"]; got != "string" {
 		t.Fatalf("status.reason type = %v, want string", got)
 	}
+	mountPath := asMap(t, statusProps["mountPath"], "status.mountPath")
+	if got := mountPath["type"]; got != "string" {
+		t.Fatalf("status.mountPath type = %v, want string", got)
+	}
+	effectiveResources := asMap(t, statusProps["effectiveResources"], "status.effectiveResources")
+	if got := effectiveResources["type"]; got != "object" {
+		t.Fatalf("status.effectiveResources type = %v, want object", got)
+	}
+	effectiveResourceProps := asMap(t, effectiveResources["properties"], "status.effectiveResources.properties")
+	for _, field := range []string{"cpuRequest", "memoryRequest", "cpuLimit", "memoryLimit", "storageSize"} {
+		prop := asMap(t, effectiveResourceProps[field], "status.effectiveResources."+field)
+		if got := prop["type"]; got != "string" {
+			t.Fatalf("status.effectiveResources.%s type = %v, want string", field, got)
+		}
+	}
 	observed := asMap(t, statusProps["observed"], "status.observed")
 	observedProps := asMap(t, observed["properties"], "status.observed.properties")
 	for _, field := range []string{"kubeblocksPhase", "observedReplicas", "availableReplicas"} {
@@ -145,6 +160,15 @@ func TestDBCompositionsRenderProductLifecyclePhase(t *testing.T) {
 				`{{ else if or (eq $kbPhase "Updating") (eq $kbPhase "SpecUpdating") (eq $kbPhase "Upgrade") (eq $kbPhase "VerticalScaling") (eq $kbPhase "VolumeExpanding") }}`,
 				`phase: {{ $productPhase }}`,
 				`reason: {{ $reason | quote }}`,
+				`kind: StatefulSet`,
+				`volumeMounts`,
+				`mountPath: {{ $mountPath | quote }}`,
+				`effectiveResources:`,
+				`cpuRequest: {{ $cpu | quote }}`,
+				`memoryRequest: {{ $mem | quote }}`,
+				`cpuLimit: {{ $cpuLim | quote }}`,
+				`memoryLimit: {{ $memLim | quote }}`,
+				`storageSize: {{ $stor | quote }}`,
 				`observed:`,
 				`kubeblocksPhase: {{ $kbPhase | quote }}`,
 				`lifecycle:`,

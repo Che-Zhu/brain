@@ -1,6 +1,7 @@
 "use client";
 
 import { MetricsChartArea } from "./metrics-chart.area";
+import { MetricsChartCompact } from "./metrics-chart.compact";
 import { MetricsChartProvider } from "./metrics-chart.provider";
 import type { MetricsChartRootProps } from "./metrics-chart.types";
 
@@ -52,6 +53,7 @@ export function MetricsChartVariant1({
 
 export const MetricsChart = {
   Area: MetricsChartArea,
+  Compact: MetricsChartCompact,
   Root: MetricsChartRoot,
   Variant0: MetricsChartVariant0,
   Variant1: MetricsChartVariant1,

@@ -23,6 +23,13 @@ export const CANVAS_SERVICE_QUERY_KEY = "service" as const;
 /** nuqs key for the workload panel tab (`?tab=…`); value matches panel tab {@link CanvasPanelTab.name}. */
 export const CANVAS_TAB_QUERY_KEY = "tab" as const;
 
+/** nuqs key for the database action pane (`?dbPane=metrics`). */
+export const DATABASE_PANE_QUERY_KEY = "dbPane" as const;
+
+export const DATABASE_PANE = {
+  metrics: "metrics",
+} as const;
+
 /** Tab `name` values — doubles as Radix tab value and URL `?tab=…` value. */
 export const WORKLOAD_PANEL_TAB = {
   settings: "Settings",

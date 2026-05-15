@@ -53,6 +53,7 @@ spec:
             {{- $dbUid := .observed.composite.resource.metadata.uid }}
             {{- $kbCluster := getComposedResource . "kubeblocks-cluster" }}
             {{- $redisConnCredentialObject := getComposedResource . "redis-conn-credential-object" }}
+            {{- $redisStatefulSetObject := getComposedResource . "redis-statefulset-object" }}
             {{- $exportSvc := getComposedResource . "db-nodeport-export" }}
             {{- $spec := .observed.composite.resource.spec }}
             {{- $projectName := "" }}
@@ -73,7 +74,16 @@ spec:
                 {{- if and (eq .type "Ready") .lastTransitionTime }}
                   {{- $lastTransition = .lastTransitionTime }}
                 {{- end }}
-              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $mountPath := "/data" }}
+            {{- if and $redisStatefulSetObject $redisStatefulSetObject.status $redisStatefulSetObject.status.atProvider $redisStatefulSetObject.status.atProvider.manifest }}
+            {{- $containers := dig "spec" "template" "spec" "containers" (list) $redisStatefulSetObject.status.atProvider.manifest }}
+            {{- range $container := $containers }}
+            {{- range $mount := (index $container "volumeMounts") }}
+            {{- if and (eq (toString (index $mount "name")) "data") (index $mount "mountPath") }}{{- $mountPath = toString (index $mount "mountPath") }}{{- end }}
+            {{- end }}
+            {{- end }}
             {{- end }}
             {{- $quota := .observed.composite.resource.spec.quota | default "xs" | lower }}
             {{- $cpu := "100m" }}{{- $mem := "512Mi" }}{{- $cpuLim := "500m" }}{{- $memLim := "768Mi" }}{{- $stor := "3Gi" }}
@@ -508,6 +518,30 @@ spec:
                     namespace: {{ $ns }}
 
             ---
+
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-statefulset-observe" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-statefulset-object
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: StatefulSet
+                  metadata:
+                    name: {{ printf "%s-redis" $name }}
+                    namespace: {{ $ns }}
+
+            ---
             {{- $connPriv := "" }}
             {{- $connPub := "" }}
             {{- if and $redisConnCredentialObject $redisConnCredentialObject.status $redisConnCredentialObject.status.atProvider $redisConnCredentialObject.status.atProvider.manifest }}
@@ -584,6 +618,13 @@ spec:
               phase: {{ $productPhase }}
               reason: {{ $reason | quote }}
               clusterVersionRef: {{ $redisVersion | quote }}
+              mountPath: {{ $mountPath | quote }}
+              effectiveResources:
+                cpuRequest: {{ $cpu | quote }}
+                memoryRequest: {{ $mem | quote }}
+                cpuLimit: {{ $cpuLim | quote }}
+                memoryLimit: {{ $memLim | quote }}
+                storageSize: {{ $stor | quote }}
               observedReplicas: {{ $observedReplicas }}
               availableReplicas: {{ $availableReplicas }}
               observed:

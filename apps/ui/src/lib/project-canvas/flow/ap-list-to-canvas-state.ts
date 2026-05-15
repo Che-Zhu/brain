@@ -179,6 +179,71 @@ function databaseVersionFromResource({
   );
 }
 
+function databaseStatusFromResource(status: Record<string, unknown>) {
+  const phaseRaw = nonEmptyString(status.phase) ?? "";
+  const label = phaseRaw === "" ? "Unknown" : phaseRaw;
+  const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
+  const tone = getToneForStatus(phaseForTone) ?? "pending";
+  return { label, tone };
+}
+
+function databaseMetricsFromTelemetry(
+  telemetry: WorkloadMetricPercents | undefined
+): DatabaseNodeStates["metrics"] {
+  return {
+    ...(telemetry?.cpuPercent === undefined
+      ? {}
+      : { cpu: telemetry.cpuPercent }),
+    ...(telemetry?.memoryPercent === undefined
+      ? {}
+      : { memory: telemetry.memoryPercent }),
+    ...(telemetry?.storagePercent === undefined
+      ? {}
+      : { storage: telemetry.storagePercent }),
+  };
+}
+
+function databaseMetricCapacitiesFromStatus(
+  status: Record<string, unknown>
+): DatabaseNodeStates["metricCapacities"] | undefined {
+  const effectiveResources = asRecord(status.effectiveResources);
+  if (effectiveResources === undefined) {
+    return undefined;
+  }
+  const cpuCapacity = nonEmptyString(effectiveResources.cpuLimit);
+  const memoryCapacity = nonEmptyString(effectiveResources.memoryLimit);
+  const storageCapacity = nonEmptyString(effectiveResources.storageSize);
+  const metricCapacities: DatabaseNodeStates["metricCapacities"] = {
+    ...(cpuCapacity === undefined ? {} : { cpu: cpuCapacity }),
+    ...(memoryCapacity === undefined ? {} : { memory: memoryCapacity }),
+    ...(storageCapacity === undefined ? {} : { storage: storageCapacity }),
+  };
+  return Object.keys(metricCapacities).length === 0
+    ? undefined
+    : metricCapacities;
+}
+
+function databaseConnectionsFromResource(
+  spec: Record<string, unknown>,
+  status: Record<string, unknown>
+): DatabaseNodeConnection[] {
+  return [
+    {
+      id: "private",
+      kind: "private",
+      label: "Private connection",
+      value: nonEmptyString(status.connectionStringPrivate),
+    },
+    {
+      id: "public",
+      kind: "public",
+      label: "Public connection",
+      publicAccess: { enabled: spec.exposeNodePort === true },
+      value: nonEmptyString(status.connectionStringPublic),
+    },
+  ];
+}
+
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
  * Sets **kind**, **image**, **name**, **replicas** (from spec), **uid** (from
@@ -302,10 +367,6 @@ export function dbToDatabaseNodeData(
   const namespace = metadataNamespace(db) ?? options?.namespaceFallback ?? "";
   const uid = metadataUid(db);
   const engineKey = nonEmptyString(spec.engine);
-  const phaseRaw = nonEmptyString(status.phase) ?? "";
-  const label = phaseRaw === "" ? "Unknown" : phaseRaw;
-  const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
-  const tone = getToneForStatus(phaseForTone) ?? "pending";
   const lookupKey =
     namespace === "" || name === ""
       ? undefined
@@ -315,21 +376,12 @@ export function dbToDatabaseNodeData(
       ? undefined
       : options?.metricsLookup?.get(lookupKey);
 
-  const metrics: DatabaseNodeStates["metrics"] = {
-    ...(telemetry?.cpuPercent === undefined
-      ? {}
-      : { cpu: telemetry.cpuPercent }),
-    ...(telemetry?.memoryPercent === undefined
-      ? {}
-      : { memory: telemetry.memoryPercent }),
-    ...(telemetry?.storagePercent === undefined
-      ? {}
-      : { storage: telemetry.storagePercent }),
-  };
   const formattedVersion = databaseVersionFromResource({
     engineKey,
     status,
   });
+  const metricCapacities = databaseMetricCapacitiesFromStatus(status);
+  const mountPath = nonEmptyString(status.mountPath);
 
   const states: DatabaseNodeStates = {
     displayEngine: displayEngineFromKey(engineKey),
@@ -337,29 +389,15 @@ export function dbToDatabaseNodeData(
       ? {}
       : { engineKey: engineKey as DatabaseEngineKey }),
     ...(formattedVersion === undefined ? {} : { formattedVersion }),
-    metrics,
+    ...(metricCapacities === undefined ? {} : { metricCapacities }),
+    metrics: databaseMetricsFromTelemetry(telemetry),
+    ...(mountPath === undefined ? {} : { mountPath }),
     name,
-    status: { label, tone },
+    status: databaseStatusFromResource(status),
   };
 
-  const connections: DatabaseNodeConnection[] = [
-    {
-      id: "private",
-      kind: "private",
-      label: "Private connection",
-      value: nonEmptyString(status.connectionStringPrivate),
-    },
-    {
-      id: "public",
-      kind: "public",
-      label: "Public connection",
-      publicAccess: { enabled: spec.exposeNodePort === true },
-      value: nonEmptyString(status.connectionStringPublic),
-    },
-  ];
-
   return {
-    connections,
+    connections: databaseConnectionsFromResource(spec, status),
     states,
     ...(uid === undefined || uid === "" ? {} : { uid }),
     workload: { name, namespace },

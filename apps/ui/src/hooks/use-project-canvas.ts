@@ -31,6 +31,8 @@ import type {
 import {
   CANVAS_SERVICE_QUERY_KEY,
   CANVAS_TAB_QUERY_KEY,
+  DATABASE_PANE,
+  DATABASE_PANE_QUERY_KEY,
   projectCanvasFlowNodeTypes,
   projectCanvasNodeServiceUid,
   projectCanvasWorkloadPanelTabs,
@@ -60,6 +62,10 @@ export function useProjectCanvas(
   const [panelTab, setPanelTab] = useQueryState(
     CANVAS_TAB_QUERY_KEY,
     parseAsString.withDefault(WORKLOAD_PANEL_TAB.settings)
+  );
+  const [databasePane, setDatabasePane] = useQueryState(
+    DATABASE_PANE_QUERY_KEY,
+    parseAsString
   );
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
@@ -188,6 +194,8 @@ export function useProjectCanvas(
         onClick: () => runMutationThenRefresh(mutation, copy),
       });
       const displayName = data.states.name || name;
+      const uid = data.uid?.trim();
+      const hasUrlActions = uid != null && uid !== "";
       const lifecycleActions = canUseLifecycle
         ? {
             delete: dbLifecycleAction(
@@ -228,6 +236,21 @@ export function useProjectCanvas(
               ? {}
               : { togglePublicConnection }),
             ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
+            quickActions: {
+              ...(data.actions?.quickActions ?? {}),
+              metrics: {
+                disabled: !hasUrlActions,
+                onClick: hasUrlActions
+                  ? () => {
+                      setSelectedEdge(null);
+                      setServiceUid(uid).catch(() => undefined);
+                      setDatabasePane(DATABASE_PANE.metrics).catch(
+                        () => undefined
+                      );
+                    }
+                  : undefined,
+              },
+            },
           },
           connections,
         },
@@ -242,8 +265,11 @@ export function useProjectCanvas(
       isDbLifecycleLoading,
       restartDbWorkload,
       runMutationThenRefresh,
+      setDatabasePane,
       startDbWorkload,
       stopDbWorkload,
+      setSelectedEdge,
+      setServiceUid,
       togglePublicAccess,
     ]
   );
@@ -365,12 +391,41 @@ export function useProjectCanvas(
     }
   }, [isStale, setServiceUid]);
 
+  useEffect(() => {
+    if (
+      databasePane === DATABASE_PANE.metrics &&
+      (serviceUid == null ||
+        serviceUid === "" ||
+        (selectedNode == null && rawNodes.length > 0) ||
+        (selectedNode != null &&
+          selectedNode.type !== CANVAS_DATABASE_NODE_TYPE))
+    ) {
+      setDatabasePane(null).catch(() => undefined);
+    }
+  }, [
+    databasePane,
+    rawNodes.length,
+    selectedNode,
+    serviceUid,
+    setDatabasePane,
+  ]);
+
   const clearSelection = useMemo(
     () => () => {
       setSelectedEdge(null);
       setServiceUid(null).catch(() => undefined);
+      setDatabasePane(null).catch(() => undefined);
     },
-    [setSelectedEdge, setServiceUid]
+    [setDatabasePane, setSelectedEdge, setServiceUid]
+  );
+
+  const closeDatabasePane = useMemo(
+    () => () => {
+      setSelectedEdge(null);
+      setServiceUid(null).catch(() => undefined);
+      setDatabasePane(null).catch(() => undefined);
+    },
+    [setDatabasePane, setSelectedEdge, setServiceUid]
   );
 
   const meta = useMemo<CanvasMeta>(
@@ -383,6 +438,9 @@ export function useProjectCanvas(
       reactFlowProps: {
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
+          if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
+            setDatabasePane(null).catch(() => undefined);
+          }
           setServiceUid(projectCanvasNodeServiceUid(node)).catch(
             () => undefined
           );
@@ -390,12 +448,28 @@ export function useProjectCanvas(
         onEdgeClick: (_, edge: Edge) => {
           setSelectedEdge(edge);
           setServiceUid(null).catch(() => undefined);
+          setDatabasePane(null).catch(() => undefined);
         },
         onPaneClick: () => clearSelection(),
       },
     }),
-    [clearSelection, panelTab, setPanelTab, setSelectedEdge, setServiceUid]
+    [
+      clearSelection,
+      panelTab,
+      setDatabasePane,
+      setPanelTab,
+      setSelectedEdge,
+      setServiceUid,
+    ]
   );
 
-  return { clearSelection, meta, nodes, selectedEdge, selectedNode };
+  return {
+    clearSelection,
+    closeDatabasePane,
+    databasePane,
+    meta,
+    nodes,
+    selectedEdge,
+    selectedNode,
+  };
 }

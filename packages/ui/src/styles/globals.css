@@ -55,6 +55,15 @@
   --color-background-secondary: var(--background-secondary);
   --color-background-selected: var(--background-selected);
   --color-background-tertiary: var(--background-tertiary);
+  --color-database-metrics-card: var(--database-metrics-card);
+  --color-database-metrics-chart: var(--database-metrics-chart);
+  --color-database-metrics-grid: var(--database-metrics-grid);
+  --color-database-metrics-pane: var(--database-metrics-pane);
+  --color-database-metrics-pane-overlay: var(--database-metrics-pane-overlay);
+  --color-database-metrics-status-running: var(
+    --database-metrics-status-running
+  );
+  --color-database-metrics-storage-track: var(--database-metrics-storage-track);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -110,6 +119,13 @@
     var(--color-theme-gray) 55%,
     transparent
   );
+  --database-metrics-pane: oklch(0.105 0.018 265);
+  --database-metrics-pane-overlay: oklch(1 0 0 / 4.5%);
+  --database-metrics-card: oklch(1 0 0 / 5%);
+  --database-metrics-chart: oklch(0.6231 0.188 259.81);
+  --database-metrics-grid: oklch(1 0 0 / 8%);
+  --database-metrics-status-running: oklch(0.72 0.17 149 / 30%);
+  --database-metrics-storage-track: oklch(1 0 0 / 5%);
 }
 
 .dark {
@@ -191,6 +207,15 @@
   }
   .scrollbar-chat-thin:hover::-webkit-scrollbar-thumb {
     background-color: var(--border);
+  }
+
+  .database-metrics-pane-surface {
+    background-color: var(--database-metrics-pane);
+    background-image: linear-gradient(
+      90deg,
+      var(--database-metrics-pane-overlay) 0%,
+      var(--database-metrics-pane-overlay) 100%
+    );
   }
 }
 

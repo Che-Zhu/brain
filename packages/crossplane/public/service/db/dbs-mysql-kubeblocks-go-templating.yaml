@@ -52,6 +52,7 @@ spec:
             {{- $dbUid := .observed.composite.resource.metadata.uid }}
             {{- $kbCluster := getComposedResource . "kubeblocks-cluster" }}
             {{- $mysqlConnCredentialObject := getComposedResource . "mysql-conn-credential-object" }}
+            {{- $mysqlStatefulSetObject := getComposedResource . "mysql-statefulset-object" }}
             {{- $exportSvc := getComposedResource . "db-nodeport-export" }}
             {{- $spec := .observed.composite.resource.spec }}
             {{- $projectName := "" }}
@@ -71,6 +72,15 @@ spec:
             {{- range $kbCluster.status.conditions }}
             {{- if and (eq .type "Ready") .lastTransitionTime }}
             {{- $lastTransition = .lastTransitionTime }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $mountPath := "/var/lib/mysql" }}
+            {{- if and $mysqlStatefulSetObject $mysqlStatefulSetObject.status $mysqlStatefulSetObject.status.atProvider $mysqlStatefulSetObject.status.atProvider.manifest }}
+            {{- $containers := dig "spec" "template" "spec" "containers" (list) $mysqlStatefulSetObject.status.atProvider.manifest }}
+            {{- range $container := $containers }}
+            {{- range $mount := (index $container "volumeMounts") }}
+            {{- if and (eq (toString (index $mount "name")) "data") (index $mount "mountPath") }}{{- $mountPath = toString (index $mount "mountPath") }}{{- end }}
             {{- end }}
             {{- end }}
             {{- end }}
@@ -475,6 +485,30 @@ spec:
                     namespace: {{ $ns }}
 
             ---
+
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-statefulset-observe" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: mysql-statefulset-object
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: StatefulSet
+                  metadata:
+                    name: {{ printf "%s-mysql" $name }}
+                    namespace: {{ $ns }}
+
+            ---
             {{- $connPriv := "" }}
             {{- $connPub := "" }}
             {{- if and $mysqlConnCredentialObject $mysqlConnCredentialObject.status $mysqlConnCredentialObject.status.atProvider $mysqlConnCredentialObject.status.atProvider.manifest }}
@@ -552,6 +586,13 @@ spec:
               phase: {{ $productPhase }}
               reason: {{ $reason | quote }}
               clusterVersionRef: {{ $clusterVersion | quote }}
+              mountPath: {{ $mountPath | quote }}
+              effectiveResources:
+                cpuRequest: {{ $cpu | quote }}
+                memoryRequest: {{ $mem | quote }}
+                cpuLimit: {{ $cpuLim | quote }}
+                memoryLimit: {{ $memLim | quote }}
+                storageSize: {{ $stor | quote }}
               observedReplicas: {{ $observedReplicas }}
               availableReplicas: {{ $availableReplicas }}
               observed:
