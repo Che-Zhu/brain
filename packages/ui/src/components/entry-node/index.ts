@@ -11,7 +11,6 @@ export type {
   EntryNodeContextValue,
   EntryNodeCopyTargetHandler,
   EntryNodeMeta,
-  EntryNodeOpenTargetSettingsHandler,
   EntryNodeProviderProps,
   EntryNodeRootProps,
   EntryNodeState,

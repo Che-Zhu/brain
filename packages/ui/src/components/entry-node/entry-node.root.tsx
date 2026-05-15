@@ -23,7 +23,6 @@ export function EntryNodeRoot({
   interaction,
   onCopyTarget,
   onExpandedChange,
-  onOpenTargetSettings,
   states,
   targets,
 }: EntryNodeRootProps) {
@@ -42,7 +41,6 @@ export function EntryNodeRoot({
           const value: EntryNodeContextValue = {
             actions: {
               copyTarget: onCopyTarget,
-              openTargetSettings: onOpenTargetSettings,
             },
             meta: {
               copiedFeedbackMs,

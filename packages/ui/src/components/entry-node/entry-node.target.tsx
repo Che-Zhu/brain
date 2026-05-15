@@ -1,9 +1,7 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import { cn } from "@workspace/ui/lib/utils";
-import { Ellipsis } from "lucide-react";
 
 import { useEntryNode } from "./entry-node.context";
 import { resolveEntryNodeTargetVisualStatus } from "./entry-node.status";
@@ -84,44 +82,26 @@ export function EntryNodeTargetRow({
       title={target.value}
     >
       {({ copied }) => (
-        <>
-          <div
-            aria-hidden
-            className="entry-node-target-content pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-2"
-          >
-            <div className="flex min-w-0 items-center gap-1.5">
-              <CanvasNode.StatusDot size="small" status={visualStatus} />
-              <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
-                {target.label}
-              </span>
-            </div>
-            <span
-              className="flex h-7 w-full min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs text-zinc-50 leading-4"
-              data-copied={copied ? "true" : undefined}
-              data-slot="entry-node-target-value"
-              title={target.value}
-            >
-              <span className="min-w-0 truncate">{target.value}</span>
-              <CanvasNode.CopyableRowIndicator />
+        <div
+          aria-hidden
+          className="entry-node-target-content pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-2"
+        >
+          <div className="flex min-w-0 items-center gap-1.5">
+            <CanvasNode.StatusDot size="small" status={visualStatus} />
+            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+              {target.label}
             </span>
           </div>
-          <CanvasNode.CopyableRowControl className="pointer-events-auto relative z-20 flex shrink-0">
-            <Button
-              aria-label={`Open settings for ${target.label}`}
-              className="entry-node-target-settings flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-zinc-950/20 p-0 text-zinc-50 shadow-none transition-colors hover:text-zinc-50"
-              data-slot="entry-node-target-settings"
-              onClick={() => {
-                actions.openTargetSettings?.(target, index);
-              }}
-              size={null}
-              title={`Open settings for ${target.label}`}
-              type="button"
-              variant={null}
-            >
-              <Ellipsis aria-hidden className="size-4" />
-            </Button>
-          </CanvasNode.CopyableRowControl>
-        </>
+          <span
+            className="flex h-7 w-full min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs text-zinc-50 leading-4"
+            data-copied={copied ? "true" : undefined}
+            data-slot="entry-node-target-value"
+            title={target.value}
+          >
+            <span className="min-w-0 truncate">{target.value}</span>
+            <CanvasNode.CopyableRowIndicator />
+          </span>
+        </div>
       )}
     </CanvasNode.CopyableRow>
   );
