@@ -488,6 +488,7 @@ spec:
                 - Observe
                 - Create
                 - Update
+                - Delete
               providerConfigRef:
                 kind: ClusterProviderConfig
                 name: default

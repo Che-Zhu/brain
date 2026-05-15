@@ -241,12 +241,33 @@ func TestProviderKubernetesRBACAllowsEntryPointWrites(t *testing.T) {
 	text := string(raw)
 	for _, fragment := range []string{
 		`resources: ["entrypoints"]`,
-		`verbs: ["get", "list", "watch", "create", "update", "patch"]`,
+		`verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]`,
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("expected provider-kubernetes RBAC to contain %q", fragment)
 		}
 	}
+}
+
+func TestAPCompositionAllowsGeneratedEntryPointCleanup(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"endpoints": []interface{}{
+						map[string]interface{}{"port": 80},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	entryPointObject := singleEntryPointObject(t, out)
+	assertManagementPolicies(t, entryPointObject, "Observe", "Create", "Update", "Delete")
 }
 
 func repoRoot(t *testing.T) string {

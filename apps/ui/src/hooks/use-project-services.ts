@@ -22,86 +22,14 @@ import {
   dbsToCanvasState,
   entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import {
+  entryPointRefreshIntervalForLifecycle,
+  hasTransientWorkloadPhase,
+} from "./project-services-refresh";
 
 const METRICS_REFRESH_MS = 5000;
 const WORKLOAD_RECONCILE_POLL_MS = 1000;
 const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
-const WORKLOAD_TRANSIENT_PHASES = new Set([
-  "binding",
-  "creating",
-  "deleting",
-  "pending",
-  "progressing",
-  "reconciling",
-  "restarting",
-  "starting",
-  "stopping",
-  "updating",
-]);
-
-function normalizeWorkloadPhase(input: unknown) {
-  return typeof input === "string"
-    ? input
-        .trim()
-        .toLowerCase()
-        .replace(/[\s_]+/g, "-")
-    : "";
-}
-
-function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
-  return apItemsFromList(data).some((item) => {
-    const status =
-      item != null && typeof item === "object" && "status" in item
-        ? item.status
-        : undefined;
-    const phase =
-      status != null && typeof status === "object" && "phase" in status
-        ? status.phase
-        : undefined;
-    return WORKLOAD_TRANSIENT_PHASES.has(normalizeWorkloadPhase(phase));
-  });
-}
-
-function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
-  return apItemsFromList(data).some((item) => {
-    if (item == null || typeof item !== "object") {
-      return false;
-    }
-    const root = item as Record<string, unknown>;
-    const status =
-      root.status != null && typeof root.status === "object"
-        ? (root.status as Record<string, unknown>)
-        : undefined;
-    const statusEndpoints = Array.isArray(status?.endpoints)
-      ? status.endpoints
-      : [];
-    if (
-      statusEndpoints.some(
-        (endpoint) =>
-          endpoint != null &&
-          typeof endpoint === "object" &&
-          typeof (endpoint as Record<string, unknown>).publicAddress ===
-            "string"
-      )
-    ) {
-      return true;
-    }
-
-    const spec =
-      root.spec != null && typeof root.spec === "object"
-        ? (root.spec as Record<string, unknown>)
-        : undefined;
-    if (Array.isArray(spec?.endpoints)) {
-      return spec.endpoints.some(
-        (endpoint) =>
-          endpoint != null &&
-          typeof endpoint === "object" &&
-          (endpoint as Record<string, unknown>).public !== false
-      );
-    }
-    return typeof spec?.host === "string" && typeof spec?.port === "number";
-  });
-}
 
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
@@ -183,17 +111,12 @@ export function useProjectServices(options: {
     refreshInterval: workloadReconcileRefreshInterval,
   });
   const entryPointRefreshInterval = useCallback(
-    (latestData: K8sGetResponse | undefined) => {
-      if (
-        workloadReconcilePollUntil > Date.now() ||
-        hasTransientWorkloadPhase(apsData) ||
-        (hasPublicApEndpoint(apsData) &&
-          apItemsFromList(latestData).length === 0)
-      ) {
-        return WORKLOAD_RECONCILE_POLL_MS;
-      }
-      return 0;
-    },
+    (latestData: K8sGetResponse | undefined) =>
+      entryPointRefreshIntervalForLifecycle({
+        apsData,
+        entryPointsData: latestData,
+        workloadReconcilePollUntil,
+      }),
     [apsData, workloadReconcilePollUntil]
   );
   const {
