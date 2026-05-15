@@ -34,6 +34,10 @@ rules:
   - apiGroups: ["example.crossplane.io"]
     resources: ["dbs", "notifs"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  # AP composition creates EntryPoint resources for public access targets.
+  - apiGroups: ["example.crossplane.io"]
+    resources: ["entrypoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   # DB compositions observe KubeBlocks-created StatefulSets to expose the actual data mountPath.
   - apiGroups: ["apps"]
     resources: ["statefulsets"]

@@ -468,6 +468,61 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- $entryTargetStatus := "unknown" }}
+            {{- if eq $phase "Running" }}{{ $entryTargetStatus = "accessible" }}
+            {{- else if eq $phase "Progressing" }}{{ $entryTargetStatus = "progressing" }}
+            {{- else if or (eq $phase "Failed") (eq $phase "Degraded") (eq $phase "Paused") }}{{ $entryTargetStatus = "inaccessible" }}
+            {{- end }}
+            {{- if $needIngress }}
+            ---
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-entrypoint" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-entrypoint
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+                - Create
+                - Update
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: example.crossplane.io/v1
+                  kind: EntryPoint
+                  metadata:
+                    name: {{ $name }}
+                    namespace: {{ $ns }}
+                    labels:
+                      crossplane.io/composite: {{ $name | quote }}
+                      {{ if ne $projectName "" }}
+                      crossplane.io/project-name: {{ $projectName | quote }}
+                      {{ end }}
+                      {{ if ne $projectUid "" }}
+                      crossplane.io/project-uid: {{ $projectUid | quote }}
+                      {{ end }}
+                    ownerReferences:
+                    - apiVersion: example.crossplane.io/v1
+                      kind: AP
+                      name: {{ $name }}
+                      uid: {{ $apUid }}
+                  spec:
+                    apRef: {{ $name | quote }}
+                    targets:
+                      {{ range $endpoints }}
+                      {{ if and .public (ne (trim (toString (default "" .host))) "") }}
+                      - port: {{ .port }}
+                        platformDomain: {{ trim (toString .host) | quote }}
+                        status: {{ $entryTargetStatus | quote }}
+                      {{ end }}
+                      {{ end }}
+            {{- end }}
+
             ---
 
             apiVersion: example.crossplane.io/v1

@@ -4,6 +4,7 @@ import {
   useApsK8sList,
   useApTelemetryMetricsBatch,
   useDbsK8sList,
+  useEntryPointList,
 } from "@workspace/api/hooks";
 import {
   apItemsFromList,
@@ -19,6 +20,7 @@ import {
   apMetricsLookupFromResults,
   apsToCanvasState,
   dbsToCanvasState,
+  entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 
 const METRICS_REFRESH_MS = 5000;
@@ -60,6 +62,47 @@ function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
   });
 }
 
+function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
+  return apItemsFromList(data).some((item) => {
+    if (item == null || typeof item !== "object") {
+      return false;
+    }
+    const root = item as Record<string, unknown>;
+    const status =
+      root.status != null && typeof root.status === "object"
+        ? (root.status as Record<string, unknown>)
+        : undefined;
+    const statusEndpoints = Array.isArray(status?.endpoints)
+      ? status.endpoints
+      : [];
+    if (
+      statusEndpoints.some(
+        (endpoint) =>
+          endpoint != null &&
+          typeof endpoint === "object" &&
+          typeof (endpoint as Record<string, unknown>).publicAddress ===
+            "string"
+      )
+    ) {
+      return true;
+    }
+
+    const spec =
+      root.spec != null && typeof root.spec === "object"
+        ? (root.spec as Record<string, unknown>)
+        : undefined;
+    if (Array.isArray(spec?.endpoints)) {
+      return spec.endpoints.some(
+        (endpoint) =>
+          endpoint != null &&
+          typeof endpoint === "object" &&
+          (endpoint as Record<string, unknown>).public !== false
+      );
+    }
+    return typeof spec?.host === "string" && typeof spec?.port === "number";
+  });
+}
+
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
   kubeconfig: string;
@@ -72,6 +115,7 @@ export function useProjectServices(options: {
   data: {
     aps: K8sGetResponse | undefined;
     dbs: K8sGetResponse | undefined;
+    entryPoints: K8sGetResponse | undefined;
   };
   canvasState: CanvasState;
   error: Error | undefined;
@@ -138,6 +182,31 @@ export function useProjectServices(options: {
     pollWhileEmpty: true,
     refreshInterval: workloadReconcileRefreshInterval,
   });
+  const entryPointRefreshInterval = useCallback(
+    (latestData: K8sGetResponse | undefined) => {
+      if (
+        workloadReconcilePollUntil > Date.now() ||
+        hasTransientWorkloadPhase(apsData) ||
+        (hasPublicApEndpoint(apsData) &&
+          apItemsFromList(latestData).length === 0)
+      ) {
+        return WORKLOAD_RECONCILE_POLL_MS;
+      }
+      return 0;
+    },
+    [apsData, workloadReconcilePollUntil]
+  );
+  const {
+    data: entryPointsData,
+    error: entryPointsError,
+    isLoading: entryPointsLoading,
+    mutate: mutateEntryPoints,
+  } = useEntryPointList({
+    kubeconfig,
+    labelSelector,
+    namespace,
+    refreshInterval: entryPointRefreshInterval,
+  });
   const { items: dbCompositionRows } = useDbCompositions({
     kubeconfig,
     toItems: true,
@@ -150,12 +219,12 @@ export function useProjectServices(options: {
     setWorkloadReconcilePollUntil(
       Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS
     );
-    return Promise.all([mutateAps(), mutateDbs()]);
-  }, [mutateAps, mutateDbs]);
+    return Promise.all([mutateAps(), mutateDbs(), mutateEntryPoints()]);
+  }, [mutateAps, mutateDbs, mutateEntryPoints]);
 
   const data = useMemo(
-    () => ({ aps: apsData, dbs: dbsData }),
-    [apsData, dbsData]
+    () => ({ aps: apsData, dbs: dbsData, entryPoints: entryPointsData }),
+    [apsData, dbsData, entryPointsData]
   );
 
   const apTargets = useMemo(
@@ -214,16 +283,26 @@ export function useProjectServices(options: {
       metricsLookup,
       namespaceFallback: namespace,
     });
+    const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
+      gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
+    });
     return {
-      edges: [...apBlock.edges, ...dbBlock.edges],
-      nodes: [...apBlock.nodes, ...dbBlock.nodes],
+      edges: [...apBlock.edges, ...dbBlock.edges, ...entryPointBlock.edges],
+      nodes: [...apBlock.nodes, ...dbBlock.nodes, ...entryPointBlock.nodes],
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [apsData, dbsData, dbCompositionIconByName, namespace, metricsLookup]);
+  }, [
+    apsData,
+    dbsData,
+    entryPointsData,
+    dbCompositionIconByName,
+    namespace,
+    metricsLookup,
+  ]);
 
-  const error = apsError ?? dbsError;
-  const isLoading = apsLoading || dbsLoading;
+  const error = apsError ?? dbsError ?? entryPointsError;
+  const isLoading = apsLoading || dbsLoading || entryPointsLoading;
   const graphEmpty =
     canvasState.nodes.length === 0 && canvasState.edges.length === 0;
 

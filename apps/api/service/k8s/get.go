@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -38,6 +39,22 @@ type GetOptions struct {
 	FieldSelector string
 	// AllNamespaces when true lists across all namespaces (like kubectl get pods -A).
 	AllNamespaces bool
+}
+
+type UnknownResourceError struct {
+	Resource string
+}
+
+func (err UnknownResourceError) Error() string {
+	return fmt.Sprintf("unknown resource %q", err.Resource)
+}
+
+func IsUnknownResourceError(err error, resource string) bool {
+	var unknownResourceErr UnknownResourceError
+	if !errors.As(err, &unknownResourceErr) {
+		return false
+	}
+	return resource == "" || unknownResourceErr.Resource == resource
 }
 
 // Get retrieves Kubernetes resources and returns them as JSON.
@@ -452,5 +469,5 @@ func resolveResource(d discovery.DiscoveryInterface, resource string) (schema.Gr
 			}
 		}
 	}
-	return schema.GroupVersionResource{}, false, fmt.Errorf("unknown resource %q", resource)
+	return schema.GroupVersionResource{}, false, UnknownResourceError{Resource: resource}
 }

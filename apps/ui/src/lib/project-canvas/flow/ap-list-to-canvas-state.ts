@@ -11,11 +11,17 @@ import type {
   DatabaseNodeConnection,
   DatabaseNodeStates,
 } from "@workspace/ui/components/database-node/database-node";
+import type {
+  EntryNodeAccessDomain,
+  EntryNodeTarget,
+  EntryNodeTargetStatus,
+} from "@workspace/ui/components/entry-node/entry-node";
 import type { Edge, Node } from "@xyflow/react";
 
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
+  CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
 import type { CanvasDatabaseNodeData } from "../nodes/types";
 
@@ -37,6 +43,9 @@ const DISPLAY_ENGINE_BY_KEY: Record<string, string> = {
   redis: "Redis",
 };
 
+const ENTRY_NODE_PROTOCOL_PATTERN = /^https?:\/\//;
+const ENTRY_NODE_STATUS_SEPARATOR_PATTERN = /[\s_]+/g;
+const ENTRY_NODE_TRAILING_SLASH_PATTERN = /\/$/;
 const VERSION_NUMBER_PATTERN = /\d+(?:\.\d+)+/;
 
 export interface WorkloadMetricPercents {
@@ -325,6 +334,11 @@ export interface DbsToCanvasStateOptions {
   namespaceFallback?: string;
 }
 
+export interface EntryPointsToCanvasStateOptions {
+  /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
+  gridIndexOffset?: number;
+}
+
 /**
  * Builds React Flow `nodes` / `edges` for the project AP list (canvas state).
  */
@@ -451,4 +465,126 @@ export function dbsToCanvasState(
     };
   });
   return { nodes, edges: [] };
+}
+
+/**
+ * Builds React Flow `nodes` / `edges` for EntryPoint claims.
+ */
+export function entryPointsToCanvasState(
+  data: K8sGetResponse | undefined,
+  options?: EntryPointsToCanvasStateOptions
+): { edges: Edge[]; nodes: Node[] } {
+  const items = apItemsFromList(data);
+  const grid0 = options?.gridIndexOffset ?? 0;
+  const nodes: Node[] = items.map((item, i) => {
+    const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
+    const name = metadataName(item) ?? "unknown";
+    const targets = entryNodeTargetsFromResource(item);
+    const accessDomain = entryNodeAccessDomainFromTargets(targets);
+    const g = grid0 + i;
+
+    return {
+      data: {
+        ...(accessDomain === undefined ? {} : { accessDomain }),
+        states: { name },
+        targets,
+      },
+      id: `entry-${String(stable).replace(/\s+/g, "-")}`,
+      position: fallbackCanvasPosition(g),
+      type: CANVAS_ENTRY_NODE_TYPE,
+    };
+  });
+  return { nodes, edges: [] };
+}
+
+function entryPointTargets(input: unknown): unknown[] {
+  const root = asRecord(input) ?? {};
+  const statusTargets = asRecord(root.status)?.targets;
+  if (Array.isArray(statusTargets)) {
+    return statusTargets;
+  }
+  const specTargets = asRecord(root.spec)?.targets;
+  return Array.isArray(specTargets) ? specTargets : [];
+}
+
+function entryNodeTargetsFromResource(input: unknown): EntryNodeTarget[] {
+  return entryPointTargets(input)
+    .map((target, index): EntryNodeTarget | undefined => {
+      const record = asRecord(target) ?? {};
+      const platformDomain = platformDomainFromTarget(record);
+      if (platformDomain === undefined) {
+        return undefined;
+      }
+      const port = entryPointTargetPort(record.port);
+      const idPort = port === undefined ? `target-${index}` : String(port);
+
+      return {
+        id: `${idPort}-${platformDomain}`,
+        label: "Public Domain",
+        status: entryPointTargetStatus(record.status),
+        value: `https://${platformDomain}/`,
+      };
+    })
+    .filter((target): target is EntryNodeTarget => target !== undefined);
+}
+
+function entryNodeAccessDomainFromTargets(
+  targets: readonly EntryNodeTarget[]
+): EntryNodeAccessDomain | undefined {
+  const first = targets[0];
+  if (first === undefined) {
+    return undefined;
+  }
+  const value = first.value
+    .replace(ENTRY_NODE_PROTOCOL_PATTERN, "")
+    .replace(ENTRY_NODE_TRAILING_SLASH_PATTERN, "");
+  return { label: "Access domain", value };
+}
+
+function platformDomainFromTarget(
+  target: Record<string, unknown>
+): string | undefined {
+  const raw = nonEmptyString(target.platformDomain);
+  if (raw === undefined) {
+    return undefined;
+  }
+  try {
+    return new URL(raw).hostname || undefined;
+  } catch {
+    return (
+      raw.replace(ENTRY_NODE_PROTOCOL_PATTERN, "").split("/")[0] || undefined
+    );
+  }
+}
+
+function entryPointTargetPort(input: unknown): number | undefined {
+  if (typeof input === "number" && Number.isFinite(input)) {
+    return input;
+  }
+  if (typeof input === "string") {
+    const n = Number(input);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+function entryPointTargetStatus(
+  input: unknown
+): EntryNodeTargetStatus | undefined {
+  const status = nonEmptyString(input);
+  if (status === undefined) {
+    return { label: "Unknown", tone: "unknown" };
+  }
+  const tone = status
+    .toLowerCase()
+    .replace(ENTRY_NODE_STATUS_SEPARATOR_PATTERN, "-");
+  return { label: titleCaseStatus(tone), tone };
+}
+
+function titleCaseStatus(status: string): string {
+  return status
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
