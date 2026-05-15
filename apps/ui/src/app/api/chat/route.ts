@@ -10,7 +10,9 @@ import {
   chatStreamRequestSchema,
   isPersistedUIMessage,
 } from "@/lib/chat-persistence/types";
+import { attachToolDurationMetrics } from "@/lib/chat-runtime/attach-tool-duration-metrics";
 import { jsonError } from "@/lib/chat-runtime/errors";
+import { createInjectToolDurationStreamTransform } from "@/lib/chat-runtime/inject-tool-duration-stream";
 import { decodeKubeconfig } from "@/lib/chat-runtime/kubeconfig";
 import {
   CHAT_MAX_STEPS,
@@ -70,19 +72,30 @@ export async function POST(req: Request) {
     const model = chatLanguageModel(openAi.connection);
     const titleModel = threadTitleLanguageModel(openAi.connection);
 
+    const toolDurationMsByCallId = new Map<string, number>();
+
     const result = streamText({
       model,
       system: systemPrompt,
       messages: await convertToModelMessages(history, { tools }),
       tools,
       stopWhen: stepCountIs(CHAT_MAX_STEPS),
+      experimental_transform: createInjectToolDurationStreamTransform(
+        toolDurationMsByCallId
+      ),
+      experimental_onToolCallFinish: (event) => {
+        toolDurationMsByCallId.set(event.toolCall.toolCallId, event.durationMs);
+      },
     });
 
     return result.toUIMessageStreamResponse({
       originalMessages: history,
       onFinish: async ({ responseMessage }) => {
         try {
-          await appendMessage(chatId, responseMessage);
+          await appendMessage(
+            chatId,
+            attachToolDurationMetrics(responseMessage, toolDurationMsByCallId)
+          );
           await maybeAutoTitleThread({
             chatId,
             languageModel: titleModel,

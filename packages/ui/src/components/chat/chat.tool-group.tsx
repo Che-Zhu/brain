@@ -24,10 +24,16 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
+import {
+  formatToolDurationMs,
+  readDurationMsFromToolMetadata,
+} from "./chat.tool-metrics";
+
 /** A `ToolUIPart` from the AI SDK, narrowed for our renderer. */
 export type ChatToolPart = UIMessage["parts"][number] & {
   state: string;
   toolCallId: string;
+  toolMetadata?: Record<string, unknown>;
   input?: unknown;
   output?: unknown;
   errorText?: string;
@@ -57,6 +63,19 @@ function isToolActive(state: string): boolean {
 
 function isToolSettled(state: string): boolean {
   return SETTLED_TOOL_STATES.has(state);
+}
+
+function sumKnownToolDurationsMs(toolParts: ChatToolPart[]): number {
+  return toolParts.reduce((sum, p) => {
+    const ms = readDurationMsFromToolMetadata(p.toolMetadata);
+    return ms === undefined ? sum : sum + ms;
+  }, 0);
+}
+
+function hasAnyKnownToolDuration(toolParts: ChatToolPart[]): boolean {
+  return toolParts.some(
+    (p) => readDurationMsFromToolMetadata(p.toolMetadata) !== undefined
+  );
 }
 
 function humanizeToolType(type: string): string {
@@ -133,6 +152,8 @@ function ChatToolGroupItem({
   const active = isToolActive(part.state);
   const pendingApprovalId =
     part.state === "approval-requested" ? part.approval?.id : undefined;
+  const durationMs = readDurationMsFromToolMetadata(part.toolMetadata);
+  const settled = isToolSettled(part.state);
 
   const labelNode = active ? (
     <Shimmer as="span" className="text-sm">
@@ -156,6 +177,11 @@ function ChatToolGroupItem({
         <span className="shrink-0 font-mono text-[10px] text-muted-foreground uppercase tracking-wide">
           {fallbackLabel}
         </span>
+        {durationMs !== undefined && settled ? (
+          <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+            {formatToolDurationMs(durationMs)}
+          </span>
+        ) : null}
         <ChevronDownIcon
           aria-hidden
           className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open/tool-row:rotate-180"
@@ -169,6 +195,12 @@ function ChatToolGroupItem({
               <PreBlock>{formatJson(part.input)}</PreBlock>
             </div>
           )}
+          {durationMs !== undefined && settled ? (
+            <p className="text-muted-foreground text-xs">
+              <span className="font-medium text-foreground">Duration</span>{" "}
+              {formatToolDurationMs(durationMs)}
+            </p>
+          ) : null}
           {part.state === "output-available" && part.output !== undefined && (
             <div>
               <p className="mb-1 font-medium text-foreground text-xs">Output</p>
@@ -264,9 +296,20 @@ export function ChatToolGroup({
   }, [anyActive, allSettled, closeWhenSettled, userTouched]);
 
   const count = parts.length;
-  const triggerLabel = anyActive
-    ? "Working"
-    : `${count} tool ${count === 1 ? "call" : "calls"}`;
+  const totalDurationMs = sumKnownToolDurationsMs(parts);
+  const anyTimed = hasAnyKnownToolDuration(parts);
+  const callsPhrase = `${count} tool ${count === 1 ? "call" : "calls"}`;
+
+  let triggerLabel: string;
+  if (anyActive) {
+    triggerLabel = anyTimed
+      ? `Working · ${formatToolDurationMs(totalDurationMs)}`
+      : "Working";
+  } else if (anyTimed) {
+    triggerLabel = `${callsPhrase} in ${formatToolDurationMs(totalDurationMs)}`;
+  } else {
+    triggerLabel = callsPhrase;
+  }
 
   return (
     <div
