@@ -57,6 +57,7 @@ export interface DatabaseNodeStates {
   displayEngine: string;
   engineKey?: DatabaseEngineKey;
   formattedVersion?: string;
+  iconUrl?: string;
   metricCapacities?: Partial<Record<DatabaseNodeMetricKey, string>>;
   metrics?: Partial<Record<DatabaseNodeMetricKey, DatabaseNodeMetricValue>>;
   mountPath?: string;

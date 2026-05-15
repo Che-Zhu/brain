@@ -6,6 +6,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
   Cpu,
+  Database,
   FileText,
   HardDrive,
   MemoryStick,
@@ -17,7 +18,6 @@ import {
 } from "lucide-react";
 import { type ComponentType, type SVGProps, useState } from "react";
 
-import { getDatabaseEngineIcon } from "./database-engine-icons";
 import { useDatabaseNode } from "./database-node.context";
 import { DatabaseNodeDeleteDialog } from "./database-node.delete-dialog";
 import { maskDatabaseConnectionString } from "./database-node.mask";
@@ -127,6 +127,26 @@ function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
   return connection.unavailableMessage ?? "Connection unavailable";
 }
 
+function DatabaseNodeHeaderIcon({ iconUrl }: { iconUrl?: string }) {
+  const resolvedIconUrl = iconUrl?.trim();
+
+  if (resolvedIconUrl) {
+    return (
+      <img
+        alt=""
+        className="size-4 object-contain"
+        decoding="async"
+        height={16}
+        loading="lazy"
+        src={resolvedIconUrl}
+        width={16}
+      />
+    );
+  }
+
+  return <Database aria-hidden className="size-4" strokeWidth={2} />;
+}
+
 export function DatabaseNodeContent() {
   return (
     <CanvasNode.Card surfaceClassName="database-node-surface">
@@ -151,14 +171,13 @@ export function DatabaseNodeHeaderContent({
   const {
     state: { states },
   } = useDatabaseNode();
-  const Icon = getDatabaseEngineIcon(states.engineKey);
   const subtitle = formatDatabaseSubtitle(states);
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <Icon aria-hidden className="size-4" strokeWidth={2} />
+          <DatabaseNodeHeaderIcon iconUrl={states.iconUrl} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span

@@ -56,6 +56,8 @@ const states: DatabaseNodeStates = {
   displayEngine: "PostgreSQL",
   engineKey: "postgresql",
   formattedVersion: "16.4",
+  iconUrl:
+    "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
   metrics: {
     cpu: 18,
     memory: 28,

@@ -244,6 +244,22 @@ function databaseConnectionsFromResource(
   ];
 }
 
+function databaseCompositionNameFromSpec(
+  spec: Record<string, unknown>
+): string | undefined {
+  const crossplane = asRecord(spec.crossplane);
+  const crossplaneCompositionRef = asRecord(crossplane?.compositionRef);
+  const crossplaneCompositionName = nonEmptyString(
+    crossplaneCompositionRef?.name
+  );
+  if (crossplaneCompositionName !== undefined) {
+    return crossplaneCompositionName;
+  }
+
+  const compositionRef = asRecord(spec.compositionRef);
+  return nonEmptyString(compositionRef?.name);
+}
+
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
  * Sets **kind**, **image**, **name**, **replicas** (from spec), **uid** (from
@@ -299,6 +315,8 @@ export interface ApsToCanvasStateOptions {
 }
 
 export interface DbsToCanvasStateOptions {
+  /** Composition `metadata.name` -> icon URL/data URI from composition metadata annotations. */
+  compositionIconByName?: ReadonlyMap<string, string>;
   /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
   /** Key from {@link telemetryWorkloadKey} -> latest workload metric % from telemetry. */
@@ -357,7 +375,10 @@ export function apsToCanvasState(
  */
 export function dbToDatabaseNodeData(
   db: unknown,
-  options?: Pick<DbsToCanvasStateOptions, "metricsLookup" | "namespaceFallback">
+  options?: Pick<
+    DbsToCanvasStateOptions,
+    "compositionIconByName" | "metricsLookup" | "namespaceFallback"
+  >
 ): CanvasDatabaseNodeData {
   const root = asRecord(db) ?? {};
   const spec = asRecord(root.spec) ?? {};
@@ -380,6 +401,11 @@ export function dbToDatabaseNodeData(
     engineKey,
     status,
   });
+  const compositionName = databaseCompositionNameFromSpec(spec);
+  const iconUrl =
+    compositionName === undefined
+      ? undefined
+      : options?.compositionIconByName?.get(compositionName);
   const metricCapacities = databaseMetricCapacitiesFromStatus(status);
   const mountPath = nonEmptyString(status.mountPath);
 
@@ -389,6 +415,7 @@ export function dbToDatabaseNodeData(
       ? {}
       : { engineKey: engineKey as DatabaseEngineKey }),
     ...(formattedVersion === undefined ? {} : { formattedVersion }),
+    ...(iconUrl === undefined ? {} : { iconUrl }),
     ...(metricCapacities === undefined ? {} : { metricCapacities }),
     metrics: databaseMetricsFromTelemetry(telemetry),
     ...(mountPath === undefined ? {} : { mountPath }),

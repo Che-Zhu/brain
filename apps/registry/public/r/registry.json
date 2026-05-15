@@ -295,7 +295,7 @@
       "name": "database-node",
       "type": "registry:ui",
       "title": "Database Node",
-      "description": "Managed database canvas node with connection rows, public-access toggle, lifecycle and quick actions, footer metrics, and engine icons",
+      "description": "Managed database canvas node with connection rows, public-access toggle, lifecycle and quick actions, footer metrics, and metadata-driven icons",
       "dependencies": ["lucide-react"],
       "registryDependencies": [
         "button",
@@ -323,11 +323,6 @@
           "path": "../../packages/ui/src/components/database-node/database-node.root.tsx",
           "type": "registry:component",
           "target": "components/database-node/database-node.root.tsx"
-        },
-        {
-          "path": "../../packages/ui/src/components/database-node/database-engine-icons.tsx",
-          "type": "registry:component",
-          "target": "components/database-node/database-engine-icons.tsx"
         },
         {
           "path": "../../packages/ui/src/components/database-node/database-node.status.ts",

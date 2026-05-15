@@ -25,10 +25,14 @@ const publicConnection =
 const longPrivateConnection =
   "postgresql://analytics_owner:very-long-secret-value@pg-orders-reporting-primary.internal-db-fkn129-postgresql.ns-mz0dmtig.svc.cluster.local:5432/postgresql-db-fkn129?connect_timeout=30&application_name=sealai-canvas-preview";
 
+const postgresqlCompositionIconUrl =
+  "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg";
+
 const baseStates: DatabaseNodeStates = {
   displayEngine: "PostgreSQL",
   engineKey: "postgresql",
   formattedVersion: "16.4",
+  iconUrl: postgresqlCompositionIconUrl,
   metrics: {
     cpu: 18,
     memory: 28,
@@ -406,7 +410,7 @@ export default function DatabaseNodePreview() {
           />
         </PreviewSurface>
       </Preview>
-      <Preview title="Fallback engine icon">
+      <Preview title="Generic fallback icon">
         <PreviewSurface>
           <DatabaseNodeSample
             states={{
@@ -414,6 +418,7 @@ export default function DatabaseNodePreview() {
               displayEngine: "TimescaleDB",
               engineKey: "timescaledb",
               formattedVersion: "2.16",
+              iconUrl: "",
               name: "metrics-store",
             }}
           />

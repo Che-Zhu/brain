@@ -90,7 +90,6 @@
     "./components/ai-elements/*": "./src/components/ai-elements/*",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
-    "./assets/db-icons": "./src/assets/db-icons/index.ts",
     "./assets/runtime-icons": "./src/assets/runtime-icons/index.ts"
   }
 }

@@ -17,19 +17,11 @@ import {
 } from "./database-node.delete-dialog";
 import { DatabaseNodeRoot } from "./database-node.root";
 
-// biome-ignore lint/performance/noBarrelFile: compound component public API includes colocated helpers.
-export {
-  DatabaseFallbackIcon,
-  getDatabaseEngineIcon,
-  MongoDBIcon,
-  MySQLIcon,
-  PostgreSQLIcon,
-  RedisIcon,
-} from "./database-engine-icons";
 export type {
   DatabaseNodeDeleteDialogPanelProps,
   DatabaseNodeDeleteDialogProps,
 } from "./database-node.delete-dialog";
+// biome-ignore lint/performance/noBarrelFile: compound component public API includes colocated helpers.
 export { maskDatabaseConnectionString } from "./database-node.mask";
 export { databaseNodeLifecycleMenuVisibility } from "./database-node.menu-visibility";
 export {

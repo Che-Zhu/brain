@@ -28,16 +28,10 @@ export type {
 // biome-ignore lint/performance/noBarrelFile: database-node public package surface
 export {
   canCopyDatabaseNodeConnection,
-  DatabaseFallbackIcon,
   DatabaseNode,
   databaseNodeLifecycleMenuVisibility,
-  getDatabaseEngineIcon,
   getDatabaseNodeConnectionKey,
-  MongoDBIcon,
-  MySQLIcon,
   maskDatabaseConnectionString,
-  PostgreSQLIcon,
-  RedisIcon,
   resolveDatabaseNodeStatus,
   resolveDatabaseNodeVisualTone,
 } from "./database-node";
