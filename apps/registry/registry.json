@@ -132,6 +132,346 @@
       ]
     },
     {
+      "name": "canvas-node",
+      "type": "registry:ui",
+      "title": "Canvas Node",
+      "description": "Shared canvas node chrome with frame, surface, layout, status, drag, expand, connector, copyable-row, metrics, actions, and card primitives",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["button"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/canvas-node/canvas-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.context.ts",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.frame.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.frame.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.surface.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.surface.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.layout.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.layout.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.card.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.card.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.connection.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.connection.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.expand-button.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.expand-button.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.drag-frame.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.drag-frame.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.status.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.status.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.actions.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.actions.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.copyable-row.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.copyable-row.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.metrics.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.metrics.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.css",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/canvas-node.tsx",
+          "type": "registry:component",
+          "target": "components/canvas-node/canvas-node.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/canvas-node/index.ts",
+          "type": "registry:component",
+          "target": "components/canvas-node/index.ts"
+        }
+      ]
+    },
+    {
+      "name": "entry-node",
+      "type": "registry:ui",
+      "title": "Entry Node",
+      "description": "Entry point node content composed with shared canvas node chrome",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["button", "canvas-node"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/entry-node/entry-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.context.ts",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.content.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.content.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/entry-node/entry-node.status.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.target.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.target.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.css",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/index.ts",
+          "type": "registry:component",
+          "target": "components/entry-node/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/entry-node/entry-node.tsx",
+          "type": "registry:component",
+          "target": "components/entry-node/entry-node.tsx"
+        }
+      ]
+    },
+    {
+      "name": "database-node",
+      "type": "registry:ui",
+      "title": "Database Node",
+      "description": "Managed database canvas node with connection rows, public-access toggle, lifecycle and quick actions, footer metrics, and metadata-driven icons",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "button",
+        "canvas-node",
+        "dropdown-menu",
+        "switch"
+      ],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/database-node/database-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.context.ts",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/database-node/database-node.status.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.mask.ts",
+          "type": "registry:lib",
+          "target": "components/database-node/database-node.mask.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.content.tsx",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.content.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.css",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/index.ts",
+          "type": "registry:component",
+          "target": "components/database-node/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/database-node/database-node.tsx",
+          "type": "registry:component",
+          "target": "components/database-node/database-node.tsx"
+        }
+      ]
+    },
+    {
+      "name": "environment-node",
+      "type": "registry:ui",
+      "title": "Environment Node",
+      "description": "Development environment canvas node with launch command, lifecycle actions, quick actions, runtime icons, and footer metrics",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": ["button", "canvas-node", "dropdown-menu"],
+      "files": [
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/types.ts",
+          "type": "registry:lib",
+          "target": "assets/runtime-icons/types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/nodejs.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/nodejs.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/go.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/go.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/python.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/python.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/java.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/java.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/rust.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/rust.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/php.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/php.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/ruby.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/ruby.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/cplusplus.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/cplusplus.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/dotnet.tsx",
+          "type": "registry:component",
+          "target": "assets/runtime-icons/dotnet.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/assets/runtime-icons/index.ts",
+          "type": "registry:lib",
+          "target": "assets/runtime-icons/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/environment-node/environment-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.context.ts",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-runtime-icons.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-runtime-icons.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/environment-node/environment-node.status.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.content.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.content.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.css",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/index.ts",
+          "type": "registry:component",
+          "target": "components/environment-node/index.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/environment-node/environment-node.tsx",
+          "type": "registry:component",
+          "target": "components/environment-node/environment-node.tsx"
+        }
+      ]
+    },
+    {
       "name": "project-explorer",
       "type": "registry:ui",
       "title": "Project Explorer",
@@ -199,7 +539,7 @@
       "title": "Canvas",
       "description": "React Flow workspace surface with Jotai, provider context, and error fallback",
       "dependencies": ["@xyflow/react", "jotai"],
-      "registryDependencies": ["preview", "button"],
+      "registryDependencies": ["preview", "button", "entry-node"],
       "files": [
         {
           "path": "../../packages/ui/src/components/canvas/canvas.types.ts",
@@ -280,6 +620,11 @@
           "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.area.tsx",
           "type": "registry:component",
           "target": "components/metrics-chart/metrics-chart.area.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.compact.tsx",
+          "type": "registry:component",
+          "target": "components/metrics-chart/metrics-chart.compact.tsx"
         },
         {
           "path": "../../packages/ui/src/components/metrics-chart/metrics-chart.tsx",

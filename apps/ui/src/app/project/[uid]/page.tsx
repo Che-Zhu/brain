@@ -8,7 +8,9 @@ import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectServices } from "@/hooks/use-project-services";
+import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+import { DATABASE_PANE } from "@/store/canvas-store";
 import { openRightPane, rightPaneOpenAtom } from "@/store/layout-store";
 
 export default function ProjectUidPage() {
@@ -25,11 +27,18 @@ export default function ProjectUidPage() {
       uid,
     });
 
-  const { clearSelection, meta, nodes, selectedEdge, selectedNode } =
-    useProjectCanvas(canvasState.nodes, {
-      kubeconfig,
-      refreshWorkloadLists,
-    });
+  const {
+    clearSelection,
+    closeDatabasePane,
+    databasePane,
+    meta,
+    nodes,
+    selectedEdge,
+    selectedNode,
+  } = useProjectCanvas(canvasState.nodes, {
+    kubeconfig,
+    refreshWorkloadLists,
+  });
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
@@ -84,6 +93,12 @@ export default function ProjectUidPage() {
                   )}
                 </Canvas.UpperRight>
                 <Canvas.Panel />
+                <DatabaseMetricsPane
+                  kubeconfig={kubeconfig}
+                  node={selectedNode}
+                  onClose={closeDatabasePane}
+                  open={databasePane === DATABASE_PANE.metrics}
+                />
               </Canvas.Flow>
             </div>
           </Canvas.Root>

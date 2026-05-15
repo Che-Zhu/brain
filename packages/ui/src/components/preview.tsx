@@ -157,7 +157,7 @@ function Preview({
             <div
               aria-label={title}
               aria-modal="true"
-              className="fixed inset-0 z-100 flex flex-col bg-background"
+              className="fixed inset-0 z-40 flex flex-col bg-background"
               role="dialog"
             >
               <div className="flex shrink-0 items-center justify-between gap-2 border-border border-b px-3 py-2">

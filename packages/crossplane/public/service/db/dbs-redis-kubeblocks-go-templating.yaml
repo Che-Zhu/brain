@@ -53,6 +53,7 @@ spec:
             {{- $dbUid := .observed.composite.resource.metadata.uid }}
             {{- $kbCluster := getComposedResource . "kubeblocks-cluster" }}
             {{- $redisConnCredentialObject := getComposedResource . "redis-conn-credential-object" }}
+            {{- $redisStatefulSetObject := getComposedResource . "redis-statefulset-object" }}
             {{- $exportSvc := getComposedResource . "db-nodeport-export" }}
             {{- $spec := .observed.composite.resource.spec }}
             {{- $projectName := "" }}
@@ -65,6 +66,23 @@ spec:
             {{- if $meta }}
             {{- $uidVal := index $meta "uid" }}
             {{- if $uidVal }}{{- $projectUid = toString $uidVal }}{{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $lastTransition := now | date "2006-01-02T15:04:05Z07:00" }}
+            {{- if and $kbCluster $kbCluster.status.conditions }}
+              {{- range $kbCluster.status.conditions }}
+                {{- if and (eq .type "Ready") .lastTransitionTime }}
+                  {{- $lastTransition = .lastTransitionTime }}
+                {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $mountPath := "/data" }}
+            {{- if and $redisStatefulSetObject $redisStatefulSetObject.status $redisStatefulSetObject.status.atProvider $redisStatefulSetObject.status.atProvider.manifest }}
+            {{- $containers := dig "spec" "template" "spec" "containers" (list) $redisStatefulSetObject.status.atProvider.manifest }}
+            {{- range $container := $containers }}
+            {{- range $mount := (index $container "volumeMounts") }}
+            {{- if and (eq (toString (index $mount "name")) "data") (index $mount "mountPath") }}{{- $mountPath = toString (index $mount "mountPath") }}{{- end }}
+            {{- end }}
             {{- end }}
             {{- end }}
             {{- $quota := .observed.composite.resource.spec.quota | default "xs" | lower }}
@@ -82,6 +100,66 @@ spec:
             {{- if .observed.composite.resource.spec.storageSize }}{{- $stor = .observed.composite.resource.spec.storageSize }}{{- end }}
             {{- $exposeNodePort := false }}
             {{- if hasKey .observed.composite.resource.spec "exposeNodePort" }}{{- $exposeNodePort = .observed.composite.resource.spec.exposeNodePort }}{{- end }}
+            {{- $paused := false }}
+            {{- if and (hasKey $spec "paused") $spec.paused }}{{- $paused = true }}{{- end }}
+            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- if $paused }}{{- $desiredReplicas = 0 }}{{- end }}
+            {{- $sentinelReplicas := 1 }}
+            {{- if $paused }}{{- $sentinelReplicas = 0 }}{{- end }}
+            {{- $restartRequest := 0 }}
+            {{- if hasKey $spec "restartRequest" }}{{- $restartRequest = int ($spec.restartRequest | default 0) }}{{- end }}
+            {{ $kbPhase := "Unknown" }}
+            {{ if and $kbCluster $kbCluster.status $kbCluster.status.phase }}{{ $kbPhase = toString $kbCluster.status.phase }}{{ end }}
+            {{ $observedReplicas := 0 }}
+            {{ if and $kbCluster $kbCluster.status $kbCluster.status.observedReplicas }}{{ $observedReplicas = int ($kbCluster.status.observedReplicas | default 0) }}{{ end }}
+            {{ $availableReplicas := 0 }}
+            {{ if and $kbCluster $kbCluster.status $kbCluster.status.availableReplicas }}{{ $availableReplicas = int ($kbCluster.status.availableReplicas | default 0) }}{{ end }}
+            {{ $everReady := false }}
+            {{ if and .observed.composite.resource.status .observed.composite.resource.status.lifecycle .observed.composite.resource.status.lifecycle.everReady }}{{ $everReady = true }}{{ end }}
+            {{ if eq $kbPhase "Running" }}{{ $everReady = true }}{{ end }}
+            {{ $lastReadyTime := "" }}
+            {{ if and .observed.composite.resource.status .observed.composite.resource.status.lifecycle .observed.composite.resource.status.lifecycle.lastReadyTime }}{{ $lastReadyTime = toString .observed.composite.resource.status.lifecycle.lastReadyTime }}{{ end }}
+            {{ if and (eq $kbPhase "Running") (eq $lastReadyTime "") }}{{ $lastReadyTime = $lastTransition }}{{ end }}
+            {{ $restartOps := getComposedResource . "kubeblocks-restart-opsrequest" }}
+            {{ $restartOpsName := "" }}
+            {{ $restartOpsPhase := "" }}
+            {{ $restartOpsType := "" }}
+            {{ if and $restartOps $restartOps.metadata $restartOps.metadata.name }}{{ $restartOpsName = toString $restartOps.metadata.name }}{{ end }}
+            {{ if and $restartOps $restartOps.status $restartOps.status.phase }}{{ $restartOpsPhase = toString $restartOps.status.phase }}{{ end }}
+            {{ $restartOpsDone := or (eq $restartOpsPhase "Succeed") (eq $restartOpsPhase "Succeeded") (eq $restartOpsPhase "Failed") }}
+            {{ if and $restartOps $restartOps.spec $restartOps.spec.type (not $restartOpsDone) }}{{ $restartOpsType = toString $restartOps.spec.type }}{{ end }}
+            {{ $deleting := false }}
+            {{ if .observed.composite.resource.metadata.deletionTimestamp }}{{ $deleting = true }}{{ end }}
+            {{ $productPhase := "Unknown" }}
+            {{ $reason := $kbPhase | default "Waiting" }}
+            {{ if $deleting }}
+            {{ $productPhase = "Deleting" }}
+            {{ $reason = "Deleting" }}
+            {{ else if eq $restartOpsType "Restart" }}
+            {{ $productPhase = "Restarting" }}
+            {{ if ne $restartOpsPhase "" }}{{ $reason = printf "Restart:%s" $restartOpsPhase }}{{ else }}{{ $reason = "Restart" }}{{ end }}
+            {{ else if or (eq $restartOpsPhase "Failed") (eq $kbPhase "Failed") (eq $kbPhase "Abnormal") (eq $kbPhase "Degraded") }}
+            {{ $productPhase = "Failed" }}
+            {{ else if and $paused (gt $availableReplicas 0) }}
+            {{ $productPhase = "Stopping" }}
+            {{ $reason = "Stopping" }}
+            {{ else if and $paused (gt $observedReplicas 0) }}
+            {{ $productPhase = "Stopping" }}
+            {{ $reason = "Stopping" }}
+            {{ else if $paused }}
+            {{ $productPhase = "Paused" }}
+            {{ $reason = "Paused" }}
+            {{ else if or (eq $kbPhase "Updating") (eq $kbPhase "SpecUpdating") (eq $kbPhase "Upgrade") (eq $kbPhase "VerticalScaling") (eq $kbPhase "VolumeExpanding") }}
+            {{ $productPhase = "Updating" }}
+            {{ else if eq $kbPhase "Running" }}
+            {{ $productPhase = "Running" }}
+            {{ else if $everReady }}
+            {{ $productPhase = "Starting" }}
+            {{ $reason = "Starting" }}
+            {{ else }}
+            {{ $productPhase = "Creating" }}
+            {{ $reason = "Creating" }}
+            {{ end }}
             {{- $scheduledBackup := index .observed.composite.resource.spec "scheduledBackup" }}
             {{- if not $scheduledBackup }}{{- $scheduledBackup = index .observed.composite.resource.spec "backup" }}{{- end }}
             {{- $restore := index .observed.composite.resource.spec "restoreFromBackup" }}
@@ -289,7 +367,7 @@ spec:
               componentSpecs:
               - componentDef: redis-7
                 name: redis
-                replicas: {{ .observed.composite.resource.spec.replicas | default 1 }}
+                replicas: {{ $desiredReplicas }}
                 enabledLogs:
                 - running
                 env:
@@ -320,7 +398,7 @@ spec:
 
               - componentDef: redis-sentinel-7
                 name: redis-sentinel
-                replicas: 1
+                replicas: {{ $sentinelReplicas }}
                 resources:
                   limits:
                     cpu: 100m
@@ -345,13 +423,36 @@ spec:
               terminationPolicy: {{ .observed.composite.resource.spec.terminationPolicy | default "Delete" | replace "Wipeout" "WipeOut" }}
               topology: replication
 
-            {{- $lastTransition := now | date "2006-01-02T15:04:05Z07:00" }}
-            {{- if and $kbCluster $kbCluster.status.conditions }}
-              {{- range $kbCluster.status.conditions }}
-                {{- if and (eq .type "Ready") .lastTransitionTime }}
-                  {{- $lastTransition = .lastTransitionTime }}
+            {{- if gt $restartRequest 0 }}
+            ---
+
+            apiVersion: apps.kubeblocks.io/v1alpha1
+            kind: OpsRequest
+            metadata:
+              name: {{ printf "%s-restart-%d" $name $restartRequest }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kubeblocks-restart-opsrequest
+              labels:
+                crossplane.io/composite: {{ $name }}
+                {{- if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
                 {{- end }}
-              {{- end }}
+                {{- if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{- end }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: DB
+                name: {{ $name }}
+                uid: {{ $dbUid }}
+            spec:
+              clusterName: {{ $name }}
+              type: Restart
+              restart:
+              - componentName: redis
+              - componentName: redis-sentinel
+              ttlSecondsAfterSucceed: 30
             {{- end }}
 
             {{- if $exposeNodePort }}
@@ -417,6 +518,30 @@ spec:
                     namespace: {{ $ns }}
 
             ---
+
+            apiVersion: kubernetes.m.crossplane.io/v1alpha1
+            kind: Object
+            metadata:
+              name: {{ printf "%s-statefulset-observe" $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: redis-statefulset-object
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              managementPolicies:
+                - Observe
+              providerConfigRef:
+                kind: ClusterProviderConfig
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: apps/v1
+                  kind: StatefulSet
+                  metadata:
+                    name: {{ printf "%s-redis" $name }}
+                    namespace: {{ $ns }}
+
+            ---
             {{- $connPriv := "" }}
             {{- $connPub := "" }}
             {{- if and $redisConnCredentialObject $redisConnCredentialObject.status $redisConnCredentialObject.status.atProvider $redisConnCredentialObject.status.atProvider.manifest }}
@@ -470,6 +595,9 @@ spec:
                     name: {{ $name }}
                     namespace: {{ $ns }}
                     labels:
+                      {{- if and .observed.composite.resource.metadata.labels (index .observed.composite.resource.metadata.labels "region") }}
+                      region: {{ index .observed.composite.resource.metadata.labels "region" | quote }}
+                      {{- end }}
                       crossplane.io/project-name: {{ $projectName | quote }}
                       crossplane.io/project-uid: {{ $projectUid | quote }}
                     ownerReferences:
@@ -487,9 +615,33 @@ spec:
               name: {{ $name }}
               namespace: {{ $ns }}
             status:
-              phase: {{ $kbCluster.status.phase | default "Unknown" }}
-              observedReplicas: {{ $kbCluster.status.observedReplicas | default 0 }}
-              availableReplicas: {{ $kbCluster.status.availableReplicas | default 0 }}
+              phase: {{ $productPhase }}
+              reason: {{ $reason | quote }}
+              clusterVersionRef: {{ $redisVersion | quote }}
+              mountPath: {{ $mountPath | quote }}
+              effectiveResources:
+                cpuRequest: {{ $cpu | quote }}
+                memoryRequest: {{ $mem | quote }}
+                cpuLimit: {{ $cpuLim | quote }}
+                memoryLimit: {{ $memLim | quote }}
+                storageSize: {{ $stor | quote }}
+              observedReplicas: {{ $observedReplicas }}
+              availableReplicas: {{ $availableReplicas }}
+              observed:
+                kubeblocksPhase: {{ $kbPhase | quote }}
+                observedReplicas: {{ $observedReplicas }}
+                availableReplicas: {{ $availableReplicas }}
+                {{ if ne $restartOpsName "" }}
+                operation:
+                  type: "Restart"
+                  phase: {{ $restartOpsPhase | quote }}
+                  name: {{ $restartOpsName | quote }}
+                {{ end }}
+              lifecycle:
+                everReady: {{ $everReady }}
+                {{ if ne $lastReadyTime "" }}
+                lastReadyTime: {{ $lastReadyTime | quote }}
+                {{ end }}
               kubeblocksServices:
                 - name: {{ printf "%s-redis-redis" $name | quote }}
                   type: ClusterIP
@@ -522,7 +674,7 @@ spec:
               {{- end }}
               conditions:
                 - type: Ready
-                  status: {{ if eq $kbCluster.status.phase "Running" -}} "True" {{- else -}} "False" {{- end }}
-                  reason: {{ $kbCluster.status.phase | default "Waiting" }}
-                  message: 'KubeBlocks Cluster phase is {{ $kbCluster.status.phase | default "Unknown" }}'
+                  status: {{ if eq $productPhase "Running" -}} "True" {{- else -}} "False" {{- end }}
+                  reason: {{ $reason | quote }}
+                  message: 'DB product phase is {{ $productPhase }}; KubeBlocks Cluster phase is {{ $kbPhase }}'
                   lastTransitionTime: {{ $lastTransition }}

@@ -1,0 +1,3 @@
+.environment-node-launch-command-row {
+  min-height: calc(var(--spacing) * 18);
+}

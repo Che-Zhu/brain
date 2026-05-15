@@ -13,6 +13,7 @@ import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 
 import {
   apMetricsLookupFromResults,
@@ -21,6 +22,43 @@ import {
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 
 const METRICS_REFRESH_MS = 5000;
+const WORKLOAD_RECONCILE_POLL_MS = 1000;
+const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
+const WORKLOAD_TRANSIENT_PHASES = new Set([
+  "binding",
+  "creating",
+  "deleting",
+  "pending",
+  "progressing",
+  "reconciling",
+  "restarting",
+  "starting",
+  "stopping",
+  "updating",
+]);
+
+function normalizeWorkloadPhase(input: unknown) {
+  return typeof input === "string"
+    ? input
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_]+/g, "-")
+    : "";
+}
+
+function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
+  return apItemsFromList(data).some((item) => {
+    const status =
+      item != null && typeof item === "object" && "status" in item
+        ? item.status
+        : undefined;
+    const phase =
+      status != null && typeof status === "object" && "phase" in status
+        ? status.phase
+        : undefined;
+    return WORKLOAD_TRANSIENT_PHASES.has(normalizeWorkloadPhase(phase));
+  });
+}
 
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
@@ -49,6 +87,20 @@ export function useProjectServices(options: {
 
   const apsListRef = useRef<K8sGetResponse | undefined>(undefined);
   const dbsListRef = useRef<K8sGetResponse | undefined>(undefined);
+  const [workloadReconcilePollUntil, setWorkloadReconcilePollUntil] =
+    useState(0);
+  const workloadReconcileRefreshInterval = useCallback(
+    (latestData: K8sGetResponse | undefined) => {
+      if (
+        workloadReconcilePollUntil > Date.now() ||
+        hasTransientWorkloadPhase(latestData)
+      ) {
+        return WORKLOAD_RECONCILE_POLL_MS;
+      }
+      return 0;
+    },
+    [workloadReconcilePollUntil]
+  );
 
   const peerDbsEmpty = useCallback(
     () => apItemsFromList(dbsListRef.current).length === 0,
@@ -70,6 +122,7 @@ export function useProjectServices(options: {
     namespace,
     peerEmpty: peerDbsEmpty,
     pollWhileEmpty: true,
+    refreshInterval: workloadReconcileRefreshInterval,
   });
 
   const {
@@ -83,15 +136,22 @@ export function useProjectServices(options: {
     namespace,
     peerEmpty: peerApsEmpty,
     pollWhileEmpty: true,
+    refreshInterval: workloadReconcileRefreshInterval,
+  });
+  const { items: dbCompositionRows } = useDbCompositions({
+    kubeconfig,
+    toItems: true,
   });
 
   apsListRef.current = apsData;
   dbsListRef.current = dbsData;
 
-  const refreshWorkloadLists = useCallback(
-    () => Promise.all([mutateAps(), mutateDbs()]),
-    [mutateAps, mutateDbs]
-  );
+  const refreshWorkloadLists = useCallback(() => {
+    setWorkloadReconcilePollUntil(
+      Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS
+    );
+    return Promise.all([mutateAps(), mutateDbs()]);
+  }, [mutateAps, mutateDbs]);
 
   const data = useMemo(
     () => ({ aps: apsData, dbs: dbsData }),
@@ -131,6 +191,16 @@ export function useProjectServices(options: {
     () => apMetricsLookupFromResults(telemetryBatch),
     [telemetryBatch]
   );
+  const dbCompositionIconByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of dbCompositionRows ?? []) {
+      const iconUrl = row.iconUrl?.trim();
+      if (iconUrl) {
+        map.set(row.metadata.compositionName, iconUrl);
+      }
+    }
+    return map;
+  }, [dbCompositionRows]);
 
   const canvasState = useMemo((): CanvasState => {
     const apBlock = apsToCanvasState(apsData, {
@@ -139,6 +209,7 @@ export function useProjectServices(options: {
       namespaceFallback: namespace,
     });
     const dbBlock = dbsToCanvasState(dbsData, {
+      compositionIconByName: dbCompositionIconByName,
       gridIndexOffset: apBlock.nodes.length,
       metricsLookup,
       namespaceFallback: namespace,
@@ -149,7 +220,7 @@ export function useProjectServices(options: {
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [apsData, dbsData, namespace, metricsLookup]);
+  }, [apsData, dbsData, dbCompositionIconByName, namespace, metricsLookup]);
 
   const error = apsError ?? dbsError;
   const isLoading = apsLoading || dbsLoading;

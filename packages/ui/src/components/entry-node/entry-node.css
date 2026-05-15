@@ -1,0 +1,23 @@
+.entry-node-target-list {
+  max-height: calc((var(--spacing) * 18 * 2) + (var(--spacing) * 2));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.entry-node-target-list::-webkit-scrollbar {
+  display: none;
+}
+
+.entry-node-target-list:not([data-scrollable]) {
+  overflow: hidden;
+}
+
+.entry-node-target-settings:hover,
+.entry-node-target-settings:focus-visible {
+  background: color-mix(in oklab, var(--color-white) 4.5%, transparent);
+}
+
+.entry-node-target-row,
+.entry-node-target-empty {
+  min-height: calc(var(--spacing) * 18);
+}

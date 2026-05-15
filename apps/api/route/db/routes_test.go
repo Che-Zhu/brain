@@ -69,6 +69,48 @@ func TestRegisterIncludesAccessObjectDetailRoutes(t *testing.T) {
 	}
 }
 
+func TestRegisterIncludesDBLifecycleRoutes(t *testing.T) {
+	router := chi.NewRouter()
+	api := humachi.New(router, huma.DefaultConfig("test", "0.0.0"))
+
+	Register(api)
+
+	paths := map[string]string{
+		"/api/db/v1alpha1/start":   "db-start",
+		"/api/db/v1alpha1/stop":    "db-stop",
+		"/api/db/v1alpha1/restart": "db-restart",
+	}
+	for path, operationID := range paths {
+		t.Run(path, func(t *testing.T) {
+			got := api.OpenAPI().Paths[path]
+			if got == nil || got.Post == nil {
+				t.Fatalf("expected POST %s to be registered", path)
+			}
+			if got.Post.OperationID != operationID {
+				t.Fatalf("unexpected operation ID: %q", got.Post.OperationID)
+			}
+		})
+	}
+}
+
+func TestDBPatchDocsIncludeLifecycleFields(t *testing.T) {
+	router := chi.NewRouter()
+	api := humachi.New(router, huma.DefaultConfig("test", "0.0.0"))
+
+	Register(api)
+
+	path := api.OpenAPI().Paths["/api/db/v1alpha1/"]
+	if path == nil || path.Patch == nil {
+		t.Fatalf("expected PATCH /api/db/v1alpha1/ to be registered")
+	}
+	description := path.Patch.Description
+	for _, want := range []string{"spec.paused", "spec.restartRequest"} {
+		if !bytes.Contains([]byte(description), []byte(want)) {
+			t.Fatalf("expected patch docs to mention %s, got: %s", want, description)
+		}
+	}
+}
+
 func TestAccessExportRejectsUnsupportedInputsAtHTTPBoundary(t *testing.T) {
 	tests := []struct {
 		name         string

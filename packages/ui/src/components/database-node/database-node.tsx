@@ -1,0 +1,87 @@
+"use client";
+
+import "./database-node.css";
+
+import {
+  DatabaseNodeActionBar,
+  DatabaseNodeBodyContent,
+  DatabaseNodeConnectionList,
+  DatabaseNodeConnectionRow,
+  DatabaseNodeContent,
+  DatabaseNodeFooterContent,
+  DatabaseNodeHeaderContent,
+} from "./database-node.content";
+import {
+  DatabaseNodeDeleteDialog,
+  DatabaseNodeDeleteDialogPanel,
+} from "./database-node.delete-dialog";
+import { DatabaseNodeRoot } from "./database-node.root";
+
+export type {
+  DatabaseNodeDeleteDialogPanelProps,
+  DatabaseNodeDeleteDialogProps,
+} from "./database-node.delete-dialog";
+// biome-ignore lint/performance/noBarrelFile: compound component public API includes colocated helpers.
+export { maskDatabaseConnectionString } from "./database-node.mask";
+export { databaseNodeLifecycleMenuVisibility } from "./database-node.menu-visibility";
+export {
+  canCopyDatabaseNodeConnection,
+  getDatabaseNodeConnectionKey,
+} from "./database-node.root";
+export {
+  resolveDatabaseNodeStatus,
+  resolveDatabaseNodeVisualTone,
+} from "./database-node.status";
+export type {
+  DatabaseEngineKey,
+  DatabaseNodeAction,
+  DatabaseNodeActions,
+  DatabaseNodeConnection,
+  DatabaseNodeConnectionKey,
+  DatabaseNodeContextValue,
+  DatabaseNodeCopyConnectionHandler,
+  DatabaseNodeLifecycleActionKey,
+  DatabaseNodeLifecycleActions,
+  DatabaseNodeMeta,
+  DatabaseNodeMetricKey,
+  DatabaseNodeMetricValue,
+  DatabaseNodePrivateConnection,
+  DatabaseNodeProviderProps,
+  DatabaseNodePublicConnection,
+  DatabaseNodeQuickActionKey,
+  DatabaseNodeQuickActions,
+  DatabaseNodeRootProps,
+  DatabaseNodeState,
+  DatabaseNodeStates,
+  DatabaseNodeStatus,
+  DatabaseNodeStatusTone,
+  DatabaseNodeTogglePublicConnectionHandler,
+} from "./database-node.types";
+
+export const DatabaseNode = {
+  ActionBar: DatabaseNodeActionBar,
+  BodyContent: DatabaseNodeBodyContent,
+  ConnectionList: DatabaseNodeConnectionList,
+  ConnectionRow: DatabaseNodeConnectionRow,
+  Content: DatabaseNodeContent,
+  DeleteDialog: DatabaseNodeDeleteDialog,
+  DeleteDialogPanel: DatabaseNodeDeleteDialogPanel,
+  FooterContent: DatabaseNodeFooterContent,
+  HeaderContent: DatabaseNodeHeaderContent,
+  Root: DatabaseNodeRoot,
+} as const;
+
+const dn = (component: object, name: string) => {
+  (component as { displayName?: string }).displayName = name;
+};
+
+dn(DatabaseNodeRoot, "DatabaseNode.Root");
+dn(DatabaseNodeContent, "DatabaseNode.Content");
+dn(DatabaseNodeDeleteDialog, "DatabaseNode.DeleteDialog");
+dn(DatabaseNodeDeleteDialogPanel, "DatabaseNode.DeleteDialogPanel");
+dn(DatabaseNodeHeaderContent, "DatabaseNode.HeaderContent");
+dn(DatabaseNodeBodyContent, "DatabaseNode.BodyContent");
+dn(DatabaseNodeConnectionList, "DatabaseNode.ConnectionList");
+dn(DatabaseNodeConnectionRow, "DatabaseNode.ConnectionRow");
+dn(DatabaseNodeActionBar, "DatabaseNode.ActionBar");
+dn(DatabaseNodeFooterContent, "DatabaseNode.FooterContent");

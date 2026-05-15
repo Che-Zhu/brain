@@ -33,8 +33,6 @@ packages/
 - Registry build: `cd apps/registry && bun run registry:build` (runs `shadcn build`)
 - Go API: `cd apps/api && <air|go run|go build|go test>` (see app's package.json scripts)
 
-**No JS test runner is configured.** Don't invent test commands. If asked to verify, run `bun typecheck` + `bun check`.
-
 ## Conventions
 
 - **Imports:** use path aliases `@workspace/ui/components/<name>`, `@workspace/crossplane/*`, and `@/*` (app-local). Never reach into another app via relative paths.

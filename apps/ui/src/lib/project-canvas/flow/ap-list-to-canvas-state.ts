@@ -6,22 +6,59 @@ import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
+import type {
+  DatabaseEngineKey,
+  DatabaseNodeConnection,
+  DatabaseNodeStates,
+} from "@workspace/ui/components/database-node/database-node";
 import type { Edge, Node } from "@xyflow/react";
 
-import { CANVAS_CONTAINER_NODE_TYPE } from "../nodes/constants";
+import {
+  CANVAS_CONTAINER_NODE_TYPE,
+  CANVAS_DATABASE_NODE_TYPE,
+} from "../nodes/constants";
+import type { CanvasDatabaseNodeData } from "../nodes/types";
 
-const COL = 280;
-const ROW = 220;
+const FALLBACK_COLUMNS = 3;
+const FALLBACK_COL_GAP = 340;
+const FALLBACK_ROW_GAP = 280;
 
-interface CpuMemoryPercents {
+function fallbackCanvasPosition(index: number): { x: number; y: number } {
+  return {
+    x: (index % FALLBACK_COLUMNS) * FALLBACK_COL_GAP,
+    y: Math.floor(index / FALLBACK_COLUMNS) * FALLBACK_ROW_GAP,
+  };
+}
+
+const DISPLAY_ENGINE_BY_KEY: Record<string, string> = {
+  mongodb: "MongoDB",
+  mysql: "MySQL",
+  postgresql: "PostgreSQL",
+  redis: "Redis",
+};
+
+const VERSION_NUMBER_PATTERN = /\d+(?:\.\d+)+/;
+
+export interface WorkloadMetricPercents {
   cpuPercent?: number;
   memoryPercent?: number;
+  storagePercent?: number;
+}
+
+function roundedMetricPercent(
+  value: number | string | undefined
+): number | undefined {
+  if (value == null || value === "") {
+    return undefined;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : undefined;
 }
 
 /** Latest sample by `time` (max); falls back to last row if `time` is missing. */
 export function telemetryLatestPercents(
   series: Record<string, number | string>[]
-): CpuMemoryPercents {
+): WorkloadMetricPercents {
   if (series.length === 0) {
     return {};
   }
@@ -38,22 +75,15 @@ export function telemetryLatestPercents(
       best = row;
     }
   }
-  const out: CpuMemoryPercents = {};
-  const cpu = best.cpu;
-  const mem = best.memory;
-  if (cpu != null && cpu !== "") {
-    const n = typeof cpu === "number" ? cpu : Number(cpu);
-    if (Number.isFinite(n)) {
-      out.cpuPercent = Math.round(n * 100) / 100;
-    }
-  }
-  if (mem != null && mem !== "") {
-    const n = typeof mem === "number" ? mem : Number(mem);
-    if (Number.isFinite(n)) {
-      out.memoryPercent = Math.round(n * 100) / 100;
-    }
-  }
-  return out;
+  const cpuPercent = roundedMetricPercent(best.cpu);
+  const memoryPercent = roundedMetricPercent(best.memory);
+  const storagePercent = roundedMetricPercent(best.disk);
+
+  return {
+    ...(cpuPercent === undefined ? {} : { cpuPercent }),
+    ...(memoryPercent === undefined ? {} : { memoryPercent }),
+    ...(storagePercent === undefined ? {} : { storagePercent }),
+  };
 }
 
 /** Map key for merging telemetry into AP/DB workload nodes (`kind:ns:name`). */
@@ -67,8 +97,8 @@ export function telemetryWorkloadKey(
 
 export function apMetricsLookupFromResults(
   results: ApTelemetryMetricsRow[] | undefined
-): Map<string, CpuMemoryPercents> {
-  const map = new Map<string, CpuMemoryPercents>();
+): Map<string, WorkloadMetricPercents> {
+  const map = new Map<string, WorkloadMetricPercents>();
   if (results == null) {
     return map;
   }
@@ -95,6 +125,139 @@ function metadataName(item: unknown): string | undefined {
 function metadataUid(item: unknown): string | undefined {
   const uid = asRecord(asRecord(item)?.metadata)?.uid;
   return typeof uid === "string" ? uid : undefined;
+}
+
+function metadataNamespace(item: unknown): string | undefined {
+  const namespace = asRecord(asRecord(item)?.metadata)?.namespace;
+  return typeof namespace === "string" ? namespace : undefined;
+}
+
+function nonEmptyString(input: unknown): string | undefined {
+  return typeof input === "string" && input.trim() !== ""
+    ? input.trim()
+    : undefined;
+}
+
+function displayEngineFromKey(engineKey: string | undefined): string {
+  if (engineKey === undefined) {
+    return "Unknown";
+  }
+  const normalized = engineKey.toLowerCase();
+  return DISPLAY_ENGINE_BY_KEY[normalized] ?? engineKey;
+}
+
+function formatDatabaseVersion(
+  rawVersion: string | undefined,
+  engineKey: string | undefined
+): string | undefined {
+  const version = nonEmptyString(rawVersion);
+  if (version === undefined) {
+    return undefined;
+  }
+
+  const numericVersion = version.match(VERSION_NUMBER_PATTERN)?.[0] ?? version;
+  if (
+    engineKey?.toLowerCase() === "postgresql" &&
+    numericVersion.endsWith(".0")
+  ) {
+    return numericVersion.slice(0, -2);
+  }
+
+  return numericVersion;
+}
+
+function databaseVersionFromResource({
+  engineKey,
+  status,
+}: {
+  engineKey: string | undefined;
+  status: Record<string, unknown>;
+}): string | undefined {
+  return formatDatabaseVersion(
+    nonEmptyString(status.clusterVersionRef),
+    engineKey
+  );
+}
+
+function databaseStatusFromResource(status: Record<string, unknown>) {
+  const phaseRaw = nonEmptyString(status.phase) ?? "";
+  const label = phaseRaw === "" ? "Unknown" : phaseRaw;
+  const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
+  const tone = getToneForStatus(phaseForTone) ?? "pending";
+  return { label, tone };
+}
+
+function databaseMetricsFromTelemetry(
+  telemetry: WorkloadMetricPercents | undefined
+): DatabaseNodeStates["metrics"] {
+  return {
+    ...(telemetry?.cpuPercent === undefined
+      ? {}
+      : { cpu: telemetry.cpuPercent }),
+    ...(telemetry?.memoryPercent === undefined
+      ? {}
+      : { memory: telemetry.memoryPercent }),
+    ...(telemetry?.storagePercent === undefined
+      ? {}
+      : { storage: telemetry.storagePercent }),
+  };
+}
+
+function databaseMetricCapacitiesFromStatus(
+  status: Record<string, unknown>
+): DatabaseNodeStates["metricCapacities"] | undefined {
+  const effectiveResources = asRecord(status.effectiveResources);
+  if (effectiveResources === undefined) {
+    return undefined;
+  }
+  const cpuCapacity = nonEmptyString(effectiveResources.cpuLimit);
+  const memoryCapacity = nonEmptyString(effectiveResources.memoryLimit);
+  const storageCapacity = nonEmptyString(effectiveResources.storageSize);
+  const metricCapacities: DatabaseNodeStates["metricCapacities"] = {
+    ...(cpuCapacity === undefined ? {} : { cpu: cpuCapacity }),
+    ...(memoryCapacity === undefined ? {} : { memory: memoryCapacity }),
+    ...(storageCapacity === undefined ? {} : { storage: storageCapacity }),
+  };
+  return Object.keys(metricCapacities).length === 0
+    ? undefined
+    : metricCapacities;
+}
+
+function databaseConnectionsFromResource(
+  spec: Record<string, unknown>,
+  status: Record<string, unknown>
+): DatabaseNodeConnection[] {
+  return [
+    {
+      id: "private",
+      kind: "private",
+      label: "Private connection",
+      value: nonEmptyString(status.connectionStringPrivate),
+    },
+    {
+      id: "public",
+      kind: "public",
+      label: "Public connection",
+      publicAccess: { enabled: spec.exposeNodePort === true },
+      value: nonEmptyString(status.connectionStringPublic),
+    },
+  ];
+}
+
+function databaseCompositionNameFromSpec(
+  spec: Record<string, unknown>
+): string | undefined {
+  const crossplane = asRecord(spec.crossplane);
+  const crossplaneCompositionRef = asRecord(crossplane?.compositionRef);
+  const crossplaneCompositionName = nonEmptyString(
+    crossplaneCompositionRef?.name
+  );
+  if (crossplaneCompositionName !== undefined) {
+    return crossplaneCompositionName;
+  }
+
+  const compositionRef = asRecord(spec.compositionRef);
+  return nonEmptyString(compositionRef?.name);
 }
 
 /**
@@ -142,44 +305,22 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   };
 }
 
-/**
- * Maps one DB list item (example.crossplane.io/v1 `DB`) into {@link ContainerNodeStates}.
- * Sets **kind**, **image**, **name**, **uid** (from `metadata.uid` when present), and **status** from `status.phase`.
- */
-export function dbToWorkloadStates(db: unknown): ContainerNodeStates {
-  const root = asRecord(db) ?? {};
-  const spec = asRecord(root.spec) ?? {};
-  const status = asRecord(root.status) ?? {};
-  const meta = asRecord(root.metadata) ?? {};
-
-  const name =
-    typeof meta.name === "string" && meta.name !== "" ? meta.name : "unknown";
-  const engine =
-    typeof spec.engine === "string" && spec.engine.trim() !== ""
-      ? spec.engine.trim()
-      : "database";
-
-  const phaseRaw = typeof status.phase === "string" ? status.phase.trim() : "";
-  const label = phaseRaw === "" ? "Unknown" : phaseRaw;
-  const phaseForTone = phaseRaw === "" ? "unknown" : phaseRaw.toLowerCase();
-  const tone = getToneForStatus(phaseForTone) ?? "pending";
-
-  const uid = metadataUid(db);
-
-  return {
-    kind: "DB",
-    image: engine,
-    name,
-    ...(uid != null && uid !== "" ? { uid } : {}),
-    status: { label, tone },
-  };
+export interface ApsToCanvasStateOptions {
+  /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
+  gridIndexOffset?: number;
+  /** Key from {@link telemetryWorkloadKey} -> latest workload metric % from telemetry. */
+  metricsLookup?: Map<string, WorkloadMetricPercents>;
+  /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
+  namespaceFallback?: string;
 }
 
-export interface ApsToCanvasStateOptions {
-  /** First slot in the shared AP+DB grid (append DB nodes after APs). @default 0 */
+export interface DbsToCanvasStateOptions {
+  /** Composition `metadata.name` -> icon URL/data URI from composition metadata annotations. */
+  compositionIconByName?: ReadonlyMap<string, string>;
+  /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
-  /** Key from {@link telemetryWorkloadKey} → latest CPU/memory % from telemetry. */
-  metricsLookup?: Map<string, CpuMemoryPercents>;
+  /** Key from {@link telemetryWorkloadKey} -> latest workload metric % from telemetry. */
+  metricsLookup?: Map<string, WorkloadMetricPercents>;
   /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
   namespaceFallback?: string;
 }
@@ -222,17 +363,76 @@ export function apsToCanvasState(
     return {
       data: { states },
       id: `ap-${String(stable).replace(/\s+/g, "-")}`,
-      position: { x: (g % 3) * COL, y: Math.floor(g / 3) * ROW },
+      position: fallbackCanvasPosition(g),
       type: CANVAS_CONTAINER_NODE_TYPE,
     };
   });
   return { nodes, edges: [] };
 }
 
-export type DbsToCanvasStateOptions = ApsToCanvasStateOptions;
+/**
+ * Maps one DB list item (example.crossplane.io/v1 `DB`) into `DatabaseNode` props.
+ */
+export function dbToDatabaseNodeData(
+  db: unknown,
+  options?: Pick<
+    DbsToCanvasStateOptions,
+    "compositionIconByName" | "metricsLookup" | "namespaceFallback"
+  >
+): CanvasDatabaseNodeData {
+  const root = asRecord(db) ?? {};
+  const spec = asRecord(root.spec) ?? {};
+  const status = asRecord(root.status) ?? {};
+
+  const name = metadataName(db) ?? "unknown";
+  const namespace = metadataNamespace(db) ?? options?.namespaceFallback ?? "";
+  const uid = metadataUid(db);
+  const engineKey = nonEmptyString(spec.engine);
+  const lookupKey =
+    namespace === "" || name === ""
+      ? undefined
+      : telemetryWorkloadKey("db", namespace, name);
+  const telemetry =
+    lookupKey === undefined
+      ? undefined
+      : options?.metricsLookup?.get(lookupKey);
+
+  const formattedVersion = databaseVersionFromResource({
+    engineKey,
+    status,
+  });
+  const compositionName = databaseCompositionNameFromSpec(spec);
+  const iconUrl =
+    compositionName === undefined
+      ? undefined
+      : options?.compositionIconByName?.get(compositionName);
+  const metricCapacities = databaseMetricCapacitiesFromStatus(status);
+  const mountPath = nonEmptyString(status.mountPath);
+
+  const states: DatabaseNodeStates = {
+    displayEngine: displayEngineFromKey(engineKey),
+    ...(engineKey === undefined
+      ? {}
+      : { engineKey: engineKey as DatabaseEngineKey }),
+    ...(formattedVersion === undefined ? {} : { formattedVersion }),
+    ...(iconUrl === undefined ? {} : { iconUrl }),
+    ...(metricCapacities === undefined ? {} : { metricCapacities }),
+    metrics: databaseMetricsFromTelemetry(telemetry),
+    ...(mountPath === undefined ? {} : { mountPath }),
+    name,
+    status: databaseStatusFromResource(status),
+  };
+
+  return {
+    connections: databaseConnectionsFromResource(spec, status),
+    states,
+    ...(uid === undefined || uid === "" ? {} : { uid }),
+    workload: { name, namespace },
+  };
+}
 
 /**
- * Builds React Flow `nodes` for the project DB (`dbs`) list — same card type as APs.
+ * Builds React Flow `nodes` / `edges` for project DB claims using `DatabaseNode`.
  */
 export function dbsToCanvasState(
   data: K8sGetResponse | undefined,
@@ -242,35 +442,12 @@ export function dbsToCanvasState(
   const grid0 = options?.gridIndexOffset ?? 0;
   const nodes: Node[] = items.map((item, i) => {
     const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
-    const meta = asRecord(asRecord(item)?.metadata) ?? {};
-    const ns =
-      typeof meta.namespace === "string" && meta.namespace !== ""
-        ? meta.namespace
-        : options?.namespaceFallback;
-    const n = typeof meta.name === "string" ? meta.name : "";
-    const lookupKey =
-      ns === undefined || ns === "" || n === ""
-        ? undefined
-        : telemetryWorkloadKey("db", ns, n);
-    const tel =
-      lookupKey === undefined
-        ? undefined
-        : options?.metricsLookup?.get(lookupKey);
-    const base = dbToWorkloadStates(item);
-    const states: ContainerNodeStates = {
-      ...base,
-      ...(tel?.cpuPercent === undefined ? {} : { cpuPercent: tel.cpuPercent }),
-      ...(tel?.memoryPercent === undefined
-        ? {}
-        : { memoryPercent: tel.memoryPercent }),
-      ...(ns !== undefined && ns !== "" ? { namespace: ns } : {}),
-    };
     const g = grid0 + i;
     return {
-      data: { states },
+      data: dbToDatabaseNodeData(item, options),
       id: `db-${String(stable).replace(/\s+/g, "-")}`,
-      position: { x: (g % 3) * COL, y: Math.floor(g / 3) * ROW },
-      type: CANVAS_CONTAINER_NODE_TYPE,
+      position: fallbackCanvasPosition(g),
+      type: CANVAS_DATABASE_NODE_TYPE,
     };
   });
   return { nodes, edges: [] };

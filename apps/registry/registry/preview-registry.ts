@@ -451,6 +451,102 @@ export const Index: RegistryIndex = {
       ),
   },
 
+  "linear/components/entry-node": {
+    style: "linear",
+    group: "components",
+    name: "entry-node",
+    title: "Entry Node",
+    description:
+      "Entry point node with hero canvas view and state matrix (access-domain header, target rows).",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: ["preview", "canvas", "entry-node"],
+    files: [
+      {
+        path: "registry/linear/components/entry-node/entry-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/entry-node/entry-node-preview.canvas.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/entry-node/entry-node-preview"),
+  },
+
+  "linear/components/database-node": {
+    style: "linear",
+    group: "components",
+    name: "database-node",
+    title: "Database Node",
+    description:
+      "Managed database node with hero canvas view and state matrix (connection controls, quick actions, footer metrics).",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "canvas",
+      "database-node",
+      "button",
+      "dropdown-menu",
+      "switch",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/database-node/database-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/database-node/database-node-preview.canvas.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import("@registry/linear/components/database-node/database-node-preview"),
+  },
+
+  "linear/components/environment-node": {
+    style: "linear",
+    group: "components",
+    name: "environment-node",
+    title: "Environment Node",
+    description:
+      "Development environment node with hero canvas view and state matrix (launch command, lifecycle actions, quick actions, footer metrics).",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "canvas",
+      "environment-node",
+      "button",
+      "dropdown-menu",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/environment-node/environment-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/environment-node/environment-node-preview.canvas.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/environment-node/environment-node-preview"
+      ),
+  },
+
   "linear/components/mdx": {
     style: "linear",
     group: "components",

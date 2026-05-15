@@ -1,0 +1,16 @@
+.database-node-connection-list {
+  scrollbar-width: none;
+}
+
+.database-node-connection-list[data-scrollable] {
+  max-height: calc((var(--spacing) * 18 * 2) + (var(--spacing) * 2));
+  overflow-y: auto;
+}
+
+.database-node-connection-list::-webkit-scrollbar {
+  display: none;
+}
+
+.database-node-connection-empty {
+  min-height: calc(var(--spacing) * 11);
+}

@@ -79,6 +79,9 @@
     "./components/canvas/*": "./src/components/canvas/*",
     "./components/container-node/*": "./src/components/container-node/*",
     "./components/chat/*": "./src/components/chat/*",
+    "./components/database-node/*": "./src/components/database-node/*",
+    "./components/entry-node/*": "./src/components/entry-node/*",
+    "./components/environment-node/*": "./src/components/environment-node/*",
     "./components/scale-slider/*": "./src/components/scale-slider/*",
     "./components/project-explorer/*": "./src/components/project-explorer/*",
     "./components/project-creator/*": "./src/components/project-creator/*",
@@ -86,6 +89,7 @@
     "./components/mdx/*": "./src/components/mdx/*",
     "./components/ai-elements/*": "./src/components/ai-elements/*",
     "./components/*": "./src/components/*.tsx",
-    "./hooks/*": "./src/hooks/*.ts"
+    "./hooks/*": "./src/hooks/*.ts",
+    "./assets/runtime-icons": "./src/assets/runtime-icons/index.ts"
   }
 }

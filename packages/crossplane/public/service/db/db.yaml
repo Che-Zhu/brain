@@ -66,7 +66,23 @@ spec:
                 replicas:
                   type: integer
                   default: 1
-                  description: KubeBlocks Cluster replica count for the primary component (default 1).
+                  description: KubeBlocks Cluster replica count for the primary component when running (default 1). Preserved while spec.paused is true.
+                paused:
+                  type: boolean
+                  default: false
+                  description: >
+                    Lifecycle flag for Start/Stop. When true, the active composition scales database
+                    compute components to zero while preserving data, configuration, and spec.replicas.
+                    When false, the composition renders the configured spec.replicas value.
+                restartRequest:
+                  type: integer
+                  default: 0
+                  minimum: 0
+                  description: >
+                    Non-negative declarative restart request counter. Incrementing the value causes
+                    the active composition to render a KubeBlocks Restart OpsRequest for the database
+                    component. API clients should prefer POST /api/db/v1alpha1/restart so the server
+                    reads and increments the current value.
                 storageSize:
                   type: string
                   description: >
@@ -158,10 +174,72 @@ spec:
             properties:
               phase:
                 type: string
+                description: Product-facing DB lifecycle phase consumed by API/UI.
+                enum:
+                  - Creating
+                  - Running
+                  - Updating
+                  - Restarting
+                  - Stopping
+                  - Paused
+                  - Starting
+                  - Failed
+                  - Deleting
+                  - Unknown
+              reason:
+                type: string
+                description: Short product/debug reason for the current lifecycle phase.
+              clusterVersionRef:
+                type: string
+                description: Observed KubeBlocks Cluster version reference used by the composed database Cluster.
+              mountPath:
+                type: string
+                description: Observed primary data volume mount path used by the database workload.
+              effectiveResources:
+                type: object
+                description: Effective database resource values after quota defaults and explicit spec overrides are resolved by the active Composition.
+                properties:
+                  cpuRequest:
+                    type: string
+                  memoryRequest:
+                    type: string
+                  cpuLimit:
+                    type: string
+                  memoryLimit:
+                    type: string
+                  storageSize:
+                    type: string
               observedReplicas:
                 type: integer
               availableReplicas:
                 type: integer
+              observed:
+                type: object
+                description: Raw observed provider details retained for debugging and support.
+                properties:
+                  kubeblocksPhase:
+                    type: string
+                  observedReplicas:
+                    type: integer
+                  availableReplicas:
+                    type: integer
+                  operation:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      phase:
+                        type: string
+                      name:
+                        type: string
+              lifecycle:
+                type: object
+                description: Product lifecycle memory maintained by composition status.
+                properties:
+                  everReady:
+                    type: boolean
+                  lastReadyTime:
+                    type: string
               kubeblocksServices:
                 type: array
                 description: >
