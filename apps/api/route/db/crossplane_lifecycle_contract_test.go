@@ -160,7 +160,6 @@ func TestDBCompositionsRenderProductLifecyclePhase(t *testing.T) {
 				`{{ else if or (eq $kbPhase "Updating") (eq $kbPhase "SpecUpdating") (eq $kbPhase "Upgrade") (eq $kbPhase "VerticalScaling") (eq $kbPhase "VolumeExpanding") }}`,
 				`phase: {{ $productPhase }}`,
 				`reason: {{ $reason | quote }}`,
-				`kind: StatefulSet`,
 				`volumeMounts`,
 				`mountPath: {{ $mountPath | quote }}`,
 				`effectiveResources:`,
@@ -178,10 +177,73 @@ func TestDBCompositionsRenderProductLifecyclePhase(t *testing.T) {
 					t.Fatalf("expected composition template to contain %q", fragment)
 				}
 			}
+			if file == "dbs-mongodb-kubeblocks-go-templating.yaml" {
+				for _, fragment := range []string{
+					`apiVersion: workloads.kubeblocks.io/v1alpha1`,
+					`kind: InstanceSet`,
+					`gotemplating.fn.crossplane.io/composition-resource-name: mongo-instanceset-object`,
+					`gotemplating.fn.crossplane.io/composition-resource-name: mongo-account-root-object`,
+					`name: {{ printf "%s-mongodb-account-root" $name }}`,
+					`gotemplating.fn.crossplane.io/ready: "True"`,
+				} {
+					if !strings.Contains(template, fragment) {
+						t.Fatalf("expected MongoDB composition template to contain %q", fragment)
+					}
+				}
+				for _, fragment := range []string{
+					`kind: StatefulSet`,
+					`mongo-statefulset-object`,
+					`clusterDefinitionRef: mongodb`,
+					`componentDefRef: mongodb`,
+					`clusterVersionRef: {{ $clusterVersion }}`,
+					`gotemplating.fn.crossplane.io/composition-resource-name: mongo-conn-credential-object`,
+					`name: {{ printf "%s-conn-credential" $name }}`,
+				} {
+					if strings.Contains(template, fragment) {
+						t.Fatalf("MongoDB composition template still contains legacy fragment %q", fragment)
+					}
+				}
+			} else if !strings.Contains(template, `kind: StatefulSet`) {
+				t.Fatal("expected composition template to observe a StatefulSet")
+			}
 			if strings.Contains(template, `phase: {{ if $paused }}Paused{{ else }}{{ $kbCluster.status.phase | default "Unknown" }}{{ end }}`) {
 				t.Fatal("composition still passes through KubeBlocks phase instead of product lifecycle phase")
 			}
 		})
+	}
+}
+
+func TestMongoDBCompositionUsesComponentDefinitionBootstrap(t *testing.T) {
+	root := repoRoot(t)
+	template := compositionTemplate(t, filepath.Join(root, "packages/crossplane/public/service/db/dbs-mongodb-kubeblocks-go-templating.yaml"))
+	for _, fragment := range []string{
+		`componentDef: mongodb`,
+		`serviceVersion: {{ $mongoServiceVersion | quote }}`,
+		`{{- $mongoServiceVersion := "6.0.20" }}`,
+		`gotemplating.fn.crossplane.io/composition-resource-name: mongo-account-root-object`,
+		`name: {{ printf "%s-mongodb-account-root" $name }}`,
+	} {
+		if !strings.Contains(template, fragment) {
+			t.Fatalf("expected MongoDB composition template to contain %q", fragment)
+		}
+	}
+}
+
+func TestProviderKubernetesRBACIncludesKubeBlocksInstanceSets(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "packages/crossplane/public/provider-kubernetes-rbac.yaml"))
+	if err != nil {
+		t.Fatalf("read provider-kubernetes RBAC: %v", err)
+	}
+	rbac := string(raw)
+	for _, fragment := range []string{
+		`apiGroups: ["workloads.kubeblocks.io"]`,
+		`resources: ["instancesets"]`,
+		`verbs: ["get", "list", "watch"]`,
+	} {
+		if !strings.Contains(rbac, fragment) {
+			t.Fatalf("expected provider-kubernetes RBAC to contain %q", fragment)
+		}
 	}
 }
 

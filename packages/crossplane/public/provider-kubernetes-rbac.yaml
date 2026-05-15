@@ -34,9 +34,12 @@ rules:
   - apiGroups: ["example.crossplane.io"]
     resources: ["dbs", "notifs"]
     verbs: ["get", "list", "watch", "update", "patch"]
-  # DB compositions observe KubeBlocks-created StatefulSets to expose the actual data mountPath.
+  # DB compositions observe KubeBlocks-created workloads to expose the actual data mountPath.
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["workloads.kubeblocks.io"]
+    resources: ["instancesets"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

@@ -5,9 +5,14 @@
 # engine, quota xs caps the preset data PVC at 3Gi. See packages/crossplane/service/db/db.yaml.
 # exposeNodePort: when DB.spec.exposeNodePort is true, composes Service {name}-export (NodePort;
 # nodePort omitted so the apiserver allocates a free port).
+# MongoDB uses the v0.9 ComponentDefinition/ComponentVersion path (`componentDef` +
+# `serviceVersion`) so KubeBlocks runs its syncer/system account bootstrap. Do not set
+# `clusterDefinitionRef`/`clusterVersionRef` here: the legacy MongoDB ClusterDefinition has
+# no topology on current clusters and its component path only starts mongod, leaving the
+# replica set and root user uninitialized.
 # KubeBlocks Services: {name}-mongodb, {name}-mongodb-headless, {name}-mongodb-mongodb (primary),
-# {name}-mongodb-mongodb-ro (secondary). Conn Secret: {name}-conn-credential (cluster; host/port/user/pass)
-# or per-component account secrets (e.g. {name}-mongodb-account-root) on some versions; we observe conn-credential.
+# {name}-mongodb-mongodb-ro (secondary). MongoDB v0.9 account bootstrap writes the root
+# credential to {name}-mongodb-account-root; observe that secret for connection strings.
 # Export: labels component-name=mongodb, role=primary, selector instance + kubeblocks.io/role=primary.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
@@ -52,8 +57,8 @@ spec:
           {{- $name := .observed.composite.resource.metadata.name }}
           {{- $dbUid := .observed.composite.resource.metadata.uid }}
           {{- $kbCluster := getComposedResource . "kubeblocks-cluster" }}
-          {{- $mongoConnCredentialObject := getComposedResource . "mongo-conn-credential-object" }}
-          {{- $mongoStatefulSetObject := getComposedResource . "mongo-statefulset-object" }}
+          {{- $mongoAccountRootObject := getComposedResource . "mongo-account-root-object" }}
+          {{- $mongoInstanceSetObject := getComposedResource . "mongo-instanceset-object" }}
           {{- $exportSvc := getComposedResource . "db-nodeport-export" }}
           {{- $spec := .observed.composite.resource.spec }}
           {{- $projectName := "" }}
@@ -77,8 +82,8 @@ spec:
           {{- end }}
           {{- end }}
           {{- $mountPath := "/data/db" }}
-          {{- if and $mongoStatefulSetObject $mongoStatefulSetObject.status $mongoStatefulSetObject.status.atProvider $mongoStatefulSetObject.status.atProvider.manifest }}
-          {{- $containers := dig "spec" "template" "spec" "containers" (list) $mongoStatefulSetObject.status.atProvider.manifest }}
+          {{- if and $mongoInstanceSetObject $mongoInstanceSetObject.status $mongoInstanceSetObject.status.atProvider $mongoInstanceSetObject.status.atProvider.manifest }}
+          {{- $containers := dig "spec" "template" "spec" "containers" (list) $mongoInstanceSetObject.status.atProvider.manifest }}
           {{- range $container := $containers }}
           {{- range $mount := (index $container "volumeMounts") }}
           {{- if and (eq (toString (index $mount "name")) "data") (index $mount "mountPath") }}{{- $mountPath = toString (index $mount "mountPath") }}{{- end }}
@@ -193,6 +198,7 @@ spec:
             namespace: {{ $ns }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: mongo-serviceaccount
+              gotemplating.fn.crossplane.io/ready: "True"
             labels:
               crossplane.io/composite: {{ $name }}
               {{- if ne $projectName "" }}
@@ -216,6 +222,7 @@ spec:
             namespace: {{ $ns }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: mongo-role
+              gotemplating.fn.crossplane.io/ready: "True"
             labels:
               crossplane.io/composite: {{ $name }}
               {{- if ne $projectName "" }}
@@ -246,6 +253,7 @@ spec:
             namespace: {{ $ns }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: mongo-rolebinding
+              gotemplating.fn.crossplane.io/ready: "True"
             labels:
               crossplane.io/composite: {{ $name }}
               {{- if ne $projectName "" }}
@@ -309,6 +317,7 @@ spec:
           {{- $engine := .observed.composite.resource.spec.engine | default "mongodb" }}
           {{- $clusterVersion := $engine }}
           {{- if eq $clusterVersion "mongodb" }}{{ $clusterVersion = "mongodb-6.0" }}{{ end }}
+          {{- $mongoServiceVersion := "6.0.20" }}
 
           metadata:
             namespace: {{ $ns }}
@@ -359,12 +368,9 @@ spec:
               repoName: {{ if $scheduledBackup }}{{ (index $scheduledBackup "repoName") | default "backuprepo-minio" | quote }}{{ else }}"backuprepo-minio"{{ end }}
               retentionPeriod: {{ if $scheduledBackup }}{{ (index $scheduledBackup "retentionPeriod") | default "14d" | quote }}{{ else }}"14d"{{ end }}
 
-            clusterDefinitionRef: mongodb
-            clusterVersionRef: {{ $clusterVersion }}
-
             componentSpecs:
             - name: mongodb
-              componentDefRef: mongodb
+              componentDef: mongodb
               monitor: true
               replicas: {{ $desiredReplicas }}
 
@@ -377,6 +383,7 @@ spec:
                   memory: {{ $memLim }}
 
               serviceAccountName: {{ printf "%s-sa" $name }}
+              serviceVersion: {{ $mongoServiceVersion | quote }}
 
               switchPolicy:
                 type: Noop
@@ -454,6 +461,7 @@ spec:
               uid: {{ $dbUid }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: db-nodeport-export
+              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             type: NodePort
             ports:
@@ -471,10 +479,11 @@ spec:
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
-            name: {{ printf "%s-conn-credential-observe" $name }}
+            name: {{ printf "%s-account-root-observe" $name }}
             namespace: {{ $ns }}
             annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: mongo-conn-credential-object
+              gotemplating.fn.crossplane.io/composition-resource-name: mongo-account-root-object
+              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             managementPolicies:
               - Observe
@@ -486,7 +495,7 @@ spec:
                 apiVersion: v1
                 kind: Secret
                 metadata:
-                  name: {{ printf "%s-conn-credential" $name }}
+                  name: {{ printf "%s-mongodb-account-root" $name }}
                   namespace: {{ $ns }}
 
           ---
@@ -494,10 +503,10 @@ spec:
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
-            name: {{ printf "%s-statefulset-observe" $name }}
+            name: {{ printf "%s-instanceset-observe" $name }}
             namespace: {{ $ns }}
             annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: mongo-statefulset-object
+              gotemplating.fn.crossplane.io/composition-resource-name: mongo-instanceset-object
               gotemplating.fn.crossplane.io/ready: "True"
           spec:
             managementPolicies:
@@ -507,8 +516,8 @@ spec:
               name: default
             forProvider:
               manifest:
-                apiVersion: apps/v1
-                kind: StatefulSet
+                apiVersion: workloads.kubeblocks.io/v1alpha1
+                kind: InstanceSet
                 metadata:
                   name: {{ printf "%s-mongodb" $name }}
                   namespace: {{ $ns }}
@@ -516,8 +525,8 @@ spec:
           ---
           {{- $connPriv := "" }}
           {{- $connPub := "" }}
-          {{- if and $mongoConnCredentialObject $mongoConnCredentialObject.status $mongoConnCredentialObject.status.atProvider $mongoConnCredentialObject.status.atProvider.manifest }}
-          {{- $d := $mongoConnCredentialObject.status.atProvider.manifest.data }}
+          {{- if and $mongoAccountRootObject $mongoAccountRootObject.status $mongoAccountRootObject.status.atProvider $mongoAccountRootObject.status.atProvider.manifest }}
+          {{- $d := $mongoAccountRootObject.status.atProvider.manifest.data }}
           {{- if and $d (index $d "username") (index $d "password") }}
           {{- $u := index $d "username" | b64dec }}
           {{- $pw := index $d "password" | b64dec }}
