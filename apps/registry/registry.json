@@ -237,7 +237,7 @@
       "title": "Entry Node",
       "description": "Entry point node content composed with shared canvas node chrome",
       "dependencies": ["lucide-react"],
-      "registryDependencies": ["button", "canvas-node"],
+      "registryDependencies": ["canvas-node"],
       "files": [
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",

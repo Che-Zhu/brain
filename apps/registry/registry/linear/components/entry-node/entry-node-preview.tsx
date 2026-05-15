@@ -108,7 +108,6 @@ function EntryNodeSample({
       copiedTargetKey={copiedTargetKey}
       defaultExpanded={defaultExpanded}
       interaction={{ dragging, selected }}
-      onOpenTargetSettings={() => undefined}
       states={entryNodeStates}
       targets={targets}
     >

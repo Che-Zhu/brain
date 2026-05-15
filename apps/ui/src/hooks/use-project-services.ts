@@ -4,6 +4,7 @@ import {
   useApsK8sList,
   useApTelemetryMetricsBatch,
   useDbsK8sList,
+  useEntryPointList,
 } from "@workspace/api/hooks";
 import {
   apItemsFromList,
@@ -19,46 +20,16 @@ import {
   apMetricsLookupFromResults,
   apsToCanvasState,
   dbsToCanvasState,
+  entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import {
+  entryPointRefreshIntervalForLifecycle,
+  hasTransientWorkloadPhase,
+} from "./project-services-refresh";
 
 const METRICS_REFRESH_MS = 5000;
 const WORKLOAD_RECONCILE_POLL_MS = 1000;
 const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
-const WORKLOAD_TRANSIENT_PHASES = new Set([
-  "binding",
-  "creating",
-  "deleting",
-  "pending",
-  "progressing",
-  "reconciling",
-  "restarting",
-  "starting",
-  "stopping",
-  "updating",
-]);
-
-function normalizeWorkloadPhase(input: unknown) {
-  return typeof input === "string"
-    ? input
-        .trim()
-        .toLowerCase()
-        .replace(/[\s_]+/g, "-")
-    : "";
-}
-
-function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
-  return apItemsFromList(data).some((item) => {
-    const status =
-      item != null && typeof item === "object" && "status" in item
-        ? item.status
-        : undefined;
-    const phase =
-      status != null && typeof status === "object" && "phase" in status
-        ? status.phase
-        : undefined;
-    return WORKLOAD_TRANSIENT_PHASES.has(normalizeWorkloadPhase(phase));
-  });
-}
 
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
@@ -72,6 +43,7 @@ export function useProjectServices(options: {
   data: {
     aps: K8sGetResponse | undefined;
     dbs: K8sGetResponse | undefined;
+    entryPoints: K8sGetResponse | undefined;
   };
   canvasState: CanvasState;
   error: Error | undefined;
@@ -138,6 +110,26 @@ export function useProjectServices(options: {
     pollWhileEmpty: true,
     refreshInterval: workloadReconcileRefreshInterval,
   });
+  const entryPointRefreshInterval = useCallback(
+    (latestData: K8sGetResponse | undefined) =>
+      entryPointRefreshIntervalForLifecycle({
+        apsData,
+        entryPointsData: latestData,
+        workloadReconcilePollUntil,
+      }),
+    [apsData, workloadReconcilePollUntil]
+  );
+  const {
+    data: entryPointsData,
+    error: entryPointsError,
+    isLoading: entryPointsLoading,
+    mutate: mutateEntryPoints,
+  } = useEntryPointList({
+    kubeconfig,
+    labelSelector,
+    namespace,
+    refreshInterval: entryPointRefreshInterval,
+  });
   const { items: dbCompositionRows } = useDbCompositions({
     kubeconfig,
     toItems: true,
@@ -150,12 +142,12 @@ export function useProjectServices(options: {
     setWorkloadReconcilePollUntil(
       Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS
     );
-    return Promise.all([mutateAps(), mutateDbs()]);
-  }, [mutateAps, mutateDbs]);
+    return Promise.all([mutateAps(), mutateDbs(), mutateEntryPoints()]);
+  }, [mutateAps, mutateDbs, mutateEntryPoints]);
 
   const data = useMemo(
-    () => ({ aps: apsData, dbs: dbsData }),
-    [apsData, dbsData]
+    () => ({ aps: apsData, dbs: dbsData, entryPoints: entryPointsData }),
+    [apsData, dbsData, entryPointsData]
   );
 
   const apTargets = useMemo(
@@ -214,16 +206,26 @@ export function useProjectServices(options: {
       metricsLookup,
       namespaceFallback: namespace,
     });
+    const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
+      gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
+    });
     return {
-      edges: [...apBlock.edges, ...dbBlock.edges],
-      nodes: [...apBlock.nodes, ...dbBlock.nodes],
+      edges: [...apBlock.edges, ...dbBlock.edges, ...entryPointBlock.edges],
+      nodes: [...apBlock.nodes, ...dbBlock.nodes, ...entryPointBlock.nodes],
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [apsData, dbsData, dbCompositionIconByName, namespace, metricsLookup]);
+  }, [
+    apsData,
+    dbsData,
+    entryPointsData,
+    dbCompositionIconByName,
+    namespace,
+    metricsLookup,
+  ]);
 
-  const error = apsError ?? dbsError;
-  const isLoading = apsLoading || dbsLoading;
+  const error = apsError ?? dbsError ?? entryPointsError;
+  const isLoading = apsLoading || dbsLoading || entryPointsLoading;
   const graphEmpty =
     canvasState.nodes.length === 0 && canvasState.edges.length === 0;
 

@@ -1,0 +1,85 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: entrypoints.example.crossplane.io
+spec:
+  scope: Namespaced
+  group: example.crossplane.io
+  names:
+    kind: EntryPoint
+    plural: entrypoints
+  defaultCompositionRef:
+    name: entrypoints-minimal
+  versions:
+    - name: v1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                apRef:
+                  type: string
+                  description: Name of the associated AP resource in the same namespace.
+                targets:
+                  type: array
+                  description: Public endpoints synced from the AP Composition.
+                  items:
+                    type: object
+                    required:
+                      - port
+                      - platformDomain
+                    properties:
+                      port:
+                        type: integer
+                        description: Service/container port number.
+                      platformDomain:
+                        type: string
+                        description: Platform-assigned hostname for this public target.
+                      status:
+                        type: string
+                        description: Target status derived from AP phase.
+                        enum:
+                          - accessible
+                          - progressing
+                          - inaccessible
+                          - unknown
+                customDomains:
+                  type: array
+                  description: Reserved for future user-configured custom domain bindings.
+                  items:
+                    type: object
+                    properties:
+                      domain:
+                        type: string
+                        description: User-owned domain.
+                      targetPort:
+                        type: integer
+                        description: Target port this custom domain binds to.
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: Aggregated public access status.
+                  enum:
+                    - Accessible
+                    - Progressing
+                    - Inaccessible
+                    - Degraded
+                    - Not configured
+                targets:
+                  type: array
+                  description: Observed public targets echoed from spec with resolved status.
+                  items:
+                    type: object
+                    properties:
+                      port:
+                        type: integer
+                      platformDomain:
+                        type: string
+                      status:
+                        type: string

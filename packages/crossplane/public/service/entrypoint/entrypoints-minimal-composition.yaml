@@ -1,0 +1,57 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: entrypoints-minimal
+  annotations:
+    meta.crossplane.io/display-name: entrypoint
+    meta.crossplane.io/description: Public access entry point status aggregation for AP targets.
+spec:
+  compositeTypeRef:
+    apiVersion: example.crossplane.io/v1
+    kind: EntryPoint
+  mode: Pipeline
+  pipeline:
+    - step: echo-status
+      functionRef:
+        name: crossplane-contrib-function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $targets := default (list) $spec.targets }}
+            {{- $phase := "Not configured" }}
+            {{- if gt (len $targets) 0 }}
+            {{-   $allOk := true }}
+            {{-   $anyFail := false }}
+            {{-   $anyProg := false }}
+            {{-   range $targets }}
+            {{-     $s := lower (default "unknown" .status) }}
+            {{-     if ne $s "accessible" }}{{ $allOk = false }}{{ end }}
+            {{-     if or (eq $s "inaccessible") (eq $s "failed") (eq $s "error") }}{{ $anyFail = true }}{{ end }}
+            {{-     if or (eq $s "progressing") (eq $s "creating") (eq $s "pending") }}{{ $anyProg = true }}{{ end }}
+            {{-   end }}
+            {{- if $allOk }}{{ $phase = "Accessible" }}
+            {{- else if $anyFail }}{{ $phase = "Inaccessible" }}
+            {{- else if $anyProg }}{{ $phase = "Progressing" }}
+            {{- else }}{{ $phase = "Degraded" }}
+            {{- end }}
+            {{- end }}
+            ---
+            apiVersion: example.crossplane.io/v1
+            kind: EntryPoint
+            metadata:
+              name: {{ .observed.composite.resource.metadata.name }}
+              namespace: {{ .observed.composite.resource.metadata.namespace }}
+            status:
+              phase: {{ $phase | quote }}
+              {{- if gt (len $targets) 0 }}
+              targets:
+                {{ range $targets }}
+                - port: {{ .port }}
+                  platformDomain: {{ .platformDomain | quote }}
+                  status: {{ default "unknown" .status | quote }}
+                {{ end }}
+              {{- end }}

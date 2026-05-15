@@ -9,9 +9,11 @@ import { atom } from "jotai";
 
 import { CanvasContainerNode } from "@/lib/project-canvas/nodes/canvas-container-node";
 import { CanvasDatabaseNode } from "@/lib/project-canvas/nodes/canvas-database-node";
+import { CanvasEntryNode } from "@/lib/project-canvas/nodes/canvas-entry-node";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
+  CANVAS_ENTRY_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
 import { WorkloadLogsCanvasPanel } from "@/lib/project-canvas/panels/workload-logs-panel";
 import { WorkloadMetricsCanvasPanel } from "@/lib/project-canvas/panels/workload-metrics-panel";
@@ -57,6 +59,7 @@ export function projectCanvasNodeServiceUid(node: Node): string | null {
 export const projectCanvasFlowNodeTypes = {
   [CANVAS_CONTAINER_NODE_TYPE]: CanvasContainerNode,
   [CANVAS_DATABASE_NODE_TYPE]: CanvasDatabaseNode,
+  [CANVAS_ENTRY_NODE_TYPE]: CanvasEntryNode,
 } as const satisfies NodeTypes;
 
 /** Side-panel tabs for the project canvas workload inspector (Settings uses {@link WORKLOAD_PANEL_REPLICAS}). */

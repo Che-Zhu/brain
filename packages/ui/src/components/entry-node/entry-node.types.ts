@@ -42,11 +42,6 @@ export type EntryNodeCopyTargetHandler = (
   index: number
 ) => Promise<void> | void;
 
-export type EntryNodeOpenTargetSettingsHandler = (
-  target: EntryNodeTarget,
-  index: number
-) => void;
-
 export interface EntryNodeState {
   accessDomain?: EntryNodeAccessDomain;
   copiedTargetKey?: EntryNodeTargetKey | null;
@@ -56,7 +51,6 @@ export interface EntryNodeState {
 
 export interface EntryNodeActions {
   copyTarget?: EntryNodeCopyTargetHandler;
-  openTargetSettings?: EntryNodeOpenTargetSettingsHandler;
 }
 
 export interface EntryNodeMeta {
@@ -84,7 +78,6 @@ export interface EntryNodeRootProps {
   interaction?: CanvasNodeInteractionState;
   onCopyTarget?: EntryNodeCopyTargetHandler;
   onExpandedChange?: (expanded: boolean) => void;
-  onOpenTargetSettings?: EntryNodeOpenTargetSettingsHandler;
   states: EntryNodeStates;
   targets?: EntryNodeTarget[];
 }

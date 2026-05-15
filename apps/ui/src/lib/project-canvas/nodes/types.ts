@@ -7,6 +7,12 @@ import type {
   DatabaseNodeConnection,
   DatabaseNodeStates,
 } from "@workspace/ui/components/database-node/database-node";
+import type {
+  EntryNodeAccessDomain,
+  EntryNodeActions,
+  EntryNodeStates,
+  EntryNodeTarget,
+} from "@workspace/ui/components/entry-node/entry-node";
 import type { Node } from "@xyflow/react";
 
 // `Node`'s second type parameter must match the node type constants in ./constants.
@@ -14,6 +20,7 @@ import type { Node } from "@xyflow/react";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
+  CANVAS_ENTRY_NODE_TYPE,
 } from "./constants";
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
@@ -42,4 +49,16 @@ export interface CanvasDatabaseNodeData extends Record<string, unknown> {
 export type CanvasDatabaseRfNode = Node<
   CanvasDatabaseNodeData,
   typeof CANVAS_DATABASE_NODE_TYPE
+>;
+
+export interface CanvasEntryNodeData extends Record<string, unknown> {
+  accessDomain?: EntryNodeAccessDomain;
+  actions?: EntryNodeActions;
+  states: EntryNodeStates;
+  targets: EntryNodeTarget[];
+}
+
+export type CanvasEntryRfNode = Node<
+  CanvasEntryNodeData,
+  typeof CANVAS_ENTRY_NODE_TYPE
 >;

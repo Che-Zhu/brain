@@ -19,6 +19,7 @@ export {
   useDbLifecycleOperations,
 } from "./use-db-lifecycle";
 export { useDbsK8sList } from "./use-dbs-k8s-list";
+export { useEntryPointList } from "./use-entrypoint-list";
 export {
   type UseK8sGetResourceOptions,
   useK8sGetResource,
