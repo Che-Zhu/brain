@@ -2,14 +2,10 @@
 
 import {
   useApsK8sList,
-  useApTelemetryMetricsBatch,
   useDbsK8sList,
   useEntryPointList,
 } from "@workspace/api/hooks";
-import {
-  apItemsFromList,
-  apNamespaceNameTargetsFromList,
-} from "@workspace/api/lib/ap-list";
+import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
@@ -17,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 
 import {
-  apMetricsLookupFromResults,
   apsToCanvasState,
   dbsToCanvasState,
   entryPointsToCanvasState,
@@ -27,7 +22,6 @@ import {
   hasTransientWorkloadPhase,
 } from "./project-services-refresh";
 
-const METRICS_REFRESH_MS = 5000;
 const WORKLOAD_RECONCILE_POLL_MS = 1000;
 const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
 
@@ -150,39 +144,6 @@ export function useProjectServices(options: {
     [apsData, dbsData, entryPointsData]
   );
 
-  const apTargets = useMemo(
-    () =>
-      apNamespaceNameTargetsFromList(apsData, namespace).map((t) => ({
-        ...t,
-        kind: "ap" as const,
-      })),
-    [apsData, namespace]
-  );
-
-  const dbTargets = useMemo(
-    () =>
-      apNamespaceNameTargetsFromList(dbsData, namespace).map((t) => ({
-        ...t,
-        kind: "db" as const,
-      })),
-    [dbsData, namespace]
-  );
-
-  const telemetryTargets = useMemo(
-    () => [...apTargets, ...dbTargets],
-    [apTargets, dbTargets]
-  );
-
-  const { data: telemetryBatch } = useApTelemetryMetricsBatch({
-    kubeconfig,
-    refreshInterval: METRICS_REFRESH_MS,
-    targets: telemetryTargets,
-  });
-
-  const metricsLookup = useMemo(
-    () => apMetricsLookupFromResults(telemetryBatch),
-    [telemetryBatch]
-  );
   const dbCompositionIconByName = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of dbCompositionRows ?? []) {
@@ -197,13 +158,11 @@ export function useProjectServices(options: {
   const canvasState = useMemo((): CanvasState => {
     const apBlock = apsToCanvasState(apsData, {
       gridIndexOffset: 0,
-      metricsLookup,
       namespaceFallback: namespace,
     });
     const dbBlock = dbsToCanvasState(dbsData, {
       compositionIconByName: dbCompositionIconByName,
       gridIndexOffset: apBlock.nodes.length,
-      metricsLookup,
       namespaceFallback: namespace,
     });
     const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
@@ -215,14 +174,7 @@ export function useProjectServices(options: {
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [
-    apsData,
-    dbsData,
-    entryPointsData,
-    dbCompositionIconByName,
-    namespace,
-    metricsLookup,
-  ]);
+  }, [apsData, dbsData, entryPointsData, dbCompositionIconByName, namespace]);
 
   const error = apsError ?? dbsError ?? entryPointsError;
   const isLoading = apsLoading || dbsLoading || entryPointsLoading;

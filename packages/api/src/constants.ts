@@ -73,6 +73,7 @@ export const API_ROUTES = {
     logs: "/api/telemetry/v1alpha1/logs",
     metricsHealth: "/api/telemetry/v1alpha1/metrics/health",
     metrics: "/api/telemetry/v1alpha1/metrics",
+    metricsSnapshot: "/api/telemetry/v1alpha1/metrics/snapshot",
   },
 
   /**

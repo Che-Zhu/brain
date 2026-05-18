@@ -12,17 +12,19 @@ import (
 	"sealos/api/route/health"
 	metricssvc "sealos/api/service/metrics"
 	projectsvc "sealos/api/service/project"
+	workloadtelemetry "sealos/api/service/workloadtelemetry"
 )
 
 // Register registers metrics endpoints on the given group (e.g. under /api/telemetry/v1alpha1).
 func Register(grp huma.API) {
 	registerHealth(grp)
 	registerQuery(grp)
+	registerSnapshot(grp)
 }
 
 func registerHealth(grp huma.API) {
 	huma.Register(grp, huma.Operation{
-		OperationID:  "metrics-health",
+		OperationID: "metrics-health",
 		Method:      http.MethodGet,
 		Path:        "/metrics/health",
 		Summary:     "Metrics health",
@@ -48,9 +50,91 @@ type queryOutput struct {
 	Body []map[string]interface{}
 }
 
+type snapshotBody struct {
+	Targets []workloadtelemetry.Target `json:"targets" required:"true" minItems:"1" doc:"Workload targets to snapshot"`
+}
+
+type snapshotInput struct {
+	Authorization string       `header:"Authorization" required:"true" doc:"Bearer url-encoded kubeconfig"`
+	Body          snapshotBody `doc:"Snapshot batch request"`
+}
+
+type snapshotOutput struct {
+	Body workloadtelemetry.SnapshotResponse
+}
+
+func registerSnapshot(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "metrics-snapshot",
+		Method:      http.MethodPost,
+		Path:        "/metrics/snapshot",
+		Summary:     "Snapshot workload metrics",
+		Description: "Batch latest AP and DB workload telemetry snapshots for canvas footer metrics.",
+		Tags:        []string{"Metrics"},
+	}, func(ctx context.Context, input *snapshotInput) (*snapshotOutput, error) {
+		authz := strings.TrimSpace(input.Authorization)
+		if authz == "" {
+			return nil, huma.Error400BadRequest("Authorization is required", nil)
+		}
+		cfg, err := middleware.ConfigFromAuth(authz)
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
+		}
+		podsGVR := middleware.PodsGVR()
+		for _, ns := range snapshotNamespaces(input.Body.Targets) {
+			if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+				Namespace:        ns,
+				AllNamespaces:    false,
+				DefaultNamespace: "",
+				AdminCheckGVR:    &podsGVR,
+			}); err != nil {
+				return nil, huma.Error500InternalServerError("failed to resolve request context", err)
+			}
+		}
+
+		service, err := workloadtelemetry.NewDefaultService()
+		if err != nil {
+			return nil, snapshotServiceError(err)
+		}
+		data, err := service.Snapshot(ctx, authz, input.Body.Targets)
+		if err != nil {
+			return nil, snapshotServiceError(err)
+		}
+		return &snapshotOutput{Body: data}, nil
+	})
+}
+
+func snapshotNamespaces(targets []workloadtelemetry.Target) []string {
+	seen := make(map[string]struct{}, len(targets))
+	out := make([]string, 0, len(targets))
+	for _, target := range targets {
+		ns := strings.TrimSpace(target.Namespace)
+		if ns == "" {
+			continue
+		}
+		if _, ok := seen[ns]; ok {
+			continue
+		}
+		seen[ns] = struct{}{}
+		out = append(out, ns)
+	}
+	return out
+}
+
+func snapshotServiceError(err error) error {
+	switch {
+	case errors.Is(err, workloadtelemetry.ErrEmptyTargets):
+		return huma.Error400BadRequest("snapshot targets are required", err)
+	case errors.Is(err, workloadtelemetry.ErrNoVictoriaMetricsURL):
+		return huma.Error500InternalServerError("VMSELECT_URL is not configured", err)
+	default:
+		return huma.Error500InternalServerError("failed to snapshot workload telemetry", err)
+	}
+}
+
 func registerQuery(grp huma.API) {
 	huma.Register(grp, huma.Operation{
-		OperationID:  "metrics-query",
+		OperationID: "metrics-query",
 		Method:      http.MethodGet,
 		Path:        "/metrics",
 		Summary:     "Query metrics (flattened time series)",
