@@ -7,6 +7,10 @@ import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { isToolUIPart } from "ai";
 
 import { ChatGenUIRenderer } from "./chat.gen-ui";
+import {
+  formatToolDurationMs,
+  readDurationMsFromToolMetadata,
+} from "./chat.tool-metrics";
 
 export function ChatTool({
   addToolApprovalResponse,
@@ -99,8 +103,16 @@ export function ChatTool({
           </p>
         );
       }
+      const durationMs = readDurationMsFromToolMetadata(part.toolMetadata);
       return (
-        <ChatGenUIRenderer key={`${partKeyPrefix}-spec`} spec={out.spec} />
+        <div className="flex w-full min-w-0 flex-col gap-1">
+          <ChatGenUIRenderer key={`${partKeyPrefix}-spec`} spec={out.spec} />
+          {durationMs === undefined ? null : (
+            <p className="text-muted-foreground text-xs">
+              Ran in {formatToolDurationMs(durationMs)}
+            </p>
+          )}
+        </div>
       );
     }
     case "output-error":

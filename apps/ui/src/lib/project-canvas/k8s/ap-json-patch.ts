@@ -3,6 +3,8 @@ import type {
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 
+import { parse as parseYaml } from "yaml";
+
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
@@ -288,7 +290,79 @@ export async function applyApReplicas(
     throw new Error("Replicas must be between 1 and 20.");
   }
   const spec = asRecord(claim.spec);
-  await patchAp(kubeconfig, claim, [
-    specReplaceOrAdd(spec, "replicas", n),
-  ]);
+  await patchAp(kubeconfig, claim, [specReplaceOrAdd(spec, "replicas", n)]);
+}
+
+/** Keys stored in `{ap}-config-backup` / snapshot `config.yaml` by the AP composition (`$effective`). */
+const EFFECTIVE_SNAPSHOT_SPEC_KEYS = [
+  "cpuLimit",
+  "cpuRequest",
+  "endpoints",
+  "env",
+  "image",
+  "imagePullPolicy",
+  "ingressAnnotations",
+  "memoryLimit",
+  "memoryRequest",
+  "paused",
+  "projectName",
+  "probes",
+  "replicas",
+  "restartRequest",
+] as const;
+
+function parseEffectiveApSnapshotYaml(
+  yamlText: string
+): Record<string, unknown> {
+  const doc = parseYaml(yamlText);
+  if (doc == null || typeof doc !== "object" || Array.isArray(doc)) {
+    throw new Error("Snapshot config.yaml must be a YAML mapping.");
+  }
+  return doc as Record<string, unknown>;
+}
+
+/**
+ * Applies effective spec fields from an orphaned snapshot (`config.yaml` in `{ap}-config-snapshot-{hash}`).
+ * Mirrors fields the composition records in backups; clears legacy `/spec/port` and `/spec/host` when endpoints are present.
+ */
+export async function rollbackApFromEffectiveConfigYaml(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  yamlText: string
+): Promise<void> {
+  const snap = parseEffectiveApSnapshotYaml(yamlText.trim());
+  const spec = asRecord(claim.spec);
+  const ops: K8sJsonPatchOp[] = [];
+
+  for (const key of EFFECTIVE_SNAPSHOT_SPEC_KEYS) {
+    if (!Object.hasOwn(snap, key)) {
+      continue;
+    }
+    const value = snap[key];
+    if (key === "image" && (typeof value !== "string" || value.trim() === "")) {
+      throw new Error("Snapshot is missing a valid image.");
+    }
+    if (key === "replicas") {
+      const n = Math.round(Number(value));
+      if (!Number.isFinite(n) || n < 1 || n > 20) {
+        throw new Error("Snapshot replicas must be between 1 and 20.");
+      }
+    }
+    ops.push(specReplaceOrAdd(spec, key, value));
+  }
+
+  if (Object.hasOwn(snap, "endpoints") && Array.isArray(snap.endpoints)) {
+    if (specHasField(spec, "port")) {
+      ops.push({ op: "remove", path: "/spec/port" });
+    }
+    if (specHasField(spec, "host")) {
+      ops.push({ op: "remove", path: "/spec/host" });
+    }
+  }
+
+  if (ops.length === 0) {
+    throw new Error("Snapshot did not contain any applicable spec fields.");
+  }
+
+  await patchAp(kubeconfig, claim, ops);
 }

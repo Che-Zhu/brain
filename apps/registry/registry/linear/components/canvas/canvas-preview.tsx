@@ -1,5 +1,6 @@
 "use client";
 
+import { mockApConfigSnapshotRows } from "@registry/linear/components/container-history-pane/container-history-mock";
 import {
   buildMockLogs,
   LOG_VIEWER_PREVIEW_QUICK_RANGE_MS,
@@ -11,6 +12,7 @@ import type {
   CanvasPanelTab,
 } from "@workspace/ui/components/canvas/canvas.types";
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
+import { ContainerHistoryPane } from "@workspace/ui/components/container-history-pane/container-history-pane";
 import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
 import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
@@ -168,6 +170,30 @@ function CanvasPreviewContainerLogViewerTab() {
   );
 }
 
+/** AP orphaned snapshot ConfigMaps (+ active backup row), aligned with composition backup model. */
+function CanvasPreviewContainerHistoryTab({ node }: CanvasPanelBodyProps) {
+  const states = canvasPreviewStatesFromNode(node);
+  const workloadName =
+    states?.name != null && states.name !== ""
+      ? states.name
+      : "preview-workload";
+  const rows = useMemo(
+    () => mockApConfigSnapshotRows(workloadName),
+    [workloadName]
+  );
+
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden p-2">
+      <ContainerHistoryPane
+        className="h-full min-h-0"
+        rows={rows}
+        showSnapshotExplainerAlert
+        workloadName={workloadName}
+      />
+    </div>
+  );
+}
+
 const CANVAS_PREVIEW_CONTAINER_PANEL_TABS: CanvasPanelTab[] = [
   {
     name: "Settings",
@@ -186,6 +212,12 @@ const CANVAS_PREVIEW_CONTAINER_PANEL_TABS: CanvasPanelTab[] = [
   {
     name: "Logs",
     component: <CanvasPreviewContainerLogViewerTab />,
+  },
+  {
+    name: "History",
+    render: ({ node }) => (
+      <CanvasPreviewContainerHistoryTab key={node.id} node={node} />
+    ),
   },
 ];
 

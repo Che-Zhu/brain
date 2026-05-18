@@ -2,35 +2,40 @@
 name: sealos-crossplane
 description: >-
   Sealos Crossplane XRDs `AP` (deploy a Docker image as Deployment + Service + Ingress via
-  `aps-deployment-ingress-go-templating`) and `Project` (group resources via
-  `project-instance-go-templating`), both `example.crossplane.io/v1`, namespaced. Lists every
-  configurable spec field, a few valid claim examples, and the bash commands the chat sandbox
-  needs (KUBECONFIG=/tmp/kubeconfig, kubectl on PATH) to pick the namespace and derive the
-  ingress base host before applying.
-  Use when authoring or applying AP/Project manifests against a Kubernetes cluster.
+  `aps-deployment-ingress-go-templating`), `Project` (group resources via
+  `project-instance-go-templating`), and `DB` (provision a KubeBlocks database Cluster via one of
+  four engine-specific compositions: postgresql / mysql / mongodb / redis), all
+  `example.crossplane.io/v1`, namespaced. Lists every configurable spec field, a few valid claim
+  examples, and the bash commands the chat sandbox needs (KUBECONFIG=/tmp/kubeconfig, kubectl on
+  PATH) to pick the namespace and derive the ingress base host before applying.
+  Use when authoring or applying AP/Project/DB manifests against a Kubernetes cluster.
 ---
 
-# Sealos Crossplane — `AP` and `Project`
+# Sealos Crossplane — `AP`, `Project`, and `DB`
 
-`AP` and `Project` are Sealos-specific Crossplane **XRDs** (Composite Resource Definitions) in
-group `example.crossplane.io`, version `v1`, both namespaced. Each XRD has a default
+`AP`, `Project`, and `DB` are Sealos-specific Crossplane **XRDs** (Composite Resource Definitions)
+in group `example.crossplane.io`, version `v1`, all namespaced. Each XRD has a default
 **Composition** that turns a small claim YAML into real Kubernetes resources via an inline Go
 template. Scope of this skill (other compositions exist on some clusters but are out of scope):
 
-| Kind      | Default `compositionRef.name`            | Composes                                                        |
-|-----------|------------------------------------------|-----------------------------------------------------------------|
-| `AP`      | `aps-deployment-ingress-go-templating`   | `Deployment`, one `Service` per endpoint, one `Ingress`, plus a config-snapshot `ConfigMap` (+ rollback `Job`). |
-| `Project` | `project-instance-go-templating`         | One `app.sealos.io/v1 Instance` (Sealos UI grouping object).    |
+| Kind      | Default `compositionRef.name`                | Composes                                                        |
+|-----------|----------------------------------------------|-----------------------------------------------------------------|
+| `AP`      | `aps-deployment-ingress-go-templating`       | `Deployment`, one `Service` per endpoint, one `Ingress`, plus a config-snapshot `ConfigMap` (+ rollback `Job`). |
+| `Project` | `project-instance-go-templating`             | One `app.sealos.io/v1 Instance` (Sealos UI grouping object).    |
+| `DB`      | `dbs-postgresql-kubeblocks-go-templating` (default) — pick one of four per engine | `apps.kubeblocks.io/v1alpha1 Cluster`, `ServiceAccount` + `Role` + `RoleBinding`, an observe-only `Object` for KubeBlocks' auto-created conn-credential Secret, optional NodePort export Service, optional user-managed `Secret`. |
 
 Need the raw XRD or Composition? Pull it from the cluster — do not invent it:
 
 ```bash
 kubectl get xrd aps.example.crossplane.io -o yaml
 kubectl get xrd projects.example.crossplane.io -o yaml
+kubectl get xrd dbs.example.crossplane.io -o yaml
 kubectl get composition aps-deployment-ingress-go-templating -o yaml
 kubectl get composition project-instance-go-templating -o yaml
+kubectl get compositions -l engine -o name           # the four dbs-*-kubeblocks-go-templating
 kubectl explain ap.spec --api-version=example.crossplane.io/v1
 kubectl explain project.spec --api-version=example.crossplane.io/v1
+kubectl explain db.spec --api-version=example.crossplane.io/v1
 ```
 
 ---
@@ -44,7 +49,7 @@ Composition behavior to know before you write a claim:
 - If `metadata.labels.region` is set, the composition **overwrites every**
   `spec.endpoints[].host` with `{metadata.name}-{slug6}.{region}` where `slug6` is the first
   6 hex chars of `sha256(name|namespace|uid)`. **That label must equal the ingress base host
-  `BASE_HOST`** from the active kubeconfig cluster server ([§5.3](#53-derive-the-ingress-base-host)):
+  `BASE_HOST`** from the active kubeconfig cluster server ([§6.3](#63-derive-the-ingress-base-host)):
   read `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` (e.g. stdout
   `https://192.168.12.53.nip.io:6443`), strip scheme/path/trailing `:port` → **`192.168.12.53.nip.io`**,
   and set `region` to **that hostname only**—not the raw `https://…:6443` URL and not an invented zone.
@@ -81,7 +86,7 @@ Composition behavior to know before you write a claim:
 | `type`                           | `prelude`                                   | unset       | UI-only hint that the image may not be pullable yet (e.g. mid-build). Omit for normal deploys. |
 
 `metadata.labels.region` (string) — **must match `BASE_HOST`** derived from
-`{.clusters[0].cluster.server}` as in [§5.3](#53-derive-the-ingress-base-host) when you use this
+`{.clusters[0].cluster.server}` as in [§6.3](#63-derive-the-ingress-base-host) when you use this
 strategy; see host-rewrite note above. Treated as part of the configurable surface even though it
 lives on `metadata`, not `spec`.
 
@@ -95,8 +100,8 @@ lives on `metadata`, not `spec`.
 
 A `Project` claim is a thin pointer: it composes exactly one `app.sealos.io/v1 Instance` with
 the same name and namespace, labelled for the Sealos UI. Other resources "belong" to a project
-by **the AP referencing it via `spec.projectName`**, not by being listed inside the Project's
-own spec.
+by **the AP (or DB) referencing it via `spec.projectName`**, not by being listed inside the
+Project's own spec.
 
 ### `Project` configurable `spec` fields
 
@@ -110,7 +115,154 @@ The composed Instance picks up `cloud.sealos.io/deploy-on-sealos: {project-name}
 
 ---
 
-## 3. Sandbox runtime (chat agent)
+## 3. `DB` — provision a KubeBlocks database Cluster
+
+A `DB` claim wraps a single KubeBlocks `apps.kubeblocks.io/v1alpha1 Cluster` (plus its
+ServiceAccount/Role/RoleBinding, an observe-only `Object` for the auto-created conn-credential
+Secret, and optional NodePort export Service). One of four engine-specific compositions is
+selected — they share the `DB` XRD but differ in cluster definition, version, KubeBlocks Service
+shape, and connection-string format.
+
+| `spec.engine` | `compositionRef.name`                          | KubeBlocks `clusterDefinitionRef` / `clusterVersionRef`         |
+|---------------|------------------------------------------------|-----------------------------------------------------------------|
+| `postgresql`  | `dbs-postgresql-kubeblocks-go-templating`      | `postgresql` / `postgresql-16.4.0`                              |
+| `mysql`       | `dbs-mysql-kubeblocks-go-templating`           | `apecloud-mysql` / `ac-mysql-8.0.30-1` (ApeCloud MySQL)         |
+| `mongodb`     | `dbs-mongodb-kubeblocks-go-templating`         | `mongodb` / `mongodb-6.0`                                       |
+| `redis`       | `dbs-redis-kubeblocks-go-templating`           | `redis` / `redis-7.2.7` (+ `redis-sentinel-7` sidecar component)|
+
+`spec.engine` is **not** auto-mapped to a composition. The XRD's `defaultCompositionRef.name` is
+the **postgresql** composition, so a claim that sets `engine: mysql` without also setting
+`crossplane.compositionRef.name: dbs-mysql-kubeblocks-go-templating` (or
+`compositionSelector.matchLabels: { engine: mysql }`) will run the postgres template against a
+mysql `clusterDefinitionRef` and produce an invalid Cluster. **Always pair `engine` with the
+matching `compositionRef.name`.**
+
+Composition behavior to know before you write a claim:
+
+- All four compositions emit: `ServiceAccount`/`Role`/`RoleBinding` named `{name}-sa`, the
+  KubeBlocks `Cluster` named `{name}`, and a `kubernetes.m.crossplane.io/v1alpha1 Object` that
+  observes (Observe-only) the conn-credential Secret KubeBlocks creates. Composed children
+  `ownerReference` the `DB`.
+- When `spec.exposeNodePort: true`, a `NodePort` Service `{name}-export` is composed selecting
+  the primary/leader workload. `nodePort` is omitted so the apiserver allocates a free port
+  cluster-wide.
+- When `spec.secretData` is set, a separate user-managed `Secret` named `spec.connectionSecretName`
+  (default `{name}-connection`) is composed with base64-encoded values. This is **independent**
+  of the KubeBlocks-managed conn-credential Secret (`{name}-conn-credential` for
+  postgres/mysql/mongodb, `{name}-redis-account-default` for redis).
+- `metadata.labels.region` does **not** rewrite hosts the way it does on `AP`. For `DB` it is only
+  used to format `status.connectionStringPublic` as `…@dbconn.{region}:{nodePort}`. Set it to
+  `BASE_HOST` ([§6.3](#63-derive-the-ingress-base-host)) **only** when `exposeNodePort: true` and
+  you want a public URI; leave it unset for private-only databases.
+- `spec.projectName` works exactly like on `AP`: the composition observes the named `Project`
+  claim in the same namespace, SSA-patches the `DB` composite with
+  `crossplane.io/project-name` + `crossplane.io/project-uid` labels and a `Project`
+  `ownerReference`, and tags composed children with the same labels.
+
+### `DB` configurable `spec` fields
+
+| Field                            | Type                                        | Default        | Notes |
+|----------------------------------|---------------------------------------------|----------------|-------|
+| `crossplane.compositionRef.name` | string                                      | postgres composition (XRD default) | **Must match `engine`.** Use `compositionSelector.matchLabels: { engine: <engine> }` as an alternative. |
+| `engine`                         | `postgresql` \| `mysql` \| `mongodb` \| `redis` | —          | **Required.** Drives `clusterDefinitionRef`/`clusterVersionRef` inside the Go template. Cannot be changed in place — delete and recreate to switch engines. |
+| `quota`                          | `xs` \| `s` \| `m` \| `l`                   | `xs`           | Preset for CPU/memory/storage (see quota table). Individual `cpuRequest`/`memoryRequest`/`cpuLimit`/`memoryLimit`/`storageSize` override only the fields you set. |
+| `replicas`                       | integer                                     | `1`            | Replica count of the **primary** component. (Redis sentinel component is fixed at 1 replica.) |
+| `cpuRequest` / `cpuLimit`        | string (k8s quantity)                       | from quota     | |
+| `memoryRequest` / `memoryLimit`  | string (k8s quantity)                       | from quota     | |
+| `storageSize`                    | string                                      | from quota     | PVC request for the primary data volume. Redis sentinel volume is set separately by quota and is not exposed as a field. |
+| `storageClassName`               | string                                      | cluster default | Applied to all volumeClaimTemplates. |
+| `terminationPolicy`              | `Delete` \| `WipeOut`                       | `Delete`       | KubeBlocks `Cluster.spec.terminationPolicy`. Case-insensitive `Wipeout` is normalised to `WipeOut`. |
+| `exposeNodePort`                 | boolean                                     | `false`        | Compose `{name}-export` NodePort Service for primary/leader. Required for `status.connectionStringPublic`. |
+| `connectionSecretName`           | string                                      | `{name}-connection` | Name of the user-managed Secret composed from `spec.secretData`. Distinct from KubeBlocks' `{name}-conn-credential`. |
+| `secretData`                     | `map[string]string`                         | unset          | When present, composition emits an Opaque `Secret` whose `data` values are base64-encoded from your raw strings. |
+| `scheduledBackup`                | `{ cronExpression?, enabled?, retentionPeriod?, repoName? }` | engine defaults | Maps to `Cluster.spec.backup`. Engine defaults below. PostgreSQL's `repoName` is **hard-coded** to `backuprepo-s3`; `scheduledBackup.repoName` is ignored for postgres. |
+| `restoreFromBackup`              | `{ backupName, namespace?, volumeRestorePolicy?, connectionPassword? }` | unset | Sets the `kubeblocks.io/restore-from-backup` annotation on the Cluster. `connectionPassword` is honoured **only** by MySQL (preserves original account password). |
+| `projectName`                    | string                                      | —              | Name of a `Project` in the same namespace. Same semantics as on `AP`. |
+
+#### Quota presets
+
+Omitted requests/limits/storage are filled from this table. Format:
+`requests.cpu/requests.memory → limits.cpu/limits.memory, primary storage`.
+
+| engine        | `xs`                                          | `s`                                              | `m`                                            | `l`                                            |
+|---------------|-----------------------------------------------|--------------------------------------------------|------------------------------------------------|------------------------------------------------|
+| `postgresql`  | `250m`/`512Mi` → `500m`/`1Gi`, `3Gi`          | `500m`/`1Gi` → `1000m`/`2Gi`, `10Gi`             | `1000m`/`2Gi` → `2000m`/`4Gi`, `20Gi`          | `2000m`/`4Gi` → `4000m`/`8Gi`, `50Gi`          |
+| `mysql`       | `100m`/`256Mi` → `500m`/`512Mi`, `3Gi`        | `250m`/`512Mi` → `1000m`/`1Gi`, `10Gi`           | `500m`/`1Gi` → `2000m`/`2Gi`, `20Gi`           | `1000m`/`2Gi` → `4000m`/`4Gi`, `50Gi`          |
+| `mongodb`     | `250m`/`768Mi` → `1000m`/`1024Mi`, `3Gi`      | `500m`/`1Gi` → `1000m`/`2Gi`, `20Gi`             | `1000m`/`2Gi` → `2000m`/`4Gi`, `50Gi`          | `2000m`/`4Gi` → `4000m`/`8Gi`, `100Gi`         |
+| `redis`       | `100m`/`512Mi` → `500m`/`768Mi`, `3Gi` + `1Gi` sentinel | `250m`/`1Gi` → `1000m`/`1536Mi`, `4Gi` + `2Gi` | `500m`/`2Gi` → `2000m`/`3Gi`, `10Gi` + `2Gi` | `1000m`/`4Gi` → `4000m`/`6Gi`, `20Gi` + `2Gi`  |
+
+#### Scheduled-backup defaults
+
+Fixed per engine; `scheduledBackup.{cronExpression,enabled,retentionPeriod,repoName}` overrides
+each individually (except postgres `repoName`):
+
+| engine        | cron           | method          | repo (default)        | retention |
+|---------------|----------------|-----------------|-----------------------|-----------|
+| `postgresql`  | `13 10 * * *`  | `pg-basebackup` | `backuprepo-s3` (fixed) | `14d`   |
+| `mysql`       | `04 07 * * *`  | `xtrabackup`    | `backuprepo-minio`    | `14d`     |
+| `mongodb`     | `30 07 * * *`  | `dump`          | `backuprepo-minio`    | `14d`     |
+| `redis`       | `02 08 * * *`  | `datafile`      | `backuprepo-minio`    | `14d`     |
+
+The named `BackupRepo` resource must exist on the cluster, otherwise backups fail to schedule.
+Set `scheduledBackup: { enabled: false }` for clusters without one.
+
+### KubeBlocks Services and connection strings
+
+Composed/observed KubeBlocks Services per engine (also echoed in `status.kubeblocksServices`,
+all `ClusterIP` unless noted; DNS name is `{svc}.{namespace}.svc`):
+
+| engine        | Services |
+|---------------|----------|
+| `postgresql`  | `{name}-postgresql` (primary), `{name}-postgresql-headless` |
+| `mysql`       | `{name}-mysql` (leader), `{name}-mysql-headless` |
+| `mongodb`     | `{name}-mongodb`, `{name}-mongodb-headless`, `{name}-mongodb-mongodb` (primary RW), `{name}-mongodb-mongodb-ro` (secondary RO) |
+| `redis`       | `{name}-redis-redis` (primary, port `6379`), `{name}-redis-headless`, `{name}-redis-sentinel-redis-sentinel`, `{name}-redis-sentinel-headless` |
+
+KubeBlocks itself creates the conn-credential Secret in the claim namespace
+(`{name}-conn-credential` for postgres/mysql/mongodb; `{name}-redis-account-default` for redis).
+The composition observes it (Observe-only, never creates/updates), decodes
+`username`/`password` (and `host`/`port` where available), and populates:
+
+- `status.connectionStringPrivate` — in-cluster URI, e.g.
+  - `postgresql://user:pw@{name}-postgresql.{ns}.svc:5432`
+  - `mysql://user:pw@{name}-mysql.{ns}.svc:3306`
+  - `mongodb://user:pw@{name}-mongodb.{ns}.svc:27017`
+  - `redis://user:pw@{name}-redis-redis.{ns}.svc:6379`
+- `status.connectionStringPublic` — **only emitted when both** `exposeNodePort: true` **and**
+  `metadata.labels.region` is set. Format
+  `{scheme}://user:pw@dbconn.{region}:{allocated-nodePort}`. PostgreSQL and MongoDB append
+  `?directConnection=true`; MySQL and Redis use no query string.
+
+`status` fields (read-only, useful when polling): `phase` (mirrors KubeBlocks
+`Cluster.status.phase`: `Creating` / `Running` / `Failed` / `Deleting` / `Unknown`),
+`observedReplicas`, `availableReplicas`, `kubeblocksServices[]`, `secretData` (echo of the
+user-managed Secret, base64), `connectionStringPrivate`, `connectionStringPublic`,
+`projectName`, `projectUid`, `conditions[]`.
+
+### `DB` common gotchas
+
+- **Connection strings appear late.** KubeBlocks creates `…-conn-credential` (or
+  `…-redis-account-default`) only after the Cluster reaches `phase: Running`; until then
+  `status.connectionStringPrivate` is empty. Poll
+  `kubectl get db <name> -n <ns> -o jsonpath='{.status.connectionStringPrivate}'`.
+- **`engine` is immutable.** Switching engines requires deleting the DB and recreating it.
+- **PostgreSQL `scheduledBackup.repoName` is ignored** — the postgres composition hard-codes
+  `backuprepo-s3`. To change repos for postgres backups, change the BackupRepo CR or use a
+  one-off `Backup` CR.
+- **MySQL ApeCloud uses `leader`, not `primary`.** The export Service selects
+  `kubeblocks.io/role=leader`; expect that role label in your own selectors too.
+- **Redis writes go to `{name}-redis-redis`** (the engine doubles the suffix), not
+  `{name}-redis`. The headless Service is `{name}-redis-headless`; sentinel uses
+  `{name}-redis-sentinel-redis-sentinel`.
+- **`metadata.labels.region` is harmless when omitted** — it only affects
+  `connectionStringPublic`. Unlike `AP`, you do not need to set it for a working in-cluster DB.
+- **Restore is annotation-based.** `spec.restoreFromBackup` adds
+  `kubeblocks.io/restore-from-backup` on the Cluster; the referenced Backup CR must exist in
+  `restoreFromBackup.namespace` (defaults to the claim namespace).
+
+---
+
+## 4. Sandbox runtime (chat agent)
 
 The chat backend runs your `bash` calls inside a Vercel Sandbox MicroVM with the user's
 kubeconfig pre-mounted:
@@ -127,37 +279,44 @@ user's cluster. Read it to make decisions; never assume a value.
 
 ---
 
-## 4. Apply flow
+## 5. Apply flow
 
-1. **Verify the cluster and that the platform is installed** ([§5.1](#51-verify-cluster-access)).
+1. **Verify the cluster and that the platform is installed** ([§6.1](#61-verify-cluster-access)).
    Stop and report verbatim if any of these fail.
-2. **Resolve `metadata.namespace`** ([§5.2](#52-pick-the-namespace)). Confirm
-   `kubectl auth can-i create aps -n <ns>` (and `... projects -n <ns>` if applying a Project).
+2. **Resolve `metadata.namespace`** ([§6.2](#62-pick-the-namespace)). Confirm
+   `kubectl auth can-i create aps -n <ns>` (and the matching `projects` / `dbs` checks for whatever
+   you are applying).
 3. For an `AP`:
-   - Pick a host strategy ([§5.3](#53-derive-the-ingress-base-host)): explicit
+   - Pick a host strategy ([§6.3](#63-derive-the-ingress-base-host)): explicit
      `endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
-4. **Apply Project before AP** when the AP sets `spec.projectName`, otherwise the AP's
+4. For a `DB`:
+   - Pick the matching `compositionRef.name` for `spec.engine` ([§3](#3-db--provision-a-kubeblocks-database-cluster)).
+   - Set `metadata.labels.region: <base-host>` **only** if you also set `exposeNodePort: true`
+     and want `connectionStringPublic` populated.
+5. **Apply Project before AP/DB** when the claim sets `spec.projectName`, otherwise the
    `project-observe` step has nothing to find on the first reconcile.
-5. **Apply, then watch readiness** ([§5.4](#54-apply-and-watch)).
+6. **Apply, then watch readiness** ([§6.4](#64-apply-and-watch)).
 
 ---
 
-## 5. Tips
+## 6. Tips
 
-### 5.1 Verify cluster access
+### 6.1 Verify cluster access
 
 ```bash
 kubectl version --client=true
 kubectl config current-context
 kubectl cluster-info
-kubectl api-resources --api-group=example.crossplane.io   # expect: aps, projects
+kubectl api-resources --api-group=example.crossplane.io   # expect: aps, projects, dbs
 kubectl get composition aps-deployment-ingress-go-templating project-instance-go-templating
+kubectl get compositions -l engine -o name                # the four dbs-*-kubeblocks-go-templating
 ```
 
 If `api-resources` shows nothing under `example.crossplane.io`, the XRDs aren't installed and
-this skill cannot be used — stop.
+this skill cannot be used — stop. If only some compositions are missing (e.g. no `dbs-*`),
+DB claims cannot be applied even though the `dbs` XRD exists.
 
-### 5.2 Pick the namespace
+### 6.2 Pick the namespace
 
 In order:
 
@@ -168,6 +327,7 @@ In order:
    kubectl get namespace "$NS"
    kubectl auth can-i create aps -n "$NS"
    kubectl auth can-i create projects -n "$NS"   # only if applying a Project
+   kubectl auth can-i create dbs -n "$NS"        # only if applying a DB
    ```
 2. **Kubeconfig context default:**
 
@@ -184,7 +344,7 @@ In order:
    done
    ```
 
-### 5.3 Derive the ingress base host
+### 6.3 Derive the ingress base host
 
 On Sealos-style clusters the API-server hostname doubles as the ingress DNS base
 (nip.io / sslip.io / wildcard A record). Parse it from the active context:
@@ -206,6 +366,10 @@ Then either:
   collisions in the same namespace), **or**
 - Set `metadata.labels.region: <BASE_HOST>` and let the composition overwrite each endpoint
   with `{name}-<slug6>.<BASE_HOST>` (slug6 is a deterministic hash you don't control).
+
+For `DB`, `BASE_HOST` doubles as the value of `metadata.labels.region` **only when** you want a
+public NodePort URI (`status.connectionStringPublic`). It is not used for host rewriting; for
+in-cluster-only databases leave the label off.
 
 If `$SERVER` is an internal IP that won't resolve publicly, ask the user what ingress base host
 the platform exposes — don't guess.
@@ -231,25 +395,35 @@ APP_SLUG="nginx-${RAND}"
 If `metadata.labels.region` is set, the composition ignores your literal `endpoints[].host` for
 the rendered Ingress and uses `<metadata.name>-<slug6>.<region>` anyway ([§1](#1-ap--deploy-one-docker-image)) — pick a collision-safe **`metadata.name`** there too.
 
-### 5.4 Apply and watch
+### 6.4 Apply and watch
 
 ```bash
-NS="<your-namespace>"; NAME="<your-app>"
-# Project first when AP references it
+NS="<your-namespace>"; NAME="<your-app-or-db>"
+# Project first when AP/DB references it
 kubectl apply -n "$NS" -f /tmp/project.yaml
-kubectl apply -n "$NS" -f /tmp/ap.yaml
+kubectl apply -n "$NS" -f /tmp/ap.yaml     # or /tmp/db.yaml
 
+# AP
 kubectl get project,ap -n "$NS" -o wide
 kubectl describe ap "$NAME" -n "$NS"
 kubectl get deploy,svc,ingress -n "$NS" -l crossplane.io/composite="$NAME"
 kubectl rollout status deploy/"$NAME" -n "$NS" --timeout=180s
+
+# DB
+kubectl get db -n "$NS" -o wide
+kubectl describe db "$NAME" -n "$NS"
+kubectl get cluster.apps.kubeblocks.io "$NAME" -n "$NS" -o wide
+kubectl get svc,secret -n "$NS" -l crossplane.io/composite="$NAME"
+kubectl get db "$NAME" -n "$NS" -o jsonpath='{.status.connectionStringPrivate}'; echo
 ```
 
 If `describe ap` shows `SYNCED=False` or `READY=False`, read `status.conditions[*].message`
 and the events on the composed Deployment for the actual failure (image pull, OOMKilled,
-missing Secret, etc.).
+missing Secret, etc.). For `DB`, also check
+`kubectl describe cluster.apps.kubeblocks.io "$NAME" -n "$NS"` — KubeBlocks surfaces
+storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` claim.
 
-### 5.5 Common gotchas
+### 6.5 Common gotchas
 
 - **Endpoint host clashes** when two APs pick the same host. Either keep hosts unique or use
   `metadata.labels.region` so the composition appends a hash.
@@ -261,11 +435,19 @@ missing Secret, etc.).
   ownerReference the AP), but orphan config-snapshot ConfigMaps and their RBAC intentionally
   survive. Clean them up manually with
   `kubectl get cm -n "$NS" -l app.sealos.io/ap-uid=<uid>` if needed.
-- **Deleting a Project** removes the Instance, but APs that referenced it keep dangling
-  `crossplane.io/project-*` labels and ownerRef — delete the dependent APs first, or accept
+- **Deleting a Project** removes the Instance, but APs/DBs that referenced it keep dangling
+  `crossplane.io/project-*` labels and ownerRef — delete the dependent claims first, or accept
   GC chaining.
+- **Deleting a DB** uses KubeBlocks `terminationPolicy`: `Delete` (default) or `WipeOut` (see
+  `packages/crossplane/public/service/db/db.yaml` / `kubectl explain db.spec`). `WipeOut` is a
+  stronger teardown than `Delete`; exact
+  resource cleanup depends on the KubeBlocks version on-cluster—confirm with
+  `kubectl explain cluster.spec.terminationPolicy` if behaviour surprises you.
+- **DB `connectionStringPublic` empty?** Confirm both `spec.exposeNodePort: true` and
+  `metadata.labels.region: <BASE_HOST>`. Then re-check the NodePort has been allocated:
+  `kubectl get svc "${NAME}-export" -n "$NS" -o jsonpath='{.spec.ports[0].nodePort}'`.
 
-### 5.6 Troubleshooting: wrong host (e.g. `.example.com`), or `kubectl apply` says `unchanged`
+### 6.6 Troubleshooting: wrong host (e.g. `.example.com`), or `kubectl apply` says `unchanged`
 
 1. **Compare claim vs composed Ingress** (traffic follows the Ingress, not your YAML file on disk):
 
@@ -294,15 +476,15 @@ missing Secret, etc.).
 
 ---
 
-## 6. Claim YAML examples
+## 7. Claim YAML examples
 
-Replace `<your-namespace>`, `<your-app>`, `<your-project>`, `<base-host>`, `<owner>`, `<repo>`,
-`<tag>` with values you've validated on the active cluster ([§5](#5-tips)). **`<base-host>` must
-come from [§5.3](#53-derive-the-ingress-base-host)** (often a `*.nip.io` / cluster-specific domain),
-never a made-up `example.com` zone. Prefer collision-proof `<your-app>` labels (see hostname and
-collision notes under §5.3).
+Replace `<your-namespace>`, `<your-app>`, `<your-project>`, `<your-db>`, `<base-host>`, `<owner>`,
+`<repo>`, `<tag>` with values you've validated on the active cluster ([§6](#6-tips)).
+**`<base-host>` must come from [§6.3](#63-derive-the-ingress-base-host)** (often a `*.nip.io` /
+cluster-specific domain), never a made-up `example.com` zone. Prefer collision-proof `<your-app>`
+labels (see hostname and collision notes under §6.3).
 
-### 6.1 Minimal `AP` (public image, explicit host)
+### 7.1 Minimal `AP` (public image, explicit host)
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -321,7 +503,7 @@ spec:
       host: <your-app>.<base-host>
 ```
 
-### 6.2 `AP` attached to a `Project`, with explicit resources
+### 7.2 `AP` attached to a `Project`, with explicit resources
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -345,7 +527,7 @@ spec:
   memoryLimit: 1Gi
 ```
 
-### 6.3 `AP` with multiple endpoints, env, probes, ingress annotations
+### 7.3 `AP` with multiple endpoints, env, probes, ingress annotations
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -385,7 +567,7 @@ spec:
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
 ```
 
-### 6.4 `AP` with composition-derived hosts (`region` label)
+### 7.4 `AP` with composition-derived hosts (`region` label)
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -406,7 +588,7 @@ spec:
       host: dns-ignored.invalid
 ```
 
-### 6.5 Minimal `Project`
+### 7.5 Minimal `Project`
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -419,4 +601,84 @@ spec:
     compositionRef:
       name: project-instance-go-templating
   public: false
+```
+
+### 7.6 Minimal `DB` (PostgreSQL, in-cluster only)
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: <your-db>
+  namespace: <your-namespace>
+spec:
+  crossplane:
+    compositionRef:
+      name: dbs-postgresql-kubeblocks-go-templating
+  engine: postgresql
+  quota: xs
+```
+
+### 7.7 `DB` (MySQL) with NodePort export and public connection string
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: <your-db>
+  namespace: <your-namespace>
+  labels:
+    region: <base-host>            # required for status.connectionStringPublic
+spec:
+  crossplane:
+    compositionRef:
+      name: dbs-mysql-kubeblocks-go-templating
+  engine: mysql
+  quota: s
+  exposeNodePort: true
+```
+
+### 7.8 `DB` (MongoDB) attached to a `Project`, with overrides and scheduled backup
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: <your-db>
+  namespace: <your-namespace>
+spec:
+  crossplane:
+    compositionRef:
+      name: dbs-mongodb-kubeblocks-go-templating
+  engine: mongodb
+  quota: m
+  replicas: 3
+  storageSize: 100Gi
+  storageClassName: csi-fast
+  projectName: <your-project>
+  scheduledBackup:
+    enabled: true
+    cronExpression: "0 2 * * *"
+    retentionPeriod: 30d
+    repoName: backuprepo-minio
+```
+
+### 7.9 `DB` (Redis) restored from an existing backup
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: <your-db>
+  namespace: <your-namespace>
+spec:
+  crossplane:
+    compositionRef:
+      name: dbs-redis-kubeblocks-go-templating
+  engine: redis
+  quota: s
+  restoreFromBackup:
+    backupName: <existing-backup-name>
+    # namespace: <backup-namespace>           # defaults to <your-namespace>
+    # volumeRestorePolicy: Parallel
 ```

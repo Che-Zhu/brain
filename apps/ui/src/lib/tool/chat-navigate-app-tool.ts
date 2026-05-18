@@ -1,6 +1,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 
+import {
+  chatToolIntentionField,
+  logChatToolIntention,
+} from "@/lib/tool/chat-tool-intention";
+
 export const NAVIGATE_APP_TOOL_NAME = "navigateApp" as const;
 
 /** Matches the project area in the App Router (`app/project`). */
@@ -25,10 +30,12 @@ export function buildNavigateAppToolDescription(): string {
     "Call when the user asks to open, go to, or switch between project screens.",
     describeProjectNavigationUrls(),
     `Only paths under ${NAVIGATION_PROJECT_INDEX_PATH} are accepted for safety.`,
+    "Always include `intention`: one short clause explaining why navigating helps the user's goal.",
   ].join(" ");
 }
 
 export const navigateAppInputSchema = z.object({
+  intention: chatToolIntentionField,
   path: z
     .string()
     .min(1)
@@ -85,6 +92,7 @@ export function runNavigateAppTool(
       error: `Refused: only ${NAVIGATION_PROJECT_INDEX_PATH} and ${NAVIGATION_PROJECT_INDEX_PATH}/… paths are allowed.`,
     };
   }
+  logChatToolIntention("navigateApp", parsed.data.intention);
   navigate(safe);
   return { success: true, path: safe };
 }

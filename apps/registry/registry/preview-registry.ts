@@ -739,12 +739,15 @@ export const Index: RegistryIndex = {
     name: "canvas",
     title: "Canvas",
     description:
-      "React Flow workspace (dots, glow), Jotai context; container panel tabs include Settings (`ContainerSettingsPane`), Metrics, Logs.",
+      "React Flow workspace (dots, glow), Jotai context; container panel tabs include Settings (`ContainerSettingsPane`), Metrics, Logs, History (AP config snapshots).",
     state: "coding",
     type: "registry:preview",
     registryDependencies: [
       "preview",
       "button",
+      "alert",
+      "badge",
+      "scroll-area",
       "container-node",
       "chart",
       "log-viewer",
@@ -869,13 +872,99 @@ export const Index: RegistryIndex = {
         type: "registry:ui",
       },
       {
-        path: "packages/ui/src/components/vercel-tabs.tsx",
+        path: "packages/ui/src/components/container-history-pane/container-history-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/container-history-pane/container-history-pane.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "registry/linear/components/container-history-pane/container-history-mock.ts",
+        target: "",
+        type: "registry:preview",
+      },
+    ],
+    load: () => import("@registry/linear/components/canvas/canvas-preview"),
+  },
+
+  "linear/components/container-history-pane": {
+    style: "linear",
+    group: "components",
+    name: "container-history-pane",
+    title: "Container history pane",
+    description:
+      "AP backup list (managed `{name}-config-backup` + orphans `{name}-config-snapshot-{hash}`); Review opens dialog with embedded `config.yaml`; optional cluster fetch via `onLoadConfigYaml`; Rollback for canvas wiring.",
+    state: "coding",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "button",
+      "badge",
+      "alert",
+      "dialog",
+      "scroll-area",
+      "spinner",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/container-history-pane/container-history-pane-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/container-history-pane/container-history-mock.ts",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "packages/ui/src/components/container-history-pane/container-history-pane.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/container-history-pane/container-history-pane.types.ts",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/alert.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/badge.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/button.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/dialog.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/spinner.tsx",
+        target: "",
+        type: "registry:ui",
+      },
+      {
+        path: "packages/ui/src/components/scroll-area.tsx",
         target: "",
         type: "registry:ui",
       },
       previewUiFile,
     ],
-    load: () => import("@registry/linear/components/canvas/canvas-preview"),
+    load: () =>
+      import(
+        "@registry/linear/components/container-history-pane/container-history-pane-preview"
+      ),
   },
 
   "linear/components/metrics-chart": {

@@ -12,6 +12,8 @@ export const CHAT_MAX_STEPS = 15;
 export const CHAT_BASE_SYSTEM_PROMPT = [
   "You are Sealos Brain, the assistant that helps users manage their Kubernetes resources across Sealos projects and namespaces.",
   "",
+  "Every tool call must include the `intention` argument: a short clause explaining why that tool is appropriate right now (audit trail and UI transcripts).",
+  "",
   "You have sandbox tools `readFile`, `writeFile`, and `bash` for filesystem access, kubectl, and shell work against the user's connected Sealos cluster; context includes the relevant Kubernetes namespace when present.",
   "For Sealos Crossplane workflows (claims, namespaces, prerequisites, kubectl patterns), load full instructions via `loadSkill` with skill name `sealos-crossplane` (source: `public/skills/sealos-crossplane/SKILL.md`). Use that skill before asserting cluster-specific details.",
   "",
