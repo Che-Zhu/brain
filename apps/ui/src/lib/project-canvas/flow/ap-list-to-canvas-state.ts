@@ -1,6 +1,5 @@
 import type {
-  ApTelemetryMetricsRow,
-  ApTelemetryResourceKind,
+  WorkloadTelemetrySnapshotKind,
   WorkloadTelemetrySnapshotMetric,
   WorkloadTelemetrySnapshotResponse,
 } from "@workspace/api/hooks";
@@ -66,60 +65,13 @@ function roundedMetricPercent(
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : undefined;
 }
 
-/** Latest sample by `time` (max); falls back to last row if `time` is missing. */
-export function telemetryLatestPercents(
-  series: Record<string, number | string>[]
-): WorkloadMetricPercents {
-  if (series.length === 0) {
-    return {};
-  }
-  const last = series.at(-1);
-  if (last === undefined) {
-    return {};
-  }
-  let best = last;
-  let bestTime = Number.NEGATIVE_INFINITY;
-  for (const row of series) {
-    const t = Number(row.time);
-    if (Number.isFinite(t) && t >= bestTime) {
-      bestTime = t;
-      best = row;
-    }
-  }
-  const cpuPercent = roundedMetricPercent(best.cpu);
-  const memoryPercent = roundedMetricPercent(best.memory);
-  const storagePercent = roundedMetricPercent(best.disk);
-
-  return {
-    ...(cpuPercent === undefined ? {} : { cpuPercent }),
-    ...(memoryPercent === undefined ? {} : { memoryPercent }),
-    ...(storagePercent === undefined ? {} : { storagePercent }),
-  };
-}
-
 /** Map key for merging telemetry into AP/DB workload nodes (`kind:ns:name`). */
 export function telemetryWorkloadKey(
-  kind: ApTelemetryResourceKind,
+  kind: WorkloadTelemetrySnapshotKind,
   namespace: string,
   name: string
 ): string {
   return `${kind}:${namespace}:${name}`;
-}
-
-export function apMetricsLookupFromResults(
-  results: ApTelemetryMetricsRow[] | undefined
-): Map<string, WorkloadMetricPercents> {
-  const map = new Map<string, WorkloadMetricPercents>();
-  if (results == null) {
-    return map;
-  }
-  for (const r of results) {
-    map.set(
-      telemetryWorkloadKey(r.kind, r.namespace, r.name),
-      telemetryLatestPercents(r.metrics)
-    );
-  }
-  return map;
 }
 
 export function apMetricsLookupFromSnapshot(

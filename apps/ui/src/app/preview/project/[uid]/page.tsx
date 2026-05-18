@@ -74,7 +74,7 @@ function usePreviewProjectCanvas(options: {
 }
 
 /**
- * Client-only: fetches AP list + metrics via share token. Share access is checked in `layout.tsx`.
+ * Client-only: fetches AP list + snapshot telemetry via share token. Share access is checked in `layout.tsx`.
  */
 export default function PreviewProjectPage() {
   const params = useParams<{ uid: string }>();

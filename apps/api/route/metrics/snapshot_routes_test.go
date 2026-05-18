@@ -48,6 +48,17 @@ func TestRegisterIncludesSeriesRoute(t *testing.T) {
 	}
 }
 
+func TestRegisterOmitsLegacySingleResourceMetricsRoute(t *testing.T) {
+	router := chi.NewRouter()
+	api := humachi.New(router, huma.DefaultConfig("test", "0.0.0"))
+
+	Register(api)
+
+	if path := api.OpenAPI().Paths["/metrics"]; path != nil {
+		t.Fatalf("expected legacy GET /metrics route to be removed, got %#v", path)
+	}
+}
+
 func TestMetricsHealthReportsVictoriaMetricsConfiguration(t *testing.T) {
 	tests := []struct {
 		name  string

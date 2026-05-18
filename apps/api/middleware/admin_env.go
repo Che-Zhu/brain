@@ -25,7 +25,7 @@ func AdminKubeconfigFromEnv() (*clientcmdapi.Config, error) {
 }
 
 // AdminAuthorizationBearer returns an Authorization header value suitable for
-// RestConfigFromAuth / RangeMetrics: "Bearer " + url-encoded kubeconfig from env.
+// RestConfigFromAuth: "Bearer " + url-encoded kubeconfig from env.
 func AdminAuthorizationBearer() (string, error) {
 	encoded := strings.TrimSpace(os.Getenv("ENCODED_ADMIN_KUBECONFIG"))
 	if encoded == "" {

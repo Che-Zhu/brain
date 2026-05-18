@@ -4,12 +4,6 @@ export {
   type UseApLifecycleOptions,
   useApLifecycleOperations,
 } from "./use-ap-lifecycle";
-export {
-  type ApTelemetryMetricsRow,
-  type ApTelemetryResourceKind,
-  type ApTelemetryTarget,
-  useApTelemetryMetricsBatch,
-} from "./use-ap-telemetry-metrics";
 export { useApsK8sList } from "./use-aps-k8s-list";
 export {
   type DbLifecycleActionKey,

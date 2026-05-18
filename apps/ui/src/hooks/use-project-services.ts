@@ -28,7 +28,7 @@ const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
 export function useProjectServices(options: {
   /** URL-encoded kubeconfig (Authorization bearer body). */
   kubeconfig: string;
-  /** K8s namespace for the AP list and telemetry targets. */
+  /** K8s namespace for AP, DB, and entrypoint discovery. */
   namespace: string;
   /** Project UID from the route (decoded). */
   uid: string;
