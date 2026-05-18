@@ -74,6 +74,7 @@ export const API_ROUTES = {
     metricsHealth: "/api/telemetry/v1alpha1/metrics/health",
     metrics: "/api/telemetry/v1alpha1/metrics",
     metricsSnapshot: "/api/telemetry/v1alpha1/metrics/snapshot",
+    metricsSeries: "/api/telemetry/v1alpha1/metrics/series",
   },
 
   /**

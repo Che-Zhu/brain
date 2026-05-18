@@ -25,3 +25,12 @@ export {
   useK8sGetResource,
 } from "./use-k8s-get-resource";
 export { useK8sNamespacedList } from "./use-k8s-namespaced-list";
+export {
+  buildWorkloadTelemetrySeriesRequest,
+  useWorkloadTelemetrySeries,
+  type WorkloadTelemetrySeriesMetricKey,
+  type WorkloadTelemetrySeriesResponse,
+  type WorkloadTelemetrySeriesRow,
+  type WorkloadTelemetrySeriesTarget,
+  type WorkloadTelemetrySeriesWindow,
+} from "./use-workload-telemetry-series";

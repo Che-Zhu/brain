@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -20,6 +21,7 @@ func Register(grp huma.API) {
 	registerHealth(grp)
 	registerQuery(grp)
 	registerSnapshot(grp)
+	registerSeries(grp)
 }
 
 func registerHealth(grp huma.API) {
@@ -63,6 +65,22 @@ type snapshotOutput struct {
 	Body workloadtelemetry.SnapshotResponse
 }
 
+type seriesBody struct {
+	End    time.Time                `json:"end" required:"true" doc:"Sampling window end time"`
+	Start  time.Time                `json:"start" required:"true" doc:"Sampling window start time"`
+	Step   string                   `json:"step" required:"true" doc:"Sampling step duration, for example 60s or 5m"`
+	Target workloadtelemetry.Target `json:"target" required:"true" doc:"Single workload target to query"`
+}
+
+type seriesInput struct {
+	Authorization string     `header:"Authorization" required:"true" doc:"Bearer url-encoded kubeconfig"`
+	Body          seriesBody `doc:"Single-workload series request"`
+}
+
+type seriesOutput struct {
+	Body workloadtelemetry.SeriesResponse
+}
+
 func registerSnapshot(grp huma.API) {
 	huma.Register(grp, huma.Operation{
 		OperationID: "metrics-snapshot",
@@ -104,6 +122,55 @@ func registerSnapshot(grp huma.API) {
 	})
 }
 
+func registerSeries(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "metrics-series",
+		Method:      http.MethodPost,
+		Path:        "/metrics/series",
+		Summary:     "Query workload metric series",
+		Description: "Query a bounded AP or DB workload telemetry series for one workload target.",
+		Tags:        []string{"Metrics"},
+	}, func(ctx context.Context, input *seriesInput) (*seriesOutput, error) {
+		step, err := time.ParseDuration(strings.TrimSpace(input.Body.Step))
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid sampling step", err)
+		}
+
+		authz := strings.TrimSpace(input.Authorization)
+		if authz == "" {
+			return nil, huma.Error400BadRequest("Authorization is required", nil)
+		}
+		cfg, err := middleware.ConfigFromAuth(authz)
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
+		}
+		podsGVR := middleware.PodsGVR()
+		if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        input.Body.Target.Namespace,
+			AllNamespaces:    false,
+			DefaultNamespace: "",
+			AdminCheckGVR:    &podsGVR,
+		}); err != nil {
+			return nil, huma.Error500InternalServerError("failed to resolve request context", err)
+		}
+
+		service, err := workloadtelemetry.NewDefaultService()
+		if err != nil {
+			return nil, telemetryServiceError(err)
+		}
+		data, err := service.Series(ctx, authz, workloadtelemetry.SeriesRequest{
+			End:    input.Body.End,
+			Start:  input.Body.Start,
+			Step:   step,
+			Target: input.Body.Target,
+		})
+		if err != nil {
+			return nil, telemetryServiceError(err)
+		}
+		return &seriesOutput{Body: data}, nil
+	})
+}
+
 func snapshotNamespaces(targets []workloadtelemetry.Target) []string {
 	seen := make(map[string]struct{}, len(targets))
 	out := make([]string, 0, len(targets))
@@ -122,13 +189,25 @@ func snapshotNamespaces(targets []workloadtelemetry.Target) []string {
 }
 
 func snapshotServiceError(err error) error {
+	return telemetryServiceError(err)
+}
+
+func telemetryServiceError(err error) error {
 	switch {
 	case errors.Is(err, workloadtelemetry.ErrEmptyTargets):
 		return huma.Error400BadRequest("snapshot targets are required", err)
+	case errors.Is(err, workloadtelemetry.ErrInvalidSamplingWindow):
+		return huma.Error400BadRequest("invalid sampling window", err)
+	case errors.Is(err, workloadtelemetry.ErrInvalidTarget):
+		return huma.Error400BadRequest("invalid workload target", err)
+	case errors.Is(err, workloadtelemetry.ErrUnsupportedDBDefinition):
+		return huma.Error400BadRequest("unsupported database definition", err)
+	case errors.Is(err, metricssvc.ErrUncompleteParam):
+		return huma.Error400BadRequest("invalid workload target", err)
 	case errors.Is(err, workloadtelemetry.ErrNoVictoriaMetricsURL):
 		return huma.Error500InternalServerError("VMSELECT_URL is not configured", err)
 	default:
-		return huma.Error500InternalServerError("failed to snapshot workload telemetry", err)
+		return huma.Error500InternalServerError("failed to query workload telemetry", err)
 	}
 }
 

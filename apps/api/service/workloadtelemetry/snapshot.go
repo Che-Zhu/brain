@@ -36,6 +36,7 @@ const (
 var (
 	ErrEmptyTargets            = errors.New("snapshot targets are required")
 	ErrInvalidTarget           = errors.New("invalid workload target")
+	ErrInvalidSamplingWindow   = errors.New("invalid sampling window")
 	ErrMetricUnavailable       = errors.New("metric unavailable")
 	ErrUnsupportedDBDefinition = errors.New("unsupported db definition")
 )
@@ -82,18 +83,24 @@ type InstantQuerier interface {
 	QueryInstant(ctx context.Context, req InstantQuery) (InstantSample, error)
 }
 
+type RangeQuerier interface {
+	QueryRange(ctx context.Context, req RangeQuery) ([]SeriesSample, error)
+}
+
 type DBResolver interface {
 	ResolveDBEngine(ctx context.Context, auth string, namespace string, name string) (DBEngine, error)
 }
 
 type ServiceOptions struct {
-	DBResolver DBResolver
-	Querier    InstantQuerier
+	DBResolver   DBResolver
+	Querier      InstantQuerier
+	RangeQuerier RangeQuerier
 }
 
 type Service struct {
-	dbResolver DBResolver
-	querier    InstantQuerier
+	dbResolver   DBResolver
+	querier      InstantQuerier
+	rangeQuerier RangeQuerier
 }
 
 func NewDefaultService() (*Service, error) {
@@ -101,16 +108,22 @@ func NewDefaultService() (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	rangeQuerier, err := NewVictoriaMetricsRangeQuerierFromEnv()
+	if err != nil {
+		return nil, err
+	}
 	return NewService(ServiceOptions{
-		DBResolver: ClusterDBResolver{},
-		Querier:    querier,
+		DBResolver:   ClusterDBResolver{},
+		Querier:      querier,
+		RangeQuerier: rangeQuerier,
 	}), nil
 }
 
 func NewService(options ServiceOptions) *Service {
 	return &Service{
-		dbResolver: options.DBResolver,
-		querier:    options.Querier,
+		dbResolver:   options.DBResolver,
+		querier:      options.Querier,
+		rangeQuerier: options.RangeQuerier,
 	}
 }
 

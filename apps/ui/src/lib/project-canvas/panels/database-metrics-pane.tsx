@@ -1,6 +1,6 @@
 "use client";
 
-import { useApTelemetryMetricsBatch } from "@workspace/api/hooks";
+import { useWorkloadTelemetrySeries } from "@workspace/api/hooks";
 import { Button } from "@workspace/ui/components/button";
 import type {
   DatabaseNodeMetricKey,
@@ -21,6 +21,11 @@ import {
   latestPercent,
   metricReading,
 } from "./database-metrics-format";
+import {
+  databaseMetricsSeriesTarget,
+  METRICS_SERIES_STEP_SECONDS,
+  workloadMetricsSeriesWindow,
+} from "./metrics-series-request";
 
 const METRICS_REFRESH_MS = 5000;
 
@@ -185,29 +190,22 @@ export function DatabaseMetricsPane({
   open,
 }: DatabaseMetricsPaneProps) {
   const databaseData = open ? databaseDataFromNode(node) : null;
-  const telemetryTargets = useMemo(
-    () =>
-      databaseData === null
-        ? []
-        : [
-            {
-              kind: "db" as const,
-              name: databaseData.workload.name,
-              namespace: databaseData.workload.namespace,
-            },
-          ],
-    [databaseData]
+  const telemetryTarget = useMemo(
+    () => databaseMetricsSeriesTarget(node, open),
+    [node, open]
   );
 
-  const { data: telemetryBatch } = useApTelemetryMetricsBatch({
+  const { data: telemetrySeries } = useWorkloadTelemetrySeries({
+    getWindow: workloadMetricsSeriesWindow,
     kubeconfig,
     refreshInterval: METRICS_REFRESH_MS,
-    targets: telemetryTargets,
+    target: telemetryTarget,
+    windowKey: `last-60m-${METRICS_SERIES_STEP_SECONDS}s`,
   });
 
   const metricsData = useMemo(
-    () => telemetryRowsToMetricsData(telemetryBatch?.[0]?.metrics),
-    [telemetryBatch]
+    () => telemetryRowsToMetricsData(telemetrySeries?.rows),
+    [telemetrySeries]
   );
 
   if (databaseData === null) {
@@ -217,7 +215,7 @@ export function DatabaseMetricsPane({
   const { states } = databaseData;
   const cpuSeries = metricsData.cpu ?? [];
   const memorySeries = metricsData.memory ?? [];
-  const storageSeries = metricsData.storage ?? metricsData.disk ?? [];
+  const storageSeries = metricsData.storage ?? [];
   const title = `${states.name} Metrics`;
   const subtitle = `${states.displayEngine}${states.formattedVersion ? ` ${states.formattedVersion}` : ""} · Last 60 minutes`;
   const statusLabel = states.status?.label ?? "Unknown";
