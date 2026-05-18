@@ -139,23 +139,9 @@ func (s *Service) snapshotTarget(ctx context.Context, auth string, target Target
 	}
 
 	for _, profile := range profiles {
-		if s.querier == nil {
-			if item.MetricErrors == nil {
-				item.MetricErrors = make(map[MetricKey]ItemError)
-			}
-			item.MetricErrors[profile.key] = *itemError(ErrMetricUnavailable)
-			continue
-		}
-		sample, err := s.querier.QueryInstant(ctx, InstantQuery{
-			Key:    profile.key,
-			Query:  profile.query,
-			Target: target,
-		})
+		sample, err := s.queryMetric(ctx, target, profile)
 		if err != nil {
-			if item.MetricErrors == nil {
-				item.MetricErrors = make(map[MetricKey]ItemError)
-			}
-			item.MetricErrors[profile.key] = *itemError(err)
+			item.addMetricError(profile.key, err)
 			continue
 		}
 		item.Metrics[profile.key] = MetricSample{Value: sample.Value}
@@ -168,6 +154,24 @@ func (s *Service) snapshotTarget(ctx context.Context, auth string, target Target
 		item.Metrics = nil
 	}
 	return item
+}
+
+func (s *Service) queryMetric(ctx context.Context, target Target, profile metricProfile) (InstantSample, error) {
+	if s.querier == nil {
+		return InstantSample{}, ErrMetricUnavailable
+	}
+	return s.querier.QueryInstant(ctx, InstantQuery{
+		Key:    profile.key,
+		Query:  profile.query,
+		Target: target,
+	})
+}
+
+func (item *SnapshotItem) addMetricError(key MetricKey, err error) {
+	if item.MetricErrors == nil {
+		item.MetricErrors = make(map[MetricKey]ItemError)
+	}
+	item.MetricErrors[key] = *itemError(err)
 }
 
 type metricProfile struct {

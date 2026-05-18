@@ -84,9 +84,10 @@ export function createWorkloadTelemetryStore(
       previous.item === state.item &&
       previous.refreshing === state.refreshing
     ) {
-      return;
+      return false;
     }
     snapshotStates.set(key, state);
+    return true;
   };
 
   const notify = (key: string) => {
@@ -96,6 +97,22 @@ export function createWorkloadTelemetryStore(
     }
     for (const listener of entry.listeners) {
       listener();
+    }
+  };
+
+  const publishSnapshotState = (
+    key: string,
+    state: WorkloadTelemetrySnapshotState
+  ) => {
+    if (setSnapshotState(key, state)) {
+      notify(key);
+    }
+  };
+
+  const publishCachedStates = (targets: WorkloadTelemetryTarget[]) => {
+    for (const target of targets) {
+      const key = workloadTelemetryTargetKey(target);
+      publishSnapshotState(key, { item: cache.get(key), refreshing });
     }
   };
 
@@ -121,26 +138,17 @@ export function createWorkloadTelemetryStore(
     }
 
     refreshing = true;
-    for (const target of targets) {
-      const key = workloadTelemetryTargetKey(target);
-      setSnapshotState(key, { item: cache.get(key), refreshing });
-      notify(key);
-    }
+    publishCachedStates(targets);
     try {
       const response = await options.fetchSnapshot(targets);
       for (const item of response.items) {
         const key = workloadTelemetryTargetKey(item.target);
         cache.set(key, item);
-        setSnapshotState(key, { item, refreshing });
-        notify(key);
+        publishSnapshotState(key, { item, refreshing });
       }
     } finally {
       refreshing = false;
-      for (const target of targets) {
-        const key = workloadTelemetryTargetKey(target);
-        setSnapshotState(key, { item: cache.get(key), refreshing });
-        notify(key);
-      }
+      publishCachedStates(targets);
     }
   };
 

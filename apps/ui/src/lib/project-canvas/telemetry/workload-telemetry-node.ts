@@ -17,13 +17,33 @@ import type {
   WorkloadTelemetryTarget,
 } from "./workload-telemetry-store";
 
+type SnapshotMetrics = NonNullable<
+  WorkloadTelemetrySnapshotState["item"]
+>["metrics"];
+
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed === "" ? undefined : trimmed;
 }
 
+function databaseMetricsFromSnapshot(
+  metrics: SnapshotMetrics
+): DatabaseNodeStates["metrics"] {
+  const nextMetrics: DatabaseNodeStates["metrics"] = {};
+  if (metrics?.cpu !== undefined) {
+    nextMetrics.cpu = metrics.cpu.value;
+  }
+  if (metrics?.memory !== undefined) {
+    nextMetrics.memory = metrics.memory.value;
+  }
+  if (metrics?.storage !== undefined) {
+    nextMetrics.storage = metrics.storage.value;
+  }
+  return nextMetrics;
+}
+
 export function containerTelemetryTargetFromStates(
-  states: ContainerNodeStates
+  states: Pick<ContainerNodeStates, "name" | "namespace">
 ): WorkloadTelemetryTarget | null {
   const namespace = nonEmpty(states.namespace);
   const name = nonEmpty(states.name);
@@ -69,13 +89,7 @@ export function databaseStatesWithTelemetry(
   }
   return {
     ...states,
-    metrics: {
-      ...(metrics.cpu === undefined ? {} : { cpu: metrics.cpu.value }),
-      ...(metrics.memory === undefined ? {} : { memory: metrics.memory.value }),
-      ...(metrics.storage === undefined
-        ? {}
-        : { storage: metrics.storage.value }),
-    },
+    metrics: databaseMetricsFromSnapshot(metrics),
   };
 }
 

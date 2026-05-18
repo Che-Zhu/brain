@@ -6,7 +6,10 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Handle, type NodeProps, Position } from "@xyflow/react";
 import { memo, useMemo } from "react";
 
-import { containerStatesWithTelemetry } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
+import {
+  containerStatesWithTelemetry,
+  containerTelemetryTargetFromStates,
+} from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { useWorkloadTelemetrySnapshot } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import type { CanvasContainerRfNode } from "./types";
 
@@ -15,14 +18,11 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   id,
 }: NodeProps<CanvasContainerRfNode>) {
   const { actions = {}, states } = data;
-  const telemetryTarget = useMemo(() => {
-    const namespace = states.namespace?.trim();
-    const name = states.name.trim();
-    if (!(namespace && name)) {
-      return null;
-    }
-    return { kind: "ap" as const, name, namespace };
-  }, [states.name, states.namespace]);
+  const { name, namespace } = states;
+  const telemetryTarget = useMemo(
+    () => containerTelemetryTargetFromStates({ name, namespace }),
+    [name, namespace]
+  );
   const telemetry = useWorkloadTelemetrySnapshot(telemetryTarget);
   const statesWithTelemetry = containerStatesWithTelemetry(states, telemetry);
   const { state } = useCanvas();
