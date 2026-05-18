@@ -34,3 +34,15 @@ export {
   type WorkloadTelemetrySeriesTarget,
   type WorkloadTelemetrySeriesWindow,
 } from "./use-workload-telemetry-series";
+export {
+  buildWorkloadTelemetrySnapshotRequest,
+  useWorkloadTelemetrySnapshotBatch,
+  type WorkloadTelemetrySnapshotError,
+  type WorkloadTelemetrySnapshotItem,
+  type WorkloadTelemetrySnapshotKind,
+  type WorkloadTelemetrySnapshotMetric,
+  type WorkloadTelemetrySnapshotMetricKey,
+  type WorkloadTelemetrySnapshotRequest,
+  type WorkloadTelemetrySnapshotResponse,
+  type WorkloadTelemetrySnapshotTarget,
+} from "./use-workload-telemetry-snapshot";

@@ -1,6 +1,7 @@
 import type {
   ApTelemetryMetricsRow,
   ApTelemetryResourceKind,
+  WorkloadTelemetrySnapshotResponse,
 } from "@workspace/api/hooks";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
@@ -116,6 +117,30 @@ export function apMetricsLookupFromResults(
       telemetryWorkloadKey(r.kind, r.namespace, r.name),
       telemetryLatestPercents(r.metrics)
     );
+  }
+  return map;
+}
+
+export function apMetricsLookupFromSnapshot(
+  response: WorkloadTelemetrySnapshotResponse | undefined
+): Map<string, WorkloadMetricPercents> {
+  const map = new Map<string, WorkloadMetricPercents>();
+  if (response == null) {
+    return map;
+  }
+  for (const item of response.items) {
+    const { target } = item;
+    if (target.kind !== "ap") {
+      continue;
+    }
+    map.set(telemetryWorkloadKey("ap", target.namespace, target.name), {
+      ...(item.metrics?.cpu === undefined
+        ? {}
+        : { cpuPercent: roundedMetricPercent(item.metrics.cpu.value) }),
+      ...(item.metrics?.memory === undefined
+        ? {}
+        : { memoryPercent: roundedMetricPercent(item.metrics.memory.value) }),
+    });
   }
   return map;
 }

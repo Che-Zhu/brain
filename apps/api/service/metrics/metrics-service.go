@@ -82,6 +82,12 @@ var (
 	ErrUnsupportedDef  = errors.New("unsupported cluster definition")
 )
 
+// VictoriaMetricsConfigured reports whether the metrics dependency has enough
+// configuration for query endpoints to attempt work. It does not perform a live probe.
+func VictoriaMetricsConfigured() bool {
+	return strings.TrimSpace(os.Getenv("VMSELECT_URL")) != ""
+}
+
 // APMetricType represents supported AP (application) metric types.
 type APMetricType string
 
@@ -344,4 +350,3 @@ func setFirstErr(mu *sync.Mutex, target *error, err error) {
 		*target = err
 	}
 }
-
