@@ -38,6 +38,7 @@ export interface UseWorkloadClaimSettingsOptions {
   kubeconfig: string;
   name: string;
   namespace: string;
+  onWorkloadMutation?: () => Promise<unknown>;
   workloadKind: WorkloadClaimKind;
 }
 
@@ -48,7 +49,8 @@ export interface UseWorkloadClaimSettingsOptions {
 export function useWorkloadClaimSettings(
   options: UseWorkloadClaimSettingsOptions
 ) {
-  const { kubeconfig, name, namespace, workloadKind } = options;
+  const { kubeconfig, name, namespace, onWorkloadMutation, workloadKind } =
+    options;
   const isApWorkload = workloadKind === "AP";
 
   const {
@@ -94,6 +96,12 @@ export function useWorkloadClaimSettings(
     () => ({ ...mapped, ...(localOverride ?? {}) }),
     [localOverride, mapped]
   );
+  const revalidateAfterApMutation = useCallback(async () => {
+    await Promise.all([
+      revalidateClaim(),
+      onWorkloadMutation?.().catch(() => undefined),
+    ]);
+  }, [onWorkloadMutation, revalidateClaim]);
 
   const ignoreImage = useCallback((_image: string) => {
     /* read-only */
@@ -126,13 +134,13 @@ export function useWorkloadClaimSettings(
       try {
         await applyApImage(kc, body, image);
         toast.success("Image applied.");
-        await revalidateClaim();
+        await revalidateAfterApMutation();
       } catch (e) {
         setLocalOverride(null);
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateClaim]
+    [isApWorkload, kubeconfig, revalidateAfterApMutation]
   );
 
   const onEnvChange = useCallback(
@@ -150,13 +158,13 @@ export function useWorkloadClaimSettings(
       try {
         await applyApEnv(kc, body, env);
         toast.success("Environment applied.");
-        await revalidateClaim();
+        await revalidateAfterApMutation();
       } catch (e) {
         setLocalOverride(null);
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateClaim]
+    [isApWorkload, kubeconfig, revalidateAfterApMutation]
   );
 
   const onPortsChange = useCallback<ContainerSettingsOnPortsChange>(
@@ -174,13 +182,13 @@ export function useWorkloadClaimSettings(
       try {
         await applyApPorts(kc, body, ports);
         toast.success("Ports applied.");
-        await revalidateClaim();
+        await revalidateAfterApMutation();
       } catch (e) {
         setLocalOverride(null);
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateClaim]
+    [isApWorkload, kubeconfig, revalidateAfterApMutation]
   );
 
   const onResourceQuotasCommit = useCallback(
@@ -222,7 +230,7 @@ export function useWorkloadClaimSettings(
           }
         );
         toast.success("Resource quota applied.");
-        await revalidateClaim();
+        await revalidateAfterApMutation();
       } catch (e) {
         setLocalOverride(null);
         toast.error(e instanceof Error ? e.message : "Apply failed");
@@ -234,7 +242,7 @@ export function useWorkloadClaimSettings(
       display.replicas,
       isApWorkload,
       kubeconfig,
-      revalidateClaim,
+      revalidateAfterApMutation,
     ]
   );
 

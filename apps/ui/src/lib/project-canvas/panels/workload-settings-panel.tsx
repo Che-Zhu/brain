@@ -10,6 +10,7 @@ import {
   workloadClaimKindFromStates,
 } from "@/lib/project-canvas/flow/container-node-workload";
 import { k8sGetClaimBody } from "@/lib/project-canvas/k8s/claim-mapper";
+import type { CanvasContainerNodeData } from "@/lib/project-canvas/nodes/types";
 import { useWorkloadClaimSettings } from "@/lib/project-canvas/panels/use-workload-claim-settings";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { WORKLOAD_PANEL_REPLICAS } from "@/store/canvas-store";
@@ -20,6 +21,10 @@ export const WorkloadSettingsCanvasPanel = memo(
     const ns = useAtomValue(namespaceAtom).trim();
 
     const states = containerStatesFromNode(node);
+    const data =
+      node.data != null && typeof node.data === "object"
+        ? (node.data as CanvasContainerNodeData)
+        : undefined;
     const name = states?.name ?? "";
     const workloadKind = workloadClaimKindFromStates(states);
 
@@ -42,6 +47,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       kubeconfig,
       name,
       namespace: ns,
+      onWorkloadMutation: data?.onWorkloadMutation,
       workloadKind,
     });
 

@@ -25,6 +25,7 @@ import {
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  onWorkloadMutation?: () => Promise<unknown>;
   states: ContainerNodeStates;
 }
 

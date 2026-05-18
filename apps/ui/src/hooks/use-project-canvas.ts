@@ -328,6 +328,7 @@ export function useProjectCanvas(
         ...node,
         data: {
           ...data,
+          onWorkloadMutation: afterLifecycle,
           actions: {
             ...(data.actions ?? {}),
             ...(hasUrlActions
@@ -343,6 +344,7 @@ export function useProjectCanvas(
     },
     [
       apAuthReady,
+      afterLifecycle,
       deleteWorkload,
       pauseWorkload,
       restartWorkload,
