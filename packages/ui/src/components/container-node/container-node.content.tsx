@@ -178,26 +178,54 @@ export function ContainerNodeImageRow({ className }: { className?: string }) {
       states: { image },
     },
   } = useContainerNode();
-  const displayImage = image.trim() || "--";
+  const copyValue = image.trim();
+  const copyable = copyValue.length > 0;
+  const displayImage = copyable ? copyValue : "--";
 
   return (
-    <div
+    <CanvasNode.CopyableRow
       className={cn(
-        "container-node-image-row flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5",
+        "container-node-image-row relative flex min-w-0 flex-col gap-1.5 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
+        !copyable && "container-node-image-row-static",
         className
       )}
+      copyAriaLabel="Copy image"
+      copyable={copyable}
+      copyValue={copyValue}
       data-slot="container-node-image-row"
+      rowKey="image"
+      title={copyable ? copyValue : undefined}
     >
-      <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
-        Image
-      </span>
-      <span
-        className="min-w-0 truncate font-mono text-xs text-zinc-50 leading-4"
-        title={displayImage === "--" ? undefined : displayImage}
-      >
-        {displayImage}
-      </span>
-    </div>
+      {({ copied, copyable: rowCopyable }) => (
+        <>
+          <div
+            className={cn(
+              "relative z-10 flex min-w-0 items-center justify-between gap-2",
+              rowCopyable ? "pointer-events-none" : "pointer-events-auto"
+            )}
+          >
+            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+              Image
+            </span>
+          </div>
+          <div
+            aria-hidden={rowCopyable ? true : undefined}
+            className={cn(
+              "relative z-10 flex h-6 min-w-0 items-center justify-between gap-2 py-1 text-left font-mono text-xs leading-4",
+              rowCopyable
+                ? "pointer-events-none text-zinc-50"
+                : "text-muted-foreground"
+            )}
+            data-copied={copied ? "true" : undefined}
+            data-slot="container-node-image-value"
+            title={copyable ? copyValue : undefined}
+          >
+            <span className="min-w-0 truncate">{displayImage}</span>
+            <CanvasNode.CopyableRowIndicator />
+          </div>
+        </>
+      )}
+    </CanvasNode.CopyableRow>
   );
 }
 

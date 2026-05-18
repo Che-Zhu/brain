@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  CANVAS_NODE_DEFAULT_COPIED_FEEDBACK_MS,
+  CanvasNodeCopyFeedbackScope,
+} from "@workspace/ui/components/canvas-node/canvas-node.copyable-row";
 import { CanvasNodeRoot } from "@workspace/ui/components/canvas-node/canvas-node.root";
 
 import { ContainerNodeProvider } from "./container-node.provider";
@@ -10,6 +14,7 @@ import type {
 
 export function ContainerNodeRoot({
   children,
+  copiedFeedbackMs = CANVAS_NODE_DEFAULT_COPIED_FEEDBACK_MS,
   defaultExpanded,
   expanded,
   interaction,
@@ -35,7 +40,9 @@ export function ContainerNodeRoot({
       interaction={interaction}
       onExpandedChange={onExpandedChange}
     >
-      <ContainerNodeProvider value={value}>{children}</ContainerNodeProvider>
+      <CanvasNodeCopyFeedbackScope copiedFeedbackMs={copiedFeedbackMs}>
+        <ContainerNodeProvider value={value}>{children}</ContainerNodeProvider>
+      </CanvasNodeCopyFeedbackScope>
     </CanvasNodeRoot>
   );
 }

@@ -104,6 +104,7 @@ export interface ContainerNodeProviderProps {
 
 export interface ContainerNodeRootProps {
   children?: ReactNode;
+  copiedFeedbackMs?: number;
   defaultExpanded?: boolean;
   expanded?: boolean;
   interaction?: CanvasNodeInteractionState;
