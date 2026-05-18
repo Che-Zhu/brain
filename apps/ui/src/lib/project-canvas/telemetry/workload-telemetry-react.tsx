@@ -6,6 +6,7 @@ import { ApiUrl } from "@workspace/api/utils";
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -58,13 +59,24 @@ export function WorkloadTelemetryProvider({
       }),
     [kubeconfig]
   );
+  const selectedKind = selectedTarget?.kind ?? null;
+  const selectedName = selectedTarget?.name ?? "";
+  const selectedNamespace = selectedTarget?.namespace ?? "";
 
   useEffect(() => {
-    store.setSelectedTarget(selectedTarget);
-    if (selectedTarget !== null) {
+    const nextSelectedTarget =
+      selectedKind === null
+        ? null
+        : {
+            kind: selectedKind,
+            name: selectedName,
+            namespace: selectedNamespace,
+          };
+    store.setSelectedTarget(nextSelectedTarget);
+    if (nextSelectedTarget !== null) {
       store.refresh().catch(() => undefined);
     }
-  }, [selectedTarget, store]);
+  }, [selectedKind, selectedName, selectedNamespace, store]);
 
   useEffect(() => {
     if (refreshIntervalMs <= 0) {
@@ -87,20 +99,43 @@ export function useWorkloadTelemetrySnapshot(
   target: WorkloadTelemetryTarget | null
 ): WorkloadTelemetrySnapshotState {
   const store = useContext(WorkloadTelemetryContext);
+  const targetKind = target?.kind ?? null;
+  const targetName = target?.name ?? "";
+  const targetNamespace = target?.namespace ?? "";
 
-  return useSyncExternalStore(
-    (listener) => {
-      if (store === null || target === null) {
+  const currentTarget = useCallback((): WorkloadTelemetryTarget | null => {
+    if (targetKind === null) {
+      return null;
+    }
+    return {
+      kind: targetKind,
+      name: targetName,
+      namespace: targetNamespace,
+    };
+  }, [targetKind, targetName, targetNamespace]);
+
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      const nextTarget = currentTarget();
+      if (store === null || nextTarget === null) {
         return () => undefined;
       }
-      return store.subscribe(target, listener);
+      return store.subscribe(nextTarget, listener);
     },
-    () => {
-      if (store === null || target === null) {
-        return EMPTY_SNAPSHOT_STATE;
-      }
-      return store.getSnapshot(target);
-    },
+    [currentTarget, store]
+  );
+
+  const getSnapshot = useCallback(() => {
+    const nextTarget = currentTarget();
+    if (store === null || nextTarget === null) {
+      return EMPTY_SNAPSHOT_STATE;
+    }
+    return store.getSnapshot(nextTarget);
+  }, [currentTarget, store]);
+
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
     () => EMPTY_SNAPSHOT_STATE
   );
 }

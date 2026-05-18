@@ -73,6 +73,7 @@ export function createWorkloadTelemetryStore(
   let selectedKey: string | null = null;
   let refreshing = false;
   let refreshScheduled = false;
+  let refreshInFlight: Promise<void> | null = null;
 
   const setSnapshotState = (
     key: string,
@@ -131,7 +132,7 @@ export function createWorkloadTelemetryStore(
     });
   };
 
-  const refresh = async () => {
+  const runRefresh = async () => {
     const targets = activeTargets();
     if (targets.length === 0) {
       return;
@@ -150,6 +151,16 @@ export function createWorkloadTelemetryStore(
       refreshing = false;
       publishCachedStates(targets);
     }
+  };
+
+  const refresh = () => {
+    if (refreshInFlight !== null) {
+      return refreshInFlight;
+    }
+    refreshInFlight = runRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+    return refreshInFlight;
   };
 
   const scheduleRefresh = () => {
@@ -190,10 +201,10 @@ export function createWorkloadTelemetryStore(
           listeners: new Set([listener]),
           target,
         });
+        scheduleRefresh();
       } else {
         entry.listeners.add(listener);
       }
-      scheduleRefresh();
 
       return () => {
         const current = consumers.get(key);
