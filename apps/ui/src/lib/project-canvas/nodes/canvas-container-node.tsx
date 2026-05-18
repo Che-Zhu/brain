@@ -1,9 +1,8 @@
 "use client";
 
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
-import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
-import { cn } from "@workspace/ui/lib/utils";
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
+import type { NodeProps } from "@xyflow/react";
 import { memo, useMemo } from "react";
 
 import {
@@ -15,6 +14,7 @@ import type { CanvasContainerRfNode } from "./types";
 
 export const CanvasContainerNode = memo(function CanvasContainerNode({
   data,
+  dragging,
   id,
 }: NodeProps<CanvasContainerRfNode>) {
   const { actions = {}, states } = data;
@@ -29,25 +29,19 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   const edge = state.selectedEdge;
   const isEndpointOfSelectedEdge =
     edge != null && (edge.source === id || edge.target === id);
-  const isOutlined =
+  const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
 
   return (
-    <div
-      className={cn(
-        "h-full w-full rounded-xl border border-dashed",
-        isOutlined ? "border-primary" : "border-transparent"
-      )}
+    <ContainerNode.Root
+      interaction={{ dragging, selected }}
+      lifecycleActions={actions.lifecycleActions}
+      quickActions={actions.quickActions}
+      states={statesWithTelemetry}
     >
-      <Handle position={Position.Top} type="target" />
-      <ContainerNode.Variant1
-        actions={actions}
-        className="min-h-40 w-60"
-        states={statesWithTelemetry}
-      />
-      <Handle position={Position.Bottom} type="source" />
-    </div>
+      <ContainerNode.Content />
+    </ContainerNode.Root>
   );
 });
 

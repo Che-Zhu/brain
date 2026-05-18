@@ -146,7 +146,44 @@ export const Index: RegistryIndex = {
     name: "container-node",
     title: "Container Node",
     description:
-      "Container node: v0 Root+context+Variant0; v1 compose `Shell` (no Root), Header, Content, Footer + explicit props per piece.",
+      "Current AP workload canvas node composed with shared Canvas Node chrome, Root/Content state, lifecycle actions, quick actions, footer metrics, and expansion behavior.",
+    state: "done",
+    type: "registry:preview",
+    registryDependencies: [
+      "preview",
+      "canvas",
+      "canvas-node",
+      "container-node",
+      "button",
+      "dropdown-menu",
+      "alert-dialog",
+    ],
+    files: [
+      {
+        path: "registry/linear/components/container-node/container-node-preview.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      {
+        path: "registry/linear/components/container-node/container-node-preview.canvas.tsx",
+        type: "registry:preview",
+        target: "",
+      },
+      previewUiFile,
+    ],
+    load: () =>
+      import(
+        "@registry/linear/components/container-node/container-node-preview"
+      ),
+  },
+
+  "linear/components/container-node-legacy": {
+    style: "linear",
+    group: "components",
+    name: "container-node-legacy",
+    title: "Container Node Legacy",
+    description:
+      "Legacy Container Node implementations kept for migration comparison: v0 Root+context+Variant0 and v1 Shell/Variant1 explicit-prop layout. Not used by product runtime.",
     state: "done",
     type: "registry:preview",
     registryDependencies: [

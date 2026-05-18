@@ -1,5 +1,5 @@
 import type { CanvasSelectedNode } from "@workspace/ui/components/canvas/canvas.types";
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import type { DatabaseNodeStates } from "@workspace/ui/components/database-node/database-node";
 import type { Node } from "@xyflow/react";
 
@@ -42,6 +42,19 @@ function databaseMetricsFromSnapshot(
   return nextMetrics;
 }
 
+function containerMetricsFromSnapshot(
+  metrics: SnapshotMetrics
+): ContainerNodeStates["metrics"] {
+  const nextMetrics: ContainerNodeStates["metrics"] = {};
+  if (metrics?.cpu !== undefined) {
+    nextMetrics.cpu = metrics.cpu.value;
+  }
+  if (metrics?.memory !== undefined) {
+    nextMetrics.memory = metrics.memory.value;
+  }
+  return nextMetrics;
+}
+
 export function containerTelemetryTargetFromStates(
   states: Pick<ContainerNodeStates, "name" | "namespace">
 ): WorkloadTelemetryTarget | null {
@@ -74,8 +87,7 @@ export function containerStatesWithTelemetry(
   }
   return {
     ...states,
-    cpuPercent: metrics.cpu?.value,
-    memoryPercent: metrics.memory?.value,
+    metrics: containerMetricsFromSnapshot(metrics),
   };
 }
 

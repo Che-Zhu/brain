@@ -11,11 +11,9 @@ import type {
   CanvasPanelBodyProps,
   CanvasPanelTab,
 } from "@workspace/ui/components/canvas/canvas.types";
-import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import { ContainerHistoryPane } from "@workspace/ui/components/container-history-pane/container-history-pane";
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
-import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
-import { containerNodeLifecycleMenuVisibility } from "@workspace/ui/components/container-node/v1/container-node.menu-visibility";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
+import { ContainerNode } from "@workspace/ui/components/container-node/container-node";
 import {
   type ContainerEnvVar,
   type ContainerPort,
@@ -27,24 +25,22 @@ import { MetricsPane } from "@workspace/ui/components/metrics-pane/metrics-pane"
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import type { TimeRange } from "@workspace/ui/components/time-range-selector";
-import { cn } from "@workspace/ui/lib/utils";
 import {
   type Edge,
-  Handle,
   type Node,
   type NodeProps,
   type NodeTypes,
-  Position,
   ReactFlowProvider,
 } from "@xyflow/react";
-import { Cpu, MemoryStick, Pause, Play, RotateCw } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 
 interface CanvasContainerNodeData extends Record<string, unknown> {
+  defaultExpanded?: boolean;
   states: ContainerNodeStates;
 }
 
 const SAMPLE_BASE_SECONDS = Math.floor(Date.now() / 1000) - 3600;
+const CANVAS_PREVIEW_PERCENT_SUFFIX_PATTERN = /%$/;
 
 function buildSampleSeries(
   count: number,
@@ -88,6 +84,19 @@ function canvasPreviewStatesFromNode(node: Node): ContainerNodeStates | null {
   return (node.data as CanvasContainerNodeData).states;
 }
 
+function canvasPreviewMetricPercent(value: number | string | undefined) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const n = Number(
+    value.trim().replace(CANVAS_PREVIEW_PERCENT_SUFFIX_PATTERN, "")
+  );
+  return Number.isFinite(n) ? n : undefined;
+}
+
 /** Settings tab body: mirrors container settings registry preview, seeded from node `states`. */
 function CanvasPreviewContainerSettingsTab({ node }: CanvasPanelBodyProps) {
   const states = canvasPreviewStatesFromNode(node);
@@ -95,9 +104,17 @@ function CanvasPreviewContainerSettingsTab({ node }: CanvasPanelBodyProps) {
     states?.image != null && states.image !== ""
       ? states.image
       : "registry.example.io/unknown:latest";
-  const cpuInit = clampScale(((states?.cpuPercent ?? 50) / 100) * 4, 0.25, 8);
+  const cpuInit = clampScale(
+    ((canvasPreviewMetricPercent(states?.metrics?.cpu) ?? 50) / 100) * 4,
+    0.25,
+    8
+  );
   const memInit = clampScale(
-    Math.round((((states?.memoryPercent ?? 50) / 100) * 4096) / 128) * 128,
+    Math.round(
+      (((canvasPreviewMetricPercent(states?.metrics?.memory) ?? 50) / 100) *
+        4096) /
+        128
+    ) * 128,
     512,
     4096
   );
@@ -223,113 +240,41 @@ const CANVAS_PREVIEW_CONTAINER_PANEL_TABS: CanvasPanelTab[] = [
 
 const PreviewCanvasContainerNode = memo(function PreviewCanvasContainerNode({
   data,
-  id,
+  dragging,
+  selected,
 }: NodeProps<Node<CanvasContainerNodeData, "containerNode">>) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const { showPause, showRestart, showStart } =
-    containerNodeLifecycleMenuVisibility(data.states.status?.tone);
-
-  const { state } = useCanvas();
-  const edge = state.selectedEdge;
-  const isEndpointOfSelectedEdge =
-    edge != null && (edge.source === id || edge.target === id);
-  const isOutlined =
-    (state.selectedNode != null && state.selectedNode.id === id) ||
-    isEndpointOfSelectedEdge;
-
   return (
-    <div
-      className={cn(
-        "h-full w-full rounded-xl border border-dashed",
-        isOutlined ? "border-primary" : "border-transparent"
-      )}
+    <ContainerNode.Root
+      defaultExpanded={data.defaultExpanded}
+      interaction={{ dragging, selected }}
+      lifecycleActions={{
+        delete: { disabled: true },
+        restart: { disabled: true },
+        start: { disabled: true },
+        stop: { disabled: true },
+      }}
+      quickActions={{
+        calendar: { disabled: true },
+        console: { disabled: true },
+        logs: { disabled: true },
+        metrics: { disabled: true },
+      }}
+      states={data.states}
     >
-      <Handle position={Position.Top} type="target" />
-      <ContainerNode.Shell className="min-h-40 w-56 max-w-[min(100%,16rem)]">
-        <ContainerNode.Header>
-          <ContainerNode.HeaderMain>
-            <ContainerNode.IconPlaceholder />
-            <ContainerNode.HeaderTitles>
-              <ContainerNode.Title name={data.states.name} />
-              <ContainerNode.Kind kind={data.states.kind} />
-            </ContainerNode.HeaderTitles>
-          </ContainerNode.HeaderMain>
-          <ContainerNode.HeaderMenuDropdown>
-            <ContainerNode.HeaderMenuTrigger />
-            <ContainerNode.HeaderMenuContent>
-              {showStart ? (
-                <ContainerNode.HeaderMenuItem
-                  accentHover="positive"
-                  disabled
-                  icon={Play}
-                >
-                  Start
-                </ContainerNode.HeaderMenuItem>
-              ) : null}
-              {showPause ? (
-                <ContainerNode.HeaderMenuItem disabled icon={Pause}>
-                  Pause
-                </ContainerNode.HeaderMenuItem>
-              ) : null}
-              {showRestart ? (
-                <ContainerNode.HeaderMenuItem
-                  accentHover="positive"
-                  disabled
-                  icon={RotateCw}
-                >
-                  Restart
-                </ContainerNode.HeaderMenuItem>
-              ) : null}
-              <ContainerNode.HeaderMenuDelete
-                onRequestDelete={() => setDeleteDialogOpen(true)}
-              />
-            </ContainerNode.HeaderMenuContent>
-          </ContainerNode.HeaderMenuDropdown>
-        </ContainerNode.Header>
-        <ContainerNode.Content>
-          <ContainerNode.Image image={data.states.image} />
-          <div className="nodrag nopan flex min-w-0 shrink-0 flex-wrap items-center gap-1 pt-2">
-            <ContainerNode.ToolbarActivity />
-            <ContainerNode.ToolbarShell />
-            <ContainerNode.ToolbarLogs />
-            <ContainerNode.ToolbarCalendar />
-          </div>
-        </ContainerNode.Content>
-        <ContainerNode.Footer>
-          <ContainerNode.Status
-            label={data.states.status?.label}
-            tone={data.states.status?.tone}
-          />
-          <ContainerNode.ResourceGroup>
-            <ContainerNode.Resource
-              icon={Cpu}
-              percent={data.states.cpuPercent}
-            />
-            <ContainerNode.Resource
-              icon={MemoryStick}
-              percent={data.states.memoryPercent}
-            />
-            <ContainerNode.Replicas replicas={data.states.replicas} />
-          </ContainerNode.ResourceGroup>
-        </ContainerNode.Footer>
-        <ContainerNode.DeleteDialog
-          name={data.states.name}
-          onOpenChange={setDeleteDialogOpen}
-          open={deleteDialogOpen}
-        />
-      </ContainerNode.Shell>
-      <Handle position={Position.Bottom} type="source" />
-    </div>
+      <ContainerNode.Content />
+    </ContainerNode.Root>
   );
 });
 
 PreviewCanvasContainerNode.displayName = "PreviewCanvasContainerNode";
 
 const containerCanvasStatesPrimary: ContainerNodeStates = {
-  cpuPercent: 42,
   image: "registry.example.io/demo:v2",
-  kind: "Container",
-  memoryPercent: 58,
+  kind: "AP",
+  metrics: {
+    cpu: 42,
+    memory: 58,
+  },
   name: "workload-demo-001",
   replicas: 3,
   status: { label: "Running", tone: "running" },
@@ -337,10 +282,12 @@ const containerCanvasStatesPrimary: ContainerNodeStates = {
 };
 
 const containerCanvasStatesSecondary: ContainerNodeStates = {
-  cpuPercent: 18,
   image: "registry.example.io/other:v5",
-  kind: "Service",
-  memoryPercent: 31,
+  kind: "AP",
+  metrics: {
+    cpu: 18,
+    memory: 31,
+  },
   name: "workload-demo-002",
   replicas: 1,
   status: { label: "Synced", tone: "running" },
@@ -353,7 +300,7 @@ const CANVAS_PREVIEW_GRAPH_NODES: Node<
   "containerNode"
 >[] = [
   {
-    data: { states: containerCanvasStatesPrimary },
+    data: { defaultExpanded: true, states: containerCanvasStatesPrimary },
     id: "container-1",
     position: { x: 72, y: 56 },
     type: "containerNode",
