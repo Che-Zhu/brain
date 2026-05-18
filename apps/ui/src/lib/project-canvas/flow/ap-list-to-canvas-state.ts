@@ -1,6 +1,7 @@
 import type {
   ApTelemetryMetricsRow,
   ApTelemetryResourceKind,
+  WorkloadTelemetrySnapshotMetric,
   WorkloadTelemetrySnapshotResponse,
 } from "@workspace/api/hooks";
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
@@ -133,16 +134,24 @@ export function apMetricsLookupFromSnapshot(
     if (target.kind !== "ap") {
       continue;
     }
-    map.set(telemetryWorkloadKey("ap", target.namespace, target.name), {
-      ...(item.metrics?.cpu === undefined
-        ? {}
-        : { cpuPercent: roundedMetricPercent(item.metrics.cpu.value) }),
-      ...(item.metrics?.memory === undefined
-        ? {}
-        : { memoryPercent: roundedMetricPercent(item.metrics.memory.value) }),
-    });
+    const metrics: WorkloadMetricPercents = {};
+    const cpuPercent = metricSamplePercent(item.metrics?.cpu);
+    const memoryPercent = metricSamplePercent(item.metrics?.memory);
+    if (cpuPercent !== undefined) {
+      metrics.cpuPercent = cpuPercent;
+    }
+    if (memoryPercent !== undefined) {
+      metrics.memoryPercent = memoryPercent;
+    }
+    map.set(telemetryWorkloadKey("ap", target.namespace, target.name), metrics);
   }
   return map;
+}
+
+function metricSamplePercent(
+  metric: WorkloadTelemetrySnapshotMetric | undefined
+): number | undefined {
+  return metric === undefined ? undefined : roundedMetricPercent(metric.value);
 }
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
