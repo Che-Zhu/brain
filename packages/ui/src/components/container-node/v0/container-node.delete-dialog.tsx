@@ -14,13 +14,7 @@ import { cn } from "@workspace/ui/lib/utils";
 
 const DELETE_TITLE = "Delete workload?";
 
-function WorkloadDeleteCopy({
-  kind,
-  name,
-}: {
-  kind?: string;
-  name: string;
-}) {
+function WorkloadDeleteCopy({ kind, name }: { kind?: string; name: string }) {
   const k = kind?.trim();
   return (
     <>
@@ -88,10 +82,10 @@ export function ContainerNodeDeleteDialogPanel({
 ContainerNodeDeleteDialogPanel.displayName = "ContainerNodeDeleteDialogPanel";
 
 export interface ContainerNodeDeleteDialogProps {
-  /** Workload display name shown in the copy. */
-  name: string;
   /** Shown in monospace after the name (e.g. `AP`, `DB`), like project resource id. */
   kind?: string;
+  /** Workload display name shown in the copy. */
+  name: string;
   onConfirmDelete?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;

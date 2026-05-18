@@ -1,11 +1,11 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
+import { Pause, Play } from "lucide-react";
 
 interface LivePauseToggleProps {
   isLive: boolean;

@@ -526,7 +526,9 @@ function SidebarMenuButton({
   );
 
   let tooltipOpenDelay: number | undefined;
-  let tooltipContentProps: React.ComponentProps<typeof TooltipContent> | undefined;
+  let tooltipContentProps:
+    | React.ComponentProps<typeof TooltipContent>
+    | undefined;
   if (tooltip) {
     if (typeof tooltip === "string") {
       tooltipContentProps = { children: tooltip };
@@ -592,7 +594,9 @@ function SidebarMenuButton({
   // per-trigger delay to 0 when the group provider delay is 0).
   if (tooltipOpenDelay !== undefined) {
     return (
-      <TooltipProvider delay={tooltipOpenDelay}>{tooltipElement}</TooltipProvider>
+      <TooltipProvider delay={tooltipOpenDelay}>
+        {tooltipElement}
+      </TooltipProvider>
     );
   }
 

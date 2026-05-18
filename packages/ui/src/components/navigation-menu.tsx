@@ -1,8 +1,8 @@
 import { NavigationMenu as NavigationMenuPrimitive } from "@base-ui/react/navigation-menu";
+import { cn } from "@workspace/ui/lib/utils";
 import { cva } from "class-variance-authority";
 import { ChevronDownIcon } from "lucide-react";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
-import { cn } from "@workspace/ui/lib/utils";
 
 /**
  * Base UI forwards `Ref<HTMLDivElement>` on several parts but renders semantic tags (`ul`, `li`, `span`).
@@ -34,7 +34,7 @@ function NavigationMenu({
   return (
     <NavigationMenuPrimitive.Root
       className={cn(
-        "group/navigation-menu relative flex max-w-max max-w-max flex-1 items-center justify-center",
+        "group/navigation-menu relative flex max-w-max flex-1 items-center justify-center",
         className
       )}
       data-slot="navigation-menu"
@@ -185,7 +185,7 @@ export {
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
+  NavigationMenuPositioner,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-  NavigationMenuPositioner,
 };

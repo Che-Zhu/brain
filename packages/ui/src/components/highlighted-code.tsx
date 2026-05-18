@@ -3,12 +3,12 @@
 import { cn } from "@workspace/ui/lib/utils";
 
 export interface HighlightedCodeProps {
-  code: string;
-  language?: string;
-  inline?: boolean;
-  showLanguage?: boolean;
-  showCopy?: boolean;
   className?: string;
+  code: string;
+  inline?: boolean;
+  language?: string;
+  showCopy?: boolean;
+  showLanguage?: boolean;
 }
 
 /** Lightweight code display (no Shiki) for registry `Response` markdown. */

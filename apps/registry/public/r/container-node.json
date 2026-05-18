@@ -3,14 +3,8 @@
   "name": "container-node",
   "title": "Container Node",
   "description": "Composable container node with Crossplane-style status, header actions, and collapsible layout",
-  "dependencies": [
-    "lucide-react"
-  ],
-  "registryDependencies": [
-    "button",
-    "dropdown-menu",
-    "alert-dialog"
-  ],
+  "dependencies": ["lucide-react"],
+  "registryDependencies": ["button", "dropdown-menu", "alert-dialog"],
   "files": [
     {
       "path": "../../packages/ui/src/components/container-node/v1/container-node.types.ts",

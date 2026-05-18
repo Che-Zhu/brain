@@ -1,6 +1,5 @@
 "use client";
 
-import { Box, Download, Search, Server } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { FacetedFilterAll } from "@workspace/ui/components/faceted";
 import {
@@ -10,10 +9,8 @@ import {
 } from "@workspace/ui/components/input-group";
 import { LivePauseToggle } from "@workspace/ui/components/refresh-controls";
 import { TimeRangeSelector } from "@workspace/ui/components/time-range-selector";
-import {
-  type LogEntry,
-  useLogViewerContext,
-} from "./log-viewer.context";
+import { Box, Download, Search, Server } from "lucide-react";
+import { type LogEntry, useLogViewerContext } from "./log-viewer.context";
 
 export function LogViewerToolbar() {
   const {

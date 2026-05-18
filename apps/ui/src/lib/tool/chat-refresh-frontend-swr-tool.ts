@@ -53,10 +53,7 @@ export async function runRefreshFrontendSwrCachesTool(
     };
   }
 
-  logChatToolIntention(
-    REFRESH_FRONTEND_SWR_TOOL_NAME,
-    parsed.data.intention
-  );
+  logChatToolIntention(REFRESH_FRONTEND_SWR_TOOL_NAME, parsed.data.intention);
 
   try {
     const batch = await mutate(

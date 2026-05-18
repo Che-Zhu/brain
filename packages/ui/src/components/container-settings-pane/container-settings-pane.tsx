@@ -45,8 +45,7 @@ function resourceQuotasDirty(
     return cpuMemDirty;
   }
   return (
-    cpuMemDirty ||
-    Math.round(replicas.draft) !== Math.round(replicas.committed)
+    cpuMemDirty || Math.round(replicas.draft) !== Math.round(replicas.committed)
   );
 }
 

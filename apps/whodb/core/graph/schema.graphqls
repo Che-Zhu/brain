@@ -144,8 +144,8 @@ type Column {
 }
 
 type StorageUnitColumns {
-    StorageUnit: String!
-    Columns: [Column!]!
+  StorageUnit: String!
+  Columns: [Column!]!
 }
 
 enum WhereConditionType {
@@ -186,7 +186,7 @@ type RowsResult {
   Columns: [Column!]!
   Rows: [[String!]!]!
   DisableUpdate: Boolean!
-    TotalCount: Int!
+  TotalCount: Int!
 }
 
 type SourceContent {
@@ -238,11 +238,11 @@ input ImportSQLInput {
 }
 
 enum GraphUnitRelationshipType {
-  OneToOne,
-  OneToMany,
-  ManyToOne,
-  ManyToMany,
-  Unknown,
+  OneToOne
+  OneToMany
+  ManyToOne
+  ManyToMany
+  Unknown
 }
 
 type GraphUnitRelationship {
@@ -254,7 +254,7 @@ type GraphUnitRelationship {
 
 type GraphUnit {
   Unit: SourceObject!
-	Relations: [GraphUnitRelationship!]!
+  Relations: [GraphUnitRelationship!]!
 }
 
 type SettingsConfig {
@@ -557,8 +557,8 @@ input AWSProviderInput {
 type LocalAWSProfile {
   Name: String!
   Region: String
-  Source: String!    # "credentials", "config", or "environment"
-  AuthType: String!  # "static", "sso", "assume-role", or "environment"
+  Source: String! # "credentials", "config", or "environment"
+  AuthType: String! # "static", "sso", "assume-role", or "environment"
   IsDefault: Boolean!
 }
 
@@ -705,11 +705,24 @@ type Query {
   Health: HealthStatus!
   SourceProfiles: [SourceProfile!]!
   SourceTypes: [SourceType!]!
-  SourceFieldOptions(sourceType: String!, fieldKey: String!, values: [RecordInput!]): [String!]!
+  SourceFieldOptions(
+    sourceType: String!
+    fieldKey: String!
+    values: [RecordInput!]
+  ): [String!]!
   SourceSessionMetadata: SourceSessionMetadata
-  SourceObjects(parent: SourceObjectRefInput, kinds: [SourceObjectKind!]): [SourceObject!]!
+  SourceObjects(
+    parent: SourceObjectRefInput
+    kinds: [SourceObjectKind!]
+  ): [SourceObject!]!
   SourceObject(ref: SourceObjectRefInput!): SourceObject
-  SourceRows(ref: SourceObjectRefInput!, where: WhereCondition, sort: [SortCondition!], pageSize: Int!, pageOffset: Int!): RowsResult!
+  SourceRows(
+    ref: SourceObjectRefInput!
+    where: WhereCondition
+    sort: [SortCondition!]
+    pageSize: Int!
+    pageOffset: Int!
+  ): RowsResult!
   SourceContent(ref: SourceObjectRefInput!): SourceContent
   SourceColumns(ref: SourceObjectRefInput!): [Column!]!
   SourceColumnsBatch(refs: [SourceObjectRefInput!]!): [SourceObjectColumns!]!
@@ -748,10 +761,24 @@ type Mutation {
   Logout: StatusResponse!
   UpdateSettings(newSettings: SettingsConfigInput!): StatusResponse!
 
-  CreateSourceObject(parent: SourceObjectRefInput, name: String!, fields: [RecordInput!]!): StatusResponse!
-  UpdateSourceObject(ref: SourceObjectRefInput!, values: [RecordInput!]!, updatedColumns: [String!]!): StatusResponse!
-  AddSourceRow(ref: SourceObjectRefInput!, values: [RecordInput!]!): StatusResponse!
-  DeleteSourceRow(ref: SourceObjectRefInput!, values: [RecordInput!]!): StatusResponse!
+  CreateSourceObject(
+    parent: SourceObjectRefInput
+    name: String!
+    fields: [RecordInput!]!
+  ): StatusResponse!
+  UpdateSourceObject(
+    ref: SourceObjectRefInput!
+    values: [RecordInput!]!
+    updatedColumns: [String!]!
+  ): StatusResponse!
+  AddSourceRow(
+    ref: SourceObjectRefInput!
+    values: [RecordInput!]!
+  ): StatusResponse!
+  DeleteSourceRow(
+    ref: SourceObjectRefInput!
+    values: [RecordInput!]!
+  ): StatusResponse!
 
   ImportSQL(input: ImportSQLInput!): ImportResult!
   ImportPreview(
@@ -777,7 +804,13 @@ type Mutation {
   TestCloudProvider(id: ID!): CloudProviderStatus!
   RefreshCloudProvider(id: ID!): CloudProvider!
   # AWS-specific: Generate a short-lived IAM auth token for RDS database authentication
-  GenerateRDSAuthToken(providerID: ID!, endpoint: String!, port: Int!, region: String!, username: String!): String!
+  GenerateRDSAuthToken(
+    providerID: ID!
+    endpoint: String!
+    port: Int!
+    region: String!
+    username: String!
+  ): String!
 
   # Azure provider-specific add/update (type-safe inputs)
   AddAzureProvider(input: AzureProviderInput!): AzureProvider!

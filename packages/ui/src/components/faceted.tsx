@@ -1,8 +1,5 @@
 "use client";
 
-import { Check, ChevronDown, ChevronsUpDown } from "lucide-react";
-import * as React from "react";
-import { cn } from "@workspace/ui/lib/utils";
 import { Badge } from "@workspace/ui/components/badge";
 import {
   Command,
@@ -18,15 +15,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover";
+import { cn } from "@workspace/ui/lib/utils";
+import { Check, ChevronDown, ChevronsUpDown } from "lucide-react";
+import * as React from "react";
 
 type FacetedValue<Multiple extends boolean> = Multiple extends true
   ? string[]
   : string;
 
 interface FacetedContextValue<Multiple extends boolean = boolean> {
-  value?: FacetedValue<Multiple>;
-  onItemSelect?: (value: string) => void;
   multiple?: Multiple;
+  onItemSelect?: (value: string) => void;
+  value?: FacetedValue<Multiple>;
 }
 
 const FacetedContext = React.createContext<FacetedContextValue<boolean> | null>(
@@ -43,10 +43,10 @@ function useFacetedContext(name: string) {
 
 interface FacetedProps<Multiple extends boolean = false>
   extends React.ComponentProps<typeof Popover> {
-  value?: FacetedValue<Multiple>;
-  onValueChange?: (value: FacetedValue<Multiple> | undefined) => void;
   children?: React.ReactNode;
   multiple?: Multiple;
+  onValueChange?: (value: FacetedValue<Multiple> | undefined) => void;
+  value?: FacetedValue<Multiple>;
 }
 
 function Faceted<Multiple extends boolean = false>(
@@ -71,7 +71,10 @@ function Faceted<Multiple extends boolean = false>(
       if (!isControlled) {
         setUncontrolledOpen(newOpen);
       }
-      (onOpenChangeProp as ((...args: unknown[]) => void) | undefined)?.(newOpen, ...rest);
+      (onOpenChangeProp as ((...args: unknown[]) => void) | undefined)?.(
+        newOpen,
+        ...rest
+      );
     },
     [isControlled, onOpenChangeProp]
   );
@@ -129,9 +132,9 @@ function FacetedTrigger(props: React.ComponentProps<typeof PopoverTrigger>) {
 }
 
 interface FacetedBadgeListProps extends React.ComponentProps<"div"> {
-  options?: { label: string; value: string }[];
-  max?: number;
   badgeClassName?: string;
+  max?: number;
+  options?: { label: string; value: string }[];
   placeholder?: string;
 }
 
@@ -271,12 +274,12 @@ function FacetedItem(props: FacetedItemProps) {
 const FacetedSeparator = CommandSeparator;
 
 interface FacetedFilterProps {
-  value: string[];
+  emptyText?: string;
   onValueChange: (v: string[]) => void;
   options: string[];
   placeholder?: string;
   searchPlaceholder?: string;
-  emptyText?: string;
+  value: string[];
 }
 
 function FacetedFilter({
@@ -314,15 +317,15 @@ function FacetedFilter({
 }
 
 interface FacetedFilterAllProps {
+  className?: string;
+  emptyText?: string;
+  icon?: React.ReactNode;
   label: string;
-  value: string[];
   onValueChange: (v: string[]) => void;
   options: string[];
   searchPlaceholder?: string;
-  emptyText?: string;
-  className?: string;
   showLabel?: boolean;
-  icon?: React.ReactNode;
+  value: string[];
 }
 
 function FacetedFilterAll({

@@ -1,11 +1,11 @@
+import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MoreHorizontalIcon,
 } from "lucide-react";
 import type * as React from "react";
-import { cn } from "@workspace/ui/lib/utils";
-import { Button } from "@workspace/ui/components/button";
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -107,7 +107,7 @@ function PaginationEllipsis({
     <span
       aria-hidden
       className={cn(
-        "flex size-9 items-center items-center justify-center justify-center [&_svg:not([class*='size-'])]:size-4",
+        "flex size-9 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       data-slot="pagination-ellipsis"

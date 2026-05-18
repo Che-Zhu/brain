@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 export interface TypewriterProps {
-  text: string | string[];
-  speed?: number;
-  cursor?: string;
-  loop?: boolean;
-  deleteSpeed?: number;
-  delay?: number;
   className?: string;
+  cursor?: string;
+  delay?: number;
+  deleteSpeed?: number;
+  loop?: boolean;
+  speed?: number;
+  text: string | string[];
 }
 
 export function Typewriter({
@@ -43,18 +43,13 @@ export function Typewriter({
   }, [text]);
 
   useEffect(() => {
-    if (!currentText) return;
+    if (!currentText) {
+      return;
+    }
 
     const timeout = setTimeout(
       () => {
-        if (!isDeleting) {
-          if (currentIndex < currentText.length) {
-            setDisplayText((prev) => prev + currentText[currentIndex]);
-            setCurrentIndex((prev) => prev + 1);
-          } else if (loop) {
-            setTimeout(() => setIsDeleting(true), delay);
-          }
-        } else {
+        if (isDeleting) {
           if (displayText.length > 0) {
             setDisplayText((prev) => prev.slice(0, -1));
           } else {
@@ -62,6 +57,11 @@ export function Typewriter({
             setCurrentIndex(0);
             setTextArrayIndex((prev) => (prev + 1) % textArray.length);
           }
+        } else if (currentIndex < currentText.length) {
+          setDisplayText((prev) => prev + currentText[currentIndex]);
+          setCurrentIndex((prev) => prev + 1);
+        } else if (loop) {
+          setTimeout(() => setIsDeleting(true), delay);
         }
       },
       isDeleting ? deleteSpeed : speed

@@ -1,9 +1,9 @@
 "use client";
 
-import { HighlightedCode } from "./highlighted-code";
+import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps } from "react";
 import { Streamdown } from "streamdown";
-import { cn } from "@workspace/ui/lib/utils";
+import { HighlightedCode } from "./highlighted-code";
 
 const LANGUAGE_CLASS = /language-(\w+)/;
 const TRAILING_NEWLINE = /\n$/;

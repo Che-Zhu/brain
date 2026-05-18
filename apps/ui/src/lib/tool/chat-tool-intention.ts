@@ -7,9 +7,7 @@ export const CHAT_TOOL_INTENTION_LOG_MAX = 400;
 /**
  * Optional extra sentence for the Zod `.describe()` (keep short; model sees this per tool).
  */
-export function chatToolIntentionFieldDescription(
-  focus: string
-): string {
+export function chatToolIntentionFieldDescription(focus: string): string {
   return `Why you are calling this tool—${focus} Logged for transcripts/audit; not sent to remote APIs except as noted.`;
 }
 

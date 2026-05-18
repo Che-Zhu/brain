@@ -19,7 +19,7 @@ export const TaskItemFile = ({
   <div
     className={cn(
       "inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-foreground text-xs",
-      className,
+      className
     )}
     {...props}
   >
@@ -63,7 +63,7 @@ export const TaskTrigger = ({
   <CollapsibleTrigger
     className={cn(
       "group flex w-full cursor-pointer items-center gap-2 rounded-md border border-transparent px-1 py-1 text-left text-muted-foreground text-sm transition-colors hover:border-border hover:bg-muted/40 hover:text-foreground",
-      className,
+      className
     )}
     type="button"
     {...props}

@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@workspace/ui/components/chart";
+import { useMemo } from "react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { useLogViewerContext } from "./log-viewer.context";
 import { formatLogTime } from "./log-viewer.utils";
 

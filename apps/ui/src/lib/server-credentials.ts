@@ -52,10 +52,7 @@ export function hasDevCredentialBypass(): boolean {
  */
 export async function fetchProjectCredentialsOrUnauthorized(): Promise<ServerCredentials> {
   const creds = await fetchServerCredentials();
-  if (
-    creds.serverEncodedKubeconfig.trim() !== "" ||
-    hasDevCredentialBypass()
-  ) {
+  if (creds.serverEncodedKubeconfig.trim() !== "" || hasDevCredentialBypass()) {
     return creds;
   }
   unauthorized();

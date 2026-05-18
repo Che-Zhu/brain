@@ -1,6 +1,6 @@
 import "server-only";
 
-import { type NodePgDatabase, drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { assistantChatMessages, assistantChats } from "./schema";

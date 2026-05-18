@@ -40,9 +40,9 @@ const DEFAULT_DATABASE_OPTIONS: ProjectCreatorDatabaseChoice[] = [
 
 export interface ProjectCreatorRootProps {
   actions?: ProjectCreatorActions;
+  children: ReactNode;
   /** Disables Confirm on Docker/database steps during async apply. */
   confirmApplying?: boolean;
-  children: ReactNode;
   /** Options for the database step combobox. */
   databaseOptions?: ProjectCreatorDatabaseChoice[];
   /** Wired into the GitHub step’s `GithubDeployer` (authorize + repos + deploy). */

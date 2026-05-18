@@ -21,8 +21,12 @@ export function buildGithubDeployerDeployedAguiExecuteInput(
 }
 
 /** Validated json-render spec: GithubDeployer completed UI with **only** `deployedRepo`. */
-export function githubDeployerDeployedAguiSpec(deployedRepo: GithubDeployerRepo) {
-  const result = executeEmitGenUISpec(buildGithubDeployerDeployedAguiExecuteInput(deployedRepo));
+export function githubDeployerDeployedAguiSpec(
+  deployedRepo: GithubDeployerRepo
+) {
+  const result = executeEmitGenUISpec(
+    buildGithubDeployerDeployedAguiExecuteInput(deployedRepo)
+  );
   if (!result.ok) {
     throw new Error(result.validationMessage);
   }

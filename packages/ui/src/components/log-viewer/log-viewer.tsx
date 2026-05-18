@@ -1,17 +1,11 @@
 "use client";
 
 import type { TimeRange } from "@workspace/ui/components/time-range-selector";
-import type { ReactNode } from "react";
 import { cn } from "@workspace/ui/lib/utils";
-import {
-  type LogsData,
-  LogViewerProvider,
-} from "./log-viewer.context";
+import type { ReactNode } from "react";
+import { type LogsData, LogViewerProvider } from "./log-viewer.context";
 import { LogViewerCountChart } from "./log-viewer.count-chart";
-import {
-  LogViewerListContent,
-  LogViewerListHeader,
-} from "./log-viewer.list";
+import { LogViewerListContent, LogViewerListHeader } from "./log-viewer.list";
 import { LogViewerToolbar } from "./log-viewer.toolbar";
 
 function LogViewerRoot({

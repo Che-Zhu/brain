@@ -179,14 +179,19 @@ export type BashToolWithIntentionInput = z.infer<
   typeof bashWithIntentionInputSchema
 >;
 
-export type ChatBashReadFileInput = z.infer<typeof readFileWithIntentionInputSchema>;
+export type ChatBashReadFileInput = z.infer<
+  typeof readFileWithIntentionInputSchema
+>;
 
 export type ChatBashWriteFileInput = z.infer<
   typeof writeFileWithIntentionInputSchema
 >;
 
 export type ChatBashBashTool = Tool<BashToolWithIntentionInput, CommandResult>;
-export type ChatBashReadFileTool = Tool<ChatBashReadFileInput, { content: string }>;
+export type ChatBashReadFileTool = Tool<
+  ChatBashReadFileInput,
+  { content: string }
+>;
 
 export type ChatBashWriteFileTool = Tool<
   ChatBashWriteFileInput,

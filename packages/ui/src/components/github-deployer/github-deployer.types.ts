@@ -18,6 +18,11 @@ export const GITHUB_DEPLOYER_DEPLOY_EVENT =
 /** Serializable deployer state from the app (`githubToken` + `repos` + optional `deployedRepo`). */
 export interface GithubDeployerStates {
   /**
+   * When set, **complete** stage: deployment finished (host-driven).
+   * Takes precedence over auth / repo picker.
+   */
+  deployedRepo?: GithubDeployerRepo | null;
+  /**
    * OAuth token / PAT from the host. Falsy (omitted, null, or `""`) → **unauthorized** stage
    * (auth CTA unless `isLoading`).
    */
@@ -28,11 +33,6 @@ export interface GithubDeployerStates {
    */
   isLoading?: boolean;
   repos: readonly GithubDeployerRepo[];
-  /**
-   * When set, **complete** stage: deployment finished (host-driven).
-   * Takes precedence over auth / repo picker.
-   */
-  deployedRepo?: GithubDeployerRepo | null;
 }
 
 /**
