@@ -90,33 +90,18 @@ func registerSnapshot(grp huma.API) {
 		Description: "Batch latest AP and DB workload telemetry snapshots for canvas footer metrics.",
 		Tags:        []string{"Metrics"},
 	}, func(ctx context.Context, input *snapshotInput) (*snapshotOutput, error) {
-		authz := strings.TrimSpace(input.Authorization)
-		if authz == "" {
-			return nil, huma.Error400BadRequest("Authorization is required", nil)
-		}
-		cfg, err := middleware.ConfigFromAuth(authz)
+		authz, err := authorizeTelemetryNamespaces(input.Authorization, snapshotNamespaces(input.Body.Targets)...)
 		if err != nil {
-			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
-		}
-		podsGVR := middleware.PodsGVR()
-		for _, ns := range snapshotNamespaces(input.Body.Targets) {
-			if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
-				Namespace:        ns,
-				AllNamespaces:    false,
-				DefaultNamespace: "",
-				AdminCheckGVR:    &podsGVR,
-			}); err != nil {
-				return nil, huma.Error500InternalServerError("failed to resolve request context", err)
-			}
+			return nil, err
 		}
 
 		service, err := workloadtelemetry.NewDefaultService()
 		if err != nil {
-			return nil, snapshotServiceError(err)
+			return nil, telemetryServiceError(err)
 		}
 		data, err := service.Snapshot(ctx, authz, input.Body.Targets)
 		if err != nil {
-			return nil, snapshotServiceError(err)
+			return nil, telemetryServiceError(err)
 		}
 		return &snapshotOutput{Body: data}, nil
 	})
@@ -136,22 +121,9 @@ func registerSeries(grp huma.API) {
 			return nil, huma.Error400BadRequest("invalid sampling step", err)
 		}
 
-		authz := strings.TrimSpace(input.Authorization)
-		if authz == "" {
-			return nil, huma.Error400BadRequest("Authorization is required", nil)
-		}
-		cfg, err := middleware.ConfigFromAuth(authz)
+		authz, err := authorizeTelemetryNamespaces(input.Authorization, input.Body.Target.Namespace)
 		if err != nil {
-			return nil, huma.Error400BadRequest("invalid kubeconfig", err)
-		}
-		podsGVR := middleware.PodsGVR()
-		if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
-			Namespace:        input.Body.Target.Namespace,
-			AllNamespaces:    false,
-			DefaultNamespace: "",
-			AdminCheckGVR:    &podsGVR,
-		}); err != nil {
-			return nil, huma.Error500InternalServerError("failed to resolve request context", err)
+			return nil, err
 		}
 
 		service, err := workloadtelemetry.NewDefaultService()
@@ -188,8 +160,28 @@ func snapshotNamespaces(targets []workloadtelemetry.Target) []string {
 	return out
 }
 
-func snapshotServiceError(err error) error {
-	return telemetryServiceError(err)
+func authorizeTelemetryNamespaces(authHeader string, namespaces ...string) (string, error) {
+	authz := strings.TrimSpace(authHeader)
+	if authz == "" {
+		return "", huma.Error400BadRequest("Authorization is required", nil)
+	}
+	cfg, err := middleware.ConfigFromAuth(authz)
+	if err != nil {
+		return "", huma.Error400BadRequest("invalid kubeconfig", err)
+	}
+
+	podsGVR := middleware.PodsGVR()
+	for _, namespace := range namespaces {
+		if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        namespace,
+			AllNamespaces:    false,
+			DefaultNamespace: "",
+			AdminCheckGVR:    &podsGVR,
+		}); err != nil {
+			return "", huma.Error500InternalServerError("failed to resolve request context", err)
+		}
+	}
+	return authz, nil
 }
 
 func telemetryServiceError(err error) error {

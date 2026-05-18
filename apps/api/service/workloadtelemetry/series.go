@@ -13,8 +13,8 @@ const (
 )
 
 type SeriesRequest struct {
-	End    time.Time
 	Start  time.Time
+	End    time.Time
 	Step   time.Duration
 	Target Target
 }
@@ -69,20 +69,26 @@ func (s *Service) Series(ctx context.Context, auth string, req SeriesRequest) (S
 }
 
 func validateSeriesWindow(start time.Time, end time.Time, step time.Duration) error {
+	window := end.Sub(start)
+
 	switch {
 	case start.IsZero(), end.IsZero(), step <= 0:
 		return ErrInvalidSamplingWindow
 	case !start.Before(end):
 		return ErrInvalidSamplingWindow
-	case end.Sub(start) > maxSeriesRange:
+	case window > maxSeriesRange:
 		return ErrInvalidSamplingWindow
 	case step < minSeriesStep:
 		return ErrInvalidSamplingWindow
-	case int(end.Sub(start)/step)+1 > maxSeriesSamples:
+	case sampleCount(window, step) > maxSeriesSamples:
 		return ErrInvalidSamplingWindow
 	default:
 		return nil
 	}
+}
+
+func sampleCount(window time.Duration, step time.Duration) int {
+	return int(window/step) + 1
 }
 
 func (s *Service) queryRangeMetric(ctx context.Context, req SeriesRequest, profile metricProfile) ([]SeriesSample, error) {

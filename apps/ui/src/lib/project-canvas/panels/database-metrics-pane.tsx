@@ -12,8 +12,6 @@ import { cn } from "@workspace/ui/lib/utils";
 import type { Node } from "@xyflow/react";
 import { Activity, Cpu, HardDrive, MemoryStick, X } from "lucide-react";
 import { type ComponentType, type SVGProps, useMemo } from "react";
-import { CANVAS_DATABASE_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
-import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
 import { telemetryRowsToMetricsData } from "@/lib/project-canvas/telemetry/rows-to-metrics";
 import {
@@ -22,6 +20,7 @@ import {
   metricReading,
 } from "./database-metrics-format";
 import {
+  databaseMetricsDataFromNode,
   databaseMetricsSeriesTarget,
   METRICS_SERIES_STEP_SECONDS,
   workloadMetricsSeriesWindow,
@@ -34,15 +33,6 @@ interface DatabaseMetricsPaneProps {
   node: Node | null;
   onClose: () => void;
   open: boolean;
-}
-
-function databaseDataFromNode(
-  node: Node | null
-): CanvasDatabaseNodeData | null {
-  if (node?.type !== CANVAS_DATABASE_NODE_TYPE) {
-    return null;
-  }
-  return node.data as CanvasDatabaseNodeData;
 }
 
 function trendLabel(series: readonly MetricDataPoint[]) {
@@ -189,7 +179,7 @@ export function DatabaseMetricsPane({
   onClose,
   open,
 }: DatabaseMetricsPaneProps) {
-  const databaseData = open ? databaseDataFromNode(node) : null;
+  const databaseData = open ? databaseMetricsDataFromNode(node) : null;
   const telemetryTarget = useMemo(
     () => databaseMetricsSeriesTarget(node, open),
     [node, open]

@@ -128,6 +128,15 @@ func TestSeriesRejectsInvalidSamplingWindows(t *testing.T) {
 				Target: Target{Kind: WorkloadKindAP, Namespace: "project-a", Name: "web"},
 			},
 		},
+		{
+			name: "too many samples",
+			req: SeriesRequest{
+				End:    start.Add(24 * time.Hour),
+				Start:  start,
+				Step:   time.Minute,
+				Target: Target{Kind: WorkloadKindAP, Namespace: "project-a", Name: "web"},
+			},
+		},
 	}
 
 	for _, tc := range cases {

@@ -32,9 +32,10 @@ export const WorkloadMetricsCanvasPanel = memo(
       windowKey: `last-60m-${METRICS_SERIES_STEP_SECONDS}s`,
     });
 
-    const metricsData = useMemo(() => {
-      return telemetryRowsToMetricsData(telemetrySeries?.rows);
-    }, [telemetrySeries]);
+    const metricsData = useMemo(
+      () => telemetryRowsToMetricsData(telemetrySeries?.rows),
+      [telemetrySeries]
+    );
 
     return (
       <div className="min-h-0 flex-1 overflow-y-auto p-2">

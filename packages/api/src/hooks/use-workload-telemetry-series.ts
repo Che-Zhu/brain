@@ -80,11 +80,13 @@ export function useWorkloadTelemetrySeries(options: {
   } = options;
   const kubeconfig = options.kubeconfig ?? "";
   const hasKubeconfig = kubeconfig.trim() !== "";
+  const shouldFetch = enabled && hasKubeconfig && target !== null;
+  const swrKey = shouldFetch
+    ? ([API_ROUTES.telemetry.metricsSeries, target, windowKey] as const)
+    : null;
 
   return useSWR(
-    enabled && hasKubeconfig && target !== null
-      ? ([API_ROUTES.telemetry.metricsSeries, target, windowKey] as const)
-      : null,
+    swrKey,
     () => {
       if (target === null) {
         throw new Error("workload telemetry series target is required");

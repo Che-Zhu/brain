@@ -12,10 +12,7 @@ import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 export const METRICS_SERIES_RANGE_MS = 60 * 60 * 1000;
 export const METRICS_SERIES_STEP_SECONDS = 60;
 
-type MetricsPanelNode = {
-  data?: unknown;
-  type?: string;
-} | null;
+type MetricsPanelNode = Node | null;
 
 export function workloadMetricsSeriesWindow(now = new Date()) {
   return {
@@ -32,32 +29,48 @@ export function workloadMetricsSeriesTarget(
   if (node === null) {
     return null;
   }
-  const states = containerStatesFromNode(node as Node);
-  const name = states?.name?.trim();
-  const ns = namespace.trim();
-  if (name === undefined || name === "" || ns === "") {
+  const states = containerStatesFromNode(node);
+  const workloadKind = workloadClaimKindFromStates(states);
+  return metricsSeriesTarget({
+    kind: telemetryKindFromWorkload(workloadKind),
+    name: states?.name,
+    namespace,
+  });
+}
+
+export function databaseMetricsDataFromNode(
+  node: MetricsPanelNode
+): CanvasDatabaseNodeData | null {
+  if (node?.type !== CANVAS_DATABASE_NODE_TYPE) {
     return null;
   }
-  const workloadKind = workloadClaimKindFromStates(states);
-  return {
-    kind: telemetryKindFromWorkload(workloadKind),
-    name,
-    namespace: ns,
-  };
+  return node.data as CanvasDatabaseNodeData;
 }
 
 export function databaseMetricsSeriesTarget(
   node: MetricsPanelNode,
   open: boolean
 ): WorkloadTelemetrySeriesTarget | null {
-  if (!open || node?.type !== CANVAS_DATABASE_NODE_TYPE) {
+  if (!open) {
     return null;
   }
-  const data = node.data as CanvasDatabaseNodeData;
-  const namespace = data.workload.namespace.trim();
-  const name = data.workload.name.trim();
-  if (namespace === "" || name === "") {
+  const data = databaseMetricsDataFromNode(node);
+  return metricsSeriesTarget({
+    kind: "db",
+    name: data?.workload.name,
+    namespace: data?.workload.namespace,
+  });
+}
+
+function metricsSeriesTarget(options: {
+  kind: WorkloadTelemetrySeriesTarget["kind"];
+  name: string | undefined;
+  namespace: string | undefined;
+}): WorkloadTelemetrySeriesTarget | null {
+  const name = options.name?.trim() ?? "";
+  const namespace = options.namespace?.trim() ?? "";
+  if (name === "" || namespace === "") {
     return null;
   }
-  return { kind: "db", name, namespace };
+  return { kind: options.kind, name, namespace };
 }
