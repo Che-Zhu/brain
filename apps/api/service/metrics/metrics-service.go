@@ -1,24 +1,10 @@
 package metrics
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-
-	"sealos/api/middleware"
 )
 
 // DBType represents a supported database type for telemetry.
@@ -72,15 +58,14 @@ var DBMetricQueries = map[DBType]map[MetricKind]string{
 }
 
 var (
-	ErrNoVMHost        = errors.New("unable to get the victoria-metrics host")
-	ErrNoPromHost      = errors.New("unable to get the prometheus host")
 	ErrUncompleteParam = errors.New("at least provide both namespace and query")
-	ErrEmptyKubeconfig = errors.New("empty kubeconfig")
-	ErrNilNs           = errors.New("namespace not found")
-	ErrInvalidKind     = errors.New("invalid metrics kind")
-	ErrClusterNotFound = errors.New("cluster not found")
-	ErrUnsupportedDef  = errors.New("unsupported cluster definition")
 )
+
+// VictoriaMetricsConfigured reports whether the metrics dependency has enough
+// configuration for query endpoints to attempt work. It does not perform a live probe.
+func VictoriaMetricsConfigured() bool {
+	return strings.TrimSpace(os.Getenv("VMSELECT_URL")) != ""
+}
 
 // APMetricType represents supported AP (application) metric types.
 type APMetricType string
@@ -176,172 +161,3 @@ func apGetPodName(name string) string {
 	}
 	return name[:idx]
 }
-
-// ----- Range query orchestration -----
-
-const (
-	clusterDefLabel   = "clusterdefinition.kubeblocks.io/name"
-	defaultRangeHours = 6
-	defaultRangeStep  = "5m"
-)
-
-var clusterGVR = schema.GroupVersionResource{
-	Group:    "apps.kubeblocks.io",
-	Version:  "v1alpha1",
-	Resource: "clusters",
-}
-
-// RangeMetrics queries VictoriaMetrics for all metrics of a given resource.
-// kind must be "db" or "ap".
-func RangeMetrics(ctx context.Context, auth, kind, namespace, name string) (map[string]json.RawMessage, error) {
-	kind = strings.ToLower(strings.TrimSpace(kind))
-	if kind != "db" && kind != "ap" {
-		return nil, ErrInvalidKind
-	}
-
-	vmBase, err := queryRangeEndpointFromEnv()
-	if err != nil {
-		return nil, err
-	}
-
-	queries, err := buildQueriesForKind(ctx, auth, kind, namespace, name)
-	if err != nil {
-		return nil, err
-	}
-
-	start, end := defaultRangeUnix()
-	return executeRangeQueries(ctx, vmBase, queries, start, end, defaultRangeStep)
-}
-
-func queryRangeEndpointFromEnv() (string, error) {
-	vmURL := os.Getenv("VMSELECT_URL")
-	if vmURL == "" {
-		return "", ErrNoVMHost
-	}
-	if strings.Contains(vmURL, "/api/v1/query_range") {
-		return vmURL, nil
-	}
-	if strings.Contains(vmURL, "/api/v1/query") {
-		return strings.Replace(vmURL, "/api/v1/query", "/api/v1/query_range", 1), nil
-	}
-	return strings.TrimRight(vmURL, "/") + "/api/v1/query_range", nil
-}
-
-func defaultRangeUnix() (string, string) {
-	now := time.Now().UTC()
-	end := strconv.FormatInt(now.Unix(), 10)
-	start := strconv.FormatInt(now.Add(-defaultRangeHours*time.Hour).Unix(), 10)
-	return start, end
-}
-
-func buildQueriesForKind(ctx context.Context, auth, kind, namespace, name string) (map[string]string, error) {
-	switch kind {
-	case "db":
-		dbType, err := resolveDBTypeFromClusterLabel(ctx, auth, namespace, name)
-		if err != nil {
-			return nil, err
-		}
-		return BuildDBQueries(dbType, namespace, name)
-	case "ap":
-		return BuildAPQueries(namespace, name)
-	default:
-		return nil, ErrInvalidKind
-	}
-}
-
-func resolveDBTypeFromClusterLabel(ctx context.Context, auth, namespace, name string) (DBType, error) {
-	restConfig, _, err := middleware.RestConfigFromAuth(auth)
-	if err != nil {
-		return "", err
-	}
-	dyn, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return "", err
-	}
-	obj, err := dyn.Resource(clusterGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", ErrClusterNotFound
-	}
-
-	labelVal := obj.GetLabels()[clusterDefLabel]
-	if labelVal == "" {
-		return "", ErrUnsupportedDef
-	}
-	dbType, ok := DBTypeFromLabel(labelVal)
-	if !ok {
-		return "", ErrUnsupportedDef
-	}
-	return dbType, nil
-}
-
-func executeRangeQueries(ctx context.Context, baseURL string, queries map[string]string, start, end, step string) (map[string]json.RawMessage, error) {
-	result := make(map[string]json.RawMessage, len(queries))
-	client := &http.Client{Timeout: 20 * time.Second}
-
-	var (
-		mu       sync.Mutex
-		wg       sync.WaitGroup
-		firstErr error
-	)
-
-	for metricName, query := range queries {
-		wg.Add(1)
-		go func(name, q string) {
-			defer wg.Done()
-			u, err := url.Parse(baseURL)
-			if err != nil {
-				setFirstErr(&mu, &firstErr, err)
-				return
-			}
-			values := u.Query()
-			values.Set("query", q)
-			values.Set("start", start)
-			values.Set("end", end)
-			values.Set("step", step)
-			u.RawQuery = values.Encode()
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-			if err != nil {
-				setFirstErr(&mu, &firstErr, err)
-				return
-			}
-			resp, err := client.Do(req)
-			if err != nil {
-				setFirstErr(&mu, &firstErr, err)
-				return
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				setFirstErr(&mu, &firstErr, fmt.Errorf("VictoriaMetrics returned %s", resp.Status))
-				return
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				setFirstErr(&mu, &firstErr, err)
-				return
-			}
-			mu.Lock()
-			result[name] = body
-			mu.Unlock()
-		}(metricName, query)
-	}
-
-	wg.Wait()
-	if firstErr != nil {
-		return nil, firstErr
-	}
-	return result, nil
-}
-
-func setFirstErr(mu *sync.Mutex, target *error, err error) {
-	if err == nil {
-		return
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if *target == nil {
-		*target = err
-	}
-}
-

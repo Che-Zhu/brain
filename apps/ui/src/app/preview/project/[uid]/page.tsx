@@ -2,7 +2,7 @@
 
 import {
   useApsK8sList,
-  useApTelemetryMetricsBatch,
+  useWorkloadTelemetrySnapshotBatch,
 } from "@workspace/api/hooks";
 import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
@@ -12,7 +12,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import {
-  apMetricsLookupFromResults,
+  apMetricsLookupFromSnapshot,
   apsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 
@@ -51,14 +51,14 @@ function usePreviewProjectCanvas(options: {
   );
 
   const st = shareToken.trim();
-  const { data: apMetrics } = useApTelemetryMetricsBatch({
+  const { data: apMetrics } = useWorkloadTelemetrySnapshotBatch({
     refreshInterval: METRICS_REFRESH_MS,
     shareToken: st === "" ? undefined : st,
     targets: apMetricsTargets,
   });
 
   const metricsLookup = useMemo(
-    () => apMetricsLookupFromResults(apMetrics),
+    () => apMetricsLookupFromSnapshot(apMetrics),
     [apMetrics]
   );
 
@@ -74,7 +74,7 @@ function usePreviewProjectCanvas(options: {
 }
 
 /**
- * Client-only: fetches AP list + metrics via share token. Share access is checked in `layout.tsx`.
+ * Client-only: fetches AP list + snapshot telemetry via share token. Share access is checked in `layout.tsx`.
  */
 export default function PreviewProjectPage() {
   const params = useParams<{ uid: string }>();

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -12,17 +13,32 @@ import (
 	"sealos/api/route/health"
 	metricssvc "sealos/api/service/metrics"
 	projectsvc "sealos/api/service/project"
+	workloadtelemetry "sealos/api/service/workloadtelemetry"
+)
+
+type workloadTelemetryService interface {
+	Series(context.Context, string, workloadtelemetry.SeriesRequest) (workloadtelemetry.SeriesResponse, error)
+	Snapshot(context.Context, string, []workloadtelemetry.Target) (workloadtelemetry.SnapshotResponse, error)
+}
+
+var (
+	adminAuthorizationBearer    = middleware.AdminAuthorizationBearer
+	adminKubeconfigFromEnv      = middleware.AdminKubeconfigFromEnv
+	newWorkloadTelemetryService = func() (workloadTelemetryService, error) { return workloadtelemetry.NewDefaultService() }
+	validateShareAccess         = projectsvc.ValidateShareAccess
+	verifyAPInShareProject      = projectsvc.VerifyAPInShareProject
 )
 
 // Register registers metrics endpoints on the given group (e.g. under /api/telemetry/v1alpha1).
 func Register(grp huma.API) {
 	registerHealth(grp)
-	registerQuery(grp)
+	registerSnapshot(grp)
+	registerSeries(grp)
 }
 
 func registerHealth(grp huma.API) {
 	huma.Register(grp, huma.Operation{
-		OperationID:  "metrics-health",
+		OperationID: "metrics-health",
 		Method:      http.MethodGet,
 		Path:        "/metrics/health",
 		Summary:     "Metrics health",
@@ -30,121 +46,234 @@ func registerHealth(grp huma.API) {
 		Tags:        []string{"Metrics"},
 	}, func(ctx context.Context, input *struct{}) (*health.Output, error) {
 		resp := &health.Output{}
-		resp.Body.Status = "ok"
+		if metricssvc.VictoriaMetricsConfigured() {
+			resp.Body.Status = "configured"
+		} else {
+			resp.Body.Status = "degraded"
+		}
 		return resp, nil
 	})
 }
 
-type queryInput struct {
-	Authorization string `header:"Authorization" doc:"Bearer url-encoded kubeconfig (omit when using share token)"`
-	ShareToken    string `header:"X-Share-Token" doc:"Project share JWT; uses ENCODED_ADMIN_KUBECONFIG; kind must be ap"`
-	ShareTokenQP  string `query:"shareToken" doc:"Same as X-Share-Token"`
-	Namespace     string `query:"namespace" required:"true" doc:"Kubernetes namespace"`
-	Name          string `query:"name" required:"true" doc:"Resource name"`
-	Kind          string `query:"kind" required:"true" doc:"Metric source kind: db or ap"`
+type snapshotBody struct {
+	Targets []workloadtelemetry.Target `json:"targets" required:"true" minItems:"1" doc:"Workload targets to snapshot"`
 }
 
-type queryOutput struct {
-	Body []map[string]interface{}
+type snapshotInput struct {
+	Authorization string       `header:"Authorization" doc:"Bearer url-encoded kubeconfig (omit when using share token)"`
+	ShareToken    string       `header:"X-Share-Token" doc:"Project share JWT; uses ENCODED_ADMIN_KUBECONFIG; targets must be ap"`
+	ShareTokenQP  string       `query:"shareToken" doc:"Same as X-Share-Token"`
+	Body          snapshotBody `doc:"Snapshot batch request"`
 }
 
-func registerQuery(grp huma.API) {
+type snapshotOutput struct {
+	Body workloadtelemetry.SnapshotResponse
+}
+
+type seriesBody struct {
+	End    time.Time                `json:"end" required:"true" doc:"Sampling window end time"`
+	Start  time.Time                `json:"start" required:"true" doc:"Sampling window start time"`
+	Step   string                   `json:"step" required:"true" doc:"Sampling step duration, for example 60s or 5m"`
+	Target workloadtelemetry.Target `json:"target" required:"true" doc:"Single workload target to query"`
+}
+
+type seriesInput struct {
+	Authorization string     `header:"Authorization" required:"true" doc:"Bearer url-encoded kubeconfig"`
+	Body          seriesBody `doc:"Single-workload series request"`
+}
+
+type seriesOutput struct {
+	Body workloadtelemetry.SeriesResponse
+}
+
+func registerSnapshot(grp huma.API) {
 	huma.Register(grp, huma.Operation{
-		OperationID:  "metrics-query",
-		Method:      http.MethodGet,
-		Path:        "/metrics",
-		Summary:     "Query metrics (flattened time series)",
-		Description: "Range query metrics from VictoriaMetrics for kind=db or kind=ap, then flatten into a single time series combining all metrics. Default range is last 6h with 5m step.",
+		OperationID: "metrics-snapshot",
+		Method:      http.MethodPost,
+		Path:        "/metrics/snapshot",
+		Summary:     "Snapshot workload metrics",
+		Description: "Batch latest AP and DB workload telemetry snapshots for canvas footer metrics.",
 		Tags:        []string{"Metrics"},
-	}, func(ctx context.Context, input *queryInput) (*queryOutput, error) {
-		shareTok := strings.TrimSpace(input.ShareToken)
-		if shareTok == "" {
-			shareTok = strings.TrimSpace(input.ShareTokenQP)
-		}
-		authz := strings.TrimSpace(input.Authorization)
-
-		var authHeader string
-		ns := input.Namespace
-
-		if shareTok != "" {
-			if authz != "" {
-				return nil, huma.Error400BadRequest("send either Authorization or share token, not both", nil)
-			}
-			if strings.ToLower(strings.TrimSpace(input.Kind)) != "ap" {
-				return nil, huma.Error403Forbidden("share token metrics only support kind=ap", nil)
-			}
-			adminCfg, err := middleware.AdminKubeconfigFromEnv()
-			if err != nil {
-				return nil, huma.Error500InternalServerError("admin kubeconfig not configured", err)
-			}
-			validated, err := projectsvc.ValidateShareAccess(ctx, adminCfg, shareTok)
-			if err != nil {
-				switch {
-				case errors.Is(err, projectsvc.ErrShareProjectNotPublic):
-					return nil, huma.Error403Forbidden("project is not shared publicly", err)
-				case errors.Is(err, projectsvc.ErrShareForbidden):
-					return nil, huma.Error403Forbidden("share permission not allowed", err)
-				case errors.Is(err, projectsvc.ErrShareTokenInvalid):
-					return nil, huma.Error401Unauthorized("invalid share token", err)
-				default:
-					return nil, huma.Error401Unauthorized("share token validation failed", err)
-				}
-			}
-			if validated.Claims.Namespace != input.Namespace {
-				return nil, huma.Error403Forbidden("namespace does not match share token", nil)
-			}
-			if err := projectsvc.VerifyAPInShareProject(ctx, adminCfg, input.Namespace, input.Name, validated.ProjectUID); err != nil {
-				return nil, huma.Error403Forbidden("AP not part of shared project", err)
-			}
-			bearer, berr := middleware.AdminAuthorizationBearer()
-			if berr != nil {
-				return nil, huma.Error500InternalServerError("admin authorization not available", berr)
-			}
-			authHeader = bearer
-		} else {
-			if authz == "" {
-				return nil, huma.Error400BadRequest("Authorization or share token is required", nil)
-			}
-			cfg, err := middleware.ConfigFromAuth(authz)
-			if err != nil {
-				return nil, huma.Error400BadRequest("invalid kubeconfig", err)
-			}
-			gvr := middleware.PodsGVR()
-			resolved, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
-				Namespace:        input.Namespace,
-				AllNamespaces:    false,
-				DefaultNamespace: "",
-				AdminCheckGVR:    &gvr,
-			})
-			if err != nil {
-				return nil, huma.Error500InternalServerError("failed to resolve request context", err)
-			}
-			ns = resolved.Namespace
-			authHeader = authz
-		}
-
-		data, err := metricssvc.RangeMetrics(ctx, authHeader, input.Kind, ns, input.Name)
+	}, func(ctx context.Context, input *snapshotInput) (*snapshotOutput, error) {
+		authz, err := authorizeSnapshotTelemetry(ctx, input)
 		if err != nil {
-			switch {
-			case errors.Is(err, metricssvc.ErrInvalidKind):
-				return nil, huma.Error400BadRequest("kind must be db or ap", err)
-			case errors.Is(err, metricssvc.ErrNoVMHost):
-				return nil, huma.Error500InternalServerError("VMSELECT_URL is not configured", err)
-			case errors.Is(err, metricssvc.ErrClusterNotFound):
-				return nil, huma.Error404NotFound("cluster not found", err)
-			case errors.Is(err, metricssvc.ErrUnsupportedDef):
-				return nil, huma.Error400BadRequest("unsupported cluster definition", err)
-			case errors.Is(err, metricssvc.ErrUncompleteParam):
-				return nil, huma.Error400BadRequest("missing namespace or name", err)
-			default:
-				return nil, huma.Error500InternalServerError("failed to query VictoriaMetrics", err)
-			}
+			return nil, err
 		}
 
-		flat, err := metricssvc.FlattenMetricsResponse(data)
+		service, err := newWorkloadTelemetryService()
 		if err != nil {
-			return nil, huma.Error500InternalServerError("failed to transform metrics response", err)
+			return nil, telemetryServiceError(err)
 		}
-		return &queryOutput{Body: flat}, nil
+		data, err := service.Snapshot(ctx, authz, input.Body.Targets)
+		if err != nil {
+			return nil, telemetryServiceError(err)
+		}
+		return &snapshotOutput{Body: data}, nil
 	})
+}
+
+func authorizeSnapshotTelemetry(ctx context.Context, input *snapshotInput) (string, error) {
+	shareTok := shareTokenValue(input.ShareToken, input.ShareTokenQP)
+	authz := strings.TrimSpace(input.Authorization)
+
+	if shareTok == "" {
+		return authorizeTelemetryNamespaces(authz, snapshotNamespaces(input.Body.Targets)...)
+	}
+	if authz != "" {
+		return "", huma.Error400BadRequest("send either Authorization or share token, not both", nil)
+	}
+
+	return authorizeShareAPTargets(ctx, shareTok, input.Body.Targets)
+}
+
+func shareTokenValue(headerValue string, queryValue string) string {
+	shareTok := strings.TrimSpace(headerValue)
+	if shareTok != "" {
+		return shareTok
+	}
+	return strings.TrimSpace(queryValue)
+}
+
+func authorizeShareAPTargets(ctx context.Context, shareTok string, targets []workloadtelemetry.Target) (string, error) {
+	for _, target := range targets {
+		if target.Kind != workloadtelemetry.WorkloadKindAP {
+			return "", huma.Error403Forbidden("share token metrics snapshot only support kind=ap", nil)
+		}
+	}
+
+	adminCfg, err := adminKubeconfigFromEnv()
+	if err != nil {
+		return "", huma.Error500InternalServerError("admin kubeconfig not configured", err)
+	}
+	validated, err := validateShareAccess(ctx, adminCfg, shareTok)
+	if err != nil {
+		return "", shareTelemetryError(err)
+	}
+	if validated == nil || validated.Claims == nil {
+		return "", huma.Error401Unauthorized("invalid share token", nil)
+	}
+
+	for _, target := range targets {
+		if strings.TrimSpace(target.Namespace) != validated.Claims.Namespace {
+			return "", huma.Error403Forbidden("namespace does not match share token", nil)
+		}
+		if err := verifyAPInShareProject(ctx, adminCfg, target.Namespace, target.Name, validated.ProjectUID); err != nil {
+			return "", huma.Error403Forbidden("AP not part of shared project", err)
+		}
+	}
+
+	bearer, err := adminAuthorizationBearer()
+	if err != nil {
+		return "", huma.Error500InternalServerError("admin authorization not available", err)
+	}
+	return bearer, nil
+}
+
+func registerSeries(grp huma.API) {
+	huma.Register(grp, huma.Operation{
+		OperationID: "metrics-series",
+		Method:      http.MethodPost,
+		Path:        "/metrics/series",
+		Summary:     "Query workload metric series",
+		Description: "Query a bounded AP or DB workload telemetry series for one workload target.",
+		Tags:        []string{"Metrics"},
+	}, func(ctx context.Context, input *seriesInput) (*seriesOutput, error) {
+		step, err := time.ParseDuration(strings.TrimSpace(input.Body.Step))
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid sampling step", err)
+		}
+
+		authz, err := authorizeTelemetryNamespaces(input.Authorization, input.Body.Target.Namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		service, err := newWorkloadTelemetryService()
+		if err != nil {
+			return nil, telemetryServiceError(err)
+		}
+		data, err := service.Series(ctx, authz, workloadtelemetry.SeriesRequest{
+			End:    input.Body.End,
+			Start:  input.Body.Start,
+			Step:   step,
+			Target: input.Body.Target,
+		})
+		if err != nil {
+			return nil, telemetryServiceError(err)
+		}
+		return &seriesOutput{Body: data}, nil
+	})
+}
+
+func snapshotNamespaces(targets []workloadtelemetry.Target) []string {
+	seen := make(map[string]struct{}, len(targets))
+	out := make([]string, 0, len(targets))
+	for _, target := range targets {
+		ns := strings.TrimSpace(target.Namespace)
+		if ns == "" {
+			continue
+		}
+		if _, ok := seen[ns]; ok {
+			continue
+		}
+		seen[ns] = struct{}{}
+		out = append(out, ns)
+	}
+	return out
+}
+
+func authorizeTelemetryNamespaces(authHeader string, namespaces ...string) (string, error) {
+	authz := strings.TrimSpace(authHeader)
+	if authz == "" {
+		return "", huma.Error400BadRequest("Authorization is required", nil)
+	}
+	cfg, err := middleware.ConfigFromAuth(authz)
+	if err != nil {
+		return "", huma.Error400BadRequest("invalid kubeconfig", err)
+	}
+
+	podsGVR := middleware.PodsGVR()
+	for _, namespace := range namespaces {
+		if _, err := middleware.ResolveContext(cfg, middleware.ResolveOptions{
+			Namespace:        namespace,
+			AllNamespaces:    false,
+			DefaultNamespace: "",
+			AdminCheckGVR:    &podsGVR,
+		}); err != nil {
+			return "", huma.Error500InternalServerError("failed to resolve request context", err)
+		}
+	}
+	return authz, nil
+}
+
+func telemetryServiceError(err error) error {
+	switch {
+	case errors.Is(err, workloadtelemetry.ErrEmptyTargets):
+		return huma.Error400BadRequest("snapshot targets are required", err)
+	case errors.Is(err, workloadtelemetry.ErrInvalidSamplingWindow):
+		return huma.Error400BadRequest("invalid sampling window", err)
+	case errors.Is(err, workloadtelemetry.ErrInvalidTarget):
+		return huma.Error400BadRequest("invalid workload target", err)
+	case errors.Is(err, workloadtelemetry.ErrUnsupportedDBDefinition):
+		return huma.Error400BadRequest("unsupported database definition", err)
+	case errors.Is(err, metricssvc.ErrUncompleteParam):
+		return huma.Error400BadRequest("invalid workload target", err)
+	case errors.Is(err, workloadtelemetry.ErrNoVictoriaMetricsURL):
+		return huma.Error500InternalServerError("VMSELECT_URL is not configured", err)
+	default:
+		return huma.Error500InternalServerError("failed to query workload telemetry", err)
+	}
+}
+
+func shareTelemetryError(err error) error {
+	switch {
+	case errors.Is(err, projectsvc.ErrShareProjectNotPublic):
+		return huma.Error403Forbidden("project is not shared publicly", err)
+	case errors.Is(err, projectsvc.ErrShareForbidden):
+		return huma.Error403Forbidden("share permission not allowed", err)
+	case errors.Is(err, projectsvc.ErrShareTokenInvalid):
+		return huma.Error401Unauthorized("invalid share token", err)
+	default:
+		return huma.Error401Unauthorized("share token validation failed", err)
+	}
 }

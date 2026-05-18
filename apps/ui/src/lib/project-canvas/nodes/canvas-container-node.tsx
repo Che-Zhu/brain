@@ -4,8 +4,13 @@ import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import { ContainerNode } from "@workspace/ui/components/container-node/v1/container-node";
 import { cn } from "@workspace/ui/lib/utils";
 import { Handle, type NodeProps, Position } from "@xyflow/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
+import {
+  containerStatesWithTelemetry,
+  containerTelemetryTargetFromStates,
+} from "@/lib/project-canvas/telemetry/workload-telemetry-node";
+import { useWorkloadTelemetrySnapshot } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import type { CanvasContainerRfNode } from "./types";
 
 export const CanvasContainerNode = memo(function CanvasContainerNode({
@@ -13,6 +18,13 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   id,
 }: NodeProps<CanvasContainerRfNode>) {
   const { actions = {}, states } = data;
+  const { name, namespace } = states;
+  const telemetryTarget = useMemo(
+    () => containerTelemetryTargetFromStates({ name, namespace }),
+    [name, namespace]
+  );
+  const telemetry = useWorkloadTelemetrySnapshot(telemetryTarget);
+  const statesWithTelemetry = containerStatesWithTelemetry(states, telemetry);
   const { state } = useCanvas();
   const edge = state.selectedEdge;
   const isEndpointOfSelectedEdge =
@@ -32,7 +44,7 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
       <ContainerNode.Variant1
         actions={actions}
         className="min-h-40 w-60"
-        states={states}
+        states={statesWithTelemetry}
       />
       <Handle position={Position.Bottom} type="source" />
     </div>

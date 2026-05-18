@@ -37,7 +37,7 @@ export function apNamesFromList(data: K8sGetResponse | undefined): string[] {
   });
 }
 
-/** Namespace + name per list item for `GET /api/telemetry/v1alpha1/metrics` (APS, DBS, or any k8s list item with metadata). */
+/** Namespace + name per list item for workload telemetry targets. */
 export function apNamespaceNameTargetsFromList(
   data: K8sGetResponse | undefined,
   fallbackNamespace?: string

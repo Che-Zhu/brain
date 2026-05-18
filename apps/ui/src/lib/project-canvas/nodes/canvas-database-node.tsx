@@ -3,8 +3,13 @@
 import { useCanvas } from "@workspace/ui/components/canvas/canvas.use";
 import { DatabaseNode } from "@workspace/ui/components/database-node/database-node";
 import type { NodeProps } from "@xyflow/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
+import {
+  databaseStatesWithTelemetry,
+  databaseTelemetryTargetFromWorkload,
+} from "@/lib/project-canvas/telemetry/workload-telemetry-node";
+import { useWorkloadTelemetrySnapshot } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import type { CanvasDatabaseRfNode } from "./types";
 
 export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
@@ -13,6 +18,12 @@ export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
   id,
 }: NodeProps<CanvasDatabaseRfNode>) {
   const { actions = {}, connections, states } = data;
+  const telemetryTarget = useMemo(
+    () => databaseTelemetryTargetFromWorkload(data.workload),
+    [data.workload]
+  );
+  const telemetry = useWorkloadTelemetrySnapshot(telemetryTarget);
+  const statesWithTelemetry = databaseStatesWithTelemetry(states, telemetry);
   const { state } = useCanvas();
   const edge = state.selectedEdge;
   const isEndpointOfSelectedEdge =
@@ -29,7 +40,7 @@ export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
       onCopyConnection={actions.copyConnection}
       onTogglePublicConnection={actions.togglePublicConnection}
       quickActions={actions.quickActions}
-      states={states}
+      states={statesWithTelemetry}
     >
       <DatabaseNode.Content />
     </DatabaseNode.Root>

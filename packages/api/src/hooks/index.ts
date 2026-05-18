@@ -4,12 +4,6 @@ export {
   type UseApLifecycleOptions,
   useApLifecycleOperations,
 } from "./use-ap-lifecycle";
-export {
-  type ApTelemetryMetricsRow,
-  type ApTelemetryResourceKind,
-  type ApTelemetryTarget,
-  useApTelemetryMetricsBatch,
-} from "./use-ap-telemetry-metrics";
 export { useApsK8sList } from "./use-aps-k8s-list";
 export {
   type DbLifecycleActionKey,
@@ -25,3 +19,24 @@ export {
   useK8sGetResource,
 } from "./use-k8s-get-resource";
 export { useK8sNamespacedList } from "./use-k8s-namespaced-list";
+export {
+  buildWorkloadTelemetrySeriesRequest,
+  useWorkloadTelemetrySeries,
+  type WorkloadTelemetrySeriesMetricKey,
+  type WorkloadTelemetrySeriesResponse,
+  type WorkloadTelemetrySeriesRow,
+  type WorkloadTelemetrySeriesTarget,
+  type WorkloadTelemetrySeriesWindow,
+} from "./use-workload-telemetry-series";
+export {
+  buildWorkloadTelemetrySnapshotRequest,
+  useWorkloadTelemetrySnapshotBatch,
+  type WorkloadTelemetrySnapshotError,
+  type WorkloadTelemetrySnapshotItem,
+  type WorkloadTelemetrySnapshotKind,
+  type WorkloadTelemetrySnapshotMetric,
+  type WorkloadTelemetrySnapshotMetricKey,
+  type WorkloadTelemetrySnapshotRequest,
+  type WorkloadTelemetrySnapshotResponse,
+  type WorkloadTelemetrySnapshotTarget,
+} from "./use-workload-telemetry-snapshot";

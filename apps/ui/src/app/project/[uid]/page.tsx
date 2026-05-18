@@ -6,9 +6,12 @@ import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
+import { useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectServices } from "@/hooks/use-project-services";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
+import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
+import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { DATABASE_PANE } from "@/store/canvas-store";
 import { openRightPane, rightPaneOpenAtom } from "@/store/layout-store";
@@ -39,69 +42,78 @@ export default function ProjectUidPage() {
     kubeconfig,
     refreshWorkloadLists,
   });
+  const selectedTelemetryTarget = useMemo(
+    () => telemetryTargetFromCanvasNode(selectedNode),
+    [selectedNode]
+  );
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       {kubeconfig !== "" && error == null && (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Canvas.Root
-            actions={{ onPanelClose: clearSelection }}
-            meta={meta}
-            state={{
-              ...canvasState,
-              nodes,
-              selectedEdge,
-              selectedNode,
-            }}
+          <WorkloadTelemetryProvider
+            kubeconfig={kubeconfig}
+            selectedTarget={selectedTelemetryTarget}
           >
-            <div className="relative min-h-0 flex-1">
-              {isEmptyGraphLoading ? (
-                <div
-                  aria-live="polite"
-                  className="pointer-events-none absolute bottom-4 left-4 z-10 max-w-[min(100%-2rem,20rem)]"
-                  data-slot="project-canvas-loading-toast"
-                  role="status"
-                >
-                  <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-md">
-                    <Spinner
-                      aria-hidden
-                      className="size-4 shrink-0 text-muted-foreground"
-                    />
-                    <span className="font-medium text-foreground text-sm">
-                      Loading workloads…
-                    </span>
-                  </div>
-                </div>
-              ) : null}
-              <Canvas.Flow>
-                <Canvas.UpperRight>
-                  {rightPaneOpen ? null : (
-                    <Button
-                      aria-label="Open assistant panel"
-                      className="hoverable rounded-xl"
-                      onClick={openRightPane}
-                      size="icon-lg"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <PanelRightOpen
+            <Canvas.Root
+              actions={{ onPanelClose: clearSelection }}
+              meta={meta}
+              state={{
+                ...canvasState,
+                nodes,
+                selectedEdge,
+                selectedNode,
+              }}
+            >
+              <div className="relative min-h-0 flex-1">
+                {isEmptyGraphLoading ? (
+                  <div
+                    aria-live="polite"
+                    className="pointer-events-none absolute bottom-4 left-4 z-10 max-w-[min(100%-2rem,20rem)]"
+                    data-slot="project-canvas-loading-toast"
+                    role="status"
+                  >
+                    <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-md">
+                      <Spinner
                         aria-hidden
-                        className="size-4"
-                        strokeWidth={2}
+                        className="size-4 shrink-0 text-muted-foreground"
                       />
-                    </Button>
-                  )}
-                </Canvas.UpperRight>
-                <Canvas.Panel />
-                <DatabaseMetricsPane
-                  kubeconfig={kubeconfig}
-                  node={selectedNode}
-                  onClose={closeDatabasePane}
-                  open={databasePane === DATABASE_PANE.metrics}
-                />
-              </Canvas.Flow>
-            </div>
-          </Canvas.Root>
+                      <span className="font-medium text-foreground text-sm">
+                        Loading workloads…
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                <Canvas.Flow>
+                  <Canvas.UpperRight>
+                    {rightPaneOpen ? null : (
+                      <Button
+                        aria-label="Open assistant panel"
+                        className="hoverable rounded-xl"
+                        onClick={openRightPane}
+                        size="icon-lg"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <PanelRightOpen
+                          aria-hidden
+                          className="size-4"
+                          strokeWidth={2}
+                        />
+                      </Button>
+                    )}
+                  </Canvas.UpperRight>
+                  <Canvas.Panel />
+                  <DatabaseMetricsPane
+                    kubeconfig={kubeconfig}
+                    node={selectedNode}
+                    onClose={closeDatabasePane}
+                    open={databasePane === DATABASE_PANE.metrics}
+                  />
+                </Canvas.Flow>
+              </div>
+            </Canvas.Root>
+          </WorkloadTelemetryProvider>
         </div>
       )}
     </div>
