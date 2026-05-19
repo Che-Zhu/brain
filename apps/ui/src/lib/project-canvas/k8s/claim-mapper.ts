@@ -5,6 +5,15 @@ import type {
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 
+import {
+  readApCpuLimit,
+  readApEnv,
+  readApImage,
+  readApInput,
+  readApMemoryLimit,
+  readApReplicas,
+} from "./ap-spec-access";
+
 export type WorkloadClaimKind = "AP" | "DB";
 
 const MEM_SUFFIX_GI = /^([0-9]+(?:\.[0-9]+)?)gi$/i;
@@ -100,8 +109,7 @@ export function parseMemoryToMib(q: unknown): number | undefined {
   return Number.isFinite(plain) ? Math.round(plain) : undefined;
 }
 
-function envFromSpec(spec: Record<string, unknown>): ContainerEnvVar[] {
-  const raw = spec.env;
+function envFromSpecEnvList(raw: unknown): ContainerEnvVar[] {
   if (!Array.isArray(raw)) {
     return [];
   }
@@ -224,8 +232,8 @@ function apStatusEndpointsByPort(
   return map;
 }
 
-function apPortsFromSpec(spec: Record<string, unknown>): ContainerPort[] {
-  const raw = spec.endpoints;
+function apPortsFromInput(input: Record<string, unknown>): ContainerPort[] {
+  const raw = input.endpoints;
   const out: ContainerPort[] = [];
   if (Array.isArray(raw) && raw.length > 0) {
     for (const item of raw) {
@@ -246,16 +254,10 @@ function apPortsFromSpec(spec: Record<string, unknown>): ContainerPort[] {
     }
     return out;
   }
-  const legacyPort = portNum(spec.port);
-  const legacyHost = typeof spec.host === "string" ? spec.host : "";
-  if (legacyPort != null && legacyPort > 0 && legacyHost !== "") {
-    return [
-      {
-        host: legacyHost,
-        port: legacyPort,
-        protocol: "tcp",
-      },
-    ];
+  const singlePort = portNum(input.port);
+  const singleHost = typeof input.host === "string" ? input.host : "";
+  if (singlePort != null && singlePort > 0 && singleHost !== "") {
+    return [{ host: singleHost, port: singlePort, protocol: "tcp" }];
   }
   return [];
 }
@@ -266,7 +268,7 @@ function mergeApPorts(
   status: Record<string, unknown>
 ): ContainerPort[] {
   const byPort = apStatusEndpointsByPort(status);
-  const specPorts = apPortsFromSpec(spec);
+  const specPorts = apPortsFromInput(readApInput(spec));
 
   if (byPort.size === 0) {
     return specPorts;
@@ -310,7 +312,7 @@ export interface ClaimContainerSettings {
   image: string;
   memoryMib: number;
   ports: ContainerPort[];
-  /** AP `spec.replicas` (1–20 in UI); omitted meaning uses default for DB mapping. */
+  /** AP `spec.resource.replicas` (1–20 in UI); omitted meaning uses default for DB mapping. */
   replicas: number;
 }
 
@@ -336,18 +338,15 @@ function mapApClaim(
   spec: Record<string, unknown>,
   status: Record<string, unknown>
 ): ClaimContainerSettings {
-  const image =
-    typeof spec.image === "string" && spec.image.trim() !== ""
-      ? spec.image.trim()
-      : "—";
-  const cpuRaw = parseCpuToCores(spec.cpuLimit);
-  const memRaw = parseMemoryToMib(spec.memoryLimit);
+  const image = readApImage(spec) ?? "—";
+  const cpuRaw = parseCpuToCores(readApCpuLimit(spec));
+  const memRaw = parseMemoryToMib(readApMemoryLimit(spec));
   const cpuCores = clampScale(cpuRaw ?? 1, CPU_MIN, CPU_MAX);
   const memoryMib = clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX);
-  const replicas = clampReplicas(spec.replicas);
+  const replicas = clampReplicas(readApReplicas(spec));
   return {
     cpuCores,
-    env: envFromSpec(spec),
+    env: envFromSpecEnvList(readApEnv(spec)),
     image,
     memoryMib,
     ports: mergeApPorts(spec, status),

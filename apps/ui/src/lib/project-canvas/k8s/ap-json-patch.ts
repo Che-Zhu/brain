@@ -5,6 +5,12 @@ import type {
 
 import { parse as parseYaml } from "yaml";
 
+import {
+  readApInput,
+  patchOpsForApInput,
+  patchOpsForApResource,
+  patchOpsFromEffectiveSnapshot,
+} from "./ap-spec-access";
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
@@ -24,25 +30,6 @@ function portNum(v: unknown): number | undefined {
     return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
-}
-
-function specHasField(
-  spec: Record<string, unknown> | undefined,
-  field: string
-): boolean {
-  return spec != null && Object.hasOwn(spec, field);
-}
-
-/** `replace` if the key exists on `spec`, otherwise `add` (RFC 6902). */
-function specReplaceOrAdd(
-  spec: Record<string, unknown> | undefined,
-  field: string,
-  value: unknown
-): K8sJsonPatchOp {
-  if (specHasField(spec, field)) {
-    return { op: "replace", path: `/spec/${field}`, value };
-  }
-  return { op: "add", path: `/spec/${field}`, value };
 }
 
 function assertApClaimForPatch(
@@ -134,9 +121,9 @@ function buildEnvArray(
 
 function portsToEndpoints(
   ports: ContainerPort[],
-  specSnapshot: Record<string, unknown>
+  inputSnapshot: Record<string, unknown>
 ): Record<string, unknown>[] {
-  const raw = specSnapshot.endpoints;
+  const raw = inputSnapshot.endpoints;
   const origEps = Array.isArray(raw) ? raw : [];
   const origByPort = new Map<number, Record<string, unknown>>();
   for (const item of origEps) {
@@ -183,7 +170,7 @@ export async function applyApImage(
     throw new Error("Image reference is empty.");
   }
   const spec = asRecord(claim.spec);
-  await patchAp(kubeconfig, claim, [specReplaceOrAdd(spec, "image", img)]);
+  await patchAp(kubeconfig, claim, patchOpsForApInput(spec, { image: img }));
 }
 
 export async function applyApCpuLimit(
@@ -193,7 +180,9 @@ export async function applyApCpuLimit(
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(kubeconfig, claim, [
-    specReplaceOrAdd(spec, "cpuLimit", coresToCpuLimit(cpuCores)),
+    ...patchOpsForApResource(spec, {
+      limits: { cpu: coresToCpuLimit(cpuCores) },
+    }),
   ]);
 }
 
@@ -204,7 +193,9 @@ export async function applyApMemoryLimit(
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(kubeconfig, claim, [
-    specReplaceOrAdd(spec, "memoryLimit", mibToMemoryLimit(memoryMib)),
+    ...patchOpsForApResource(spec, {
+      limits: { memory: mibToMemoryLimit(memoryMib) },
+    }),
   ]);
 }
 
@@ -229,26 +220,28 @@ export async function applyApResourceQuotas(
   if (!(cpuChanged || memChanged || replicasChanged)) {
     return;
   }
-  const ops: K8sJsonPatchOp[] = [];
+
   const spec = asRecord(claim.spec);
+  const merge: Record<string, unknown> = {};
+  const limits: Record<string, unknown> = {};
   if (cpuChanged) {
-    ops.push(
-      specReplaceOrAdd(spec, "cpuLimit", coresToCpuLimit(next.cpuCores))
-    );
+    limits.cpu = coresToCpuLimit(next.cpuCores);
   }
   if (memChanged) {
-    ops.push(
-      specReplaceOrAdd(spec, "memoryLimit", mibToMemoryLimit(next.memoryMib))
-    );
+    limits.memory = mibToMemoryLimit(next.memoryMib);
+  }
+  if (Object.keys(limits).length > 0) {
+    merge.limits = limits;
   }
   if (replicasChanged && repNext !== undefined) {
     const n = Math.round(Number(repNext));
     if (!Number.isFinite(n) || n < 1 || n > 20) {
       throw new Error("Replicas must be between 1 and 20.");
     }
-    ops.push(specReplaceOrAdd(spec, "replicas", n));
+    merge.replicas = n;
   }
-  await patchAp(kubeconfig, claim, ops);
+
+  await patchAp(kubeconfig, claim, patchOpsForApResource(spec, merge));
 }
 
 export async function applyApEnv(
@@ -257,8 +250,8 @@ export async function applyApEnv(
   env: ContainerEnvVar[]
 ): Promise<void> {
   const spec = asRecord(claim.spec);
-  const list = buildEnvArray(spec?.env, env);
-  await patchAp(kubeconfig, claim, [specReplaceOrAdd(spec, "env", list)]);
+  const list = buildEnvArray(readApInput(spec ?? {}).env, env);
+  await patchAp(kubeconfig, claim, patchOpsForApInput(spec, { env: list }));
 }
 
 export async function applyApPorts(
@@ -267,16 +260,15 @@ export async function applyApPorts(
   ports: ContainerPort[]
 ): Promise<void> {
   const spec = asRecord(claim.spec);
-  const snapshot = spec ?? {};
-  const endpoints = portsToEndpoints(ports, snapshot);
-  const ops: K8sJsonPatchOp[] = [];
-  if (specHasField(spec, "port")) {
-    ops.push({ op: "remove", path: "/spec/port" });
+  const input = asRecord(spec?.input);
+  const endpoints = portsToEndpoints(ports, readApInput(spec ?? {}));
+  const ops = patchOpsForApInput(spec, { endpoints });
+  if (input != null && Object.hasOwn(input, "port")) {
+    ops.push({ op: "remove", path: "/spec/input/port" });
   }
-  if (specHasField(spec, "host")) {
-    ops.push({ op: "remove", path: "/spec/host" });
+  if (input != null && Object.hasOwn(input, "host")) {
+    ops.push({ op: "remove", path: "/spec/input/host" });
   }
-  ops.push(specReplaceOrAdd(spec, "endpoints", endpoints));
   await patchAp(kubeconfig, claim, ops);
 }
 
@@ -290,26 +282,12 @@ export async function applyApReplicas(
     throw new Error("Replicas must be between 1 and 20.");
   }
   const spec = asRecord(claim.spec);
-  await patchAp(kubeconfig, claim, [specReplaceOrAdd(spec, "replicas", n)]);
+  await patchAp(
+    kubeconfig,
+    claim,
+    patchOpsForApResource(spec, { replicas: n })
+  );
 }
-
-/** Keys stored in `{ap}-config-backup` / snapshot `config.yaml` by the AP composition (`$effective`). */
-const EFFECTIVE_SNAPSHOT_SPEC_KEYS = [
-  "cpuLimit",
-  "cpuRequest",
-  "endpoints",
-  "env",
-  "image",
-  "imagePullPolicy",
-  "ingressAnnotations",
-  "memoryLimit",
-  "memoryRequest",
-  "paused",
-  "projectName",
-  "probes",
-  "replicas",
-  "restartRequest",
-] as const;
 
 function parseEffectiveApSnapshotYaml(
   yamlText: string
@@ -322,8 +300,7 @@ function parseEffectiveApSnapshotYaml(
 }
 
 /**
- * Applies effective spec fields from an orphaned snapshot (`config.yaml` in `{ap}-config-snapshot-{hash}`).
- * Mirrors fields the composition records in backups; clears legacy `/spec/port` and `/spec/host` when endpoints are present.
+ * Applies effective fields from an orphaned snapshot (`config.yaml` in `{ap}-config-snapshot-{hash}`).
  */
 export async function rollbackApFromEffectiveConfigYaml(
   kubeconfig: string,
@@ -332,33 +309,27 @@ export async function rollbackApFromEffectiveConfigYaml(
 ): Promise<void> {
   const snap = parseEffectiveApSnapshotYaml(yamlText.trim());
   const spec = asRecord(claim.spec);
-  const ops: K8sJsonPatchOp[] = [];
 
-  for (const key of EFFECTIVE_SNAPSHOT_SPEC_KEYS) {
-    if (!Object.hasOwn(snap, key)) {
-      continue;
-    }
-    const value = snap[key];
-    if (key === "image" && (typeof value !== "string" || value.trim() === "")) {
-      throw new Error("Snapshot is missing a valid image.");
-    }
-    if (key === "replicas") {
-      const n = Math.round(Number(value));
-      if (!Number.isFinite(n) || n < 1 || n > 20) {
-        throw new Error("Snapshot replicas must be between 1 and 20.");
+  const resource = asRecord(snap.resource);
+  if (resource != null) {
+    const replicas = resource.replicas;
+    if (replicas != null) {
+      const n = Math.round(Number(replicas));
+      if (!Number.isFinite(n) || n < 0 || n > 20) {
+        throw new Error("Snapshot replicas must be between 0 and 20.");
       }
     }
-    ops.push(specReplaceOrAdd(spec, key, value));
   }
 
-  if (Object.hasOwn(snap, "endpoints") && Array.isArray(snap.endpoints)) {
-    if (specHasField(spec, "port")) {
-      ops.push({ op: "remove", path: "/spec/port" });
-    }
-    if (specHasField(spec, "host")) {
-      ops.push({ op: "remove", path: "/spec/host" });
+  const input = asRecord(snap.input);
+  if (input != null) {
+    const image = input.image;
+    if (image != null && (typeof image !== "string" || image.trim() === "")) {
+      throw new Error("Snapshot is missing a valid image.");
     }
   }
+
+  const ops = patchOpsFromEffectiveSnapshot(spec, snap);
 
   if (ops.length === 0) {
     throw new Error("Snapshot did not contain any applicable spec fields.");
