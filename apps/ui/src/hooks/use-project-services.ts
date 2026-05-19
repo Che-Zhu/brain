@@ -17,6 +17,8 @@ import {
   dbsToCanvasState,
   entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { applyCanvasLayoutToNodes } from "@/lib/project-canvas/layout/merge";
+import type { CanvasLayoutDocument } from "@/lib/project-canvas/layout/types";
 import {
   entryPointRefreshIntervalForLifecycle,
   hasTransientWorkloadPhase,
@@ -26,6 +28,8 @@ const WORKLOAD_RECONCILE_POLL_MS = 1000;
 const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
 
 export function useProjectServices(options: {
+  canvasLayout?: CanvasLayoutDocument;
+  canvasLayoutReady?: boolean;
   /** URL-encoded kubeconfig (Authorization bearer body). */
   kubeconfig: string;
   /** K8s namespace for AP, DB, and entrypoint discovery. */
@@ -47,7 +51,13 @@ export function useProjectServices(options: {
   /** Refetch AP + DB list SWR caches (e.g. after lifecycle mutations). */
   refreshWorkloadLists: () => Promise<unknown>;
 } {
-  const { kubeconfig, namespace, uid } = options;
+  const {
+    canvasLayout,
+    canvasLayoutReady = true,
+    kubeconfig,
+    namespace,
+    uid,
+  } = options;
 
   const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
 
@@ -167,14 +177,36 @@ export function useProjectServices(options: {
     });
     const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
       gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
+      namespaceFallback: namespace,
     });
+    const edges = [
+      ...apBlock.edges,
+      ...dbBlock.edges,
+      ...entryPointBlock.edges,
+    ];
+    const detectedNodes = [
+      ...apBlock.nodes,
+      ...dbBlock.nodes,
+      ...entryPointBlock.nodes,
+    ];
+    const nodes = canvasLayoutReady
+      ? applyCanvasLayoutToNodes(detectedNodes, canvasLayout).nodes
+      : [];
     return {
-      edges: [...apBlock.edges, ...dbBlock.edges, ...entryPointBlock.edges],
-      nodes: [...apBlock.nodes, ...dbBlock.nodes, ...entryPointBlock.nodes],
+      edges: canvasLayoutReady ? edges : [],
+      nodes,
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [apsData, dbsData, entryPointsData, dbCompositionIconByName, namespace]);
+  }, [
+    apsData,
+    canvasLayout,
+    canvasLayoutReady,
+    dbsData,
+    entryPointsData,
+    dbCompositionIconByName,
+    namespace,
+  ]);
 
   const error = apsError ?? dbsError ?? entryPointsError;
   const isLoading = apsLoading || dbsLoading || entryPointsLoading;

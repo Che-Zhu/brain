@@ -337,6 +337,8 @@ export interface DbsToCanvasStateOptions {
 export interface EntryPointsToCanvasStateOptions {
   /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
+  /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
+  namespaceFallback?: string;
 }
 
 /**
@@ -476,6 +478,9 @@ export function entryPointsToCanvasState(
   const nodes: Node[] = items.map((item, i) => {
     const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
     const name = metadataName(item) ?? "unknown";
+    const namespace =
+      metadataNamespace(item) ?? options?.namespaceFallback ?? "";
+    const uid = metadataUid(item);
     const targets = entryNodeTargetsFromResource(item);
     const accessDomain = entryNodeAccessDomainFromTargets(targets);
     const g = grid0 + i;
@@ -483,6 +488,11 @@ export function entryPointsToCanvasState(
     return {
       data: {
         ...(accessDomain === undefined ? {} : { accessDomain }),
+        resource: {
+          name,
+          namespace,
+          ...(uid === undefined || uid === "" ? {} : { uid }),
+        },
         states: { name },
         targets,
       },

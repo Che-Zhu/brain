@@ -42,6 +42,7 @@ import {
 
 export interface UseProjectCanvasOptions {
   kubeconfig?: string;
+  onNodePositionChange?: (node: Node) => void;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
   shareToken?: string;
@@ -96,6 +97,7 @@ export function useProjectCanvas(
   });
 
   const refreshWorkloadLists = options?.refreshWorkloadLists;
+  const onNodePositionChange = options?.onNodePositionChange;
 
   const afterLifecycle = useCallback(async () => {
     try {
@@ -479,11 +481,15 @@ export function useProjectCanvas(
           setServiceUid(null).catch(() => undefined);
           setDatabasePane(null).catch(() => undefined);
         },
+        onNodeDragStop: (_, node: Node) => {
+          onNodePositionChange?.(node);
+        },
         onPaneClick: () => clearSelection(),
       },
     }),
     [
       clearSelection,
+      onNodePositionChange,
       panelTab,
       setDatabasePane,
       setPanelTab,

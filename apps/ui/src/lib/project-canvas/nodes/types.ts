@@ -55,6 +55,11 @@ export type CanvasDatabaseRfNode = Node<
 export interface CanvasEntryNodeData extends Record<string, unknown> {
   accessDomain?: EntryNodeAccessDomain;
   actions?: EntryNodeActions;
+  resource: {
+    name: string;
+    namespace: string;
+    uid?: string;
+  };
   states: EntryNodeStates;
   targets: EntryNodeTarget[];
 }
