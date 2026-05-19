@@ -6,7 +6,7 @@ import type {
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import { getToneForStatus } from "@workspace/crossplane/lib/status";
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import type {
   DatabaseEngineKey,
   DatabaseNodeConnection,
@@ -198,6 +198,19 @@ function databaseMetricsFromTelemetry(
   };
 }
 
+function containerMetricsFromTelemetry(
+  telemetry: WorkloadMetricPercents | undefined
+): ContainerNodeStates["metrics"] {
+  return {
+    ...(telemetry?.cpuPercent === undefined
+      ? {}
+      : { cpu: telemetry.cpuPercent }),
+    ...(telemetry?.memoryPercent === undefined
+      ? {}
+      : { memory: telemetry.memoryPercent }),
+  };
+}
+
 function databaseMetricCapacitiesFromStatus(
   status: Record<string, unknown>
 ): DatabaseNodeStates["metricCapacities"] | undefined {
@@ -259,7 +272,8 @@ function databaseCompositionNameFromSpec(
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
  * Sets **kind**, **image**, **name**, **replicas** (from spec), **uid** (from
  * `metadata.uid` when present), and **status** from `status.phase`.
- * When `spec.replicas === 0`, status is shown as **Paused** regardless of `status.phase`.
+ * When `spec.replicas === 0` and no phase is present, status falls back to
+ * **Paused**.
  */
 export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   const root = asRecord(ap) ?? {};
@@ -280,7 +294,7 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
       : undefined;
 
   let phaseRaw = typeof status.phase === "string" ? status.phase.trim() : "";
-  if (replicas === 0) {
+  if (phaseRaw === "" && replicas === 0) {
     phaseRaw = "Paused";
   }
 
@@ -353,10 +367,7 @@ export function apsToCanvasState(
     const base = apToWorkloadStates(item);
     const states: ContainerNodeStates = {
       ...base,
-      ...(tel?.cpuPercent === undefined ? {} : { cpuPercent: tel.cpuPercent }),
-      ...(tel?.memoryPercent === undefined
-        ? {}
-        : { memoryPercent: tel.memoryPercent }),
+      metrics: containerMetricsFromTelemetry(tel),
       ...(ns !== undefined && ns !== "" ? { namespace: ns } : {}),
     };
     const g = grid0 + i;

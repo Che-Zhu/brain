@@ -1,6 +1,9 @@
 "use client";
 
-import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
+import {
+  CanvasNode,
+  type CanvasNodeMetricListItem,
+} from "@workspace/ui/components/canvas-node/canvas-node";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
@@ -38,11 +41,7 @@ const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
   { icon: MemoryStick, key: "memory", label: "Memory" },
   { icon: HardDrive, key: "storage", label: "Storage" },
-] as const satisfies readonly {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  key: EnvironmentNodeMetricKey;
-  label: string;
-}[];
+] as const satisfies readonly CanvasNodeMetricListItem<EnvironmentNodeMetricKey>[];
 
 const QUICK_ACTION_ITEMS = [
   { icon: SquareTerminal, key: "terminal", label: "Open terminal" },
@@ -79,16 +78,6 @@ function formatEnvironmentSubtitle({
   const runtime = displayRuntime.trim() || "Unknown runtime";
 
   return `Environment ${runtime}${formattedVersion ? ` ${formattedVersion}` : ""}`;
-}
-
-function formatEnvironmentMetricValue(value: number | string | undefined) {
-  if (typeof value === "number") {
-    return `${value}%`;
-  }
-
-  const trimmed = value?.trim();
-
-  return trimmed || "--";
 }
 
 function getRuntimeToneClassName(tone: EnvironmentRuntimeTone) {
@@ -301,21 +290,7 @@ export function EnvironmentNodeFooterContent({
       data-slot="environment-node-footer-content"
     >
       <CanvasNode.FooterStatus status={visualStatus} />
-      <CanvasNode.Metrics>
-        {METRIC_ITEMS.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <CanvasNode.Metric
-              key={item.key}
-              label={item.label}
-              value={formatEnvironmentMetricValue(metrics?.[item.key])}
-            >
-              <Icon aria-hidden className="size-3.5 shrink-0" />
-            </CanvasNode.Metric>
-          );
-        })}
-      </CanvasNode.Metrics>
+      <CanvasNode.MetricList items={METRIC_ITEMS} values={metrics} />
     </div>
   );
 }

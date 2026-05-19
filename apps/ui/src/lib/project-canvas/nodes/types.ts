@@ -1,7 +1,7 @@
 import type {
   ContainerNodeActions,
   ContainerNodeStates,
-} from "@workspace/ui/components/container-node/v1/container-node";
+} from "@workspace/ui/components/container-node/container-node";
 import type {
   DatabaseNodeActions,
   DatabaseNodeConnection,

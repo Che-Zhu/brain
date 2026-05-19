@@ -1,0 +1,3 @@
+.container-node-image-row {
+  min-height: calc(var(--spacing) * 16);
+}

@@ -65,10 +65,134 @@
       "name": "container-node",
       "type": "registry:ui",
       "title": "Container Node",
-      "description": "Composable container node with Crossplane-style status, header actions, and collapsible layout",
+      "description": "AP workload canvas node composed with shared Canvas Node chrome, Root/Content state, lifecycle actions, quick actions, footer metrics, and expansion behavior",
       "dependencies": ["lucide-react"],
-      "registryDependencies": ["button", "dropdown-menu", "alert-dialog"],
+      "registryDependencies": [
+        "canvas-node",
+        "button",
+        "dropdown-menu",
+        "alert-dialog"
+      ],
       "files": [
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/container-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.context.ts",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.context.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.provider.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.provider.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.root.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.root.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.status.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/container-node.status.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.menu-visibility.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/container-node.menu-visibility.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.delete-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.delete-dialog.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.css",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.css"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.content.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.content.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/container-node.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/container-node.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/index.ts",
+          "type": "registry:component",
+          "target": "components/container-node/index.ts"
+        }
+      ]
+    },
+    {
+      "name": "container-node-legacy",
+      "type": "registry:ui",
+      "title": "Container Node Legacy",
+      "description": "Legacy Container Node implementations kept for migration comparison. Not used by product runtime.",
+      "dependencies": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "button",
+        "dropdown-menu",
+        "alert-dialog",
+        "scale-slider"
+      ],
+      "files": [
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.types.ts",
+          "type": "registry:lib",
+          "target": "components/container-node/v0/container-node.types.ts"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.context.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.context.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.layout.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.layout.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.primitives.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.primitives.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.header-menu.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.header-menu.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.variant0.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.variant0.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.delete-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.delete-dialog.tsx"
+        },
+        {
+          "path": "../../packages/ui/src/components/container-node/v0/container-node.scale-dialog.tsx",
+          "type": "registry:component",
+          "target": "components/container-node/v0/container-node.scale-dialog.tsx"
+        },
         {
           "path": "../../packages/ui/src/components/container-node/v1/container-node.types.ts",
           "type": "registry:lib",
@@ -237,7 +361,7 @@
       "title": "Entry Node",
       "description": "Entry point node content composed with shared canvas node chrome",
       "dependencies": ["lucide-react"],
-      "registryDependencies": ["button", "canvas-node"],
+      "registryDependencies": ["canvas-node"],
       "files": [
         {
           "path": "../../packages/ui/src/components/entry-node/entry-node.types.ts",

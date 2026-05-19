@@ -1,6 +1,9 @@
 "use client";
 
-import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
+import {
+  CanvasNode,
+  type CanvasNodeMetricListItem,
+} from "@workspace/ui/components/canvas-node/canvas-node";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -39,11 +42,7 @@ const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
   { icon: MemoryStick, key: "memory", label: "Memory" },
   { icon: HardDrive, key: "storage", label: "Storage" },
-] as const satisfies readonly {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  key: DatabaseNodeMetricKey;
-  label: string;
-}[];
+] as const satisfies readonly CanvasNodeMetricListItem<DatabaseNodeMetricKey>[];
 
 const QUICK_ACTION_ITEMS = [
   { icon: Activity, key: "metrics", label: "Open metrics" },
@@ -69,11 +68,6 @@ const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
   { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
 ] as const;
 
-const DATABASE_METRIC_PERCENT_FORMATTER = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 0,
-});
-const DATABASE_METRIC_PERCENT_PATTERN = /^(-?\d+(?:\.\d+)?)\s*%$/;
-
 function formatDatabaseSubtitle({
   displayEngine,
   formattedVersion,
@@ -82,31 +76,6 @@ function formatDatabaseSubtitle({
   formattedVersion?: string;
 }) {
   return `Database ${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
-}
-
-function formatDatabaseMetricPercent(value: number) {
-  return Number.isFinite(value)
-    ? `${DATABASE_METRIC_PERCENT_FORMATTER.format(value)}%`
-    : "--";
-}
-
-function formatDatabaseMetricValue(value: number | string | undefined) {
-  if (typeof value === "number") {
-    return formatDatabaseMetricPercent(value);
-  }
-
-  const trimmed = value?.trim();
-
-  if (!trimmed) {
-    return "--";
-  }
-
-  const percentMatch = DATABASE_METRIC_PERCENT_PATTERN.exec(trimmed);
-  if (percentMatch) {
-    return formatDatabaseMetricPercent(Number(percentMatch[1]));
-  }
-
-  return trimmed;
 }
 
 function getConnectionDisplayValue(connection: DatabaseNodeConnection) {
@@ -415,21 +384,7 @@ export function DatabaseNodeFooterContent({
       data-slot="database-node-footer-content"
     >
       <CanvasNode.FooterStatus status={visualStatus} />
-      <CanvasNode.Metrics>
-        {METRIC_ITEMS.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <CanvasNode.Metric
-              key={item.key}
-              label={item.label}
-              value={formatDatabaseMetricValue(metrics?.[item.key])}
-            >
-              <Icon aria-hidden className="size-3.5 shrink-0" />
-            </CanvasNode.Metric>
-          );
-        })}
-      </CanvasNode.Metrics>
+      <CanvasNode.MetricList items={METRIC_ITEMS} values={metrics} />
     </div>
   );
 }

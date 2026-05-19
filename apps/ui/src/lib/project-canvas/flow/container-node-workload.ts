@@ -1,4 +1,4 @@
-import type { ContainerNodeStates } from "@workspace/ui/components/container-node/v1/container-node";
+import type { ContainerNodeStates } from "@workspace/ui/components/container-node/container-node";
 import type { Node } from "@xyflow/react";
 
 import type { WorkloadClaimKind } from "../k8s/claim-mapper";

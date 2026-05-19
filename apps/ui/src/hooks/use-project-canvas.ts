@@ -301,28 +301,60 @@ export function useProjectCanvas(
       const displayName = states.name;
       const lifecycleActions = isApLifecycle
         ? {
-            onDelete: () =>
-              runMutationThenRefresh(() => deleteWorkload(ref), {
-                loading: `Deleting "${displayName}"…`,
-                success: `Deleted "${displayName}"`,
-              }),
-            onPause: () =>
-              runMutationThenRefresh(() => pauseWorkload(ref), {
-                loading: `Pausing "${displayName}"…`,
-                success: `Paused "${displayName}"`,
-              }),
-            onRestart: () =>
-              runMutationThenRefresh(() => restartWorkload(ref), {
-                loading: `Restarting "${displayName}"…`,
-                success: `Restarted "${displayName}"`,
-              }),
-            onStart: () =>
-              runMutationThenRefresh(() => startWorkload(ref), {
-                loading: `Starting "${displayName}"…`,
-                success: `Started "${displayName}"`,
-              }),
+            delete: {
+              onClick: () =>
+                runMutationThenRefresh(() => deleteWorkload(ref), {
+                  loading: `Deleting "${displayName}"...`,
+                  success: `Deleted "${displayName}"`,
+                }),
+            },
+            restart: {
+              onClick: () =>
+                runMutationThenRefresh(() => restartWorkload(ref), {
+                  loading: `Restarting "${displayName}"...`,
+                  success: `Restarted "${displayName}"`,
+                }),
+            },
+            start: {
+              onClick: () =>
+                runMutationThenRefresh(() => startWorkload(ref), {
+                  loading: `Starting "${displayName}"...`,
+                  success: `Started "${displayName}"`,
+                }),
+            },
+            stop: {
+              onClick: () =>
+                runMutationThenRefresh(() => pauseWorkload(ref), {
+                  loading: `Stopping "${displayName}"...`,
+                  success: `Stop requested for "${displayName}"`,
+                }),
+            },
           }
-        : {};
+        : undefined;
+      const quickActions = {
+        ...(data.actions?.quickActions ?? {}),
+        calendar: {
+          disabled: !hasUrlActions,
+          onClick: hasUrlActions
+            ? () => select(WORKLOAD_PANEL_TAB.history)
+            : undefined,
+        },
+        console: {
+          disabled: true,
+        },
+        logs: {
+          disabled: !hasUrlActions,
+          onClick: hasUrlActions
+            ? () => select(WORKLOAD_PANEL_TAB.logs)
+            : undefined,
+        },
+        metrics: {
+          disabled: !hasUrlActions,
+          onClick: hasUrlActions
+            ? () => select(WORKLOAD_PANEL_TAB.metrics)
+            : undefined,
+        },
+      };
 
       return {
         ...node,
@@ -331,13 +363,8 @@ export function useProjectCanvas(
           onWorkloadMutation: afterLifecycle,
           actions: {
             ...(data.actions ?? {}),
-            ...(hasUrlActions
-              ? {
-                  onViewActivity: () => select(WORKLOAD_PANEL_TAB.metrics),
-                  onViewLogs: () => select(WORKLOAD_PANEL_TAB.logs),
-                }
-              : {}),
-            ...lifecycleActions,
+            ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
+            quickActions,
           },
         },
       };
