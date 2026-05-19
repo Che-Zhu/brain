@@ -66,6 +66,7 @@ export default function ProjectUidPage() {
           >
             <Canvas.Root
               actions={{ onPanelClose: clearSelection }}
+              key={`${namespace}:${uid}`}
               meta={meta}
               state={{
                 ...canvasState,

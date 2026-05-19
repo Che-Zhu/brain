@@ -14,9 +14,10 @@ import {
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -59,7 +60,9 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
+  const { fitView } = useReactFlow<Node, Edge>();
   const initializedRef = useRef(false);
+  const openingFitAppliedRef = useRef(false);
 
   useLayoutEffect(() => {
     if (initializedRef.current) {
@@ -122,6 +125,25 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       },
     },
   };
+  const openingFitViewOptions = passThrough.fitViewOptions;
+  const shouldFitOpeningView = passThrough.fitView !== false;
+
+  useEffect(() => {
+    if (
+      openingFitAppliedRef.current ||
+      !shouldFitOpeningView ||
+      nodes.length === 0
+    ) {
+      return;
+    }
+
+    openingFitAppliedRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      fitView(openingFitViewOptions);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitView, nodes.length, openingFitViewOptions, shouldFitOpeningView]);
 
   return (
     <CanvasUpperRightProvider>

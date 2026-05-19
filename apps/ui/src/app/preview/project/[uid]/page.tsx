@@ -116,6 +116,7 @@ export default function PreviewProjectPage() {
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Canvas.Root
           actions={{ onPanelClose: clearSelection }}
+          key={`${ns}:${uid}:${shareToken}`}
           meta={meta}
           state={{ ...canvasState, nodes, selectedEdge, selectedNode }}
         >

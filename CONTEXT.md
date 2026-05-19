@@ -31,6 +31,18 @@ Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that compo
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
 
+### Canvas Layout
+
+A Project-scoped visual arrangement of the canvas, shared by everyone who opens that Project.
+
+### Canvas Label
+
+A user-editable display name for a canvas node that does not rename the underlying AP, DB, or EntryPoint resource.
+
+### Canvas Connection
+
+A canvas edge that represents a real runtime dependency between resources. In the first version, Canvas Connections are detected from existing resource state rather than created by user-drawn edges.
+
 ### Workload Telemetry Series
 
 A normalized time-series representation of workload resource usage for AP and DB workloads. It is consumed by both compact canvas node summaries and detailed metrics panels.
@@ -75,6 +87,42 @@ On the canvas, an entry node card is only rendered when the AP has a correspondi
 ### Canvas edges and layout are deferred
 
 Entry node and container node are not connected by edges and have no special layout rules for now. Edge generation and node arrangement will be addressed as a unified system when more node-to-node relationships (AP-to-DB, AP-to-AP) are introduced.
+
+### Canvas Layout is shared per Project
+
+Canvas Layout is not a personal browser preference. It belongs to the Project and should be reused when the same Project is opened by another user, browser, or share preview. Ephemeral UI state such as the selected node, open panel, and temporary zoom can remain local.
+
+### Canvas Layout v1 stores positions and labels, not viewport
+
+The first persisted Canvas Layout stores node positions and optional Canvas Labels. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, or other ephemeral UI state.
+
+### Canvas Layout saves merge by node
+
+Canvas Layout saves should merge changes by node resource reference instead of replacing the whole layout document. Concurrent edits to different nodes should both survive; concurrent edits to the same node may use last-write-wins for that node.
+
+### Orphan Canvas Layout items are retained temporarily
+
+When a resource no longer appears in the detected graph, its Canvas Layout item should be hidden rather than deleted immediately. If the resource reappears, its layout is restored. Orphan layout items are purged after seven days.
+
+### Canvas Layout is persisted in App Postgres
+
+Canvas Layout belongs to the application persistence layer, not the Crossplane resource model. K8s and Crossplane remain the source of truth for Project, AP, DB, and EntryPoint resources; App Postgres stores the Project's visual arrangement.
+
+### Canvas Layout is keyed by Project UID
+
+Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
+
+### Canvas node naming is separate from resource naming
+
+Renaming a node on the canvas changes its Canvas Label. It does not rename the underlying Kubernetes resource. A resource rename, if introduced later, is a distinct workload migration operation and must preserve or migrate the Canvas Layout intentionally.
+
+### Canvas edges are not freeform annotations
+
+Users do not draw arbitrary diagram lines on the canvas. In the first version, edges are rendered only when the system detects a real runtime dependency such as EntryPoint-to-AP or AP-to-DB.
+
+### Only established Canvas Connections are persisted
+
+Connecting edges are temporary UI feedback for a future in-flight connection operation. App Postgres stores only established Canvas Connections whose required resource changes have succeeded. The first version does not support user-initiated connecting edges.
 
 ### Canvas telemetry is store-mediated
 
