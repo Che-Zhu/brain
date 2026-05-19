@@ -9,7 +9,6 @@ import {
   cleanupCanvasLayoutDocument,
   cloneCanvasLayoutDocument,
   cloneCanvasLayoutNode,
-  isCanvasLayoutOrphanExpired,
 } from "./cleanup";
 import type {
   CanvasLayoutDocument,
@@ -137,19 +136,51 @@ function layoutDocumentsEqual(
     a.nodes.length === b.nodes.length &&
     a.nodes.every((node, index) => {
       const other = b.nodes[index];
-      return (
-        other !== undefined &&
-        node.label === other.label &&
-        node.lastSeenUid === other.lastSeenUid &&
-        node.orphanedAt === other.orphanedAt &&
-        node.position.x === other.position.x &&
-        node.position.y === other.position.y &&
-        node.ref.kind === other.ref.kind &&
-        node.ref.name === other.ref.name &&
-        node.ref.namespace === other.ref.namespace
-      );
+      return other !== undefined && layoutNodesEqual(node, other);
     })
   );
+}
+
+function layoutNodesEqual(a: CanvasLayoutNode, b: CanvasLayoutNode): boolean {
+  return (
+    a.label === b.label &&
+    a.lastSeenUid === b.lastSeenUid &&
+    a.orphanedAt === b.orphanedAt &&
+    a.position.x === b.position.x &&
+    a.position.y === b.position.y &&
+    a.ref.kind === b.ref.kind &&
+    a.ref.name === b.ref.name &&
+    a.ref.namespace === b.ref.namespace
+  );
+}
+
+function restoredLayoutNodeFromDetectedNode(
+  saved: CanvasLayoutNode,
+  detected: Node
+): CanvasLayoutNode {
+  const lastSeenUid = lastSeenUidFromNode(detected) ?? saved.lastSeenUid;
+  const restored: CanvasLayoutNode = {
+    position: { x: saved.position.x, y: saved.position.y },
+    ref: { ...saved.ref },
+  };
+  if (saved.label !== undefined) {
+    restored.label = saved.label;
+  }
+  if (lastSeenUid !== undefined) {
+    restored.lastSeenUid = lastSeenUid;
+  }
+  return restored;
+}
+
+function orphanedLayoutNode(
+  node: CanvasLayoutNode,
+  orphanedAt: string
+): CanvasLayoutNode {
+  const orphan = cloneCanvasLayoutNode(node);
+  if (orphan.orphanedAt === undefined) {
+    orphan.orphanedAt = orphanedAt;
+  }
+  return orphan;
 }
 
 export function mergeCanvasLayoutWithDetectedNodes({
@@ -172,7 +203,6 @@ export function mergeCanvasLayoutWithDetectedNodes({
     layoutByRef.set(canvasLayoutResourceKey(item.ref), item);
   }
 
-  const detectedRefKeys = new Set<string>();
   const nextLayoutByRef = new Map<string, CanvasLayoutNode>();
   const renderedNodes = nodes.map((node) => {
     const ref = canvasLayoutResourceRefFromNode(node);
@@ -181,20 +211,12 @@ export function mergeCanvasLayoutWithDetectedNodes({
     }
 
     const key = canvasLayoutResourceKey(ref);
-    detectedRefKeys.add(key);
     const saved = layoutByRef.get(key);
     if (saved === undefined) {
       return { ...node };
     }
 
-    const lastSeenUid = lastSeenUidFromNode(node) ?? saved.lastSeenUid;
-    const nextLayoutNode: CanvasLayoutNode = {
-      ...(saved.label === undefined ? {} : { label: saved.label }),
-      ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
-      position: { x: saved.position.x, y: saved.position.y },
-      ref: { ...saved.ref },
-    };
-    nextLayoutByRef.set(key, nextLayoutNode);
+    nextLayoutByRef.set(key, restoredLayoutNodeFromDetectedNode(saved, node));
 
     const savedPosition = finitePosition(saved.position);
     return savedPosition === undefined
@@ -203,23 +225,13 @@ export function mergeCanvasLayoutWithDetectedNodes({
   });
 
   const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);
-  nextLayout.nodes = cleanedLayout.nodes.flatMap((item) => {
+  nextLayout.nodes = cleanedLayout.nodes.map((item) => {
     const key = canvasLayoutResourceKey(item.ref);
     const live = nextLayoutByRef.get(key);
     if (live !== undefined) {
-      return [live];
+      return live;
     }
-    if (detectedRefKeys.has(key)) {
-      return [];
-    }
-    if (isCanvasLayoutOrphanExpired(item, now)) {
-      return [];
-    }
-    return [
-      item.orphanedAt === undefined
-        ? { ...cloneCanvasLayoutNode(item), orphanedAt: nowIso }
-        : cloneCanvasLayoutNode(item),
-    ];
+    return orphanedLayoutNode(item, nowIso);
   });
 
   return {

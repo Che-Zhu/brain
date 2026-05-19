@@ -71,6 +71,19 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
   };
 }
 
+function upsertNormalizedNode(
+  nodesByRef: Map<string, CanvasLayoutNode>,
+  order: string[],
+  node: CanvasLayoutNode
+): void {
+  const normalized = normalizeNode(node);
+  const key = canvasLayoutResourceKey(normalized.ref);
+  if (!nodesByRef.has(key)) {
+    order.push(key);
+  }
+  nodesByRef.set(key, normalized);
+}
+
 export function applyCanvasLayoutPatch(
   existing: CanvasLayoutDocument,
   patch: CanvasLayoutPatch,
@@ -80,21 +93,11 @@ export function applyCanvasLayoutPatch(
   const order: string[] = [];
 
   for (const node of existing.nodes) {
-    const normalized = normalizeNode(node);
-    const key = canvasLayoutResourceKey(normalized.ref);
-    if (!nextByRef.has(key)) {
-      order.push(key);
-    }
-    nextByRef.set(key, normalized);
+    upsertNormalizedNode(nextByRef, order, node);
   }
 
   for (const node of patch.nodes) {
-    const normalized = normalizeNode(node);
-    const key = canvasLayoutResourceKey(normalized.ref);
-    if (!nextByRef.has(key)) {
-      order.push(key);
-    }
-    nextByRef.set(key, normalized);
+    upsertNormalizedNode(nextByRef, order, node);
   }
 
   const projectNameSnapshot =

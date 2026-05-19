@@ -9,29 +9,35 @@ export interface CanvasLayoutCleanupOptions {
 export function cloneCanvasLayoutNode(
   node: CanvasLayoutNode
 ): CanvasLayoutNode {
-  return {
-    ...(node.label === undefined ? {} : { label: node.label }),
-    ...(node.lastSeenUid === undefined
-      ? {}
-      : { lastSeenUid: node.lastSeenUid }),
-    ...(node.orphanedAt === undefined ? {} : { orphanedAt: node.orphanedAt }),
+  const clone: CanvasLayoutNode = {
     position: { x: node.position.x, y: node.position.y },
     ref: { ...node.ref },
   };
+  if (node.label !== undefined) {
+    clone.label = node.label;
+  }
+  if (node.lastSeenUid !== undefined) {
+    clone.lastSeenUid = node.lastSeenUid;
+  }
+  if (node.orphanedAt !== undefined) {
+    clone.orphanedAt = node.orphanedAt;
+  }
+  return clone;
 }
 
 export function cloneCanvasLayoutDocument(
   layout: CanvasLayoutDocument
 ): CanvasLayoutDocument {
-  return {
+  const clone: CanvasLayoutDocument = {
     namespace: layout.namespace,
     nodes: layout.nodes.map(cloneCanvasLayoutNode),
-    ...(layout.projectNameSnapshot === undefined
-      ? {}
-      : { projectNameSnapshot: layout.projectNameSnapshot }),
     projectUid: layout.projectUid,
     version: layout.version,
   };
+  if (layout.projectNameSnapshot !== undefined) {
+    clone.projectNameSnapshot = layout.projectNameSnapshot;
+  }
+  return clone;
 }
 
 export function isCanvasLayoutOrphanExpired(
@@ -53,10 +59,9 @@ export function cleanupCanvasLayoutDocument(
   options?: CanvasLayoutCleanupOptions
 ): CanvasLayoutDocument {
   const now = options?.now ?? new Date();
-  return {
-    ...cloneCanvasLayoutDocument(layout),
-    nodes: layout.nodes
-      .filter((node) => !isCanvasLayoutOrphanExpired(node, now))
-      .map(cloneCanvasLayoutNode),
-  };
+  const clone = cloneCanvasLayoutDocument(layout);
+  clone.nodes = clone.nodes.filter(
+    (node) => !isCanvasLayoutOrphanExpired(node, now)
+  );
+  return clone;
 }

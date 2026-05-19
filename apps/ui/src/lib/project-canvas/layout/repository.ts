@@ -129,7 +129,9 @@ export function patchProjectCanvasLayout(
       .for("update");
 
     const existing =
-      row === undefined ? emptyLayoutDocument(key) : rowToDocument(row);
+      row === undefined
+        ? emptyLayoutDocument(key)
+        : rowToDocument(row, { now });
     const next = applyCanvasLayoutPatch(
       existing,
       normalizePatchForProject(key, patch),
@@ -147,6 +149,6 @@ export function patchProjectCanvasLayout(
       .where(whereLayoutKey(key))
       .returning();
 
-    return updated === undefined ? next : rowToDocument(updated);
+    return updated === undefined ? next : rowToDocument(updated, { now });
   });
 }
