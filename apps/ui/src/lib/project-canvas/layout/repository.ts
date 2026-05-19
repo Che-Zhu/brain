@@ -9,11 +9,7 @@ import {
 } from "@/lib/project-persistence/schema";
 
 import { applyCanvasLayoutPatch, CanvasLayoutValidationError } from "./patch";
-import type {
-  CanvasLayoutDocument,
-  CanvasLayoutPatch,
-  CanvasLayoutResourceRef,
-} from "./types";
+import type { CanvasLayoutDocument, CanvasLayoutPatch } from "./types";
 
 export interface ProjectCanvasLayoutKey {
   namespace: string;
@@ -50,27 +46,33 @@ function whereLayoutKey(key: ProjectCanvasLayoutKey) {
   );
 }
 
+function normalizeNodeForProject(
+  key: ProjectCanvasLayoutKey,
+  node: CanvasLayoutPatch["nodes"][number]
+) {
+  const namespace = node.ref.namespace.trim();
+  if (namespace !== key.namespace) {
+    throw new CanvasLayoutValidationError(
+      "node namespace must match layout namespace."
+    );
+  }
+
+  return {
+    ...node,
+    ref: {
+      ...node.ref,
+      namespace,
+    },
+  };
+}
+
 function normalizePatchForProject(
   key: ProjectCanvasLayoutKey,
   patch: CanvasLayoutPatch
 ): CanvasLayoutPatch {
   return {
     ...patch,
-    nodes: patch.nodes.map((node) => ({
-      ...node,
-      ref: (() => {
-        const ref = {
-          ...node.ref,
-          namespace: node.ref.namespace.trim(),
-        } satisfies CanvasLayoutResourceRef;
-        if (ref.namespace !== key.namespace) {
-          throw new CanvasLayoutValidationError(
-            "node namespace must match layout namespace."
-          );
-        }
-        return ref;
-      })(),
-    })),
+    nodes: patch.nodes.map((node) => normalizeNodeForProject(key, node)),
   };
 }
 

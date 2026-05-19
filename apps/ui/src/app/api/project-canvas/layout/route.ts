@@ -6,6 +6,7 @@ import {
   parseCanvasLayoutGetQuery,
   parseCanvasLayoutPatchRequest,
 } from "@/lib/project-canvas/layout/contract";
+import { CanvasLayoutValidationError } from "@/lib/project-canvas/layout/patch";
 import {
   loadProjectCanvasLayout,
   patchProjectCanvasLayout,
@@ -37,7 +38,10 @@ async function authorizeNamespace(namespace: string): Promise<Response | null> {
 }
 
 function validationError(error: unknown): Response | null {
-  if (error instanceof ZodError) {
+  if (
+    error instanceof ZodError ||
+    error instanceof CanvasLayoutValidationError
+  ) {
     return jsonError("Invalid canvas layout request.", 400);
   }
   return null;
@@ -87,7 +91,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(
       await patchProjectCanvasLayout({ namespace, projectUid }, patch)
     );
-  } catch {
-    return jsonError("Canvas layout persistence is unavailable.", 503);
+  } catch (error) {
+    return (
+      validationError(error) ??
+      jsonError("Canvas layout persistence is unavailable.", 503)
+    );
   }
 }

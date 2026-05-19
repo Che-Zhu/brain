@@ -190,7 +190,7 @@ export function useProjectServices(options: {
       ...entryPointBlock.nodes,
     ];
     const nodes = canvasLayoutReady
-      ? applyCanvasLayoutToNodes(detectedNodes, canvasLayout).nodes
+      ? applyCanvasLayoutToNodes(detectedNodes, canvasLayout)
       : [];
     return {
       edges: canvasLayoutReady ? edges : [],

@@ -6,17 +6,20 @@ import type { CanvasLayoutDocument, CanvasLayoutNode } from "./types";
 
 export const PROJECT_CANVAS_LAYOUT_API_PATH = "/api/project-canvas/layout";
 
+function errorMessageFromBody(body: unknown): string | undefined {
+  if (body == null || typeof body !== "object" || !("error" in body)) {
+    return undefined;
+  }
+
+  const { error } = body;
+  return typeof error === "string" && error.trim() !== "" ? error : undefined;
+}
+
 async function jsonOrError<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let message = `Canvas layout request failed (${response.status}).`;
-    try {
-      const raw = (await response.json()) as { error?: unknown };
-      if (typeof raw.error === "string" && raw.error.trim() !== "") {
-        message = raw.error;
-      }
-    } catch {
-      //
-    }
+    const fallback = `Canvas layout request failed (${response.status}).`;
+    const body = await response.json().catch(() => undefined);
+    const message = errorMessageFromBody(body) ?? fallback;
     throw new Error(message);
   }
   return (await response.json()) as T;

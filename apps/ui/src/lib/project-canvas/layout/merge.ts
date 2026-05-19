@@ -9,6 +9,7 @@ import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
   CanvasLayoutPosition,
+  CanvasLayoutResourceKind,
   CanvasLayoutResourceRef,
 } from "./types";
 
@@ -26,6 +27,20 @@ function nonEmptyString(value: unknown): string | undefined {
 
 export function canvasLayoutResourceKey(ref: CanvasLayoutResourceRef): string {
   return `${ref.kind}:${ref.namespace}:${ref.name}`;
+}
+
+function resourceRefFromRecord(
+  kind: CanvasLayoutResourceKind,
+  source: Record<string, unknown> | undefined
+): CanvasLayoutResourceRef | undefined {
+  const name = nonEmptyString(source?.name);
+  const namespace = nonEmptyString(source?.namespace);
+
+  if (name === undefined || namespace === undefined) {
+    return undefined;
+  }
+
+  return { kind, name, namespace };
 }
 
 function finitePosition(
@@ -46,50 +61,31 @@ export function canvasLayoutResourceRefFromNode(
 ): CanvasLayoutResourceRef | undefined {
   const data = asRecord(node.data);
 
-  if (node.type === CANVAS_CONTAINER_NODE_TYPE) {
-    const states = asRecord(data?.states);
-    const name = nonEmptyString(states?.name);
-    const namespace = nonEmptyString(states?.namespace);
-    return name === undefined || namespace === undefined
-      ? undefined
-      : { kind: "AP", name, namespace };
+  switch (node.type) {
+    case CANVAS_CONTAINER_NODE_TYPE:
+      return resourceRefFromRecord("AP", asRecord(data?.states));
+    case CANVAS_DATABASE_NODE_TYPE:
+      return resourceRefFromRecord("DB", asRecord(data?.workload));
+    case CANVAS_ENTRY_NODE_TYPE:
+      return resourceRefFromRecord("EntryPoint", asRecord(data?.resource));
+    default:
+      return undefined;
   }
-
-  if (node.type === CANVAS_DATABASE_NODE_TYPE) {
-    const workload = asRecord(data?.workload);
-    const name = nonEmptyString(workload?.name);
-    const namespace = nonEmptyString(workload?.namespace);
-    return name === undefined || namespace === undefined
-      ? undefined
-      : { kind: "DB", name, namespace };
-  }
-
-  if (node.type === CANVAS_ENTRY_NODE_TYPE) {
-    const resource = asRecord(data?.resource);
-    const name = nonEmptyString(resource?.name);
-    const namespace = nonEmptyString(resource?.namespace);
-    return name === undefined || namespace === undefined
-      ? undefined
-      : { kind: "EntryPoint", name, namespace };
-  }
-
-  return undefined;
 }
 
 function lastSeenUidFromNode(node: Node): string | undefined {
   const data = asRecord(node.data);
-  if (node.type === CANVAS_CONTAINER_NODE_TYPE) {
-    const states = asRecord(data?.states);
-    return nonEmptyString(states?.uid);
+
+  switch (node.type) {
+    case CANVAS_CONTAINER_NODE_TYPE:
+      return nonEmptyString(asRecord(data?.states)?.uid);
+    case CANVAS_DATABASE_NODE_TYPE:
+      return nonEmptyString(data?.uid);
+    case CANVAS_ENTRY_NODE_TYPE:
+      return nonEmptyString(asRecord(data?.resource)?.uid);
+    default:
+      return undefined;
   }
-  if (node.type === CANVAS_DATABASE_NODE_TYPE) {
-    return nonEmptyString(data?.uid);
-  }
-  if (node.type === CANVAS_ENTRY_NODE_TYPE) {
-    const resource = asRecord(data?.resource);
-    return nonEmptyString(resource?.uid);
-  }
-  return undefined;
 }
 
 export function canvasLayoutNodeFromNode(
@@ -111,9 +107,9 @@ export function canvasLayoutNodeFromNode(
 export function applyCanvasLayoutToNodes(
   nodes: Node[],
   layout: CanvasLayoutDocument | undefined
-): { nodes: Node[] } {
+): Node[] {
   if (layout === undefined) {
-    return { nodes: nodes.map((node) => ({ ...node })) };
+    return nodes.map((node) => ({ ...node }));
   }
 
   const positionByRef = new Map<string, CanvasLayoutPosition>();
@@ -124,16 +120,14 @@ export function applyCanvasLayoutToNodes(
     }
   }
 
-  return {
-    nodes: nodes.map((node) => {
-      const ref = canvasLayoutResourceRefFromNode(node);
-      if (ref === undefined) {
-        return { ...node };
-      }
-      const savedPosition = positionByRef.get(canvasLayoutResourceKey(ref));
-      return savedPosition === undefined
-        ? { ...node }
-        : { ...node, position: savedPosition };
-    }),
-  };
+  return nodes.map((node) => {
+    const ref = canvasLayoutResourceRefFromNode(node);
+    if (ref === undefined) {
+      return { ...node };
+    }
+    const savedPosition = positionByRef.get(canvasLayoutResourceKey(ref));
+    return savedPosition === undefined
+      ? { ...node }
+      : { ...node, position: savedPosition };
+  });
 }
