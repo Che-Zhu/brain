@@ -24,9 +24,9 @@ spec:
             description: >
               Claim metadata. Set metadata.labels.region to a DNS base (e.g. 192.168.12.53.nip.io).
               When set, aps-deployment-ingress-go-templating uses {metadata.name}-{slug}.{region} as the
-              Ingress hostname for a **single** public endpoint (spec.endpoints[].public true, default), and
+              Ingress hostname for a **single** public endpoint (spec.input.endpoints[].public true, default), and
               {metadata.name}-p{port}-{slug}.{region} when **two or more** endpoints are public, so each port
-              gets a distinct hostname. spec.endpoints[].host is ignored for those rules when region is set.
+              gets a distinct hostname. spec.input.endpoints[].host is ignored for those rules when region is set.
               Endpoints with public false get a ClusterIP Service only.
             properties:
               labels:
@@ -67,13 +67,128 @@ spec:
               projectName:
                 type: string
                 description: >
-                  When set, aps-deployment-ingress-go-templating observes the Project claim with this
-                  name in the same namespace as the AP (example.crossplane.io/v1), adds labels
-                  crossplane.io/project-name and crossplane.io/project-uid to composed resources, and
-                  sets ownerReferences to that Project once its UID is observed.
-              image:
-                type: string
-                description: Container image (e.g. puddlecat/sealos-brain-ai:0.20.67)
+                  When set, compositions observe the Project claim with this name in the same
+                  namespace as the AP (example.crossplane.io/v1), add labels crossplane.io/project-name
+                  and crossplane.io/project-uid to composed resources, and set ownerReferences once
+                  the Project UID is observed.
+              input:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+                description: >
+                  Template-specific parameters and deployment overrides. Sealos *-composite.yaml
+                  compositions store Sealos inputs here. aps-deployment-ingress-go-templating uses image,
+                  endpoints, env, probes, and imagePullPolicy (and optional legacy port/host).
+                properties:
+                  image:
+                    type: string
+                    description: Container image (e.g. puddlecat/sealos-brain-ai:0.20.67)
+                  endpoints:
+                    type: array
+                    description: >
+                      Per-port exposure for aps-deployment-ingress-go-templating (same semantics as former
+                      spec.endpoints).
+                    items:
+                      type: object
+                      required: [port]
+                      properties:
+                        port:
+                          type: integer
+                          description: Container port and service port
+                        host:
+                          type: string
+                          description: >
+                            Optional Ingress hostname when metadata.labels.region is omitted.
+                        public:
+                          type: boolean
+                          default: true
+                          description: >
+                            When true (default), compose an Ingress rule when a hostname resolves.
+                  port:
+                    type: integer
+                    description: >
+                      (Legacy) Single port when input.endpoints is omitted; use with input.host.
+                  host:
+                    type: string
+                    description: >
+                      (Legacy) Ingress host paired with input.port when input.endpoints is omitted.
+                      Sealos *-composite templates also use this when metadata.labels.region is omitted.
+                  imagePullPolicy:
+                    type: string
+                    default: "Always"
+                  env:
+                    type: array
+                    items:
+                      type: object
+                      required: [name]
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                        valueFrom:
+                          type: object
+                          description: Kubernetes EnvVarSource (e.g. secretKeyRef, configMapKeyRef)
+                          properties:
+                            secretKeyRef:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                key: { type: string }
+                                optional: { type: boolean }
+                            configMapKeyRef:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                key: { type: string }
+                                optional: { type: boolean }
+                  probes:
+                    type: object
+                    description: |
+                      Health probes for the Deployment container. No defaults are applied;
+                      configure startup, liveness, and readiness explicitly for production safety.
+                    properties:
+                      startup:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      liveness:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      readiness:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+              resource:
+                type: object
+                description: >
+                  Workload scale and container resources (Kubernetes-shaped). Used by
+                  aps-deployment-ingress-go-templating for Deployment replicas and container
+                  resources.requests/limits.
+                properties:
+                  replicas:
+                    type: integer
+                    default: 1
+                    minimum: 1
+                    maximum: 20
+                    description: Desired Deployment replica count.
+                  requests:
+                    type: object
+                    description: Container resources.requests
+                    properties:
+                      cpu:
+                        type: string
+                        default: "200m"
+                      memory:
+                        type: string
+                        default: "204Mi"
+                  limits:
+                    type: object
+                    description: Container resources.limits
+                    properties:
+                      cpu:
+                        type: string
+                        default: "2000m"
+                      memory:
+                        type: string
+                        default: "2048Mi"
               type:
                 type: string
                 description: >
@@ -82,19 +197,13 @@ spec:
                   treatment. Omit the field for standard deployments.
                 enum:
                   - prelude
-              replicas:
-                type: integer
-                default: 1
-                minimum: 1
-                maximum: 20
-                description: Desired Deployment replica count (client UIs typically expose 1–20).
               paused:
                 type: boolean
                 default: false
                 description: >
                   When true, scales the composed Deployment to 0 replicas and applies SealOS-style
                   pause annotations (compatible with workloads managed by SealOS Deploy). When false,
-                  the Deployment uses spec.replicas (default 1).
+                  the Deployment uses spec.resource.replicas (default 1).
               restartRequest:
                 type: integer
                 minimum: 0
@@ -102,109 +211,11 @@ spec:
                   Bump this integer to trigger a coordinated pod-template change (RollingUpdate) via the
                   Crossplane composition. Mirrors incrementing workload restart counters in GitOps flows.
                   The UI/API may instead call POST /api/ap/v1alpha1/restart to annotate the Deployment directly.
-              port:
-                type: integer
-                description: >
-                  (Legacy) Single container/service port; use with host when spec.endpoints is omitted.
-                  If spec.endpoints is set (including empty []), port/host are ignored. No default port:
-                  omit endpoints and port/host to run without exposed ports, Services, or Ingress rules.
-              host:
-                type: string
-                description: >
-                  (Legacy) Ingress host paired with port when spec.endpoints is omitted; both must be set.
-              endpoints:
-                type: array
-                description: >
-                  Per-port exposure: one ClusterIP Service per unique port; Ingress rules only for entries
-                  with public true (default) and a resolvable hostname. Optional endpoints.host when
-                  metadata.labels.region is omitted. With metadata.labels.region, the composition sets host to
-                  {metadata.name}-{slug}.{region} for one public port, or {metadata.name}-p{port}-{slug}.{region}
-                  when multiple entries are public, so ports do not share one hostname. public false keeps the
-                  Service cluster-internal (no Ingress rule).
-                items:
-                  type: object
-                  required: [port]
-                  properties:
-                    port:
-                      type: integer
-                      description: Container port and service port
-                    host:
-                      type: string
-                      description: >
-                        Optional Ingress hostname when metadata.labels.region is omitted. When region is set,
-                        the composition chooses {name}-{slug}.{region} or {name}-p{port}-{slug}.{region} for
-                        multiple public ports, and ignores this field.
-                    public:
-                      type: boolean
-                      default: true
-                      description: >
-                        When true (default), compose an Ingress rule for this port when a hostname resolves.
-                        When false, only the in-cluster Service is created.
-              cpuRequest:
-                type: string
-                default: "200m"
-              memoryRequest:
-                type: string
-                default: "204Mi"
-              cpuLimit:
-                type: string
-                default: "2000m"
-              memoryLimit:
-                type: string
-                default: "2048Mi"
-              imagePullPolicy:
-                type: string
-                default: "Always"
-              env:
-                type: array
-                items:
-                  type: object
-                  required: [name]
-                  properties:
-                    name:
-                      type: string
-                    value:
-                      type: string
-                    valueFrom:
-                      type: object
-                      description: Kubernetes EnvVarSource (e.g. secretKeyRef, configMapKeyRef)
-                      properties:
-                        secretKeyRef:
-                          type: object
-                          properties:
-                            name: { type: string }
-                            key: { type: string }
-                            optional: { type: boolean }
-                        configMapKeyRef:
-                          type: object
-                          properties:
-                            name: { type: string }
-                            key: { type: string }
-                            optional: { type: boolean }
               ingressAnnotations:
                 type: object
                 additionalProperties:
                   type: string
                 description: Additional ingress annotations
-              probes:
-                type: object
-                description: |
-                  Health probes for the Deployment container. No defaults are applied;
-                  configure startup, liveness, and readiness explicitly for production safety.
-                  Each probe supports httpGet, tcpSocket, exec, or grpc (Kubernetes Probe format).
-                properties:
-                  startup:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                    description: Startup probe; container is not considered ready until this succeeds
-                  liveness:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                    description: Liveness probe; failed probe restarts the container
-                  readiness:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                    description: Readiness probe; failed probe removes pod from Service endpoints
               hooksYamlTmpl:
                 type: string
                 description: >
@@ -215,7 +226,7 @@ spec:
                 description: >
                   For aps-webhook-go-templating: if set, creates Secret <metadata.name>-webhook-secret
                   with key WEBHOOK_SECRET and injects it into the pod. The plaintext is stored on the
-                  AP resource (etcd); for GitOps prefer omitting this field and using spec.env with
+                  AP resource (etcd); for GitOps prefer omitting this field and using spec.input.env with
                   valueFrom.secretKeyRef instead. Must match GitHub's webhook secret when using HMAC rules.
               webhookListenPort:
                 type: integer
@@ -278,7 +289,7 @@ spec:
                     publicAddress:
                       type: string
                       description: >
-                        http(s) URL when this port is public on Ingress. Omitted when spec.endpoints[].public
+                        http(s) URL when this port is public on Ingress. Omitted when spec.input.endpoints[].public
                         is false or no hostname was resolved for the Ingress rule.
               conditions:
                 type: array

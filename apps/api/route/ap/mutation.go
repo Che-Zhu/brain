@@ -17,7 +17,7 @@ import (
 
 func registerCreate(grp huma.API) {
 	type createBody struct {
-		YAML string `json:"yaml" required:"true" doc:"AP manifest (YAML or JSON). Must be a single example.crossplane.io/v1, kind: AP resource.\n\nAP spec fields:\n- spec.name: logical instance name used by the Composition for resource naming; defaults to metadata.name if omitted.\n- spec.image: container image used by the Deployment.\n- spec.replicas: number of Deployment replicas.\n- spec.port: legacy single container/service port. Use spec.endpoints for multiple services.\n- spec.host: legacy single ingress host. Use spec.endpoints for multiple ingress rules.\n- spec.endpoints: array of {port, host} entries; each item creates one Ingress rule and one Service for that port, and unique ports determine the container/service ports.\n- spec.cpuRequest / spec.memoryRequest: resource requests for the Deployment container.\n- spec.cpuLimit / spec.memoryLimit: resource limits for the Deployment container.\n- spec.imagePullPolicy: image pull policy for the Deployment container.\n- spec.env: environment variables injected into the Deployment container. Each item needs name and may use either value or valueFrom (secretKeyRef/configMapKeyRef).\n- spec.ingressAnnotations: extra annotations merged into the generated Ingress metadata.\n- spec.probes: health probes (startup, liveness, readiness). Each supports httpGet, tcpSocket, exec, or grpc. No defaults; configure explicitly for production safety."`
+		YAML string `json:"yaml" required:"true" doc:"AP manifest (YAML or JSON). Must be a single example.crossplane.io/v1, kind: AP resource.\n\nAP spec fields:\n- spec.name: logical instance name used by the Composition for resource naming; defaults to metadata.name if omitted.\n- spec.projectName: optional Project claim name in the same namespace (labels + ownerReference on composed resources).\n- spec.input.image: container image for the Deployment.\n- spec.input.endpoints: array of {port, host?, public?}; each public entry creates Service + Ingress wiring.\n- spec.input.port / spec.input.host: single-endpoint alternative when input.endpoints is omitted.\n- spec.input.env: environment variables (name + value or valueFrom).\n- spec.input.probes: health probes (startup, liveness, readiness).\n- spec.input.imagePullPolicy: image pull policy (default Always).\n- spec.resource.replicas: Deployment replica count (default 1).\n- spec.resource.requests / spec.resource.limits: container resources (cpu, memory).\n- spec.paused: scale to 0 with SealOS pause annotations when true.\n- spec.restartRequest: bump to roll pods via Composition.\n- spec.ingressAnnotations: extra Ingress annotations."`
 	}
 	type createInput struct {
 		middleware.AuthInput
@@ -35,36 +35,44 @@ metadata:
   name: my-app
 spec:
   name: my-app
-  image: nginx:1.27
-  replicas: 1
-  endpoints:
-    - port: 80
-      host: my-app.example.com
-  probes:
-    startup:
-      httpGet:
-        path: /
-        port: 80
-      failureThreshold: 30
-    liveness:
-      httpGet:
-        path: /
-        port: 80
-      initialDelaySeconds: 15
-      failureThreshold: 3
-    readiness:
-      httpGet:
-        path: /
-        port: 80
-      initialDelaySeconds: 5
-      failureThreshold: 3`
+  input:
+    image: nginx:1.27
+    endpoints:
+      - port: 80
+        host: my-app.example.com
+    probes:
+      startup:
+        httpGet:
+          path: /
+          port: 80
+        failureThreshold: 30
+      liveness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 15
+        failureThreshold: 3
+      readiness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        failureThreshold: 3
+  resource:
+    replicas: 1
+    requests:
+      cpu: 200m
+      memory: 204Mi
+    limits:
+      cpu: 2000m
+      memory: 2048Mi`
 
 	huma.Register(grp, huma.Operation{
 		OperationID: "ap-create",
 		Method:      http.MethodPut,
 		Path:        "/",
 		Summary:     "Create or replace AP",
-		Description: "Create an AP instance by applying a single manifest (PUT). Returns the created resource as YAML.\n\n**Request body usage:**\n- Send exactly one AP resource in the `yaml` field.\n- The manifest must use `apiVersion: example.crossplane.io/v1` and `kind: AP`.\n- The AP `spec` is the desired state consumed by the Crossplane Composition; it drives the generated Deployment, Service(s), and Ingress.\n\n**How the AP `spec` is used:**\n- `spec.name`: logical instance name used for composed-resource naming. If omitted, `metadata.name` is used.\n- `spec.image`: container image for the Deployment.\n- `spec.replicas`: number of Deployment replicas.\n- `spec.port`: legacy single container/service port. Use `spec.endpoints` for multiple services.\n- `spec.host`: legacy single ingress host. Use `spec.endpoints` for multiple ingress rules.\n- `spec.endpoints`: array of `{port, host}` entries. Each entry creates one Service and one Ingress rule; unique ports are reused for the Deployment container port wiring.\n- `spec.cpuRequest` / `spec.memoryRequest`: resource requests for the Deployment container.\n- `spec.cpuLimit` / `spec.memoryLimit`: resource limits for the Deployment container.\n- `spec.imagePullPolicy`: image pull policy for the Deployment container.\n- `spec.env`: environment variables injected into the Deployment container. Each item must have `name`, and may define either `value` or `valueFrom` (`secretKeyRef` / `configMapKeyRef`).\n- `spec.ingressAnnotations`: extra annotations merged into the generated Ingress metadata.\n- `spec.probes`: health probes (startup, liveness, readiness). Each supports httpGet, tcpSocket, exec, or grpc. No defaults; configure explicitly for production safety.\n\n**Response:** Returns the created AP in YAML format (server state after apply).\n\n**Copy-pasteable example (use in `yaml` field):**\n```yaml\n" + exampleYAML + "\n```",
+		Description: "Create an AP instance by applying a single manifest (PUT). Returns the created resource as YAML.\n\n**Request body usage:**\n- Send exactly one AP resource in the `yaml` field.\n- The manifest must use `apiVersion: example.crossplane.io/v1` and `kind: AP`.\n- The AP `spec` is the desired state consumed by the Crossplane Composition; it drives the generated Deployment, Service(s), and Ingress.\n\n**How the AP `spec` is used:**\n- `spec.name`: logical instance name used for composed-resource naming. If omitted, `metadata.name` is used.\n- `spec.projectName`: optional Project claim in the same namespace.\n- `spec.input.image`: container image for the Deployment.\n- `spec.input.endpoints`: array of `{port, host?, public?}` entries. Each public entry creates Service + Ingress wiring.\n- `spec.input.port` / `spec.input.host`: single-endpoint alternative when `input.endpoints` is omitted.\n- `spec.input.env`: environment variables (`name` + `value` or `valueFrom`).\n- `spec.input.probes`: health probes (startup, liveness, readiness).\n- `spec.input.imagePullPolicy`: image pull policy (default Always).\n- `spec.resource.replicas`: Deployment replica count.\n- `spec.resource.requests` / `spec.resource.limits`: container cpu/memory.\n- `spec.paused` / `spec.restartRequest` / `spec.ingressAnnotations`: lifecycle and Ingress metadata.\n\n**Response:** Returns the created AP in YAML format (server state after apply).\n\n**Copy-pasteable example (use in `yaml` field):**\n```yaml\n" + exampleYAML + "\n```",
 		Tags:        []string{"AP"},
 	}, func(ctx context.Context, input *createInput) (*createOutput, error) {
 		restConfig, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
@@ -136,7 +144,7 @@ func registerUpdate(grp huma.API) {
 		middleware.AuthInput
 		Name      string          `query:"name" required:"true" doc:"AP instance name to patch"`
 		Namespace string          `query:"namespace" doc:"Namespace (default from kubeconfig; admin can override)"`
-		Body      json.RawMessage `contentType:"application/json" required:"true" doc:"JSON merge patch body applied to the AP resource.\n\nWhat to patch:\n- spec.image: update the application image.\n- spec.replicas: desired replica count when running (ignored for replica count while spec.paused is true).\n- spec.paused: when true, scale the Deployment to 0 with SealOS pause annotations; false resumes using spec.replicas.\n- spec.restartRequest: bump this integer to roll pods via Composition (alternative: POST .../restart on the Deployment).\n- spec.port / spec.host: update the legacy single-port/single-host wiring.\n- spec.endpoints: replace the full endpoint list; each item is {port, host}.\n- spec.env: replace the full environment variable list; each item needs a name and may use value or valueFrom.\n- spec.ingressAnnotations: add or replace Ingress annotations.\n- spec.probes: replace health probes (startup, liveness, readiness); each supports httpGet, tcpSocket, exec, or grpc.\n\nPatch examples:\n- Pause: {\"spec\":{\"paused\":true}}\n- Resume: {\"spec\":{\"paused\":false}}\n- Update image only: {\"spec\":{\"image\":\"nginx:1.27\"}}\n- Change replicas: {\"spec\":{\"replicas\":2}}\n- Replace endpoints: {\"spec\":{\"endpoints\":[{\"port\":80,\"host\":\"app.example.com\"},{\"port\":8080,\"host\":\"api.example.com\"}]}}\n- Set env var: {\"spec\":{\"env\":[{\"name\":\"DEMO_SECRET_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"ap-nginx-env\",\"key\":\"token\"}}}]}}\n\nPatch semantics:\n- Only the fields you send are changed.\n- For nested objects like spec, send the subtree you want to modify.\n- For arrays such as spec.endpoints and spec.env, send the full array you want Crossplane to use."`
+		Body      json.RawMessage `contentType:"application/json" required:"true" doc:"JSON merge patch body applied to the AP resource.\n\nWhat to patch:\n- spec.input.image: update the application image.\n- spec.resource.replicas: desired replica count when running (ignored while spec.paused is true).\n- spec.paused: when true, scale the Deployment to 0 with SealOS pause annotations; false resumes using spec.resource.replicas.\n- spec.restartRequest: bump this integer to roll pods via Composition (alternative: POST .../restart on the Deployment).\n- spec.input.endpoints: replace the full endpoint list; each item is {port, host?, public?}.\n- spec.input.port / spec.input.host: single-endpoint wiring when endpoints is omitted.\n- spec.input.env: replace the full environment variable list.\n- spec.input.probes: replace health probes (startup, liveness, readiness).\n- spec.resource.requests / spec.resource.limits: container resources.\n- spec.ingressAnnotations: add or replace Ingress annotations.\n\nPatch examples:\n- Pause: {\"spec\":{\"paused\":true}}\n- Resume: {\"spec\":{\"paused\":false}}\n- Update image: {\"spec\":{\"input\":{\"image\":\"nginx:1.27\"}}}\n- Change replicas: {\"spec\":{\"resource\":{\"replicas\":2}}}\n- Replace endpoints: {\"spec\":{\"input\":{\"endpoints\":[{\"port\":80,\"host\":\"app.example.com\"}]}}}\n\nPatch semantics:\n- Only the fields you send are changed.\n- Nested objects merge at the subtree you provide.\n- Arrays such as spec.input.endpoints and spec.input.env are replaced as whole lists."`
 	}
 	type updateOutput struct {
 		Body json.RawMessage
@@ -147,7 +155,7 @@ func registerUpdate(grp huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/",
 		Summary:     "Update AP",
-		Description: "Patch an AP instance by name.\n\nRequest parameter usage:\n- `name` is required and selects the AP to patch.\n- `namespace` is optional; admins can use it to target a different namespace.\n- The request body must be a JSON merge patch fragment for the AP resource.\n\nPatch semantics:\n- Only the fields present in the patch body are changed.\n- Nested objects are merged at the subtree you provide.\n- Arrays such as `spec.endpoints` and `spec.env` are replaced as whole lists, so send the full desired array.\n\nCommon patch targets:\n- `spec.image`: change the deployed image.\n- `spec.replicas`: scale the Deployment.\n- `spec.port` / `spec.host`: update legacy single-endpoint wiring.\n- `spec.endpoints`: replace the full ingress/service endpoint list.\n- `spec.env`: replace the full environment variable list.\n- `spec.ingressAnnotations`: add or replace Ingress annotations.\n- `spec.probes`: replace health probes (startup, liveness, readiness); each supports httpGet, tcpSocket, exec, or grpc.",
+		Description: "Patch an AP instance by name.\n\nRequest parameter usage:\n- `name` is required and selects the AP to patch.\n- `namespace` is optional; admins can use it to target a different namespace.\n- The request body must be a JSON merge patch fragment for the AP resource.\n\nPatch semantics:\n- Only the fields present in the patch body are changed.\n- Nested objects are merged at the subtree you provide.\n- Arrays such as `spec.input.endpoints` and `spec.input.env` are replaced as whole lists.\n\nCommon patch targets:\n- `spec.input.image`: change the deployed image.\n- `spec.resource.replicas`: scale the Deployment.\n- `spec.input.endpoints`: replace ingress/service endpoint list.\n- `spec.input.env` / `spec.input.probes`: container env and probes.\n- `spec.resource.requests` / `spec.resource.limits`: container resources.\n- `spec.paused` / `spec.restartRequest` / `spec.ingressAnnotations`: lifecycle and Ingress metadata.",
 		Tags:        []string{"AP"},
 	}, func(ctx context.Context, input *updateInput) (*updateOutput, error) {
 		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)

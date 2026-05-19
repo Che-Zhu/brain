@@ -1,6 +1,8 @@
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 
+import { hasApPublicExposure } from "@/lib/project-canvas/k8s/ap-spec-access";
+
 export const ENTRYPOINT_FAST_REFRESH_MS = 1000;
 export const ENTRYPOINT_STEADY_REFRESH_MS = 5000;
 
@@ -69,15 +71,10 @@ export function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
       root.spec != null && typeof root.spec === "object"
         ? (root.spec as Record<string, unknown>)
         : undefined;
-    if (Array.isArray(spec?.endpoints)) {
-      return spec.endpoints.some(
-        (endpoint) =>
-          endpoint != null &&
-          typeof endpoint === "object" &&
-          (endpoint as Record<string, unknown>).public !== false
-      );
+    if (spec != null) {
+      return hasApPublicExposure(spec);
     }
-    return typeof spec?.host === "string" && typeof spec?.port === "number";
+    return false;
   });
 }
 

@@ -3,9 +3,11 @@ kind: Composition
 metadata:
   name: aps-deployment-ingress-go-templating
   annotations:
+    meta.crossplane.io/type: deployment
     meta.crossplane.io/display-name: app
     meta.crossplane.io/description: >
-      Generic app with Deployment, Service, and optional Ingress per spec.endpoints[].public (default true).
+      Generic app with Deployment, Service, and optional Ingress per spec.input.endpoints[].public (default true).
+      Container image is spec.input.image; replicas and CPU/memory are spec.resource (Kubernetes-shaped).
       With metadata.labels.region, hostname is {name}-{slug}.{region} for a single public port, or
       {name}-p{port}-{slug}.{region} when multiple endpoints are public. Optional endpoints.host when region
       is omitted. Optional spec.projectName observes a Project claim in the same namespace (kubernetes.m
@@ -27,16 +29,20 @@ metadata:
         crossplane:
           compositionRef:
             name: aps-deployment-ingress-go-templating
-        image: {{ image }}
         # Optional: Project claim name (same namespace) for crossplane.io/project-name and owner refs
         # projectName: my-project
-        replicas: 1
-        endpoints:
-          - port: 80
-        cpuRequest: 200m
-        memoryRequest: 204Mi
-        cpuLimit: 2000m
-        memoryLimit: 2048Mi
+        input:
+          image: {{ image }}
+          endpoints:
+            - port: 80
+        resource:
+          replicas: 1
+          requests:
+            cpu: 200m
+            memory: 204Mi
+          limits:
+            cpu: 2000m
+            memory: 2048Mi
 spec:
   compositeTypeRef:
     apiVersion: example.crossplane.io/v1
@@ -53,6 +59,20 @@ spec:
         inline:
           template: |
             {{- $spec := .observed.composite.resource.spec }}
+            {{- $input := $spec.input | default dict }}
+            {{- $resource := $spec.resource | default dict }}
+            {{- $req := default dict $resource.requests }}
+            {{- $lim := default dict $resource.limits }}
+            {{- $replicas := 1 }}
+            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $cpuRequest := "200m" }}
+            {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
+            {{- $memoryRequest := "204Mi" }}
+            {{- if $req.memory }}{{ $memoryRequest = $req.memory }}{{ end }}
+            {{- $cpuLimit := "2000m" }}
+            {{- if $lim.cpu }}{{ $cpuLimit = $lim.cpu }}{{ end }}
+            {{- $memoryLimit := "2048Mi" }}
+            {{- if $lim.memory }}{{ $memoryLimit = $lim.memory }}{{ end }}
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
@@ -78,10 +98,10 @@ spec:
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
             {{- $endpointsRaw := list }}
-            {{- if hasKey $spec "endpoints" }}
-            {{- $endpointsRaw = default (list) $spec.endpoints }}
-            {{- else if and $spec.port $spec.host }}
-            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- if hasKey $input "endpoints" }}
+            {{- $endpointsRaw = default (list) $input.endpoints }}
+            {{- else if and $input.port $input.host }}
+            {{- $endpointsRaw = list (dict "port" $input.port "host" (trim (toString $input.host))) }}
             {{- end }}
             {{- $publicOnly := list }}
             {{- range $endpointsRaw }}
@@ -114,7 +134,7 @@ spec:
             {{- /* Pause/start: AP spec.paused scales Deployment to zero with SealOS pause annotation. */}}
             {{- $paused := false }}
             {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
-            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- $desiredReplicas := $replicas }}
             {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
             {{- $restartRequest := 0 }}
             {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
@@ -122,20 +142,22 @@ spec:
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
-                  "image" $spec.image
-                  "replicas" ($spec.replicas | default 1)
+                  "input" (dict
+                    "image" ($input.image | default "")
+                    "endpoints" $endpoints
+                    "imagePullPolicy" ($input.imagePullPolicy | default "Always")
+                    "env" ($input.env | default (list))
+                    "probes" ($input.probes | default (dict))
+                  )
+                  "resource" (dict
+                    "replicas" $replicas
+                    "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
+                    "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
+                  )
+                  "projectName" $projectName
                   "paused" $paused
                   "restartRequest" $restartRequest
-                  "endpoints" $endpoints
-                  "cpuRequest" ($spec.cpuRequest | default "200m")
-                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
-                  "cpuLimit" ($spec.cpuLimit | default "2000m")
-                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
-                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
-                  "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
-                  "probes" ($spec.probes | default (dict))
-                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
@@ -205,8 +227,8 @@ spec:
                 {{- if $paused }}
                 deploy.cloud.sealos.io/pause: '{"target":"","value":""}'
                 {{- else }}
-                deploy.cloud.sealos.io/minReplicas: {{ $spec.replicas | default 1 | quote }}
-                deploy.cloud.sealos.io/maxReplicas: {{ $spec.replicas | default 1 | quote }}
+                deploy.cloud.sealos.io/minReplicas: {{ $replicas | quote }}
+                deploy.cloud.sealos.io/maxReplicas: {{ $replicas | quote }}
                 deploy.cloud.sealos.io/resize: "0Gi"
                 {{- end }}
               labels:
@@ -244,7 +266,7 @@ spec:
                   automountServiceAccountToken: false
                   containers:
                   - name: {{ $name }}
-                    image: {{ $spec.image }}
+                    image: {{ $input.image }}
                     {{- if $endpoints }}
                     ports:
                     {{- $containerPortsSeen := dict }}
@@ -257,9 +279,9 @@ spec:
                     {{- end }}
                     {{- end }}
                     {{- end }}
-                    {{- if $spec.env }}
+                    {{- if $input.env }}
                     env:
-                    {{- range $spec.env }}
+                    {{- range $input.env }}
                     - name: {{ .name }}
                       {{- if .valueFrom }}
                       valueFrom:
@@ -271,24 +293,24 @@ spec:
                     {{- end }}
                     resources:
                       requests:
-                        cpu: {{ $spec.cpuRequest | default "200m" }}
-                        memory: {{ $spec.memoryRequest | default "204Mi" }}
+                        cpu: {{ $cpuRequest }}
+                        memory: {{ $memoryRequest }}
                       limits:
-                        cpu: {{ $spec.cpuLimit | default "2000m" }}
-                        memory: {{ $spec.memoryLimit | default "2048Mi" }}
-                    imagePullPolicy: {{ $spec.imagePullPolicy | default "Always" }}
-                    {{- if $spec.probes }}
-                    {{- if $spec.probes.startup }}
+                        cpu: {{ $cpuLimit }}
+                        memory: {{ $memoryLimit }}
+                    imagePullPolicy: {{ $input.imagePullPolicy | default "Always" }}
+                    {{- if $input.probes }}
+                    {{- if $input.probes.startup }}
                     startupProbe:
-            {{ $spec.probes.startup | toYaml | nindent 22 }}
+            {{ $input.probes.startup | toYaml | nindent 22 }}
                     {{- end }}
-                    {{- if $spec.probes.liveness }}
+                    {{- if $input.probes.liveness }}
                     livenessProbe:
-            {{ $spec.probes.liveness | toYaml | nindent 22 }}
+            {{ $input.probes.liveness | toYaml | nindent 22 }}
                     {{- end }}
-                    {{- if $spec.probes.readiness }}
+                    {{- if $input.probes.readiness }}
                     readinessProbe:
-            {{ $spec.probes.readiness | toYaml | nindent 22 }}
+            {{ $input.probes.readiness | toYaml | nindent 22 }}
                     {{- end }}
                     {{- end }}
 
@@ -592,6 +614,20 @@ spec:
         inline:
           template: |
             {{- $spec := .observed.composite.resource.spec }}
+            {{- $input := $spec.input | default dict }}
+            {{- $resource := $spec.resource | default dict }}
+            {{- $req := default dict $resource.requests }}
+            {{- $lim := default dict $resource.limits }}
+            {{- $replicas := 1 }}
+            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $cpuRequest := "200m" }}
+            {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
+            {{- $memoryRequest := "204Mi" }}
+            {{- if $req.memory }}{{ $memoryRequest = $req.memory }}{{ end }}
+            {{- $cpuLimit := "2000m" }}
+            {{- if $lim.cpu }}{{ $cpuLimit = $lim.cpu }}{{ end }}
+            {{- $memoryLimit := "2048Mi" }}
+            {{- if $lim.memory }}{{ $memoryLimit = $lim.memory }}{{ end }}
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
@@ -617,10 +653,10 @@ spec:
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
             {{- $endpointsRaw := list }}
-            {{- if hasKey $spec "endpoints" }}
-            {{- $endpointsRaw = default (list) $spec.endpoints }}
-            {{- else if and $spec.port $spec.host }}
-            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- if hasKey $input "endpoints" }}
+            {{- $endpointsRaw = default (list) $input.endpoints }}
+            {{- else if and $input.port $input.host }}
+            {{- $endpointsRaw = list (dict "port" $input.port "host" (trim (toString $input.host))) }}
             {{- end }}
             {{- $publicOnly := list }}
             {{- range $endpointsRaw }}
@@ -652,27 +688,29 @@ spec:
             {{- end }}
             {{- $paused := false }}
             {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
-            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- $desiredReplicas := $replicas }}
             {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
             {{- $restartRequest := 0 }}
             {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
-                  "image" $spec.image
-                  "replicas" ($spec.replicas | default 1)
+                  "input" (dict
+                    "image" ($input.image | default "")
+                    "endpoints" $endpoints
+                    "imagePullPolicy" ($input.imagePullPolicy | default "Always")
+                    "env" ($input.env | default (list))
+                    "probes" ($input.probes | default (dict))
+                  )
+                  "resource" (dict
+                    "replicas" $replicas
+                    "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
+                    "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
+                  )
+                  "projectName" $projectName
                   "paused" $paused
                   "restartRequest" $restartRequest
-                  "endpoints" $endpoints
-                  "cpuRequest" ($spec.cpuRequest | default "200m")
-                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
-                  "cpuLimit" ($spec.cpuLimit | default "2000m")
-                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
-                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
-                  "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
-                  "probes" ($spec.probes | default (dict))
-                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}
@@ -749,6 +787,20 @@ spec:
         inline:
           template: |
             {{- $spec := .observed.composite.resource.spec }}
+            {{- $input := $spec.input | default dict }}
+            {{- $resource := $spec.resource | default dict }}
+            {{- $req := default dict $resource.requests }}
+            {{- $lim := default dict $resource.limits }}
+            {{- $replicas := 1 }}
+            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $cpuRequest := "200m" }}
+            {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
+            {{- $memoryRequest := "204Mi" }}
+            {{- if $req.memory }}{{ $memoryRequest = $req.memory }}{{ end }}
+            {{- $cpuLimit := "2000m" }}
+            {{- if $lim.cpu }}{{ $cpuLimit = $lim.cpu }}{{ end }}
+            {{- $memoryLimit := "2048Mi" }}
+            {{- if $lim.memory }}{{ $memoryLimit = $lim.memory }}{{ end }}
             {{- $name := .observed.composite.resource.metadata.name }}
             {{- $ns := .observed.composite.resource.metadata.namespace }}
             {{- $apUid := .observed.composite.resource.metadata.uid }}
@@ -774,10 +826,10 @@ spec:
             {{- $computedHost = printf "%s-%s.%s" $name $slug $region }}
             {{- end }}
             {{- $endpointsRaw := list }}
-            {{- if hasKey $spec "endpoints" }}
-            {{- $endpointsRaw = default (list) $spec.endpoints }}
-            {{- else if and $spec.port $spec.host }}
-            {{- $endpointsRaw = list (dict "port" $spec.port "host" (trim (toString $spec.host))) }}
+            {{- if hasKey $input "endpoints" }}
+            {{- $endpointsRaw = default (list) $input.endpoints }}
+            {{- else if and $input.port $input.host }}
+            {{- $endpointsRaw = list (dict "port" $input.port "host" (trim (toString $input.host))) }}
             {{- end }}
             {{- $publicOnly := list }}
             {{- range $endpointsRaw }}
@@ -809,27 +861,29 @@ spec:
             {{- end }}
             {{- $paused := false }}
             {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
-            {{- $desiredReplicas := $spec.replicas | default 1 }}
+            {{- $desiredReplicas := $replicas }}
             {{- if $paused }}{{ $desiredReplicas = 0 }}{{ end }}
             {{- $restartRequest := 0 }}
             {{- if hasKey $spec "restartRequest" }}{{ $restartRequest = int ($spec.restartRequest | default 0) }}{{ end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
-                  "image" $spec.image
-                  "replicas" ($spec.replicas | default 1)
+                  "input" (dict
+                    "image" ($input.image | default "")
+                    "endpoints" $endpoints
+                    "imagePullPolicy" ($input.imagePullPolicy | default "Always")
+                    "env" ($input.env | default (list))
+                    "probes" ($input.probes | default (dict))
+                  )
+                  "resource" (dict
+                    "replicas" $replicas
+                    "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
+                    "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
+                  )
+                  "projectName" $projectName
                   "paused" $paused
                   "restartRequest" $restartRequest
-                  "endpoints" $endpoints
-                  "cpuRequest" ($spec.cpuRequest | default "200m")
-                  "memoryRequest" ($spec.memoryRequest | default "204Mi")
-                  "cpuLimit" ($spec.cpuLimit | default "2000m")
-                  "memoryLimit" ($spec.memoryLimit | default "2048Mi")
-                  "imagePullPolicy" ($spec.imagePullPolicy | default "Always")
-                  "env" ($spec.env | default (list))
                   "ingressAnnotations" ($spec.ingressAnnotations | default (dict))
-                  "probes" ($spec.probes | default (dict))
-                  "projectName" $projectName
             }}
             {{- $effectiveYaml := $effective | toYaml }}
             {{- $versionHash := sha256sum $effectiveYaml | trunc 12 }}

@@ -1,7 +1,7 @@
 ---
 name: sealos-crossplane
 description: >-
-  Sealos Crossplane XRDs `AP` (deploy a Docker image as Deployment + Service + Ingress via
+  Sealos Crossplane XRDs `AP` (`spec.input` + `spec.resource`; deploy via
   `aps-deployment-ingress-go-templating`), `Project` (group resources via
   `project-instance-go-templating`), and `DB` (provision a KubeBlocks database Cluster via one of
   four engine-specific compositions: postgresql / mysql / mongodb / redis), all
@@ -34,6 +34,8 @@ kubectl get composition aps-deployment-ingress-go-templating -o yaml
 kubectl get composition project-instance-go-templating -o yaml
 kubectl get compositions -l engine -o name           # the four dbs-*-kubeblocks-go-templating
 kubectl explain ap.spec --api-version=example.crossplane.io/v1
+kubectl explain ap.spec.input --api-version=example.crossplane.io/v1
+kubectl explain ap.spec.resource --api-version=example.crossplane.io/v1
 kubectl explain project.spec --api-version=example.crossplane.io/v1
 kubectl explain db.spec --api-version=example.crossplane.io/v1
 ```
@@ -46,22 +48,28 @@ Composition behavior to know before you write a claim:
 
 - The `Ingress` uses `ingressClassName: nginx` and TLS via `secretName: wildcard-cert` in the
   same namespace.
-- If `metadata.labels.region` is set, the composition **overwrites every**
-  `spec.endpoints[].host` with `{metadata.name}-{slug6}.{region}` where `slug6` is the first
-  6 hex chars of `sha256(name|namespace|uid)`. **That label must equal the ingress base host
+- **Spec layout:** workload settings live under **`spec.input`** (image, endpoints, env, probes,
+  `imagePullPolicy`, optional single `port`/`host`); scale and CPU/memory under **`spec.resource`**
+  (`replicas`, `requests`, `limits`). Top-level **`spec.projectName`**, **`spec.paused`**,
+  **`spec.restartRequest`**, and **`spec.ingressAnnotations`** are not nested under `input`.
+- If `metadata.labels.region` is set, the composition **overwrites hosts** on **public**
+  `spec.input.endpoints[]` entries (`public` defaults to `true`). `slug6` is the first 6 hex chars of
+  `sha256(name|namespace|uid)`. With **one** public endpoint the host is
+  `{metadata.name}-{slug6}.{region}`; with **two or more** public endpoints each port gets
+  `{metadata.name}-p{port}-{slug6}.{region}`. **That label must equal the ingress base host
   `BASE_HOST`** from the active kubeconfig cluster server ([§6.3](#63-derive-the-ingress-base-host)):
   read `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` (e.g. stdout
   `https://192.168.12.53.nip.io:6443`), strip scheme/path/trailing `:port` → **`192.168.12.53.nip.io`**,
   and set `region` to **that hostname only**—not the raw `https://…:6443` URL and not an invented zone.
-  Either use `region` and let it compute hosts, **or** set explicit `endpoints[].host` and omit
+  Either use `region` and let it compute hosts, **or** set explicit `spec.input.endpoints[].host` and omit
   `region`. Don't mix.
 - **If `metadata.labels.region` is omitted**, the composition **does not** replace your hosts and
   **does not** auto-fill `BASE_HOST` or default to `*.example.com`. Ingress `rules[].host` is taken
-  **verbatim** from `spec.endpoints[].host` (the template only overwrites endpoints when `region` is
-  set; see `packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml` in this
-  repo). So a live Ingress ending in `.example.com` matches a **literal** hostname you (or a prior
-  apply) put in the AP—compare `kubectl get ap <name> -n <ns> -o yaml` with
+  **verbatim** from `spec.input.endpoints[].host` (or from `spec.input.port` + `spec.input.host` when
+  `endpoints` is omitted). See `packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml`.
+  Compare `kubectl get ap <name> -n <ns> -o yaml` with
   `kubectl get ingress <name>-ingress -n <ns> -o yaml` if they disagree.
+- Endpoints with **`public: false`** get a ClusterIP Service only (no Ingress rule for that port).
 - The composed `Deployment`/`Service`/`Ingress`/`ConfigMap` ownerReference the `AP`. Composed
   child names: `Deployment={name}`, `Service={name}-service-port-{port}`,
   `Ingress={name}-ingress`, ConfigMap=`{name}-config-backup` (managed) and
@@ -72,18 +80,30 @@ Composition behavior to know before you write a claim:
 | Field                            | Type                                        | Default     | Notes |
 |----------------------------------|---------------------------------------------|-------------|-------|
 | `crossplane.compositionRef.name` | string                                      | (XRD default) | Set to `aps-deployment-ingress-go-templating`. Omit to use the XRD default. |
-| `image`                          | string                                      | —           | Container image, e.g. `nginx:latest` or `ghcr.io/<owner>/<repo>:<tag>`. |
-| `replicas`                       | integer                                     | `1`         | Deployment replica count. |
-| `endpoints[]`                    | `[{ port: int, host: string }]`             | —           | One Service + Ingress rule per entry. Empty array `[]` = no Service/Ingress. |
-| `port` + `host`                  | int + string                                | —           | Legacy single endpoint, only used when `endpoints` is omitted. Prefer `endpoints`. |
-| `cpuRequest` / `cpuLimit`        | string (k8s quantity)                       | `200m` / `2000m`   | Container resources. |
-| `memoryRequest` / `memoryLimit`  | string (k8s quantity)                       | `204Mi` / `2048Mi` | Container resources. |
-| `imagePullPolicy`                | `Always` \| `IfNotPresent` \| `Never`        | `Always`    | |
-| `env[]`                          | `[{ name, value? , valueFrom? }]`           | `[]`        | `valueFrom` supports `secretKeyRef` and `configMapKeyRef` (standard Kubernetes EnvVarSource shape). |
-| `ingressAnnotations`             | `map[string]string`                         | `{}`        | Extra annotations merged onto the rendered Ingress (in addition to the nginx defaults the composition always sets). |
-| `probes.startup` / `liveness` / `readiness` | Kubernetes Probe                  | none        | No defaults applied. Each accepts `httpGet` / `tcpSocket` / `exec` / `grpc`. |
-| `projectName`                    | string                                      | —           | Name of a `Project` claim **in the same namespace**. Adds labels `crossplane.io/project-name` + `crossplane.io/project-uid` to composed children and SSA-patches the AP itself with the same labels + a `Project` `ownerReference`. |
-| `type`                           | `prelude`                                   | unset       | UI-only hint that the image may not be pullable yet (e.g. mid-build). Omit for normal deploys. |
+| `name`                           | string                                      | `metadata.name` | Logical instance name for composed resources. |
+| `projectName`                    | string                                      | —           | `Project` claim name in the same namespace (labels + `ownerReference`). |
+| `input.image`                    | string                                      | —           | Container image. |
+| `input.endpoints[]`              | `[{ port, host?, public? }]`                | —           | One Service + Ingress per public entry. `[]` = no Service/Ingress. |
+| `input.port` + `input.host`      | int + string                                | —           | Single endpoint when `input.endpoints` is omitted. |
+| `input.env[]`                    | `[{ name, value?, valueFrom? }]`            | `[]`        | Standard Kubernetes env shape. |
+| `input.probes`                   | Kubernetes Probe map                        | none        | `startup` / `liveness` / `readiness`; no defaults. |
+| `input.imagePullPolicy`          | `Always` \| `IfNotPresent` \| `Never`        | `Always`    | |
+| `resource.replicas`              | integer                                     | `1`         | Deployment replica count (1–20). |
+| `resource.requests` / `limits`   | `{ cpu, memory }`                           | `200m`/`204Mi` / `2000m`/`2048Mi` | Kubernetes quantities. |
+| `paused`                         | boolean                                     | `false`     | Scale to 0 with SealOS pause annotations when true. |
+| `restartRequest`                 | integer                                     | `0`         | Bump to roll pods via Composition. |
+| `ingressAnnotations`             | `map[string]string`                         | `{}`        | Extra Ingress annotations. |
+| `type`                           | `prelude`                                   | unset       | UI hint that the image may not be pullable yet. |
+| `hooksYamlTmpl` / `webhookSecret` / `webhookListenPort` / `webhookExtraArgs` / `imagePullSecrets` | various | — | **Only** for composition `aps-webhook-go-templating` (GitHub webhooks), not the default deployment composition. |
+
+**Sealos app templates** (`*-composite.yaml` compositions) store Sealos template `inputs` under
+`spec.input` (same object as deployment overrides). Generic deploys use
+`aps-deployment-ingress-go-templating` with the fields above.
+
+**Config backup / rollback:** the composition snapshots an *effective* spec into ConfigMap
+`{name}-config-snapshot-{hash}` key `config.yaml` with top-level `name`, `namespace`, `input`,
+`resource`, `projectName`, `paused`, `restartRequest`, `ingressAnnotations` (not flat `image` /
+`replicas`). Roll back by re-applying those nested blocks onto a live AP claim.
 
 `metadata.labels.region` (string) — **must match `BASE_HOST`** derived from
 `{.clusters[0].cluster.server}` as in [§6.3](#63-derive-the-ingress-base-host) when you use this
@@ -91,8 +111,14 @@ strategy; see host-rewrite note above. Treated as part of the configurable surfa
 lives on `metadata`, not `spec`.
 
 `status` fields (read-only, useful when polling): `phase` (`Running` / `Progressing` /
-`Failed` / `Degraded` / `Paused` / `Unknown`), `configVersionHash`, `projectName`,
-`projectUid`, `conditions[]`.
+`Failed` / `Degraded` / `Paused` / `Unknown`), `configVersionHash`, `endpoints[]` (per-port
+`number`, `privateAddress`, optional `publicAddress`), `projectName`, `projectUid`,
+`conditions[]`.
+
+**JSON merge patch** (API `PATCH /api/ap/v1alpha1/`): patch nested subtrees, e.g.
+`{"spec":{"input":{"image":"nginx:1.27"}}}`, `{"spec":{"resource":{"replicas":2}}}`,
+`{"spec":{"paused":true}}`. Replacing `spec.input.endpoints` or `spec.input.env` requires sending
+the **full** desired array.
 
 ---
 
@@ -287,8 +313,10 @@ user's cluster. Read it to make decisions; never assume a value.
    `kubectl auth can-i create aps -n <ns>` (and the matching `projects` / `dbs` checks for whatever
    you are applying).
 3. For an `AP`:
+   - Nest image/endpoints/env/probes under **`spec.input`** and replicas/requests/limits under
+     **`spec.resource`** ([§1](#1-ap--deploy-one-docker-image)).
    - Pick a host strategy ([§6.3](#63-derive-the-ingress-base-host)): explicit
-     `endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
+     `spec.input.endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
 4. For a `DB`:
    - Pick the matching `compositionRef.name` for `spec.engine` ([§3](#3-db--provision-a-kubeblocks-database-cluster)).
    - Set `metadata.labels.region: <base-host>` **only** if you also set `exposeNodePort: true`
@@ -362,10 +390,11 @@ Example: if the command prints `https://192.168.12.53.nip.io:6443`, then `region
 
 Then either:
 
-- Set `endpoints[].host: <your-app>.<BASE_HOST>` per endpoint (use distinct slugs to avoid
-  collisions in the same namespace), **or**
-- Set `metadata.labels.region: <BASE_HOST>` and let the composition overwrite each endpoint
-  with `{name}-<slug6>.<BASE_HOST>` (slug6 is a deterministic hash you don't control).
+- Set `spec.input.endpoints[].host: <your-app>.<BASE_HOST>` per public endpoint (use distinct slugs
+  to avoid collisions in the same namespace), **or**
+- Set `metadata.labels.region: <BASE_HOST>` and let the composition compute hosts from
+  `{name}-<slug6>.<region>` (one public port) or `{name}-p<port>-<slug6>.<region>` (multiple public
+  ports). Slug6 is a deterministic hash you don't control.
 
 For `DB`, `BASE_HOST` doubles as the value of `metadata.labels.region` **only when** you want a
 public NodePort URI (`status.connectionStringPublic`). It is not used for host rewriting; for
@@ -392,8 +421,9 @@ APP_SLUG="nginx-${RAND}"
 # Use $APP_SLUG as metadata.name; host="${APP_SLUG}.${BASE_HOST}"
 ```
 
-If `metadata.labels.region` is set, the composition ignores your literal `endpoints[].host` for
-the rendered Ingress and uses `<metadata.name>-<slug6>.<region>` anyway ([§1](#1-ap--deploy-one-docker-image)) — pick a collision-safe **`metadata.name`** there too.
+If `metadata.labels.region` is set, the composition ignores your literal `spec.input.endpoints[].host`
+for public endpoints and uses the computed host pattern ([§1](#1-ap--deploy-one-docker-image)) — pick a
+collision-safe **`metadata.name`** there too.
 
 ### 6.4 Apply and watch
 
@@ -427,10 +457,13 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 
 - **Endpoint host clashes** when two APs pick the same host. Either keep hosts unique or use
   `metadata.labels.region` so the composition appends a hash.
-- **`spec.endpoints: []`** suppresses Service and Ingress entirely — useful for workers that
-  shouldn't be reachable.
-- **Changing `spec.image`** rolls the Deployment and stamps a new immutable
-  `{name}-config-snapshot-{hash}` ConfigMap for rollback.
+- **`spec.input.endpoints: []`** (and no `spec.input.port`/`host`) suppresses Service and Ingress
+  entirely — useful for workers that shouldn't be reachable.
+- **Changing `spec.input.image`** rolls the Deployment and stamps a new immutable
+  `{name}-config-snapshot-{hash}` ConfigMap for rollback (effective snapshot uses nested `input` /
+  `resource`).
+- **`spec.paused: true`** scales the Deployment to 0 with SealOS pause annotations; resume with
+  `spec.paused: false` (replica count comes from `spec.resource.replicas`).
 - **Deleting an AP** garbage-collects the Deployment/Service/Ingress/managed ConfigMap (they
   ownerReference the AP), but orphan config-snapshot ConfigMaps and their RBAC intentionally
   survive. Clean them up manually with
@@ -452,20 +485,20 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 1. **Compare claim vs composed Ingress** (traffic follows the Ingress, not your YAML file on disk):
 
    ```bash
-   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.endpoints}' ; echo
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.input.endpoints}' ; echo
    kubectl get ingress "${NAME}-ingress" -n "$NS" -o jsonpath='{.spec.rules[*].host}' ; echo
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.status.endpoints}' ; echo
    ```
 
-2. **`metadata.labels.region` overrides `spec.endpoints[].host`**: when `region` is set, the
-   composition **replaces** every endpoint host with `<metadata.name>-<slug6>.<region>` for
-   the rendered Ingress. Remove `metadata.labels.region` if you need full manual control of
-   `endpoints[].host` ([§1](#1-ap--deploy-one-docker-image)).
+2. **`metadata.labels.region` overrides `spec.input.endpoints[].host`** on **public** endpoints:
+   when `region` is set, the composition **replaces** hosts per [§1](#1-ap--deploy-one-docker-image).
+   Remove `metadata.labels.region` if you need full manual control of `spec.input.endpoints[].host`.
 
 3. **`kubectl apply ... unchanged`**: the live **AP** object already matched your manifest. If
    you thought you changed the host, re-check namespace/name, `kubectl get ap ... -o yaml`, and
-   whether another controller (SSA field manager / webhook) resets `spec.endpoints`.
+   whether another controller (SSA field manager / webhook) resets `spec.input.endpoints`.
 
-4. **Stale Ingress after fixing `spec.endpoints`**: if the AP spec shows the new host but
+4. **Stale Ingress after fixing `spec.input.endpoints`**: if the AP spec shows the new host but
    `kubectl get ingress` still shows an old one, inspect `kubectl describe ap` (sync/ready).
    Wait for reconcile, or apply a harmless metadata annotation bump to force a new pipeline
    pass; if still wedged, recreate the AP with a **new** `metadata.name` and a fresh host.
@@ -496,11 +529,14 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: nginx:latest
-  replicas: 1
-  endpoints:
-    - port: 80
-      host: <your-app>.<base-host>
+  name: <your-app>
+  input:
+    image: nginx:latest
+    endpoints:
+      - port: 80
+        host: <your-app>.<base-host>
+  resource:
+    replicas: 1
 ```
 
 ### 7.2 `AP` attached to a `Project`, with explicit resources
@@ -515,16 +551,21 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: nginx:latest
+  name: <your-app>
   projectName: <your-project>
-  replicas: 1
-  endpoints:
-    - port: 80
-      host: <your-app>.<base-host>
-  cpuRequest: 250m
-  memoryRequest: 512Mi
-  cpuLimit: 500m
-  memoryLimit: 1Gi
+  input:
+    image: nginx:latest
+    endpoints:
+      - port: 80
+        host: <your-app>.<base-host>
+  resource:
+    replicas: 1
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 ```
 
 ### 7.3 `AP` with multiple endpoints, env, probes, ingress annotations
@@ -539,30 +580,33 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: ghcr.io/<owner>/<repo>:<tag>
-  replicas: 2
-  endpoints:
-    - port: 8080
-      host: <your-app>.<base-host>
-    - port: 9090
-      host: <your-app>-metrics.<base-host>
-  env:
-    - name: LOG_LEVEL
-      value: "info"
-    - name: DB_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: <your-app>-db
-          key: password
-  probes:
-    readiness:
-      httpGet: { path: /healthz, port: 8080 }
-      initialDelaySeconds: 5
-      periodSeconds: 10
-    liveness:
-      httpGet: { path: /livez, port: 8080 }
-      initialDelaySeconds: 30
-      periodSeconds: 30
+  name: <your-app>
+  input:
+    image: ghcr.io/<owner>/<repo>:<tag>
+    endpoints:
+      - port: 8080
+        host: <your-app>.<base-host>
+      - port: 9090
+        host: <your-app>-metrics.<base-host>
+    env:
+      - name: LOG_LEVEL
+        value: "info"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: <your-app>-db
+            key: password
+    probes:
+      readiness:
+        httpGet: { path: /healthz, port: 8080 }
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet: { path: /livez, port: 8080 }
+        initialDelaySeconds: 30
+        periodSeconds: 30
+  resource:
+    replicas: 2
   ingressAnnotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
 ```
@@ -581,11 +625,36 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: nginx:latest
-  endpoints:
-    - port: 80
-      # When `region` is set, this host is NOT used for Ingress; effective host is <name>-<slug6>.<region>
-      host: dns-ignored.invalid
+  name: <your-app>
+  input:
+    image: nginx:latest
+    endpoints:
+      - port: 80
+        # When `region` is set, this host is NOT used for Ingress; effective host is <name>-<slug6>.<region>
+        host: dns-ignored.invalid
+  resource:
+    replicas: 1
+```
+
+### 7.4b `AP` single endpoint via `input.port` + `input.host` (no `endpoints` array)
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: AP
+metadata:
+  name: <your-app>
+  namespace: <your-namespace>
+spec:
+  crossplane:
+    compositionRef:
+      name: aps-deployment-ingress-go-templating
+  name: <your-app>
+  input:
+    image: nginx:latest
+    port: 80
+    host: <your-app>.<base-host>
+  resource:
+    replicas: 1
 ```
 
 ### 7.5 Minimal `Project`

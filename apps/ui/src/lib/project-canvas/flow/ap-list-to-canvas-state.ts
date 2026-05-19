@@ -20,6 +20,12 @@ import type {
 import type { Edge, Node } from "@xyflow/react";
 
 import {
+  readApImage,
+  readApIsPaused,
+  readApReplicas,
+} from "@/lib/project-canvas/k8s/ap-spec-access";
+
+import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
@@ -270,10 +276,9 @@ function databaseCompositionNameFromSpec(
 
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
- * Sets **kind**, **image**, **name**, **replicas** (from spec), **uid** (from
- * `metadata.uid` when present), and **status** from `status.phase`.
- * When `spec.replicas === 0` and no phase is present, status falls back to
- * **Paused**.
+ * Sets **kind**, **image**, **name**, **replicas** (from `spec.resource`), **uid**
+ * (from `metadata.uid` when present), and **status** from `status.phase`.
+ * When paused or desired replicas are zero, status is shown as **Paused** regardless of `status.phase`.
  */
 export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
   const root = asRecord(ap) ?? {};
@@ -283,18 +288,12 @@ export function apToWorkloadStates(ap: unknown): ContainerNodeStates {
 
   const name =
     typeof meta.name === "string" && meta.name !== "" ? meta.name : "unknown";
-  const image =
-    typeof spec.image === "string" && spec.image.trim() !== ""
-      ? spec.image
-      : "—";
+  const image = readApImage(spec) ?? "—";
 
-  const replicas =
-    typeof spec.replicas === "number" && Number.isFinite(spec.replicas)
-      ? spec.replicas
-      : undefined;
+  const replicas = readApReplicas(spec);
 
   let phaseRaw = typeof status.phase === "string" ? status.phase.trim() : "";
-  if (phaseRaw === "" && replicas === 0) {
+  if (readApIsPaused(spec)) {
     phaseRaw = "Paused";
   }
 

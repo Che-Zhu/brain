@@ -47,4 +47,9 @@ skills-lock.json
 
 .scratch
 
+# Local venv for sync-sealos-templates.py
+packages/crossplane/public/service/ap/templates/.venv-sync/
+
 main
+
+CONTEXT.md
