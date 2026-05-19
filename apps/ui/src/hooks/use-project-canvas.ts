@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
+import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
@@ -469,10 +470,7 @@ export function useProjectCanvas(
         [CANVAS_CONTAINER_NODE_TYPE]: projectCanvasWorkloadPanelTabs,
       },
       reactFlowProps: {
-        connectOnClick: !readOnly,
-        edgesReconnectable: !readOnly,
-        nodesConnectable: !readOnly,
-        nodesDraggable: !readOnly,
+        ...projectCanvasInteractionProps({ readOnly }),
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {

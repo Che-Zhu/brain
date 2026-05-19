@@ -87,3 +87,37 @@ test("share preview state applies saved AP, DB, and EntryPoint layout positions"
   assert.equal(state.selectedEdge, null);
   assert.equal(state.selectedNode, null);
 });
+
+test("share preview state renders detected EntryPoint-to-AP connections", () => {
+  const state = buildPreviewProjectCanvasState({
+    apsData: list([
+      {
+        metadata: { name: "web", namespace: "ns-a", uid: "web-uid" },
+        spec: { image: "nginx", replicas: 2 },
+        status: { phase: "Running" },
+      },
+    ]),
+    canvasLayout: undefined,
+    canvasLayoutReady: true,
+    dbsData: list([]),
+    entryPointsData: list([
+      {
+        metadata: {
+          name: "public-web",
+          namespace: "ns-a",
+          uid: "entry-uid",
+        },
+        spec: { apRef: "web" },
+      },
+    ]),
+    namespace: "ns-a",
+  });
+
+  assert.deepEqual(state.edges, [
+    {
+      id: "detected:EntryPoint:ns-a:public-web->AP:ns-a:web",
+      source: "entry-public-web",
+      target: "ap-web",
+    },
+  ]);
+});

@@ -7,6 +7,7 @@ import {
   entryPointsToCanvasState,
   type WorkloadMetricPercents,
 } from "../flow/ap-list-to-canvas-state";
+import { detectedCanvasConnectionEdges } from "../flow/detected-connections";
 import { mergeCanvasLayoutWithDetectedNodes } from "../layout/merge";
 import type { CanvasLayoutDocument } from "../layout/types";
 
@@ -43,16 +44,24 @@ export function buildPreviewProjectCanvasState({
   });
 
   const nodes = [...apBlock.nodes, ...dbBlock.nodes, ...entryPointBlock.nodes];
-  const edges = [...apBlock.edges, ...dbBlock.edges, ...entryPointBlock.edges];
   const merge = canvasLayoutReady
     ? mergeCanvasLayoutWithDetectedNodes({
         layout: canvasLayout,
         nodes,
       })
     : { nodes: [] };
+  const edges = canvasLayoutReady
+    ? detectedCanvasConnectionEdges({
+        apsData,
+        dbsData,
+        entryPointsData,
+        namespaceFallback: namespace,
+        nodes: merge.nodes,
+      })
+    : [];
 
   return {
-    edges: canvasLayoutReady ? edges : [],
+    edges,
     nodes: merge.nodes,
     selectedEdge: null,
     selectedNode: null,

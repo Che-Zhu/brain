@@ -17,6 +17,7 @@ import {
   dbsToCanvasState,
   entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { detectedCanvasConnectionEdges } from "@/lib/project-canvas/flow/detected-connections";
 import { mergeCanvasLayoutWithDetectedNodes } from "@/lib/project-canvas/layout/merge";
 import type {
   CanvasLayoutDocument,
@@ -184,11 +185,6 @@ export function useProjectServices(options: {
       gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
       namespaceFallback: namespace,
     });
-    const edges = [
-      ...apBlock.edges,
-      ...dbBlock.edges,
-      ...entryPointBlock.edges,
-    ];
     const detectedNodes = [
       ...apBlock.nodes,
       ...dbBlock.nodes,
@@ -200,9 +196,18 @@ export function useProjectServices(options: {
           nodes: detectedNodes,
         })
       : { changed: false, layout: canvasLayout, nodes: [] };
+    const edges = canvasLayoutReady
+      ? detectedCanvasConnectionEdges({
+          apsData,
+          dbsData,
+          entryPointsData,
+          namespaceFallback: namespace,
+          nodes: merge.nodes,
+        })
+      : [];
     return {
       changed: merge.changed,
-      edges: canvasLayoutReady ? edges : [],
+      edges,
       layout: merge.layout,
       nodes: merge.nodes,
     };

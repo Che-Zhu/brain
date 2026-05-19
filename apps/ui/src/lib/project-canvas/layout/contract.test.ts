@@ -32,3 +32,32 @@ test("patch contract preserves orphan metadata but drops non-layout state", () =
     projectUid: "project-a",
   });
 });
+
+test("patch contract ignores user-created or connecting edges", () => {
+  const parsed = parseCanvasLayoutPatchRequest({
+    namespace: "ns-a",
+    nodes: [],
+    edges: [
+      {
+        id: "user-created-edge",
+        source: "ap-web",
+        target: "db-postgres",
+      },
+      {
+        id: "xy-edge__ap-web-db-postgres",
+        source: "ap-web",
+        sourceHandle: null,
+        target: "db-postgres",
+        targetHandle: null,
+      },
+    ],
+    projectUid: "project-a",
+  });
+
+  assert.deepEqual(parsed, {
+    namespace: "ns-a",
+    nodes: [],
+    projectUid: "project-a",
+  });
+  assert.equal("edges" in parsed, false);
+});
