@@ -1,7 +1,7 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: aps-Reactive-Resume-go-templating
+  name: aps-reactive-resume-go-templating
   labels:
     template: Reactive-Resume
   annotations:

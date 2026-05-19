@@ -1,7 +1,7 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: aps-Ruiqi-Waf-go-templating
+  name: aps-ruiqi-waf-go-templating
   labels:
     template: Ruiqi-Waf
   annotations:

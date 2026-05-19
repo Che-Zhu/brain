@@ -1,7 +1,7 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: aps-Readeck-go-templating
+  name: aps-readeck-go-templating
   labels:
     template: Readeck
   annotations:

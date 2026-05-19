@@ -1,7 +1,7 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: aps-AllinSSL-go-templating
+  name: aps-allinssl-go-templating
   labels:
     template: AllinSSL
   annotations:

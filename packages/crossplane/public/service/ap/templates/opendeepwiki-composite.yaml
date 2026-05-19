@@ -1,7 +1,7 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: aps-OpenDeepWiki-go-templating
+  name: aps-opendeepwiki-go-templating
   labels:
     template: OpenDeepWiki
   annotations:

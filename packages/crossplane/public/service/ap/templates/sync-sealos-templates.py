@@ -621,6 +621,11 @@ def indent_template(text: str, spaces: int = 12) -> str:
     return "\n".join(prefix + line if line else "" for line in text.splitlines())
 
 
+def composition_metadata_name(template_name: str) -> str:
+    """RFC 1123 subdomain for Composition metadata.name."""
+    return template_name.lower()
+
+
 def write_composition_file(
     path: Path, template_name: str, meta: dict[str, Any], go_template: str
 ) -> None:
@@ -632,7 +637,7 @@ def write_composition_file(
         "apiVersion: apiextensions.crossplane.io/v1",
         "kind: Composition",
         "metadata:",
-        f"  name: aps-{template_name}-go-templating",
+        f"  name: aps-{composition_metadata_name(template_name)}-go-templating",
         "  labels:",
         f"    template: {template_name}",
         "  annotations:",

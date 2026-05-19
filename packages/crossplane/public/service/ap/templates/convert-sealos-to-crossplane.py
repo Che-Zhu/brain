@@ -246,7 +246,7 @@ status:
         'apiVersion': 'apiextensions.crossplane.io/v1',
         'kind': 'Composition',
         'metadata': {
-            'name': f'aps-{name}-go-templating',
+            'name': f'aps-{name.lower()}-go-templating',
             'labels': {
                 'template': name
             },
