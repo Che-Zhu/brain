@@ -16,11 +16,8 @@ import {
 } from "./container-node.delete-dialog";
 import { ContainerNodeRoot } from "./container-node.root";
 
-// biome-ignore lint/performance/noBarrelFile: compound hook re-export for `import { useContainerNode }`
-export { useContainerNode } from "./container-node.context";
-export { ContainerNodeRoot } from "./container-node.root";
+// biome-ignore lint/performance/noBarrelFile: compound component public API includes colocated helpers.
 export {
-  formatContainerMetricValue,
   ContainerNodeActionBar,
   ContainerNodeBodyContent,
   ContainerNodeContent,
@@ -28,11 +25,17 @@ export {
   ContainerNodeHeaderContent,
   ContainerNodeImageRow,
 } from "./container-node.content";
+export { useContainerNode } from "./container-node.context";
+export type {
+  ContainerNodeDeleteDialogPanelProps,
+  ContainerNodeDeleteDialogProps,
+} from "./container-node.delete-dialog";
 export {
   ContainerNodeDeleteDialog,
   ContainerNodeDeleteDialogPanel,
 } from "./container-node.delete-dialog";
 export { containerNodeLifecycleMenuVisibility } from "./container-node.menu-visibility";
+export { ContainerNodeRoot } from "./container-node.root";
 export {
   resolveContainerNodeStatus,
   resolveContainerNodeVisualTone,
@@ -54,10 +57,6 @@ export type {
   ContainerNodeStatus,
   ContainerNodeStatusTone,
 } from "./container-node.types";
-export type {
-  ContainerNodeDeleteDialogPanelProps,
-  ContainerNodeDeleteDialogProps,
-} from "./container-node.delete-dialog";
 
 export const ContainerNode = {
   ActionBar: ContainerNodeActionBar,

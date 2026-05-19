@@ -30,6 +30,7 @@ import {
 import {
   CanvasNodeFooterStatus,
   CanvasNodeMetric,
+  CanvasNodeMetricList,
   CanvasNodeMetrics,
 } from "./canvas-node.metrics";
 import { CanvasNodeRoot } from "./canvas-node.root";
@@ -48,6 +49,13 @@ export type {
   CanvasNodeCopyFeedbackScopeProps,
   CanvasNodeCopyFeedbackValue,
 } from "./canvas-node.copyable-row";
+export type {
+  CanvasNodeMetricListItem,
+  CanvasNodeMetricListProps,
+  CanvasNodeMetricRecord,
+  CanvasNodeMetricValue,
+  CanvasNodeMetricValueFormat,
+} from "./canvas-node.metrics";
 export type {
   CanvasNodeActions,
   CanvasNodeConnectionSide,
@@ -81,6 +89,7 @@ export const CanvasNode = {
   FooterStatus: CanvasNodeFooterStatus,
   Header: CanvasNodeHeader,
   Metric: CanvasNodeMetric,
+  MetricList: CanvasNodeMetricList,
   Metrics: CanvasNodeMetrics,
   Root: CanvasNodeRoot,
   Status: CanvasNodeStatus,
@@ -106,6 +115,7 @@ dn(CanvasNodeCard, "CanvasNode.Card");
 dn(CanvasNodeFooter, "CanvasNode.Footer");
 dn(CanvasNodeFooterStatus, "CanvasNode.FooterStatus");
 dn(CanvasNodeMetric, "CanvasNode.Metric");
+dn(CanvasNodeMetricList, "CanvasNode.MetricList");
 dn(CanvasNodeMetrics, "CanvasNode.Metrics");
 dn(CanvasNodeConnectionAnchor, "CanvasNode.ConnectionAnchor");
 dn(CanvasNodeCopyFeedbackScope, "CanvasNode.CopyFeedbackScope");

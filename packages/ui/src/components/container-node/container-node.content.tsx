@@ -1,6 +1,9 @@
 "use client";
 
-import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
+import {
+  CanvasNode,
+  type CanvasNodeMetricListItem,
+} from "@workspace/ui/components/canvas-node/canvas-node";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Activity,
@@ -25,18 +28,13 @@ import { resolveContainerNodeStatus } from "./container-node.status";
 import type {
   ContainerNodeLifecycleActionKey,
   ContainerNodeMetricKey,
-  ContainerNodeMetricValue,
   ContainerNodeQuickActionKey,
 } from "./container-node.types";
 
 const METRIC_ITEMS = [
   { icon: Cpu, key: "cpu", label: "CPU" },
   { icon: MemoryStick, key: "memory", label: "Memory" },
-] as const satisfies readonly {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  key: ContainerNodeMetricKey;
-  label: string;
-}[];
+] as const satisfies readonly CanvasNodeMetricListItem<ContainerNodeMetricKey>[];
 
 const QUICK_ACTION_ITEMS = [
   { icon: Activity, key: "metrics", label: "Open workload metrics" },
@@ -63,42 +61,10 @@ const LIFECYCLE_ACTION_ITEMS: readonly LifecycleActionItem[] = [
   { icon: Trash2, key: "delete", label: "Delete", tone: "destructive" },
 ] as const;
 
-const CONTAINER_METRIC_PERCENT_FORMATTER = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 0,
-});
-const CONTAINER_METRIC_PERCENT_PATTERN = /^(-?\d+(?:\.\d+)?)\s*%$/;
-
 function formatContainerSubtitle(kind: string | undefined) {
   const resolvedKind = kind?.trim() || "AP";
 
   return `${resolvedKind} workload`;
-}
-
-function formatContainerMetricPercent(value: number) {
-  return Number.isFinite(value)
-    ? `${CONTAINER_METRIC_PERCENT_FORMATTER.format(value)}%`
-    : "--";
-}
-
-export function formatContainerMetricValue(
-  value: ContainerNodeMetricValue | undefined
-) {
-  if (typeof value === "number") {
-    return formatContainerMetricPercent(value);
-  }
-
-  const trimmed = value?.trim();
-
-  if (!trimmed) {
-    return "--";
-  }
-
-  const percentMatch = CONTAINER_METRIC_PERCENT_PATTERN.exec(trimmed);
-  if (percentMatch) {
-    return formatContainerMetricPercent(Number(percentMatch[1]));
-  }
-
-  return trimmed;
 }
 
 function formatContainerReplicas(replicas: number | undefined) {
@@ -276,27 +242,14 @@ export function ContainerNodeFooterContent({
       data-slot="container-node-footer-content"
     >
       <CanvasNode.FooterStatus status={visualStatus} />
-      <CanvasNode.Metrics>
-        {METRIC_ITEMS.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <CanvasNode.Metric
-              key={item.key}
-              label={item.label}
-              value={formatContainerMetricValue(metrics?.[item.key])}
-            >
-              <Icon aria-hidden className="size-3.5 shrink-0" />
-            </CanvasNode.Metric>
-          );
-        })}
+      <CanvasNode.MetricList items={METRIC_ITEMS} values={metrics}>
         <CanvasNode.Metric
           label="Replicas"
           value={formatContainerReplicas(replicas)}
         >
           <Layers aria-hidden className="size-3.5 shrink-0" />
         </CanvasNode.Metric>
-      </CanvasNode.Metrics>
+      </CanvasNode.MetricList>
     </div>
   );
 }
