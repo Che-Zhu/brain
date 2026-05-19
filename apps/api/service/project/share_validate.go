@@ -17,7 +17,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sealos/api/middleware"
-	"sealos/api/service/authlog"
 )
 
 // ProjectUIDLabel matches composed resources (AP, etc.); same as crossplane constants in TS.
@@ -50,31 +49,24 @@ type ValidatedShare struct {
 func ValidateShareAccess(ctx context.Context, adminCfg *clientcmdapi.Config, rawToken string) (*ValidatedShare, error) {
 	rawToken = strings.TrimSpace(rawToken)
 	if rawToken == "" || adminCfg == nil {
-		authlog.Warn("share validate: rejected empty token or missing admin config")
 		return nil, ErrShareTokenInvalid
 	}
-	authlog.Info("share validate: starting shareToken=%s", authlog.SecretMeta(rawToken))
 
 	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	var prelim ShareClaims
 	_, _, err := jwt.NewParser().ParseUnverified(rawToken, &prelim)
 	if err != nil {
-		authlog.Warn("share validate: unverified JWT parse failed err=%v", err)
 		return nil, fmt.Errorf("%w: %w", ErrShareTokenInvalid, err)
 	}
 	if strings.ToLower(strings.TrimSpace(prelim.Perm)) != "view" {
-		authlog.Warn("share validate: rejected perm=%q (want view)", prelim.Perm)
 		return nil, ErrShareForbidden
 	}
 	ns := strings.TrimSpace(prelim.Namespace)
 	pn := strings.TrimSpace(prelim.ProjectName)
 	if ns == "" || pn == "" {
-		authlog.Warn("share validate: missing namespace or projectName in claims")
 		return nil, ErrShareTokenInvalid
 	}
-	authlog.Info("share validate: claims namespace=%q projectName=%q perm=%q projectUID=%q",
-		ns, pn, prelim.Perm, strings.TrimSpace(prelim.ProjectUID))
 
 	restCfg, err := clientcmd.NewDefaultClientConfig(*adminCfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
@@ -93,19 +85,15 @@ func ValidateShareAccess(ctx context.Context, adminCfg *clientcmdapi.Config, raw
 	projObj, err := dyn.Resource(ProjectGVR).Namespace(ns).Get(ctx, pn, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			authlog.Warn("share validate: project not found namespace=%q name=%q", ns, pn)
 			return nil, ErrShareTokenInvalid
 		}
-		authlog.Warn("share validate: get project failed namespace=%q name=%q err=%v", ns, pn, err)
 		return nil, err
 	}
 	canonicalUID := string(projObj.GetUID())
 	if pu := strings.TrimSpace(prelim.ProjectUID); pu != "" && pu != canonicalUID {
-		authlog.Warn("share validate: project UID mismatch claim=%q canonical=%q", pu, canonicalUID)
 		return nil, ErrShareTokenInvalid
 	}
 	if !projectSpecPublic(projObj) {
-		authlog.Warn("share validate: project not public namespace=%q name=%q uid=%q", ns, pn, canonicalUID)
 		return nil, ErrShareProjectNotPublic
 	}
 
@@ -113,15 +101,12 @@ func ValidateShareAccess(ctx context.Context, adminCfg *clientcmdapi.Config, raw
 	sec, err := clientset.CoreV1().Secrets(ns).Get(ctx, secName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			authlog.Warn("share validate: share secret not found namespace=%q secret=%q", ns, secName)
 			return nil, ErrShareTokenInvalid
 		}
-		authlog.Warn("share validate: get share secret failed namespace=%q secret=%q err=%v", ns, secName, err)
 		return nil, err
 	}
 	key := sec.Data[shareSecretKey]
 	if len(key) == 0 {
-		authlog.Warn("share validate: share secret missing signing key namespace=%q secret=%q", ns, secName)
 		return nil, ErrShareTokenInvalid
 	}
 
@@ -130,11 +115,8 @@ func ValidateShareAccess(ctx context.Context, adminCfg *clientcmdapi.Config, raw
 		return key, nil
 	})
 	if err != nil {
-		authlog.Warn("share validate: JWT signature verification failed namespace=%q project=%q err=%v", ns, pn, err)
 		return nil, fmt.Errorf("%w: %w", ErrShareTokenInvalid, err)
 	}
-
-	authlog.Info("share validate: success namespace=%q project=%q projectUID=%q", ns, pn, canonicalUID)
 
 	return &ValidatedShare{Claims: &claims, ProjectUID: canonicalUID}, nil
 }

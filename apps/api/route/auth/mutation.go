@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"sealos/api/service/authlog"
 	"sealos/api/service/regiontoken"
 )
 
@@ -34,20 +33,14 @@ func registerRegionToken(grp huma.API) {
 			"derived from the returned kubeconfig.",
 		Tags: []string{"Auth"},
 	}, func(ctx context.Context, input *regionTokenInput) (*regionTokenOutput, error) {
-		authlog.Info("POST /regionToken: exchange requested regionToken=%s",
-			authlog.SecretMeta(input.Body.RegionToken))
 		base, err := regiontoken.SealosDesktopBaseURL(ctx)
 		if err != nil {
-			authlog.Warn("POST /regionToken: sealos desktop base URL failed: %v", err)
 			return nil, huma.Error500InternalServerError("sealos desktop base URL (ingress or ENCODED_ADMIN_KUBECONFIG)", err)
 		}
 		out, err := regiontoken.Exchange(ctx, base, input.Body.RegionToken)
 		if err != nil {
-			authlog.Warn("POST /regionToken: exchange failed baseURL=%q err=%v", base, err)
 			return nil, huma.Error502BadGateway("region token exchange failed", err)
 		}
-		authlog.Info("POST /regionToken: exchange succeeded namespace=%q encodedKubeconfig=%s",
-			out.Namespace, authlog.SecretMeta(out.EncodedKubeconfig))
 		resp := &regionTokenOutput{}
 		resp.Body.EncodedKubeconfig = out.EncodedKubeconfig
 		resp.Body.Namespace = out.Namespace

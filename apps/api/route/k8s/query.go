@@ -13,7 +13,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sealos/api/middleware"
-	"sealos/api/service/authlog"
 	k8ssvc "sealos/api/service/k8s"
 	projectsvc "sealos/api/service/project"
 )
@@ -53,10 +52,7 @@ func registerGet(grp huma.API) {
 		}
 
 		if shareTok != "" {
-			authlog.Info("k8s get: share token auth kind=%q namespace=%q shareToken=%s",
-				input.Kind, input.Namespace, authlog.SecretMeta(shareTok))
 			if authz != "" {
-				authlog.Warn("k8s get: rejected both Authorization and share token")
 				return nil, huma.Error400BadRequest("send either Authorization or share token, not both", nil)
 			}
 			if allNs {
@@ -73,21 +69,15 @@ func registerGet(grp huma.API) {
 			if err != nil {
 				switch {
 				case errors.Is(err, projectsvc.ErrShareProjectNotPublic):
-					authlog.Warn("k8s get: share denied — project not public namespace=%q", input.Namespace)
 					return nil, huma.Error403Forbidden("project is not shared publicly", err)
 				case errors.Is(err, projectsvc.ErrShareForbidden):
-					authlog.Warn("k8s get: share denied — permission not allowed")
 					return nil, huma.Error403Forbidden("share permission not allowed", err)
 				case errors.Is(err, projectsvc.ErrShareTokenInvalid):
-					authlog.Warn("k8s get: share denied — invalid token err=%v", err)
 					return nil, huma.Error401Unauthorized("invalid share token", err)
 				default:
-					authlog.Warn("k8s get: share validation failed err=%v", err)
 					return nil, huma.Error401Unauthorized("share token validation failed", err)
 				}
 			}
-			authlog.Info("k8s get: share authorized projectUID=%q namespace=%q",
-				validated.ProjectUID, validated.Claims.Namespace)
 			opts.Namespace = validated.Claims.Namespace
 			opts.LabelSelector = projectsvc.ProjectUIDLabel + "=" + validated.ProjectUID
 			opts.FieldSelector = ""
@@ -99,14 +89,10 @@ func registerGet(grp huma.API) {
 			cfg = adminCfg
 		} else {
 			if authz == "" {
-				authlog.Warn("k8s get: rejected — missing Authorization and share token kind=%q", input.Kind)
 				return nil, huma.Error400BadRequest("Authorization or share token is required", nil)
 			}
-			authlog.Info("k8s get: kubeconfig auth kind=%q authorization=%s",
-				input.Kind, authlog.SecretMeta(authz))
 			_, cfg, err = middleware.RestConfigFromAuth(authz)
 			if err != nil {
-				authlog.Warn("k8s get: invalid kubeconfig err=%v", err)
 				return nil, huma.Error400BadRequest("invalid kubeconfig", err)
 			}
 			gvr := middleware.PodsGVR()

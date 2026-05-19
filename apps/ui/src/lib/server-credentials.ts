@@ -3,7 +3,6 @@ import "server-only";
 import { API_ROUTES } from "@workspace/api/constants";
 import { cookies } from "next/headers";
 import { unauthorized } from "next/navigation";
-import { authInfo, authWarn, secretMeta } from "@/lib/auth-log";
 
 /** Region JWT cookie (desktop / cluster auth). */
 export const SEALOS_AUTH_TOKEN_COOKIE = "sealos_auth_token" as const;
@@ -52,35 +51,10 @@ export function hasDevCredentialBypass(): boolean {
  * no kubeconfig from the region token API and no dev env bypass.
  */
 export async function fetchProjectCredentialsOrUnauthorized(): Promise<ServerCredentials> {
-  authInfo("project credentials: checking access");
-
-  const devBypass = hasDevCredentialBypass();
-  if (devBypass) {
-    authInfo("project credentials: dev bypass active", {
-      devKubeconfig: secretMeta(
-        process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG ?? ""
-      ),
-      devNamespace: secretMeta(process.env.NEXT_PUBLIC_DEV_NS ?? ""),
-    });
-  }
-
   const creds = await fetchServerCredentials();
-  const hasKubeconfig = creds.serverEncodedKubeconfig.trim() !== "";
-
-  if (hasKubeconfig) {
-    authInfo("project credentials: authorized via region token exchange", {
-      namespace: creds.serverNamespace || "(empty)",
-      encodedKubeconfig: secretMeta(creds.serverEncodedKubeconfig),
-    });
+  if (creds.serverEncodedKubeconfig.trim() !== "" || hasDevCredentialBypass()) {
     return creds;
   }
-
-  if (devBypass) {
-    authInfo("project credentials: authorized via dev bypass (no server kubeconfig)");
-    return creds;
-  }
-
-  authWarn("project credentials: unauthorized — no kubeconfig and no dev bypass");
   unauthorized();
 }
 
@@ -96,7 +70,6 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
 
   const apiUrlRaw = process.env.API_URL?.trim();
   if (!apiUrlRaw) {
-    authWarn("region token exchange: skipped — API_URL is not configured");
     return empty();
   }
 
@@ -104,16 +77,10 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
   const regionToken =
     cookieStore.get(SEALOS_AUTH_TOKEN_COOKIE)?.value?.trim() ?? "";
   if (regionToken === "") {
-    authWarn("region token exchange: skipped — sealos_auth_token cookie missing");
     return empty();
   }
 
   const url = new URL(API_ROUTES.auth.regionToken, apiUrlRaw);
-  authInfo("region token exchange: requesting credentials", {
-    apiUrl: apiUrlRaw,
-    route: API_ROUTES.auth.regionToken,
-    regionToken: secretMeta(regionToken),
-  });
 
   let response: Response;
   try {
@@ -123,57 +90,26 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
       body: JSON.stringify({ regionToken }),
       cache: "no-store",
     });
-  } catch (error) {
-    authWarn("region token exchange: fetch failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
     return empty();
   }
 
   if (!response.ok) {
-    let bodySnippet = "";
-    try {
-      bodySnippet = (await response.text()).slice(0, 200);
-    } catch {
-      bodySnippet = "(unreadable)";
-    }
-    authWarn("region token exchange: API returned error", {
-      status: response.status,
-      body: bodySnippet,
-    });
     return empty();
   }
 
   let raw: RegionTokenResponse;
   try {
     raw = (await response.json()) as RegionTokenResponse;
-  } catch (error) {
-    authWarn("region token exchange: invalid JSON response", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
     return empty();
   }
-
-  const encodedKubeconfig = pickString(
-    raw.encodedKubeconfig,
-    raw.body?.encodedKubeconfig
-  );
-  const namespace = pickString(raw.namespace, raw.body?.namespace);
-
-  if (encodedKubeconfig.trim() === "") {
-    authWarn("region token exchange: API ok but encodedKubeconfig empty", {
-      namespace: namespace || "(empty)",
-    });
-    return empty();
-  }
-
-  authInfo("region token exchange: success", {
-    namespace: namespace || "(empty)",
-    encodedKubeconfig: secretMeta(encodedKubeconfig),
-  });
 
   return {
-    serverEncodedKubeconfig: encodedKubeconfig,
-    serverNamespace: namespace,
+    serverEncodedKubeconfig: pickString(
+      raw.encodedKubeconfig,
+      raw.body?.encodedKubeconfig
+    ),
+    serverNamespace: pickString(raw.namespace, raw.body?.namespace),
   };
 }
