@@ -47,8 +47,14 @@ function nonEmptyString(value: unknown): string | undefined {
     : undefined;
 }
 
+function metadataRecord(
+  resource: unknown
+): Record<string, unknown> | undefined {
+  return asRecord(asRecord(resource)?.metadata);
+}
+
 function metadataName(resource: unknown): string | undefined {
-  return nonEmptyString(asRecord(asRecord(resource)?.metadata)?.name);
+  return nonEmptyString(metadataRecord(resource)?.name);
 }
 
 function metadataNamespace(
@@ -56,7 +62,7 @@ function metadataNamespace(
   fallback: string | undefined
 ): string | undefined {
   return (
-    nonEmptyString(asRecord(asRecord(resource)?.metadata)?.namespace) ??
+    nonEmptyString(metadataRecord(resource)?.namespace) ??
     nonEmptyString(fallback)
   );
 }
@@ -80,6 +86,17 @@ function resourceRef(
   return { kind, name, namespace };
 }
 
+function resourceRefFromRecord(
+  kind: CanvasConnectionResourceKind,
+  source: Record<string, unknown> | undefined
+): CanvasConnectionResourceRef | undefined {
+  return resourceRef(
+    kind,
+    nonEmptyString(source?.name),
+    nonEmptyString(source?.namespace)
+  );
+}
+
 function resourceRefFromMetadata(
   kind: CanvasConnectionResourceKind,
   resource: unknown,
@@ -97,23 +114,11 @@ function nodeResourceRef(node: Node): CanvasConnectionResourceRef | undefined {
 
   switch (node.type) {
     case CANVAS_CONTAINER_NODE_TYPE:
-      return resourceRef(
-        "AP",
-        nonEmptyString(asRecord(data?.states)?.name),
-        nonEmptyString(asRecord(data?.states)?.namespace)
-      );
+      return resourceRefFromRecord("AP", asRecord(data?.states));
     case CANVAS_DATABASE_NODE_TYPE:
-      return resourceRef(
-        "DB",
-        nonEmptyString(asRecord(data?.workload)?.name),
-        nonEmptyString(asRecord(data?.workload)?.namespace)
-      );
+      return resourceRefFromRecord("DB", asRecord(data?.workload));
     case CANVAS_ENTRY_NODE_TYPE:
-      return resourceRef(
-        "EntryPoint",
-        nonEmptyString(asRecord(data?.resource)?.name),
-        nonEmptyString(asRecord(data?.resource)?.namespace)
-      );
+      return resourceRefFromRecord("EntryPoint", asRecord(data?.resource));
     default:
       return undefined;
   }
@@ -142,13 +147,28 @@ function secretRefsFromAp(ap: unknown): string[] {
   }
   const refs: string[] = [];
   for (const item of env) {
-    const ref = asRecord(asRecord(asRecord(item)?.valueFrom)?.secretKeyRef);
-    const name = nonEmptyString(ref?.name);
+    const envItem = asRecord(item);
+    const valueFrom = asRecord(envItem?.valueFrom);
+    const secretKeyRef = asRecord(valueFrom?.secretKeyRef);
+    const name = nonEmptyString(secretKeyRef?.name);
     if (name !== undefined) {
       refs.push(name);
     }
   }
   return refs;
+}
+
+function addUniqueConnection(
+  connections: CanvasDetectedConnection[],
+  seenConnectionKeys: Set<string>,
+  connection: CanvasDetectedConnection
+): void {
+  const key = connectionKey(connection);
+  if (seenConnectionKeys.has(key)) {
+    return;
+  }
+  seenConnectionKeys.add(key);
+  connections.push(connection);
 }
 
 export function detectCanvasConnections({
@@ -157,8 +177,11 @@ export function detectCanvasConnections({
   entryPointsData,
   namespaceFallback,
 }: DetectCanvasConnectionsOptions): CanvasDetectedConnection[] {
+  const aps = apItemsFromList(apsData);
+  const dbs = apItemsFromList(dbsData);
+  const entryPoints = apItemsFromList(entryPointsData);
   const apRefs = new Set<string>();
-  for (const ap of apItemsFromList(apsData)) {
+  for (const ap of aps) {
     const ref = resourceRefFromMetadata("AP", ap, namespaceFallback);
     if (ref !== undefined) {
       apRefs.add(resourceKey(ref));
@@ -167,15 +190,7 @@ export function detectCanvasConnections({
 
   const connections: CanvasDetectedConnection[] = [];
   const seenConnectionKeys = new Set<string>();
-  const addConnection = (connection: CanvasDetectedConnection) => {
-    const key = connectionKey(connection);
-    if (seenConnectionKeys.has(key)) {
-      return;
-    }
-    seenConnectionKeys.add(key);
-    connections.push(connection);
-  };
-  for (const entryPoint of apItemsFromList(entryPointsData)) {
+  for (const entryPoint of entryPoints) {
     const namespace = metadataNamespace(entryPoint, namespaceFallback);
     const source = resourceRefFromMetadata(
       "EntryPoint",
@@ -189,12 +204,16 @@ export function detectCanvasConnections({
       target !== undefined &&
       apRefs.has(resourceKey(target))
     ) {
-      addConnection({ kind: "EntryPointToAP", source, target });
+      addUniqueConnection(connections, seenConnectionKeys, {
+        kind: "EntryPointToAP",
+        source,
+        target,
+      });
     }
   }
 
   const dbRefBySecret = new Map<string, CanvasConnectionResourceRef>();
-  for (const db of apItemsFromList(dbsData)) {
+  for (const db of dbs) {
     const ref = resourceRefFromMetadata("DB", db, namespaceFallback);
     const secretName = connectionSecretName(db);
     if (ref !== undefined && secretName !== undefined) {
@@ -202,7 +221,7 @@ export function detectCanvasConnections({
     }
   }
 
-  for (const ap of apItemsFromList(apsData)) {
+  for (const ap of aps) {
     const source = resourceRefFromMetadata("AP", ap, namespaceFallback);
     if (source === undefined) {
       continue;
@@ -212,7 +231,11 @@ export function detectCanvasConnections({
         namespaceSecretKey(source.namespace, secretName)
       );
       if (target !== undefined) {
-        addConnection({ kind: "APToDB", source, target });
+        addUniqueConnection(connections, seenConnectionKeys, {
+          kind: "APToDB",
+          source,
+          target,
+        });
       }
     }
   }

@@ -18,25 +18,61 @@ function list(items: unknown[]): K8sGetResponse {
   return { items };
 }
 
+interface TestNodeOptions {
+  id?: string;
+  name?: string;
+  namespace?: string;
+}
+
+const ORIGIN = { x: 0, y: 0 };
+
+function apNode({
+  id = "current-ap-node-id",
+  name = "web",
+  namespace = "ns-a",
+}: TestNodeOptions = {}): Node {
+  return {
+    data: {
+      states: { kind: "AP", name, namespace },
+    },
+    id,
+    position: ORIGIN,
+    type: CANVAS_CONTAINER_NODE_TYPE,
+  };
+}
+
+function dbNode({
+  id = "current-db-node-id",
+  name = "postgres",
+  namespace = "ns-a",
+}: TestNodeOptions = {}): Node {
+  return {
+    data: {
+      workload: { name, namespace },
+    },
+    id,
+    position: ORIGIN,
+    type: CANVAS_DATABASE_NODE_TYPE,
+  };
+}
+
+function entryPointNode({
+  id = "current-entry-node-id",
+  name = "public-web",
+  namespace = "ns-a",
+}: TestNodeOptions = {}): Node {
+  return {
+    data: {
+      resource: { name, namespace },
+    },
+    id,
+    position: ORIGIN,
+    type: CANVAS_ENTRY_NODE_TYPE,
+  };
+}
+
 test("renders an EntryPoint-to-AP connection when apRef targets an existing AP", () => {
-  const nodes: Node[] = [
-    {
-      data: {
-        states: { kind: "AP", name: "web", namespace: "ns-a" },
-      },
-      id: "current-ap-node-id",
-      position: { x: 0, y: 0 },
-      type: CANVAS_CONTAINER_NODE_TYPE,
-    },
-    {
-      data: {
-        resource: { name: "public-web", namespace: "ns-a" },
-      },
-      id: "current-entry-node-id",
-      position: { x: 0, y: 0 },
-      type: CANVAS_ENTRY_NODE_TYPE,
-    },
-  ];
+  const nodes: Node[] = [apNode(), entryPointNode()];
 
   const edges = detectedCanvasConnectionEdges({
     apsData: list([{ metadata: { name: "web", namespace: "ns-a" } }]),
@@ -71,16 +107,7 @@ test("does not render an EntryPoint-to-AP connection when the AP is missing", ()
       },
     ]),
     namespaceFallback: "ns-a",
-    nodes: [
-      {
-        data: {
-          resource: { name: "public-web", namespace: "ns-a" },
-        },
-        id: "current-entry-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_ENTRY_NODE_TYPE,
-      },
-    ],
+    nodes: [entryPointNode()],
   });
 
   assert.deepEqual(edges, []);
@@ -111,24 +138,7 @@ test("renders an AP-to-DB connection when an AP references the DB connection Sec
     ]),
     entryPointsData: list([]),
     namespaceFallback: "ns-a",
-    nodes: [
-      {
-        data: {
-          states: { kind: "AP", name: "web", namespace: "ns-a" },
-        },
-        id: "current-ap-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_CONTAINER_NODE_TYPE,
-      },
-      {
-        data: {
-          workload: { name: "postgres", namespace: "ns-a" },
-        },
-        id: "current-db-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_DATABASE_NODE_TYPE,
-      },
-    ],
+    nodes: [apNode(), dbNode()],
   });
 
   assert.deepEqual(edges, [
@@ -171,24 +181,7 @@ test("deduplicates detected connections across repeated resource references", ()
     ]),
     entryPointsData: list([]),
     namespaceFallback: "ns-a",
-    nodes: [
-      {
-        data: {
-          states: { kind: "AP", name: "web", namespace: "ns-a" },
-        },
-        id: "current-ap-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_CONTAINER_NODE_TYPE,
-      },
-      {
-        data: {
-          workload: { name: "postgres", namespace: "ns-a" },
-        },
-        id: "current-db-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_DATABASE_NODE_TYPE,
-      },
-    ],
+    nodes: [apNode(), dbNode()],
   });
 
   assert.equal(edges.length, 1);
@@ -223,24 +216,7 @@ test("does not create AP-to-DB connections from ambiguous text env values", () =
     ]),
     entryPointsData: list([]),
     namespaceFallback: "ns-a",
-    nodes: [
-      {
-        data: {
-          states: { kind: "AP", name: "web", namespace: "ns-a" },
-        },
-        id: "current-ap-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_CONTAINER_NODE_TYPE,
-      },
-      {
-        data: {
-          workload: { name: "postgres", namespace: "ns-a" },
-        },
-        id: "current-db-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_DATABASE_NODE_TYPE,
-      },
-    ],
+    nodes: [apNode(), dbNode()],
   });
 
   assert.deepEqual(edges, []);
@@ -271,16 +247,7 @@ test("does not render a detected connection when a current endpoint node is miss
     ]),
     entryPointsData: list([]),
     namespaceFallback: "ns-a",
-    nodes: [
-      {
-        data: {
-          states: { kind: "AP", name: "web", namespace: "ns-a" },
-        },
-        id: "current-ap-node-id",
-        position: { x: 0, y: 0 },
-        type: CANVAS_CONTAINER_NODE_TYPE,
-      },
-    ],
+    nodes: [apNode()],
   });
 
   assert.deepEqual(edges, []);
