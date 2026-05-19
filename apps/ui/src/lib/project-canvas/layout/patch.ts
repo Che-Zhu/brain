@@ -1,3 +1,4 @@
+import { cleanupCanvasLayoutDocument } from "./cleanup";
 import { canvasLayoutResourceKey } from "./merge";
 import type {
   CanvasLayoutDocument,
@@ -5,6 +6,10 @@ import type {
   CanvasLayoutPatch,
   CanvasLayoutResourceRef,
 } from "./types";
+
+export interface ApplyCanvasLayoutPatchOptions {
+  now?: Date;
+}
 
 export class CanvasLayoutValidationError extends Error {
   constructor(message: string) {
@@ -17,6 +22,25 @@ function assertNonEmpty(value: string, field: string): string {
   const trimmed = value.trim();
   if (trimmed === "") {
     throw new CanvasLayoutValidationError(`${field} is required.`);
+  }
+  return trimmed;
+}
+
+function optionalTrimmed(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed === undefined || trimmed === "" ? undefined : trimmed;
+}
+
+function normalizeOptionalTimestamp(
+  value: string | undefined,
+  field: string
+): string | undefined {
+  const trimmed = optionalTrimmed(value);
+  if (trimmed === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(Date.parse(trimmed))) {
+    throw new CanvasLayoutValidationError(`${field} must be a valid date.`);
   }
   return trimmed;
 }
@@ -35,10 +59,13 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
   if (!(Number.isFinite(x) && Number.isFinite(y))) {
     throw new CanvasLayoutValidationError("node position must be finite.");
   }
+  const label = optionalTrimmed(node.label);
+  const lastSeenUid = optionalTrimmed(node.lastSeenUid);
+  const orphanedAt = normalizeOptionalTimestamp(node.orphanedAt, "orphanedAt");
   return {
-    ...(node.lastSeenUid === undefined
-      ? {}
-      : { lastSeenUid: node.lastSeenUid }),
+    ...(label === undefined ? {} : { label }),
+    ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
+    ...(orphanedAt === undefined ? {} : { orphanedAt }),
     position: { x, y },
     ref: normalizeRef(node.ref),
   };
@@ -46,7 +73,8 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
 
 export function applyCanvasLayoutPatch(
   existing: CanvasLayoutDocument,
-  patch: CanvasLayoutPatch
+  patch: CanvasLayoutPatch,
+  options?: ApplyCanvasLayoutPatchOptions
 ): CanvasLayoutDocument {
   const nextByRef = new Map<string, CanvasLayoutNode>();
   const order: string[] = [];
@@ -74,7 +102,7 @@ export function applyCanvasLayoutPatch(
       ? existing.projectNameSnapshot
       : patch.projectNameSnapshot;
 
-  return {
+  const next = {
     namespace: assertNonEmpty(existing.namespace, "namespace"),
     nodes: order.flatMap((key) => {
       const node = nextByRef.get(key);
@@ -84,4 +112,6 @@ export function applyCanvasLayoutPatch(
     projectUid: assertNonEmpty(existing.projectUid, "project UID"),
     version: existing.version + 1,
   };
+
+  return cleanupCanvasLayoutDocument(next, options);
 }

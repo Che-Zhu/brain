@@ -5,6 +5,12 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
+import {
+  cleanupCanvasLayoutDocument,
+  cloneCanvasLayoutDocument,
+  cloneCanvasLayoutNode,
+  isCanvasLayoutOrphanExpired,
+} from "./cleanup";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
@@ -12,6 +18,18 @@ import type {
   CanvasLayoutResourceKind,
   CanvasLayoutResourceRef,
 } from "./types";
+
+export interface CanvasLayoutMergeResult {
+  changed: boolean;
+  layout: CanvasLayoutDocument | undefined;
+  nodes: Node[];
+}
+
+export interface CanvasLayoutMergeOptions {
+  layout: CanvasLayoutDocument | undefined;
+  nodes: Node[];
+  now?: Date;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value != null && typeof value === "object"
@@ -104,30 +122,116 @@ export function canvasLayoutNodeFromNode(
   };
 }
 
-export function applyCanvasLayoutToNodes(
-  nodes: Node[],
-  layout: CanvasLayoutDocument | undefined
-): Node[] {
+function layoutDocumentsEqual(
+  a: CanvasLayoutDocument | undefined,
+  b: CanvasLayoutDocument | undefined
+): boolean {
+  if (a === undefined || b === undefined) {
+    return a === b;
+  }
+  return (
+    a.namespace === b.namespace &&
+    a.projectNameSnapshot === b.projectNameSnapshot &&
+    a.projectUid === b.projectUid &&
+    a.version === b.version &&
+    a.nodes.length === b.nodes.length &&
+    a.nodes.every((node, index) => {
+      const other = b.nodes[index];
+      return (
+        other !== undefined &&
+        node.label === other.label &&
+        node.lastSeenUid === other.lastSeenUid &&
+        node.orphanedAt === other.orphanedAt &&
+        node.position.x === other.position.x &&
+        node.position.y === other.position.y &&
+        node.ref.kind === other.ref.kind &&
+        node.ref.name === other.ref.name &&
+        node.ref.namespace === other.ref.namespace
+      );
+    })
+  );
+}
+
+export function mergeCanvasLayoutWithDetectedNodes({
+  layout,
+  nodes,
+  now = new Date(),
+}: CanvasLayoutMergeOptions): CanvasLayoutMergeResult {
   if (layout === undefined) {
-    return nodes.map((node) => ({ ...node }));
+    return {
+      changed: false,
+      layout: undefined,
+      nodes: nodes.map((node) => ({ ...node })),
+    };
   }
 
-  const positionByRef = new Map<string, CanvasLayoutPosition>();
-  for (const item of layout.nodes) {
-    const position = finitePosition(item.position);
-    if (position !== undefined) {
-      positionByRef.set(canvasLayoutResourceKey(item.ref), position);
-    }
+  const nowIso = now.toISOString();
+  const cleanedLayout = cleanupCanvasLayoutDocument(layout, { now });
+  const layoutByRef = new Map<string, CanvasLayoutNode>();
+  for (const item of cleanedLayout.nodes) {
+    layoutByRef.set(canvasLayoutResourceKey(item.ref), item);
   }
 
-  return nodes.map((node) => {
+  const detectedRefKeys = new Set<string>();
+  const nextLayoutByRef = new Map<string, CanvasLayoutNode>();
+  const renderedNodes = nodes.map((node) => {
     const ref = canvasLayoutResourceRefFromNode(node);
     if (ref === undefined) {
       return { ...node };
     }
-    const savedPosition = positionByRef.get(canvasLayoutResourceKey(ref));
+
+    const key = canvasLayoutResourceKey(ref);
+    detectedRefKeys.add(key);
+    const saved = layoutByRef.get(key);
+    if (saved === undefined) {
+      return { ...node };
+    }
+
+    const lastSeenUid = lastSeenUidFromNode(node) ?? saved.lastSeenUid;
+    const nextLayoutNode: CanvasLayoutNode = {
+      ...(saved.label === undefined ? {} : { label: saved.label }),
+      ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
+      position: { x: saved.position.x, y: saved.position.y },
+      ref: { ...saved.ref },
+    };
+    nextLayoutByRef.set(key, nextLayoutNode);
+
+    const savedPosition = finitePosition(saved.position);
     return savedPosition === undefined
       ? { ...node }
       : { ...node, position: savedPosition };
   });
+
+  const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);
+  nextLayout.nodes = cleanedLayout.nodes.flatMap((item) => {
+    const key = canvasLayoutResourceKey(item.ref);
+    const live = nextLayoutByRef.get(key);
+    if (live !== undefined) {
+      return [live];
+    }
+    if (detectedRefKeys.has(key)) {
+      return [];
+    }
+    if (isCanvasLayoutOrphanExpired(item, now)) {
+      return [];
+    }
+    return [
+      item.orphanedAt === undefined
+        ? { ...cloneCanvasLayoutNode(item), orphanedAt: nowIso }
+        : cloneCanvasLayoutNode(item),
+    ];
+  });
+
+  return {
+    changed: !layoutDocumentsEqual(layout, nextLayout),
+    layout: nextLayout,
+    nodes: renderedNodes,
+  };
+}
+
+export function applyCanvasLayoutToNodes(
+  nodes: Node[],
+  layout: CanvasLayoutDocument | undefined
+): Node[] {
+  return mergeCanvasLayoutWithDetectedNodes({ layout, nodes }).nodes;
 }

@@ -4,6 +4,14 @@ const boundedString = z.string().trim().min(1).max(256);
 const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
   message: "Expected a finite number.",
 });
+const optionalBoundedString = z.string().trim().max(256).optional();
+const optionalTimestamp = z
+  .string()
+  .trim()
+  .refine((value) => Number.isFinite(Date.parse(value)), {
+    message: "Expected a valid date.",
+  })
+  .optional();
 
 export const canvasLayoutResourceRefSchema = z.object({
   kind: z.enum(["AP", "DB", "EntryPoint"]),
@@ -12,7 +20,9 @@ export const canvasLayoutResourceRefSchema = z.object({
 });
 
 export const canvasLayoutNodeSchema = z.object({
-  lastSeenUid: z.string().trim().max(256).optional(),
+  label: optionalBoundedString,
+  lastSeenUid: optionalBoundedString,
+  orphanedAt: optionalTimestamp,
   position: z.object({
     x: finiteNumber,
     y: finiteNumber,

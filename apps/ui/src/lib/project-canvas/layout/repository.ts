@@ -8,6 +8,7 @@ import {
   projectCanvasLayouts,
 } from "@/lib/project-persistence/schema";
 
+import { cleanupCanvasLayoutDocument } from "./cleanup";
 import { applyCanvasLayoutPatch, CanvasLayoutValidationError } from "./patch";
 import type { CanvasLayoutDocument, CanvasLayoutPatch } from "./types";
 
@@ -27,16 +28,22 @@ function emptyLayoutDocument(
   };
 }
 
-function rowToDocument(row: ProjectCanvasLayoutRow): CanvasLayoutDocument {
-  return {
-    namespace: row.namespace,
-    nodes: row.nodes,
-    ...(row.projectNameSnapshot == null
-      ? {}
-      : { projectNameSnapshot: row.projectNameSnapshot }),
-    projectUid: row.projectUid,
-    version: row.version,
-  };
+function rowToDocument(
+  row: ProjectCanvasLayoutRow,
+  options?: { now?: Date }
+): CanvasLayoutDocument {
+  return cleanupCanvasLayoutDocument(
+    {
+      namespace: row.namespace,
+      nodes: row.nodes,
+      ...(row.projectNameSnapshot == null
+        ? {}
+        : { projectNameSnapshot: row.projectNameSnapshot }),
+      projectUid: row.projectUid,
+      version: row.version,
+    },
+    options
+  );
 }
 
 function whereLayoutKey(key: ProjectCanvasLayoutKey) {
@@ -79,12 +86,15 @@ function normalizePatchForProject(
 export async function loadProjectCanvasLayout(
   key: ProjectCanvasLayoutKey
 ): Promise<CanvasLayoutDocument> {
+  const now = new Date();
   const [row] = await getProjectDb()
     .select()
     .from(projectCanvasLayouts)
     .where(whereLayoutKey(key))
     .limit(1);
-  return row === undefined ? emptyLayoutDocument(key) : rowToDocument(row);
+  return row === undefined
+    ? emptyLayoutDocument(key)
+    : rowToDocument(row, { now });
 }
 
 export function patchProjectCanvasLayout(
@@ -122,7 +132,8 @@ export function patchProjectCanvasLayout(
       row === undefined ? emptyLayoutDocument(key) : rowToDocument(row);
     const next = applyCanvasLayoutPatch(
       existing,
-      normalizePatchForProject(key, patch)
+      normalizePatchForProject(key, patch),
+      { now }
     );
 
     const [updated] = await tx

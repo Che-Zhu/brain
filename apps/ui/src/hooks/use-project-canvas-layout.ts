@@ -99,6 +99,7 @@ export function useProjectCanvasLayout(options: {
     layout: data,
     layoutLoadError: error instanceof Error ? error : undefined,
     layoutReady: !(enabled && isLoading) || error != null,
+    saveLayoutNodes: saveNodes,
     scheduleNodePositionSave,
   };
 }

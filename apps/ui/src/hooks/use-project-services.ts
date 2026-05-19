@@ -17,8 +17,11 @@ import {
   dbsToCanvasState,
   entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
-import { applyCanvasLayoutToNodes } from "@/lib/project-canvas/layout/merge";
-import type { CanvasLayoutDocument } from "@/lib/project-canvas/layout/types";
+import { mergeCanvasLayoutWithDetectedNodes } from "@/lib/project-canvas/layout/merge";
+import type {
+  CanvasLayoutDocument,
+  CanvasLayoutNode,
+} from "@/lib/project-canvas/layout/types";
 import {
   entryPointRefreshIntervalForLifecycle,
   hasTransientWorkloadPhase,
@@ -34,6 +37,7 @@ export function useProjectServices(options: {
   kubeconfig: string;
   /** K8s namespace for AP, DB, and entrypoint discovery. */
   namespace: string;
+  onCanvasLayoutMerge?: (nodes: CanvasLayoutNode[]) => void;
   /** Project UID from the route (decoded). */
   uid: string;
 }): {
@@ -56,6 +60,7 @@ export function useProjectServices(options: {
     canvasLayoutReady = true,
     kubeconfig,
     namespace,
+    onCanvasLayoutMerge,
     uid,
   } = options;
 
@@ -165,7 +170,7 @@ export function useProjectServices(options: {
     return map;
   }, [dbCompositionRows]);
 
-  const canvasState = useMemo((): CanvasState => {
+  const layoutMerge = useMemo(() => {
     const apBlock = apsToCanvasState(apsData, {
       gridIndexOffset: 0,
       namespaceFallback: namespace,
@@ -189,14 +194,17 @@ export function useProjectServices(options: {
       ...dbBlock.nodes,
       ...entryPointBlock.nodes,
     ];
-    const nodes = canvasLayoutReady
-      ? applyCanvasLayoutToNodes(detectedNodes, canvasLayout)
-      : [];
+    const merge = canvasLayoutReady
+      ? mergeCanvasLayoutWithDetectedNodes({
+          layout: canvasLayout,
+          nodes: detectedNodes,
+        })
+      : { changed: false, layout: canvasLayout, nodes: [] };
     return {
+      changed: merge.changed,
       edges: canvasLayoutReady ? edges : [],
-      nodes,
-      selectedEdge: null,
-      selectedNode: null,
+      layout: merge.layout,
+      nodes: merge.nodes,
     };
   }, [
     apsData,
@@ -207,6 +215,22 @@ export function useProjectServices(options: {
     dbCompositionIconByName,
     namespace,
   ]);
+
+  useEffect(() => {
+    if (!layoutMerge.changed || layoutMerge.layout === undefined) {
+      return;
+    }
+    onCanvasLayoutMerge?.(layoutMerge.layout.nodes);
+  }, [layoutMerge.changed, layoutMerge.layout, onCanvasLayoutMerge]);
+
+  const canvasState = useMemo((): CanvasState => {
+    return {
+      edges: layoutMerge.edges,
+      nodes: layoutMerge.nodes,
+      selectedEdge: null,
+      selectedNode: null,
+    };
+  }, [layoutMerge.edges, layoutMerge.nodes]);
 
   const error = apsError ?? dbsError ?? entryPointsError;
   const isLoading = apsLoading || dbsLoading || entryPointsLoading;

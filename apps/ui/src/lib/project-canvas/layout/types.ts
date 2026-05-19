@@ -12,7 +12,9 @@ export interface CanvasLayoutPosition {
 }
 
 export interface CanvasLayoutNode {
+  label?: string;
   lastSeenUid?: string;
+  orphanedAt?: string;
   position: CanvasLayoutPosition;
   ref: CanvasLayoutResourceRef;
 }
