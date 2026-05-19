@@ -13,15 +13,9 @@
   --canvas-node-connection-gap: calc(var(--spacing) * 1.5);
   --canvas-node-edge-highlight-size: calc(var(--spacing) * 0.25);
   display: grid;
-  grid-template-columns:
-    var(--canvas-node-control-size) var(--canvas-node-control-gap)
-    var(--canvas-node-card-width);
+  grid-template-columns: var(--canvas-node-card-width);
   align-items: start;
-  width: calc(
-    var(--canvas-node-control-size) +
-    var(--canvas-node-control-gap) +
-    var(--canvas-node-card-width)
-  );
+  width: var(--canvas-node-card-width);
   min-height: var(--canvas-node-card-height-collapsed);
   cursor: default;
   transition: min-height 180ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -37,7 +31,7 @@
 
 .canvas-node-surface {
   grid-row: 1;
-  grid-column: 3;
+  grid-column: 1;
   width: var(--canvas-node-card-width);
   min-height: var(--canvas-node-card-height-collapsed);
   background:
@@ -148,7 +142,7 @@
 .canvas-node-connection-anchor {
   top: 0;
   bottom: 0;
-  left: calc(var(--canvas-node-control-size) + var(--canvas-node-control-gap));
+  left: 0;
   z-index: 1;
   width: var(--canvas-node-card-width);
 }
@@ -338,7 +332,7 @@
 .canvas-node-card-frame {
   position: relative;
   grid-row: 1;
-  grid-column: 3;
+  grid-column: 1;
 }
 
 .canvas-node-card-frame::before {
@@ -405,7 +399,10 @@
   --canvas-node-expand-underlay: transparent;
   position: absolute;
   top: 0;
-  left: 0;
+  left: calc(
+    -1 *
+    (var(--canvas-node-control-size) + var(--canvas-node-control-gap))
+  );
   width: var(--canvas-node-control-size);
   height: var(--canvas-node-control-size);
   color: var(--color-zinc-400);

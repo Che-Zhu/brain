@@ -107,6 +107,8 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     panOnScroll: true,
     proOptions: { hideAttribution: true },
     selectNodesOnDrag: false,
+    snapGrid: [16, 16],
+    snapToGrid: true,
     ...meta.reactFlowProps,
     connectionLineStyle: {
       ...CANVAS_DEFAULT_EDGE_STYLE,
@@ -137,7 +139,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
           >
             <Background
               color="var(--color-canvas-dot)"
-              gap={[32, 41]}
+              gap={32}
               size={1}
               variant={BackgroundVariant.Dots}
             />

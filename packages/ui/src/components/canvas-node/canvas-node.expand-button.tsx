@@ -19,7 +19,7 @@ export function CanvasNodeExpandButton({ className }: { className?: string }) {
     <Button
       aria-label={meta.expanded ? "Collapse" : "Expand"}
       className={cn(
-        "nodrag nopan canvas-node-expand-button flex items-center justify-center rounded-lg border-[0.5px] border-white/10 p-0 shadow-none",
+        "nodrag nopan canvas-node-expand-button flex items-center justify-center rounded-lg border-[0.5px] border-white/10 p-0 shadow-none active:translate-y-0!",
         className
       )}
       data-slot="canvas-node-expand-button"
