@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sealos/api/middleware"
+	"sealos/api/service/authlog"
 )
 
 const (
@@ -93,8 +94,10 @@ func firstIngressHost(ing *networkingv1.Ingress) string {
 // SealosDesktopBaseURL fetches the sealos-desktop Ingress in namespace sealos (admin kubeconfig) and
 // returns https://<host> (no trailing slash).
 func SealosDesktopBaseURL(ctx context.Context) (string, error) {
+	authlog.Info("region token: resolving sealos-desktop base URL")
 	apiCfg, err := middleware.AdminKubeconfigFromEnv()
 	if err != nil {
+		authlog.Warn("region token: admin kubeconfig unavailable: %v", err)
 		return "", err
 	}
 	restCfg, err := clientcmd.NewDefaultClientConfig(*apiCfg, &clientcmd.ConfigOverrides{}).ClientConfig()
@@ -108,25 +111,34 @@ func SealosDesktopBaseURL(ctx context.Context) (string, error) {
 	}
 	ing, err := clientset.NetworkingV1().Ingresses(ingressNamespace).Get(ctx, ingressName, metav1.GetOptions{})
 	if err != nil {
+		authlog.Warn("region token: get ingress %s/%s failed: %v", ingressNamespace, ingressName, err)
 		return "", fmt.Errorf("get ingress %s/%s: %w", ingressNamespace, ingressName, err)
 	}
 	host := firstIngressHost(ing)
 	if host == "" {
+		authlog.Warn("region token: ingress %s/%s has no usable host", ingressNamespace, ingressName)
 		return "", fmt.Errorf("ingress %s/%s has no usable host in spec.rules or status.loadBalancer", ingressNamespace, ingressName)
 	}
 	// Do not use url.URL for host: may be IP; ensure single colon for port if ever present
+	var baseURL string
 	if strings.Contains(host, "://") {
-		return strings.TrimRight(host, "/"), nil
+		baseURL = strings.TrimRight(host, "/")
+	} else {
+		baseURL = "https://" + strings.TrimRight(host, "/")
 	}
-	return "https://" + strings.TrimRight(host, "/"), nil
+	authlog.Info("region token: sealos-desktop base URL resolved host=%q baseURL=%q", host, baseURL)
+	return baseURL, nil
 }
 
 // Exchange calls the upstream regionToken endpoint and returns URL-encoded kubeconfig and namespace.
 func Exchange(ctx context.Context, baseURL, regionToken string) (*ExchangeResult, error) {
 	regionToken = strings.TrimSpace(regionToken)
 	if regionToken == "" {
+		authlog.Warn("region token exchange: rejected empty region token")
 		return nil, fmt.Errorf("regionToken is empty")
 	}
+	authlog.Info("region token exchange: starting upstream call regionToken=%s skipTLSVerify=%t",
+		authlog.SecretMeta(regionToken), desktopUpstreamSkipTLSVerify())
 	u, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil {
 		return nil, err
@@ -149,31 +161,40 @@ func Exchange(ctx context.Context, baseURL, regionToken string) (*ExchangeResult
 	client := exchangeHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
+		authlog.Warn("region token exchange: upstream request failed url=%q err=%v", uStr, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		authlog.Warn("region token exchange: read upstream body failed url=%q err=%v", uStr, err)
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		authlog.Warn("region token exchange: upstream non-success url=%q status=%d body=%q",
+			uStr, resp.StatusCode, strings.TrimSpace(string(body)))
 		return nil, fmt.Errorf("upstream %s: status %d: %s", uStr, resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var parsed UpstreamResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
+		authlog.Warn("region token exchange: decode upstream JSON failed url=%q err=%v", uStr, err)
 		return nil, fmt.Errorf("decode upstream JSON: %w", err)
 	}
 	if parsed.Code != 200 {
+		authlog.Warn("region token exchange: upstream application error url=%q code=%d message=%q",
+			uStr, parsed.Code, parsed.Message)
 		return nil, fmt.Errorf("upstream error: code=%d message=%s", parsed.Code, parsed.Message)
 	}
 	kc := strings.TrimSpace(unescapeKubeconfigLiterals(parsed.Data.Kubeconfig))
 	if kc == "" {
+		authlog.Warn("region token exchange: upstream returned empty kubeconfig url=%q", uStr)
 		return nil, fmt.Errorf("upstream response: empty data.kubeconfig")
 	}
 
 	kubeAPI, err := clientcmd.Load([]byte(kc))
 	if err != nil {
+		authlog.Warn("region token exchange: parse kubeconfig failed url=%q err=%v", uStr, err)
 		return nil, fmt.Errorf("parse kubeconfig from upstream: %w", err)
 	}
 	cc := kubeAPI.CurrentContext
@@ -185,6 +206,9 @@ func Exchange(ctx context.Context, baseURL, regionToken string) (*ExchangeResult
 	}
 	// QueryEscape uses '+' for space (form-style). Clients expect percent-encoding with '%20' for spaces; QueryUnescape accepts both.
 	enc := strings.ReplaceAll(url.QueryEscape(kc), "+", "%20")
+
+	authlog.Info("region token exchange: success namespace=%q encodedKubeconfig=%s currentContext=%q",
+		ns, authlog.SecretMeta(enc), cc)
 
 	return &ExchangeResult{
 		EncodedKubeconfig: enc,

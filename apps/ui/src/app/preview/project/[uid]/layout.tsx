@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShellSolo } from "@/components/app-shell";
+import { authWarn, secretMeta } from "@/lib/auth-log";
 import { PREVIEW_QUERY_HEADER } from "@/lib/preview/headers";
 import { assertPreviewShareAuthorized } from "@/lib/preview/share";
 
@@ -38,6 +39,12 @@ export default async function PreviewProjectLayout({
       projectUid: uid,
       namespace,
       shareToken,
+    });
+  } else {
+    authWarn("preview layout: skipping share validation — missing params", {
+      projectUid: uid || "(empty)",
+      namespace: namespace || "(empty)",
+      shareToken: secretMeta(shareToken),
     });
   }
   return <AppShellSolo>{children}</AppShellSolo>;

@@ -3,6 +3,7 @@
 import { useAtomValue } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import { useEffect } from "react";
+import { authInfo } from "@/lib/auth-log";
 import { scheduleChatSandboxWarmup } from "@/lib/vercel-sandbox.actions";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
@@ -49,6 +50,15 @@ export default function AuthBootstrap({
     [kubeconfigAtom, kubeconfig],
     [namespaceAtom, namespace],
   ]);
+
+  useEffect(() => {
+    authInfo("auth bootstrap: hydrated client credentials", {
+      source: hasDevOverride ? "dev-env" : "server",
+      namespace: namespace || "(empty)",
+      kubeconfig:
+        kubeconfig === "" ? "missing" : `present len=${kubeconfig.length}`,
+    });
+  }, [hasDevOverride, kubeconfig, namespace]);
 
   return null;
 }
