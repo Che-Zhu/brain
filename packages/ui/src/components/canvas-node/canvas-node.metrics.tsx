@@ -1,5 +1,6 @@
 "use client";
 
+import NumberFlow from "@number-flow/react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps, ComponentType, ReactNode, SVGProps } from "react";
 
@@ -39,6 +40,8 @@ const CANVAS_NODE_METRIC_PERCENT_FORMATTER = new Intl.NumberFormat("en-US", {
 });
 
 const CANVAS_NODE_METRIC_PERCENT_PATTERN = /^(-?\d+(?:\.\d+)?)\s*%$/;
+const CANVAS_NODE_RESOURCE_PRESSURE_ELEVATED_THRESHOLD = 75;
+const CANVAS_NODE_RESOURCE_PRESSURE_CRITICAL_THRESHOLD = 90;
 
 function formatCanvasNodeMetricPercent(value: number) {
   return Number.isFinite(value)
@@ -46,27 +49,62 @@ function formatCanvasNodeMetricPercent(value: number) {
     : "--";
 }
 
+function parseCanvasNodeMetricPercentValue(
+  value: CanvasNodeMetricValue
+): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const percentMatch = CANVAS_NODE_METRIC_PERCENT_PATTERN.exec(trimmed);
+  const n = percentMatch ? Number(percentMatch[1]) : Number(trimmed);
+
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function getCanvasNodeResourcePressureTextClassName(value: number) {
+  if (value > CANVAS_NODE_RESOURCE_PRESSURE_CRITICAL_THRESHOLD) {
+    return "text-theme-red";
+  }
+
+  if (value >= CANVAS_NODE_RESOURCE_PRESSURE_ELEVATED_THRESHOLD) {
+    return "text-theme-yellow";
+  }
+
+  return "text-muted-foreground";
+}
+
+function getCanvasNodeMetricTextClassName(
+  format: CanvasNodeMetricValueFormat | undefined,
+  percentValue: number | undefined
+) {
+  if (format !== "percent") {
+    return "text-muted-foreground";
+  }
+
+  if (percentValue === undefined) {
+    return "text-muted-foreground";
+  }
+
+  return getCanvasNodeResourcePressureTextClassName(percentValue);
+}
+
 export function formatCanvasNodeMetricValue(
   value: CanvasNodeMetricValue,
   format: CanvasNodeMetricValueFormat = "default"
 ) {
   if (format === "percent") {
-    if (typeof value === "number") {
-      return formatCanvasNodeMetricPercent(value);
+    const percentValue = parseCanvasNodeMetricPercentValue(value);
+    if (percentValue !== undefined) {
+      return formatCanvasNodeMetricPercent(percentValue);
     }
 
-    const trimmed = value?.trim();
-
-    if (!trimmed) {
-      return "--";
-    }
-
-    const percentMatch = CANVAS_NODE_METRIC_PERCENT_PATTERN.exec(trimmed);
-    if (percentMatch) {
-      return formatCanvasNodeMetricPercent(Number(percentMatch[1]));
-    }
-
-    return trimmed;
+    return typeof value === "string" ? value.trim() || "--" : "--";
   }
 
   if (typeof value === "number") {
@@ -134,17 +172,40 @@ export function CanvasNodeMetric({
   value: CanvasNodeMetricValue;
 }) {
   const formattedValue = formatCanvasNodeMetricValue(value, format);
+  const percentValue =
+    format === "percent" ? parseCanvasNodeMetricPercentValue(value) : undefined;
+  const metricTextClassName = getCanvasNodeMetricTextClassName(
+    format,
+    percentValue
+  );
 
   return (
     <span
       className={cn(
-        "flex h-5 min-w-0 shrink-0 items-center gap-1.5 rounded-full text-zinc-50",
+        "flex h-5 min-w-0 shrink-0 items-center rounded-full transition-colors duration-200",
+        metricTextClassName,
         className
       )}
-      title={`${label}: ${formattedValue}`}
     >
-      {children}
-      <span className="truncate tabular-nums">{formattedValue}</span>
+      <span className="sr-only">{`${label}: ${formattedValue}`}</span>
+      <span aria-hidden className="flex min-w-0 shrink-0 items-center gap-1.5">
+        {children}
+        {percentValue === undefined ? (
+          <span className="truncate tabular-nums">{formattedValue}</span>
+        ) : (
+          <NumberFlow
+            className="truncate tabular-nums"
+            format={{
+              maximumFractionDigits: 0,
+              style: "percent",
+            }}
+            isolate
+            locales="en-US"
+            value={percentValue / 100}
+            willChange
+          />
+        )}
+      </span>
     </span>
   );
 }

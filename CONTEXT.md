@@ -27,6 +27,10 @@ One accessible public endpoint within an EntryPoint. Maps 1:1 to a public AP end
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, basic networking, and triggers EntryPoint creation for public endpoints.
 
+### Container Node
+
+A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
+
 ### Workload Telemetry Series
 
 A normalized time-series representation of workload resource usage for AP and DB workloads. It is consumed by both compact canvas node summaries and detailed metrics panels.
@@ -93,6 +97,14 @@ Canvas nodes consume workload telemetry through a shared telemetry store rather 
 Canvas telemetry snapshots use instant telemetry queries and return only the latest sampled metric values. Snapshot requests do not carry a sampling window. Detailed metrics panels request one workload at a time and use range telemetry queries with `start`, `end`, and `step` when they need a Workload Telemetry Series.
 
 The legacy single-resource metrics request is not part of the Workload Telemetry interface. Callers should use snapshot batches for compact canvas summaries and single-workload series requests for detailed metrics panels.
+
+### Resource Pressure
+
+The latest observed usage level of a workload resource, derived from a single telemetry sample. Resource Pressure is instant, not sustained; it is appropriate for compact canvas summaries and does not imply an alert condition.
+
+Low Resource Pressure is visually neutral by default. Elevated Resource Pressure begins at 75% usage, and Critical Resource Pressure begins above 90% usage.
+
+Canvas node footer percentages for CPU, memory, and storage represent Resource Pressure across AP, DB, and environment nodes.
 
 ### Custom domain implementation is deferred
 
