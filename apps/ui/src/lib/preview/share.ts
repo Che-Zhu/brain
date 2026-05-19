@@ -6,16 +6,20 @@ import { ApiUrl } from "@workspace/api/utils";
 import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import { unauthorized } from "next/navigation";
 
+export type PreviewShareAuthorizationResult =
+  | { ok: true }
+  | { ok: false; status: 401 | 403 };
+
 /**
  * Replays the list request used by the preview route: `kind=aps` with project UID
  * label selector and `shareToken` in the query. The API returns 401 for
  * invalid/malformed JWTs and 403 for non-public / forbidden share access.
  */
-export async function assertPreviewShareAuthorized(input: {
+export async function validatePreviewShareAccess(input: {
   namespace: string;
   projectUid: string;
   shareToken: string;
-}): Promise<void> {
+}): Promise<PreviewShareAuthorizationResult> {
   const getParams = k8sGetQuerySchema.parse({
     kind: "aps",
     namespace: input.namespace,
@@ -33,9 +37,21 @@ export async function assertPreviewShareAuthorized(input: {
 
   const res = await fetch(url, { cache: "no-store", method: "GET" });
   if (res.status === 401 || res.status === 403) {
-    unauthorized();
+    return { ok: false, status: res.status };
   }
   if (!res.ok) {
     throw new Error(`Preview could not be validated (${res.status})`);
+  }
+  return { ok: true };
+}
+
+export async function assertPreviewShareAuthorized(input: {
+  namespace: string;
+  projectUid: string;
+  shareToken: string;
+}): Promise<void> {
+  const result = await validatePreviewShareAccess(input);
+  if (!result.ok) {
+    unauthorized();
   }
 }

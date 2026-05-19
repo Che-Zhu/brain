@@ -5,6 +5,7 @@ const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
   message: "Expected a finite number.",
 });
 const optionalBoundedString = z.string().trim().max(256).optional();
+const optionalShareToken = z.string().trim().max(4096).optional();
 const optionalTimestamp = z
   .string()
   .trim()
@@ -20,7 +21,6 @@ export const canvasLayoutResourceRefSchema = z.object({
 });
 
 export const canvasLayoutNodeSchema = z.object({
-  label: optionalBoundedString,
   lastSeenUid: optionalBoundedString,
   orphanedAt: optionalTimestamp,
   position: z.object({
@@ -48,6 +48,7 @@ export const canvasLayoutPatchRequestSchema = z.object({
 export const canvasLayoutGetQuerySchema = z.object({
   namespace: boundedString,
   projectUid: boundedString,
+  shareToken: optionalShareToken,
 });
 
 export type CanvasLayoutPatchRequest = z.infer<

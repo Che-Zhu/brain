@@ -143,7 +143,6 @@ function layoutDocumentsEqual(
 
 function layoutNodesEqual(a: CanvasLayoutNode, b: CanvasLayoutNode): boolean {
   return (
-    a.label === b.label &&
     a.lastSeenUid === b.lastSeenUid &&
     a.orphanedAt === b.orphanedAt &&
     a.position.x === b.position.x &&
@@ -163,9 +162,6 @@ function restoredLayoutNodeFromDetectedNode(
     position: { x: saved.position.x, y: saved.position.y },
     ref: { ...saved.ref },
   };
-  if (saved.label !== undefined) {
-    restored.label = saved.label;
-  }
   if (lastSeenUid !== undefined) {
     restored.lastSeenUid = lastSeenUid;
   }

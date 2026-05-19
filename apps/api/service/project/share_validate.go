@@ -29,6 +29,20 @@ var APGVR = schema.GroupVersionResource{
 	Resource: "aps",
 }
 
+// DBGVR is the namespaced DB claim.
+var DBGVR = schema.GroupVersionResource{
+	Group:    "example.crossplane.io",
+	Version:  "v1",
+	Resource: "dbs",
+}
+
+// EntryPointGVR is the namespaced EntryPoint claim.
+var EntryPointGVR = schema.GroupVersionResource{
+	Group:    "example.crossplane.io",
+	Version:  "v1",
+	Resource: "entrypoints",
+}
+
 var (
 	// ErrShareTokenInvalid is returned when the JWT is malformed, signature fails, or references missing data.
 	ErrShareTokenInvalid = errors.New("invalid share token")
@@ -131,6 +145,15 @@ func projectSpecPublic(obj *unstructured.Unstructured) bool {
 
 // VerifyAPInShareProject ensures the AP exists in ns and carries the shared project UID label.
 func VerifyAPInShareProject(ctx context.Context, adminCfg *clientcmdapi.Config, ns, apName, projectUID string) error {
+	return VerifyResourceInShareProject(ctx, adminCfg, "ap", ns, apName, projectUID)
+}
+
+// VerifyResourceInShareProject ensures an allowed preview resource exists in ns and carries the shared project UID label.
+func VerifyResourceInShareProject(ctx context.Context, adminCfg *clientcmdapi.Config, kind, ns, name, projectUID string) error {
+	gvr, ok := shareK8sKindGVR(kind)
+	if !ok {
+		return ErrShareForbidden
+	}
 	restCfg, err := clientcmd.NewDefaultClientConfig(*adminCfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return err
@@ -140,18 +163,31 @@ func VerifyAPInShareProject(ctx context.Context, adminCfg *clientcmdapi.Config, 
 	if err != nil {
 		return err
 	}
-	obj, err := dyn.Resource(APGVR).Namespace(ns).Get(ctx, apName, metav1.GetOptions{})
+	obj, err := dyn.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	if obj.GetLabels()[ProjectUIDLabel] != projectUID {
-		return fmt.Errorf("%w: AP not in shared project", ErrShareTokenInvalid)
+		return fmt.Errorf("%w: resource not in shared project", ErrShareTokenInvalid)
 	}
 	return nil
 }
 
+func shareK8sKindGVR(kind string) (schema.GroupVersionResource, bool) {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "ap", "aps":
+		return APGVR, true
+	case "db", "dbs":
+		return DBGVR, true
+	case "entrypoint", "entrypoints":
+		return EntryPointGVR, true
+	default:
+		return schema.GroupVersionResource{}, false
+	}
+}
+
 // ShareK8sKindAllowed is true for kinds that may be listed with a project share token (read-only preview).
 func ShareK8sKindAllowed(kind string) bool {
-	k := strings.ToLower(strings.TrimSpace(kind))
-	return k == "aps" || k == "ap"
+	_, ok := shareK8sKindGVR(kind)
+	return ok
 }

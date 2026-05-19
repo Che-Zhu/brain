@@ -19,17 +19,28 @@ export function useProjectCanvasLayout(options: {
   enabled?: boolean;
   namespace: string;
   projectUid: string;
+  shareToken?: string;
 }) {
   const namespace = options.namespace.trim();
   const projectUid = options.projectUid.trim();
+  const shareToken = options.shareToken?.trim() ?? "";
   const enabled =
     options.enabled === true && namespace !== "" && projectUid !== "";
 
   const swrKey = enabled
-    ? ([PROJECT_CANVAS_LAYOUT_API_PATH, namespace, projectUid] as const)
+    ? ([
+        PROJECT_CANVAS_LAYOUT_API_PATH,
+        namespace,
+        projectUid,
+        shareToken,
+      ] as const)
     : null;
   const { data, error, isLoading, mutate } = useSWR(swrKey, () =>
-    fetchProjectCanvasLayout({ namespace, projectUid })
+    fetchProjectCanvasLayout({
+      namespace,
+      projectUid,
+      ...(shareToken === "" ? {} : { shareToken }),
+    })
   );
 
   const loadToastKey = enabled ? `${namespace}:${projectUid}` : "";
@@ -49,7 +60,7 @@ export function useProjectCanvasLayout(options: {
     async (
       nodes: Parameters<typeof patchProjectCanvasLayoutNodes>[0]["nodes"]
     ) => {
-      if (!enabled) {
+      if (!enabled || shareToken !== "") {
         return;
       }
       try {
@@ -65,7 +76,7 @@ export function useProjectCanvasLayout(options: {
         );
       }
     },
-    [enabled, mutate, namespace, projectUid]
+    [enabled, mutate, namespace, projectUid, shareToken]
   );
 
   const scheduler = useMemo(
@@ -84,7 +95,7 @@ export function useProjectCanvasLayout(options: {
 
   const scheduleNodePositionSave = useCallback(
     (node: Node) => {
-      if (!enabled) {
+      if (!enabled || shareToken !== "") {
         return;
       }
       const layoutNode = canvasLayoutNodeFromNode(node);
@@ -92,7 +103,7 @@ export function useProjectCanvasLayout(options: {
         scheduler.schedule(layoutNode);
       }
     },
-    [enabled, scheduler]
+    [enabled, scheduler, shareToken]
   );
 
   return {

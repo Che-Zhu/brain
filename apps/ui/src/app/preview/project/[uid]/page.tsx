@@ -2,6 +2,8 @@
 
 import {
   useApsK8sList,
+  useDbsK8sList,
+  useEntryPointList,
   useWorkloadTelemetrySnapshotBatch,
 } from "@workspace/api/hooks";
 import { apNamespaceNameTargetsFromList } from "@workspace/api/lib/ap-list";
@@ -11,10 +13,9 @@ import type { CanvasState } from "@workspace/ui/components/canvas/canvas.types";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
-import {
-  apMetricsLookupFromSnapshot,
-  apsToCanvasState,
-} from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
+import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { buildPreviewProjectCanvasState } from "@/lib/project-canvas/preview/state";
 
 const METRICS_REFRESH_MS = 5000;
 
@@ -38,8 +39,37 @@ function usePreviewProjectCanvas(options: {
     namespace,
     shareToken: shareToken.trim() === "" ? undefined : shareToken.trim(),
   });
+  const {
+    data: dbsData,
+    error: dbsError,
+    isLoading: dbsLoading,
+    mutate: mutateDbs,
+  } = useDbsK8sList({
+    labelSelector,
+    namespace,
+    shareToken: shareToken.trim() === "" ? undefined : shareToken.trim(),
+  });
+  const {
+    data: entryPointsData,
+    error: entryPointsError,
+    isLoading: entryPointsLoading,
+    mutate: mutateEntryPoints,
+  } = useEntryPointList({
+    labelSelector,
+    namespace,
+    shareToken: shareToken.trim() === "" ? undefined : shareToken.trim(),
+  });
+  const projectCanvasLayout = useProjectCanvasLayout({
+    enabled: namespace !== "" && shareToken.trim() !== "" && uid !== "",
+    namespace,
+    projectUid: uid,
+    shareToken,
+  });
 
-  const refreshWorkloadLists = useCallback(() => mutate(), [mutate]);
+  const refreshWorkloadLists = useCallback(
+    () => Promise.all([mutate(), mutateDbs(), mutateEntryPoints()]),
+    [mutate, mutateDbs, mutateEntryPoints]
+  );
 
   const apMetricsTargets = useMemo(
     () =>
@@ -62,15 +92,38 @@ function usePreviewProjectCanvas(options: {
     [apMetrics]
   );
 
-  const canvasState = useMemo((): CanvasState => {
-    const { edges, nodes } = apsToCanvasState(data, {
+  const canvasState = useMemo(
+    (): CanvasState =>
+      buildPreviewProjectCanvasState({
+        apMetricsLookup: metricsLookup,
+        apsData: data,
+        canvasLayout: projectCanvasLayout.layout,
+        canvasLayoutReady: projectCanvasLayout.layoutReady,
+        dbsData,
+        entryPointsData,
+        namespace,
+      }),
+    [
+      data,
+      dbsData,
+      entryPointsData,
       metricsLookup,
-      namespaceFallback: namespace,
-    });
-    return { edges, nodes, selectedEdge: null, selectedNode: null };
-  }, [data, namespace, metricsLookup]);
+      namespace,
+      projectCanvasLayout.layout,
+      projectCanvasLayout.layoutReady,
+    ]
+  );
 
-  return { canvasState, error, isLoading, refreshWorkloadLists };
+  return {
+    canvasState,
+    error: error ?? dbsError ?? entryPointsError,
+    isLoading:
+      isLoading ||
+      dbsLoading ||
+      entryPointsLoading ||
+      !projectCanvasLayout.layoutReady,
+    refreshWorkloadLists,
+  };
 }
 
 /**
@@ -92,6 +145,7 @@ export default function PreviewProjectPage() {
 
   const { clearSelection, meta, nodes, selectedEdge, selectedNode } =
     useProjectCanvas(canvasState.nodes, {
+      readOnly: true,
       refreshWorkloadLists,
       shareToken,
     });

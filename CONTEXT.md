@@ -35,10 +35,6 @@ A canvas node that represents an AP workload. The name is retained as a product/
 
 A Project-scoped visual arrangement of the canvas, shared by everyone who opens that Project.
 
-### Canvas Label
-
-A user-editable display name for a canvas node that does not rename the underlying AP, DB, or EntryPoint resource.
-
 ### Canvas Connection
 
 A canvas edge that represents a real runtime dependency between resources. In the first version, Canvas Connections are detected from existing resource state rather than created by user-drawn edges.
@@ -92,9 +88,9 @@ Entry node and container node are not connected by edges and have no special lay
 
 Canvas Layout is not a personal browser preference. It belongs to the Project and should be reused when the same Project is opened by another user, browser, or share preview. Ephemeral UI state such as the selected node, open panel, and temporary zoom can remain local.
 
-### Canvas Layout v1 stores positions and labels, not viewport
+### Canvas Layout v1 stores positions, not viewport or names
 
-The first persisted Canvas Layout stores node positions and optional Canvas Labels. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, or other ephemeral UI state.
+The first persisted Canvas Layout stores node positions. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, Resource Display Names, or other non-layout state.
 
 ### Canvas Layout saves merge by node
 
@@ -111,10 +107,6 @@ Canvas Layout belongs to the application persistence layer, not the Crossplane r
 ### Canvas Layout is keyed by Project UID
 
 Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
-
-### Canvas node naming is separate from resource naming
-
-Renaming a node on the canvas changes its Canvas Label. It does not rename the underlying Kubernetes resource. A resource rename, if introduced later, is a distinct workload migration operation and must preserve or migrate the Canvas Layout intentionally.
 
 ### Canvas edges are not freeform annotations
 

@@ -43,6 +43,7 @@ import {
 export interface UseProjectCanvasOptions {
   kubeconfig?: string;
   onNodePositionChange?: (node: Node) => void;
+  readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
   shareToken?: string;
@@ -70,6 +71,7 @@ export function useProjectCanvas(
   );
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
+  const readOnly = options?.readOnly === true;
 
   const {
     authReady: apAuthReady,
@@ -78,8 +80,8 @@ export function useProjectCanvas(
     restartWorkload,
     startWorkload,
   } = useApLifecycleOperations({
-    kubeconfig: options?.kubeconfig,
-    shareToken: options?.shareToken,
+    kubeconfig: readOnly ? undefined : options?.kubeconfig,
+    shareToken: readOnly ? undefined : options?.shareToken,
   });
   const {
     authReady: dbAuthReady,
@@ -92,8 +94,8 @@ export function useProjectCanvas(
     stopWorkload: stopDbWorkload,
     togglePublicAccess,
   } = useDbLifecycleOperations({
-    kubeconfig: options?.kubeconfig,
-    shareToken: options?.shareToken,
+    kubeconfig: readOnly ? undefined : options?.kubeconfig,
+    shareToken: readOnly ? undefined : options?.shareToken,
   });
 
   const refreshWorkloadLists = options?.refreshWorkloadLists;
@@ -467,6 +469,10 @@ export function useProjectCanvas(
         [CANVAS_CONTAINER_NODE_TYPE]: projectCanvasWorkloadPanelTabs,
       },
       reactFlowProps: {
+        connectOnClick: !readOnly,
+        edgesReconnectable: !readOnly,
+        nodesConnectable: !readOnly,
+        nodesDraggable: !readOnly,
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
@@ -482,7 +488,9 @@ export function useProjectCanvas(
           setDatabasePane(null).catch(() => undefined);
         },
         onNodeDragStop: (_, node: Node) => {
-          onNodePositionChange?.(node);
+          if (!readOnly) {
+            onNodePositionChange?.(node);
+          }
         },
         onPaneClick: () => clearSelection(),
       },
@@ -491,6 +499,7 @@ export function useProjectCanvas(
       clearSelection,
       onNodePositionChange,
       panelTab,
+      readOnly,
       setDatabasePane,
       setPanelTab,
       setSelectedEdge,

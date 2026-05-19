@@ -59,11 +59,9 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
   if (!(Number.isFinite(x) && Number.isFinite(y))) {
     throw new CanvasLayoutValidationError("node position must be finite.");
   }
-  const label = optionalTrimmed(node.label);
   const lastSeenUid = optionalTrimmed(node.lastSeenUid);
   const orphanedAt = normalizeOptionalTimestamp(node.orphanedAt, "orphanedAt");
   return {
-    ...(label === undefined ? {} : { label }),
     ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
     ...(orphanedAt === undefined ? {} : { orphanedAt }),
     position: { x, y },

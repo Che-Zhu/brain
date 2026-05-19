@@ -59,7 +59,7 @@ func registerGet(grp huma.API) {
 				return nil, huma.Error400BadRequest("all-namespaces is not allowed with share token", nil)
 			}
 			if !projectsvc.ShareK8sKindAllowed(input.Kind) {
-				return nil, huma.Error403Forbidden("share token only allows kind ap/aps for this API", nil)
+				return nil, huma.Error403Forbidden("share token only allows project preview graph kinds for this API", nil)
 			}
 			adminCfg, err := middleware.AdminKubeconfigFromEnv()
 			if err != nil {
@@ -82,7 +82,7 @@ func registerGet(grp huma.API) {
 			opts.LabelSelector = projectsvc.ProjectUIDLabel + "=" + validated.ProjectUID
 			opts.FieldSelector = ""
 			if opts.Name != "" {
-				if err := projectsvc.VerifyAPInShareProject(ctx, adminCfg, opts.Namespace, opts.Name, validated.ProjectUID); err != nil {
+				if err := projectsvc.VerifyResourceInShareProject(ctx, adminCfg, input.Kind, opts.Namespace, opts.Name, validated.ProjectUID); err != nil {
 					return nil, huma.Error403Forbidden("resource not part of shared project", err)
 				}
 			}
@@ -142,12 +142,12 @@ func registerDescribe(grp huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-describe",
-		Method:       http.MethodGet,
-		Path:         "/describe",
-		Summary:      "Describe resource",
-		Description:  "Describe Kubernetes resources (events, conditions, etc.).",
-		Tags:         []string{"K8s"},
+		OperationID: "k8s-describe",
+		Method:      http.MethodGet,
+		Path:        "/describe",
+		Summary:     "Describe resource",
+		Description: "Describe Kubernetes resources (events, conditions, etc.).",
+		Tags:        []string{"K8s"},
 	}, func(ctx context.Context, input *describeInput) (*describeOutput, error) {
 		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
 		if err != nil {
@@ -195,7 +195,7 @@ func registerLogs(grp huma.API) {
 		Body string `contentType:"text/plain"`
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-logs",
+		OperationID: "k8s-logs",
 		Method:      http.MethodGet,
 		Path:        "/logs",
 		Summary:     "Get pod logs",
@@ -248,7 +248,7 @@ func registerTop(grp huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(grp, huma.Operation{
-		OperationID:  "k8s-top",
+		OperationID: "k8s-top",
 		Method:      http.MethodGet,
 		Path:        "/top",
 		Summary:     "Resource usage",

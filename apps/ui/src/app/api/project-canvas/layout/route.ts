@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
-
+import { validatePreviewShareAccess } from "@/lib/preview/share";
 import {
   assertCanvasLayoutPatchMatchesOwner,
   parseCanvasLayoutGetQuery,
@@ -37,6 +37,30 @@ async function authorizeNamespace(namespace: string): Promise<Response | null> {
   return null;
 }
 
+async function authorizeLayoutRead(
+  query: ReturnType<typeof parseCanvasLayoutGetQuery>,
+  request: NextRequest
+): Promise<Response | null> {
+  const shareToken =
+    query.shareToken?.trim() || request.headers.get("X-Share-Token")?.trim();
+  if (shareToken) {
+    const result = await validatePreviewShareAccess({
+      namespace: query.namespace,
+      projectUid: query.projectUid,
+      shareToken,
+    });
+    if (!result.ok) {
+      return jsonError(
+        "Canvas layout share token is not authorized.",
+        result.status
+      );
+    }
+    return null;
+  }
+
+  return authorizeNamespace(query.namespace);
+}
+
 function validationError(error: unknown): Response | null {
   if (
     error instanceof ZodError ||
@@ -53,18 +77,25 @@ export async function GET(request: NextRequest) {
     query = parseCanvasLayoutGetQuery({
       namespace: request.nextUrl.searchParams.get("namespace") ?? "",
       projectUid: request.nextUrl.searchParams.get("projectUid") ?? "",
+      shareToken:
+        request.nextUrl.searchParams.get("shareToken") ??
+        request.headers.get("X-Share-Token") ??
+        undefined,
     });
   } catch (error) {
     return validationError(error) ?? jsonError("Invalid request.", 400);
   }
 
-  const denied = await authorizeNamespace(query.namespace);
+  const denied = await authorizeLayoutRead(query, request);
   if (denied !== null) {
     return denied;
   }
 
   try {
-    return NextResponse.json(await loadProjectCanvasLayout(query));
+    const { namespace, projectUid } = query;
+    return NextResponse.json(
+      await loadProjectCanvasLayout({ namespace, projectUid })
+    );
   } catch {
     return jsonError("Canvas layout persistence is unavailable.", 503);
   }
