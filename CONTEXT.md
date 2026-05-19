@@ -35,18 +35,6 @@ A canvas node that represents an AP workload. The name is retained as a product/
 
 A normalized time-series representation of workload resource usage for AP and DB workloads. It is consumed by both compact canvas node summaries and detailed metrics panels.
 
-Workload Telemetry Series exposes stable product-facing metric keys:
-
-- **cpu** - CPU usage percent
-- **memory** - memory usage percent
-- **storage** - storage usage percent
-
-The underlying telemetry implementation may query infrastructure names such as disk, PVC, pod, or engine-specific metric names. Those names are implementation details and should not leak through the Workload Telemetry Series interface. Database uptime is not part of the Workload Telemetry Series; it is runtime/status information, not resource usage telemetry.
-
-Callers may request one sampling window for the whole request using `start`, `end`, and `step`; all requested workloads in that request share the same window. Sampling windows are constrained by the platform so callers cannot request unbounded telemetry ranges or overly fine-grained samples.
-
-Missing metrics are partial data, not a total workload telemetry failure. Consumers should render the metrics that are available and treat missing metric keys as unavailable telemetry for that metric. In a request for multiple workloads, each workload can succeed or fail independently. Within one workload, each metric can also succeed or fail independently.
-
 ### Custom Domain Binding (future, not yet implemented)
 
 The process of attaching a user-owned domain to an EntryPoint target. Blocked on cert-manager infrastructure. When implemented:
@@ -95,16 +83,6 @@ Canvas workload nodes should not wait for a full-project telemetry batch before 
 Canvas nodes consume workload telemetry through a shared telemetry store rather than each node owning an independent polling loop. The first version treats mounted canvas nodes as eligible telemetry consumers and prioritizes the selected workload, without requiring viewport visibility calculation. For compact canvas summaries, the store batches mounted workload targets into snapshot requests so nodes can update independently while the network layer avoids one request per node.
 
 Canvas telemetry snapshots use instant telemetry queries and return only the latest sampled metric values. Snapshot requests do not carry a sampling window. Detailed metrics panels request one workload at a time and use range telemetry queries with `start`, `end`, and `step` when they need a Workload Telemetry Series.
-
-The legacy single-resource metrics request is not part of the Workload Telemetry interface. Callers should use snapshot batches for compact canvas summaries and single-workload series requests for detailed metrics panels.
-
-### Resource Pressure
-
-The latest observed usage level of a workload resource, derived from a single telemetry sample. Resource Pressure is instant, not sustained; it is appropriate for compact canvas summaries and does not imply an alert condition.
-
-Low Resource Pressure is visually neutral by default. Elevated Resource Pressure begins at 75% usage, and Critical Resource Pressure begins above 90% usage.
-
-Canvas node footer percentages for CPU, memory, and storage represent Resource Pressure across AP, DB, and environment nodes.
 
 ### Custom domain implementation is deferred
 
