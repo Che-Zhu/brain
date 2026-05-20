@@ -15,7 +15,7 @@ import { ASSISTANT_DB_SCHEMA } from "./types";
  * Isolated from `public` so `drizzle-kit push` with `schemaFilter` does not try
  * to drop operator/managed tables (e.g. `postgres_log`, extension views).
  */
-const ns = pgSchema(ASSISTANT_DB_SCHEMA);
+export const ns = pgSchema(ASSISTANT_DB_SCHEMA);
 
 /**
  * Conversation thread scoped by `namespace` (e.g. K8s namespace) so assistants

@@ -12,7 +12,7 @@ import type { CanvasLayoutNode } from "@/lib/project-canvas/layout/types";
 
 import { PROJECT_DB_SCHEMA } from "./types";
 
-const ns = pgSchema(PROJECT_DB_SCHEMA);
+export const ns = pgSchema(PROJECT_DB_SCHEMA);
 
 /** Shared Project canvas layout, keyed by Kubernetes namespace and stable Project UID. */
 export const projectCanvasLayouts = ns.table(
