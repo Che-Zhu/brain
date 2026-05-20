@@ -6,6 +6,7 @@ import type {
   ReactFlowProps,
 } from "@xyflow/react";
 import type { ComponentType, ReactNode } from "react";
+import type { CanvasNodeConnectionSide } from "../canvas-node/canvas-node.types";
 import type { CanvasEdgeAnchorResolver } from "./canvas.edge-anchors";
 
 /** Body content for {@link CanvasPanel}; receives the selected React Flow node. */
@@ -60,6 +61,10 @@ export type CanvasReactFlowProps = Omit<
 >;
 
 export interface CanvasState {
+  connectionOrigin?: {
+    nodeId: string;
+    side: CanvasNodeConnectionSide;
+  } | null;
   edges: Edge[];
   nodes: Node[];
   selectedEdge: Edge | null;

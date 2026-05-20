@@ -10,6 +10,7 @@ import type {
   CanvasReactFlowProps,
   CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
+import type { CanvasNodeConnectionSide } from "@workspace/ui/components/canvas-node/canvas-node";
 import type { ContainerSettingsPaneAddDbDsnReferenceIntent } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type {
   DatabaseNodeCopyConnectionHandler,
@@ -79,6 +80,35 @@ export interface UseProjectCanvasOptions {
 interface PendingAddDbDsnReferenceIntent
   extends ContainerSettingsPaneAddDbDsnReferenceIntent {
   apNodeId: string;
+}
+
+interface ProjectCanvasConnectionOrigin {
+  nodeId: string;
+  side: CanvasNodeConnectionSide;
+}
+
+const CANVAS_NODE_CONNECTION_SIDES = new Set<string>([
+  "bottom",
+  "left",
+  "right",
+  "top",
+]);
+
+function connectionOriginFromHandle(
+  handle: ProjectCanvasConnectionHandle | null
+): ProjectCanvasConnectionOrigin | null {
+  if (
+    handle?.nodeId == null ||
+    handle.id == null ||
+    !CANVAS_NODE_CONNECTION_SIDES.has(handle.id)
+  ) {
+    return null;
+  }
+
+  return {
+    nodeId: handle.nodeId,
+    side: handle.id as CanvasNodeConnectionSide,
+  };
 }
 
 function dbReferenceIntentDataForContainerNode({
@@ -173,6 +203,8 @@ export function useProjectCanvas(
     null
   );
   const snappedConnectionInGestureRef = useRef<Connection | null>(null);
+  const [connectionOrigin, setConnectionOrigin] =
+    useState<ProjectCanvasConnectionOrigin | null>(null);
   const [connectionGestureActive, setConnectionGestureActive] = useState(false);
   const [pendingAddDbDsnReferenceIntent, setPendingAddDbDsnReferenceIntent] =
     useState<PendingAddDbDsnReferenceIntent | null>(null);
@@ -635,9 +667,10 @@ export function useProjectCanvas(
     NonNullable<CanvasReactFlowProps["onConnectStart"]>
   >((_event, params) => {
     connectHandledInGestureRef.current = false;
-    connectingFromHandleRef.current =
-      connectionHandleFromConnectStartParams(params);
+    const fromHandle = connectionHandleFromConnectStartParams(params);
+    connectingFromHandleRef.current = fromHandle;
     snappedConnectionInGestureRef.current = null;
+    setConnectionOrigin(connectionOriginFromHandle(fromHandle));
     setConnectionGestureActive(true);
   }, []);
   const handleConnectEnd = useCallback<
@@ -659,6 +692,7 @@ export function useProjectCanvas(
       connectHandledInGestureRef.current = false;
       connectingFromHandleRef.current = null;
       snappedConnectionInGestureRef.current = null;
+      setConnectionOrigin(null);
       setConnectionGestureActive(false);
     },
     [handleConnect, isSupportedCanvasConnection]
@@ -811,6 +845,7 @@ export function useProjectCanvas(
   return {
     clearSelection,
     closeDatabasePane,
+    connectionOrigin,
     databasePane,
     meta,
     nodes,

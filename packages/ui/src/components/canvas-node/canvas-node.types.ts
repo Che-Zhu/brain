@@ -14,6 +14,7 @@ export interface CanvasNodeStatus {
 
 export interface CanvasNodeInteractionState {
   dragging?: boolean;
+  highlightedConnectionSide?: CanvasNodeConnectionSide;
   selected?: boolean;
 }
 

@@ -84,6 +84,7 @@ export default function ProjectUidPage() {
   const {
     clearSelection,
     closeDatabasePane,
+    connectionOrigin,
     databasePane,
     meta: canvasMeta,
     nodes,
@@ -126,6 +127,7 @@ export default function ProjectUidPage() {
               meta={meta}
               state={{
                 ...canvasState,
+                connectionOrigin,
                 edges: canvasEdges,
                 nodes,
                 selectedEdge,

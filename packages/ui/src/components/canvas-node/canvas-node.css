@@ -81,6 +81,28 @@
     var(--color-blue-400);
 }
 
+.canvas-node-frame[data-highlighted-connection-side="top"]
+  .canvas-node-surface {
+  box-shadow: 0 calc(var(--canvas-node-edge-highlight-size) * -1) 0 0
+    var(--color-blue-400);
+}
+
+.canvas-node-frame[data-highlighted-connection-side="right"]
+  .canvas-node-surface {
+  box-shadow: var(--canvas-node-edge-highlight-size) 0 0 0 var(--color-blue-400);
+}
+
+.canvas-node-frame[data-highlighted-connection-side="bottom"]
+  .canvas-node-surface {
+  box-shadow: 0 var(--canvas-node-edge-highlight-size) 0 0 var(--color-blue-400);
+}
+
+.canvas-node-frame[data-highlighted-connection-side="left"]
+  .canvas-node-surface {
+  box-shadow: calc(var(--canvas-node-edge-highlight-size) * -1) 0 0 0
+    var(--color-blue-400);
+}
+
 .canvas-node-header {
   min-height: var(--canvas-node-card-height-collapsed);
   padding: calc(var(--spacing) * 2.5);
