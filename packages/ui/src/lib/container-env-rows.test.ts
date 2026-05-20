@@ -93,6 +93,50 @@ test("container env rows normalize direct rows and compare by saved shape", () =
   );
 });
 
+test("container env rows compare primitive DB references by saved Secret ref", () => {
+  assert.equal(
+    containerEnvRowsEqual(
+      [
+        {
+          dbDsn: {
+            dbName: "postgres",
+            dbNamespace: "default",
+            field: "username",
+          },
+          name: "DATABASE_FIELD",
+          value: "(valueFrom)",
+          valueFrom: {
+            secretKeyRef: {
+              key: "user",
+              name: "postgres-conn-credential",
+            },
+          },
+          valueSource: "dbDsn",
+        },
+      ],
+      [
+        {
+          dbDsn: {
+            dbName: "postgres",
+            dbNamespace: "default",
+            field: "password",
+          },
+          name: "DATABASE_FIELD",
+          value: "(valueFrom)",
+          valueFrom: {
+            secretKeyRef: {
+              key: "passwd",
+              name: "postgres-conn-credential",
+            },
+          },
+          valueSource: "dbDsn",
+        },
+      ]
+    ),
+    false
+  );
+});
+
 test("container env rows add DB DSN references with private DSN as the default field", () => {
   const dbs = [
     {
@@ -144,6 +188,50 @@ test("container env rows omit unavailable public DSNs and cannot add DBs without
     ),
     []
   );
+});
+
+test("container env rows offer primitive DB fields from Secret key evidence", () => {
+  const source = {
+    name: "postgres",
+    namespace: "default",
+    primitiveSecretRefs: {
+      host: { key: "endpoint", name: "postgres-conn-credential" },
+      password: { key: "passwd", name: "postgres-conn-credential" },
+      port: { key: "port", name: "postgres-conn-credential" },
+      username: { key: "user", name: "postgres-conn-credential" },
+    },
+  };
+
+  assert.deepEqual(containerEnvDbDsnFieldOptions(source), [
+    {
+      field: "username",
+      label: "Username",
+      valueFrom: {
+        secretKeyRef: { key: "user", name: "postgres-conn-credential" },
+      },
+    },
+    {
+      field: "password",
+      label: "Password",
+      valueFrom: {
+        secretKeyRef: { key: "passwd", name: "postgres-conn-credential" },
+      },
+    },
+    {
+      field: "host",
+      label: "Host",
+      valueFrom: {
+        secretKeyRef: { key: "endpoint", name: "postgres-conn-credential" },
+      },
+    },
+    {
+      field: "port",
+      label: "Port",
+      valueFrom: {
+        secretKeyRef: { key: "port", name: "postgres-conn-credential" },
+      },
+    },
+  ]);
 });
 
 test("container env rows reconstruct DB DSN references only by exact value equality", () => {

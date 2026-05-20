@@ -7,24 +7,41 @@ export interface ContainerEnvRow {
 }
 
 export type ContainerEnvDbDsnField = "private" | "public";
+export type ContainerEnvDbPrimitiveField =
+  | "host"
+  | "password"
+  | "port"
+  | "username";
+export type ContainerEnvDbReferenceField =
+  | ContainerEnvDbDsnField
+  | ContainerEnvDbPrimitiveField;
+
+export interface ContainerEnvSecretKeyRef {
+  key: string;
+  name: string;
+}
 
 export interface ContainerEnvDbDsnReference {
   dbName: string;
   dbNamespace: string;
-  field: ContainerEnvDbDsnField;
+  field: ContainerEnvDbReferenceField;
 }
 
 export interface ContainerEnvDbDsnSource {
   name: string;
   namespace: string;
+  primitiveSecretRefs?: Partial<
+    Record<ContainerEnvDbPrimitiveField, ContainerEnvSecretKeyRef>
+  >;
   privateDsn?: string;
   publicDsn?: string;
 }
 
 export interface ContainerEnvDbDsnFieldOption {
-  field: ContainerEnvDbDsnField;
+  field: ContainerEnvDbReferenceField;
   label: string;
-  value: string;
+  value?: string;
+  valueFrom?: { secretKeyRef: ContainerEnvSecretKeyRef };
 }
 
 export type ContainerEnvRowValidationErrorType =
@@ -47,6 +64,23 @@ export const CONTAINER_ENV_VALUE_FROM_PLACEHOLDER = "(valueFrom)";
 
 const K8S_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 const DEFAULT_ROW_NAME = "NEW_VARIABLE";
+const PRIMITIVE_FIELD_LABELS: Record<ContainerEnvDbPrimitiveField, string> = {
+  host: "Host",
+  password: "Password",
+  port: "Port",
+  username: "Username",
+};
+export const CONTAINER_ENV_DB_SECRET_KEY_CANDIDATES: Record<
+  ContainerEnvDbPrimitiveField,
+  readonly string[]
+> = {
+  host: ["host", "endpoint"],
+  password: ["password", "passwd"],
+  port: ["port"],
+  username: ["username", "user"],
+};
+export const CONTAINER_ENV_DB_PRIMITIVE_FIELD_ORDER: readonly ContainerEnvDbPrimitiveField[] =
+  ["username", "password", "host", "port"];
 
 function nextDefaultRowName(rows: readonly ContainerEnvRow[]): string {
   const used = new Set(rows.map((row) => row.name.trim()).filter(Boolean));
@@ -62,6 +96,16 @@ function nextDefaultRowName(rows: readonly ContainerEnvRow[]): string {
 
 function nonEmptyValue(value: string | undefined): string | undefined {
   return value === undefined || value === "" ? undefined : value;
+}
+
+function isPrimitiveDbReferenceField(
+  field: ContainerEnvDbReferenceField
+): field is ContainerEnvDbPrimitiveField {
+  return field !== "private" && field !== "public";
+}
+
+function valueForDbReferenceField(field: ContainerEnvDbDsnFieldOption): string {
+  return field.value ?? CONTAINER_ENV_VALUE_FROM_PLACEHOLDER;
 }
 
 export function isKubernetesEnvName(name: string): boolean {
@@ -87,6 +131,18 @@ export function containerEnvDbDsnFieldOptions(
       field: "public",
       label: "Public DSN",
       value: publicDsn,
+    });
+  }
+
+  for (const field of CONTAINER_ENV_DB_PRIMITIVE_FIELD_ORDER) {
+    const secretKeyRef = source?.primitiveSecretRefs?.[field];
+    if (secretKeyRef === undefined) {
+      continue;
+    }
+    options.push({
+      field,
+      label: PRIMITIVE_FIELD_LABELS[field],
+      valueFrom: { secretKeyRef },
     });
   }
 
@@ -130,6 +186,17 @@ export function normalizeContainerEnvRowsForSave(
       };
     }
     if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+      if (
+        isPrimitiveDbReferenceField(row.dbDsn.field) &&
+        row.valueFrom != null
+      ) {
+        return {
+          name,
+          value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+          valueFrom: row.valueFrom,
+          valueSource: "valueFrom",
+        };
+      }
       return { name, value: row.value };
     }
     return { name, value: row.value };
@@ -160,7 +227,10 @@ export function addContainerEnvDbDsnReferenceRow(
           field: field.field,
         },
         name: nextDefaultRowName(rows),
-        value: field.value,
+        value: valueForDbReferenceField(field),
+        ...(field.valueFrom === undefined
+          ? {}
+          : { valueFrom: field.valueFrom }),
         valueSource: "dbDsn",
       },
     ];
@@ -190,6 +260,83 @@ function valueFromKey(valueFrom: unknown): string {
   return valueFrom == null ? "" : JSON.stringify(valueFrom);
 }
 
+function rowSavesAsValueFrom(row: ContainerEnvRow): boolean {
+  if (row.valueSource === "valueFrom" && row.valueFrom != null) {
+    return true;
+  }
+  return (
+    row.valueSource === "dbDsn" &&
+    row.dbDsn != null &&
+    isPrimitiveDbReferenceField(row.dbDsn.field) &&
+    row.valueFrom != null
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function secretKeyRefFromValueFrom(
+  valueFrom: unknown
+): ContainerEnvSecretKeyRef | undefined {
+  const valueFromRecord = asRecord(valueFrom);
+  const secretKeyRef = asRecord(valueFromRecord?.secretKeyRef);
+  const name = secretKeyRef?.name;
+  const key = secretKeyRef?.key;
+  if (typeof name !== "string" || name === "") {
+    return undefined;
+  }
+  if (typeof key !== "string" || key === "") {
+    return undefined;
+  }
+  return { key, name };
+}
+
+export function containerEnvDbPrimitiveFieldForSecretKey(
+  key: string
+): { field: ContainerEnvDbPrimitiveField; priority: number } | undefined {
+  for (const field of CONTAINER_ENV_DB_PRIMITIVE_FIELD_ORDER) {
+    const priority = CONTAINER_ENV_DB_SECRET_KEY_CANDIDATES[field].indexOf(key);
+    if (priority !== -1) {
+      return { field, priority };
+    }
+  }
+  return undefined;
+}
+
+export function containerEnvDbSecretReferenceFromValueFrom(
+  valueFrom: unknown,
+  sources: readonly ContainerEnvDbDsnSource[]
+):
+  | Pick<ContainerEnvRow, "dbDsn" | "value" | "valueFrom" | "valueSource">
+  | undefined {
+  const ref = secretKeyRefFromValueFrom(valueFrom);
+  if (ref === undefined) {
+    return undefined;
+  }
+  for (const source of sources) {
+    for (const field of containerEnvDbDsnFieldOptions(source)) {
+      const fieldRef = field.valueFrom?.secretKeyRef;
+      if (fieldRef?.name !== ref.name || fieldRef.key !== ref.key) {
+        continue;
+      }
+      return {
+        dbDsn: {
+          dbName: source.name,
+          dbNamespace: source.namespace,
+          field: field.field,
+        },
+        value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+        valueFrom,
+        valueSource: "dbDsn",
+      };
+    }
+  }
+  return undefined;
+}
+
 export function containerEnvRowsEqual(
   a: readonly ContainerEnvRow[],
   b: readonly ContainerEnvRow[]
@@ -203,10 +350,8 @@ export function containerEnvRowsEqual(
       return false;
     }
 
-    const rowIsExternal =
-      row.valueSource === "valueFrom" && row.valueFrom != null;
-    const otherIsExternal =
-      other.valueSource === "valueFrom" && other.valueFrom != null;
+    const rowIsExternal = rowSavesAsValueFrom(row);
+    const otherIsExternal = rowSavesAsValueFrom(other);
     if (rowIsExternal !== otherIsExternal) {
       return false;
     }

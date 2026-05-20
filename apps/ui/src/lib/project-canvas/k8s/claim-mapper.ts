@@ -8,6 +8,7 @@ import {
   CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
   type ContainerEnvDbDsnSource,
   containerEnvDbDsnReferenceFromValue,
+  containerEnvDbSecretReferenceFromValueFrom,
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
@@ -142,9 +143,14 @@ function envFromSpecEnvList(
     } else if (e.valueFrom != null) {
       out.push({
         name,
-        value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
-        valueFrom: e.valueFrom,
-        valueSource: "valueFrom",
+        ...(containerEnvDbSecretReferenceFromValueFrom(
+          e.valueFrom,
+          dbDsnReferenceSources
+        ) ?? {
+          value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+          valueFrom: e.valueFrom,
+          valueSource: "valueFrom",
+        }),
       });
     }
   }

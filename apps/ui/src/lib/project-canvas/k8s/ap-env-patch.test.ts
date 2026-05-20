@@ -66,6 +66,36 @@ test("AP env settings patch DB DSN references as plain value entries", () => {
   ]);
 });
 
+test("AP env settings patch DB primitive references as Secret key refs", () => {
+  const secretKeyRef = { key: "passwd", name: "postgres-conn-credential" };
+  const ops = patchOpsForApEnvSettings({ input: { env: [] } }, [
+    {
+      dbDsn: {
+        dbName: "postgres",
+        dbNamespace: "default",
+        field: "password",
+      },
+      name: "DATABASE_PASSWORD",
+      value: "(valueFrom)",
+      valueFrom: { secretKeyRef },
+      valueSource: "dbDsn",
+    },
+  ]);
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/env",
+      value: [
+        {
+          name: "DATABASE_PASSWORD",
+          valueFrom: { secretKeyRef },
+        },
+      ],
+    },
+  ]);
+});
+
 test("AP env settings reject duplicate names across direct and DB DSN reference rows", () => {
   assert.throws(
     () =>

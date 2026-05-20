@@ -51,6 +51,208 @@ test("canvas connections detect AP to DB edges from exact DB DSN env values and 
   );
 });
 
+test("canvas connections detect primitive Secret-backed AP to DB edges and de-duplicate each pair", () => {
+  const apsData = {
+    items: [
+      {
+        metadata: { name: "api", namespace: "default" },
+        spec: {
+          input: {
+            env: [
+              {
+                name: "DATABASE_USER",
+                valueFrom: {
+                  secretKeyRef: {
+                    key: "user",
+                    name: "postgres-conn-credential",
+                  },
+                },
+              },
+              {
+                name: "DATABASE_PASSWORD",
+                valueFrom: {
+                  secretKeyRef: {
+                    key: "passwd",
+                    name: "postgres-conn-credential",
+                  },
+                },
+              },
+              {
+                name: "EXTERNAL_PASSWORD",
+                valueFrom: {
+                  secretKeyRef: {
+                    key: "passwd",
+                    name: "external-db",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const dbsData = {
+    items: [
+      {
+        metadata: { name: "postgres", namespace: "default" },
+        status: {
+          variables: [
+            {
+              name: "PG_USER",
+              valueFrom: {
+                secretKeyRef: {
+                  key: "user",
+                  name: "postgres-conn-credential",
+                },
+              },
+            },
+            {
+              name: "PG_PASSWORD",
+              valueFrom: {
+                secretKeyRef: {
+                  key: "passwd",
+                  name: "postgres-conn-credential",
+                },
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData,
+      entryPointsData: undefined,
+    }),
+    [
+      {
+        kind: "APToDB",
+        source: { kind: "AP", name: "api", namespace: "default" },
+        target: { kind: "DB", name: "postgres", namespace: "default" },
+      },
+    ]
+  );
+});
+
+test("canvas connections ignore primitive Secret refs with non-matching names or keys", () => {
+  const dbsData = {
+    items: [
+      {
+        metadata: { name: "postgres", namespace: "default" },
+        status: {
+          variables: [
+            {
+              name: "PG_USER",
+              valueFrom: {
+                secretKeyRef: {
+                  key: "user",
+                  name: "postgres-conn-credential",
+                },
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData: {
+        items: [
+          {
+            metadata: { name: "api", namespace: "default" },
+            spec: {
+              input: {
+                env: [
+                  {
+                    name: "EXTERNAL_USER",
+                    valueFrom: {
+                      secretKeyRef: { key: "user", name: "external-db" },
+                    },
+                  },
+                  {
+                    name: "DATABASE_NAME",
+                    valueFrom: {
+                      secretKeyRef: {
+                        key: "database",
+                        name: "postgres-conn-credential",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      dbsData,
+      entryPointsData: undefined,
+    }),
+    []
+  );
+});
+
+test("canvas connections keep EntryPoint-to-AP detection alongside AP-to-DB detection", () => {
+  const apsData = {
+    items: [
+      {
+        metadata: { name: "api", namespace: "default" },
+        spec: {
+          input: {
+            env: [
+              {
+                name: "DATABASE_URL",
+                value: "postgres://private",
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const dbsData = {
+    items: [
+      {
+        metadata: { name: "postgres", namespace: "default" },
+        status: { connectionStringPrivate: "postgres://private" },
+      },
+    ],
+  };
+  const entryPointsData = {
+    items: [
+      {
+        metadata: { name: "api-entry", namespace: "default" },
+        spec: { apRef: "api" },
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData,
+      entryPointsData,
+    }),
+    [
+      {
+        kind: "EntryPointToAP",
+        source: { kind: "EntryPoint", name: "api-entry", namespace: "default" },
+        target: { kind: "AP", name: "api", namespace: "default" },
+      },
+      {
+        kind: "APToDB",
+        source: { kind: "AP", name: "api", namespace: "default" },
+        target: { kind: "DB", name: "postgres", namespace: "default" },
+      },
+    ]
+  );
+});
+
 test("canvas connection edges include DSN-backed AP to DB connections", () => {
   const apsData = {
     items: [

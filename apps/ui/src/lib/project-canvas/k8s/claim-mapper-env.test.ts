@@ -114,3 +114,141 @@ test("AP claim settings reconstruct DB DSN references only from exact current DB
     { name: "ALMOST_DATABASE_URL", value: "postgres://private " },
   ]);
 });
+
+test("AP claim settings reconstruct DB primitive references from exact Secret evidence", () => {
+  const secretKeyRef = { key: "user", name: "postgres-conn-credential" };
+  const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
+    {
+      items: [
+        {
+          metadata: { name: "postgres", namespace: "default" },
+          status: {
+            variables: [
+              {
+                name: "PG_USER",
+                valueFrom: { secretKeyRef },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    "default"
+  );
+
+  assert.deepEqual(dbDsnReferenceSources, [
+    {
+      name: "postgres",
+      namespace: "default",
+      primitiveSecretRefs: {
+        username: secretKeyRef,
+      },
+    },
+  ]);
+
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          env: [
+            {
+              name: "DATABASE_USER",
+              valueFrom: { secretKeyRef },
+            },
+          ],
+          image: "ghcr.io/acme/api:latest",
+        },
+      },
+    },
+    "AP",
+    { dbDsnReferenceSources }
+  );
+
+  assert.deepEqual(settings.env, [
+    {
+      dbDsn: {
+        dbName: "postgres",
+        dbNamespace: "default",
+        field: "username",
+      },
+      name: "DATABASE_USER",
+      value: "(valueFrom)",
+      valueFrom: { secretKeyRef },
+      valueSource: "dbDsn",
+    },
+  ]);
+});
+
+test("AP claim settings leave non-matching Secret rows as external rows", () => {
+  const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
+    {
+      items: [
+        {
+          metadata: { name: "postgres", namespace: "default" },
+          status: {
+            variables: [
+              {
+                name: "PG_USER",
+                valueFrom: {
+                  secretKeyRef: {
+                    key: "user",
+                    name: "postgres-conn-credential",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    "default"
+  );
+  const wrongName = {
+    key: "user",
+    name: "external-db",
+  };
+  const wrongKey = {
+    key: "database",
+    name: "postgres-conn-credential",
+  };
+
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          env: [
+            {
+              name: "EXTERNAL_USER",
+              valueFrom: { secretKeyRef: wrongName },
+            },
+            {
+              name: "DATABASE_NAME",
+              valueFrom: { secretKeyRef: wrongKey },
+            },
+          ],
+        },
+      },
+    },
+    "AP",
+    { dbDsnReferenceSources }
+  );
+
+  assert.deepEqual(settings.env, [
+    {
+      name: "EXTERNAL_USER",
+      value: "(valueFrom)",
+      valueFrom: { secretKeyRef: wrongName },
+      valueSource: "valueFrom",
+    },
+    {
+      name: "DATABASE_NAME",
+      value: "(valueFrom)",
+      valueFrom: { secretKeyRef: wrongKey },
+      valueSource: "valueFrom",
+    },
+  ]);
+});

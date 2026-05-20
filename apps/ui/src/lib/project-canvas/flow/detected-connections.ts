@@ -3,6 +3,7 @@ import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import {
   type ContainerEnvDbDsnSource,
   containerEnvDbDsnReferenceFromValue,
+  containerEnvDbSecretReferenceFromValueFrom,
 } from "@workspace/ui/lib/container-env-rows";
 import type { Edge, Node } from "@xyflow/react";
 
@@ -133,16 +134,8 @@ function specRecord(resource: unknown): Record<string, unknown> | undefined {
   return asRecord(asRecord(resource)?.spec);
 }
 
-function connectionSecretName(db: unknown): string | undefined {
-  return nonEmptyString(specRecord(db)?.connectionSecretName);
-}
-
 function entryPointApRef(entryPoint: unknown): string | undefined {
   return nonEmptyString(specRecord(entryPoint)?.apRef);
-}
-
-function namespaceSecretKey(namespace: string, secretName: string): string {
-  return `${namespace}:${secretName}`;
 }
 
 function envItemsFromAp(ap: unknown): unknown[] {
@@ -155,15 +148,12 @@ function envItemsFromAp(ap: unknown): unknown[] {
   return Array.isArray(env) ? env : [];
 }
 
-function secretRefsFromAp(ap: unknown): string[] {
-  const refs: string[] = [];
+function valueFromRefsFromAp(ap: unknown): unknown[] {
+  const refs: unknown[] = [];
   for (const item of envItemsFromAp(ap)) {
     const envItem = asRecord(item);
-    const valueFrom = asRecord(envItem?.valueFrom);
-    const secretKeyRef = asRecord(valueFrom?.secretKeyRef);
-    const name = nonEmptyString(secretKeyRef?.name);
-    if (name !== undefined) {
-      refs.push(name);
+    if (envItem?.valueFrom !== undefined) {
+      refs.push(envItem.valueFrom);
     }
   }
   return refs;
@@ -242,34 +232,33 @@ function dbConnectionEvidence(
   namespaceFallback: string | undefined
 ): {
   dbDsnSources: ContainerEnvDbDsnSource[];
-  dbRefBySecret: Map<string, CanvasConnectionResourceRef>;
 } {
-  const dbRefBySecret = new Map<string, CanvasConnectionResourceRef>();
   const dbDsnSources: ContainerEnvDbDsnSource[] = [];
   for (const db of dbs) {
-    const ref = resourceRefFromMetadata("DB", db, namespaceFallback);
     const dsnSource = dbDsnReferenceSourceFromDb(db, namespaceFallback);
     if (dsnSource !== undefined) {
       dbDsnSources.push(dsnSource);
     }
-    const secretName = connectionSecretName(db);
-    if (ref !== undefined && secretName !== undefined) {
-      dbRefBySecret.set(namespaceSecretKey(ref.namespace, secretName), ref);
-    }
   }
-  return { dbDsnSources, dbRefBySecret };
+  return { dbDsnSources };
 }
 
 function addSecretBackedApDbConnections(
   connections: CanvasDetectedConnection[],
   seenConnectionKeys: Set<string>,
   source: CanvasConnectionResourceRef,
-  dbRefBySecret: ReadonlyMap<string, CanvasConnectionResourceRef>,
+  dbDsnSources: readonly ContainerEnvDbDsnSource[],
   ap: unknown
 ): void {
-  for (const secretName of secretRefsFromAp(ap)) {
-    const target = dbRefBySecret.get(
-      namespaceSecretKey(source.namespace, secretName)
+  for (const valueFrom of valueFromRefsFromAp(ap)) {
+    const reference = containerEnvDbSecretReferenceFromValueFrom(
+      valueFrom,
+      dbDsnSources
+    );
+    const target = resourceRef(
+      "DB",
+      reference?.dbDsn?.dbName,
+      reference?.dbDsn?.dbNamespace
     );
     if (target !== undefined) {
       addUniqueConnection(connections, seenConnectionKeys, {
@@ -324,7 +313,7 @@ function addApDbConnections(
       connections,
       seenConnectionKeys,
       source,
-      evidence.dbRefBySecret,
+      evidence.dbDsnSources,
       ap
     );
     addDsnBackedApDbConnections(
