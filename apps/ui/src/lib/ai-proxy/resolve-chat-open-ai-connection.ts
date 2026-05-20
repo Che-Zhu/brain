@@ -13,21 +13,15 @@ export type ResolveChatOpenAiOutcome =
   | { ok: true; connection: ChatOpenAiConnection }
   | { ok: false; status: number; message: string };
 
+/** Who pays for the model call: platform system token vs user AI proxy. */
+export type ChatBillingMode = "free" | "user";
+
 function trimmedEnv(value: string | undefined): string | undefined {
   const t = value?.trim();
   return t && t.length > 0 ? t : undefined;
 }
 
-/**
- * Resolves `{ apiKey, baseURL }` for OpenAI-compatible chat:
- * - If `DEV_OPENAI_API_KEY` and `DEV_OPENAI_API_BASE_URL` are both non-empty → use those.
- * - Else create or fetch token from AI proxy (`POST /api/v2alpha/tokens`), using `encodedKubeconfig` as `Authorization`,
- *   and derive `baseURL` as `https://aiproxy.<cluster-host>/v1` from kubeconfig YAML.
- */
-export async function resolveChatOpenAiConnection(options: {
-  encodedKubeconfig: string | undefined;
-  kubeconfigText: string;
-}): Promise<ResolveChatOpenAiOutcome> {
+function resolveDevOpenAiConnection(): ResolveChatOpenAiOutcome | null {
   const devApiKey = trimmedEnv(process.env.DEV_OPENAI_API_KEY);
   const devBaseUrl = trimmedEnv(process.env.DEV_OPENAI_API_BASE_URL);
   if (devApiKey && devBaseUrl) {
@@ -35,6 +29,41 @@ export async function resolveChatOpenAiConnection(options: {
       ok: true,
       connection: { apiKey: devApiKey, baseURL: devBaseUrl },
     };
+  }
+  return null;
+}
+
+function resolveSystemOpenAiConnection(): ResolveChatOpenAiOutcome {
+  const apiKey = trimmedEnv(process.env.SYSTEM_OPENAI_API_KEY);
+  const baseURL = trimmedEnv(process.env.SYSTEM_OPENAI_API_BASE_URL);
+  if (apiKey && baseURL) {
+    return { ok: true, connection: { apiKey, baseURL } };
+  }
+  return {
+    ok: false,
+    status: 503,
+    message:
+      "Free assistant turns require SYSTEM_OPENAI_API_KEY and SYSTEM_OPENAI_API_BASE_URL.",
+  };
+}
+
+/**
+ * Resolves `{ apiKey, baseURL }` for OpenAI-compatible chat:
+ * - `billing: "free"` → `SYSTEM_OPENAI_*` (platform token).
+ * - `billing: "user"` → AI proxy token from kubeconfig (or `DEV_OPENAI_*` when set).
+ */
+export async function resolveChatOpenAiConnection(options: {
+  encodedKubeconfig: string | undefined;
+  kubeconfigText: string;
+  billing: ChatBillingMode;
+}): Promise<ResolveChatOpenAiOutcome> {
+  const dev = resolveDevOpenAiConnection();
+  if (dev != null) {
+    return dev;
+  }
+
+  if (options.billing === "free") {
+    return resolveSystemOpenAiConnection();
   }
 
   const authorization = options.encodedKubeconfig?.trim();

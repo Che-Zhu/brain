@@ -2,7 +2,8 @@
 name: sealos-crossplane
 description: >-
   Sealos Crossplane XRDs `AP` (`spec.input` + `spec.resource`; deploy via
-  `aps-deployment-ingress-go-templating`), `Project` (group resources via
+  `aps-deployment-ingress-go-templating` or app-store **template** compositions),
+  `Project` (group resources via
   `project-instance-go-templating`), and `DB` (provision a KubeBlocks database Cluster via one of
   four engine-specific compositions: postgresql / mysql / mongodb / redis), all
   `example.crossplane.io/v1`, namespaced. Lists every configurable spec field, a few valid claim
@@ -21,6 +22,7 @@ template. Scope of this skill (other compositions exist on some clusters but are
 | Kind      | Default `compositionRef.name`                | Composes                                                        |
 |-----------|----------------------------------------------|-----------------------------------------------------------------|
 | `AP`      | `aps-deployment-ingress-go-templating`       | `Deployment`, one `Service` per endpoint, one `Ingress`, plus a config-snapshot `ConfigMap` (+ rollback `Job`). |
+| `AP` (template / app store) | one of `aps-<template>-go-templating` in `crossplane-system` | Same kinds as generic `AP`, plus template-specific Secrets/StatefulSets/etc. from the inline Go template. |
 | `Project` | `project-instance-go-templating`             | One `app.sealos.io/v1 Instance` (Sealos UI grouping object).    |
 | `DB`      | `dbs-postgresql-kubeblocks-go-templating` (default) — pick one of four per engine | `apps.kubeblocks.io/v1alpha1 Cluster`, `ServiceAccount` + `Role` + `RoleBinding`, an observe-only `Object` for KubeBlocks' auto-created conn-credential Secret, optional NodePort export Service, optional user-managed `Secret`. |
 
@@ -33,6 +35,10 @@ kubectl get xrd dbs.example.crossplane.io -o yaml
 kubectl get composition aps-deployment-ingress-go-templating -o yaml
 kubectl get composition project-instance-go-templating -o yaml
 kubectl get compositions -l engine -o name           # the four dbs-*-kubeblocks-go-templating
+# Template catalog (metadata only — see §1.1; do NOT -o yaml all templates)
+kubectl get compositions.apiextensions.crossplane.io -n crossplane-system \
+  -o go-template='{{range .items}}{{if eq (index .metadata.annotations "meta.crossplane.io/type") "template"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
+  | wc -l
 kubectl explain ap.spec --api-version=example.crossplane.io/v1
 kubectl explain ap.spec.input --api-version=example.crossplane.io/v1
 kubectl explain ap.spec.resource --api-version=example.crossplane.io/v1
@@ -98,7 +104,108 @@ Composition behavior to know before you write a claim:
 
 **Sealos app templates** (`*-composite.yaml` compositions) store Sealos template `inputs` under
 `spec.input` (same object as deployment overrides). Generic deploys use
-`aps-deployment-ingress-go-templating` with the fields above.
+`aps-deployment-ingress-go-templating` with the fields above. See
+[§1.1 Template AP (app store)](#11-template-ap-app-store) for discovery, drafting, and apply flow.
+
+### 1.1 Template AP (app store)
+
+Besides the generic deployment composition, the cluster may expose **many** Sealos app-store
+templates — each is a Crossplane `Composition` in namespace **`crossplane-system`**, named
+`aps-<template-slug>-go-templating` (RFC 1123 lowercase, e.g. `aps-fastgpt-go-templating`,
+`aps-allinssl-go-templating`). They are tagged with:
+
+| Where | Key | Value |
+|-------|-----|-------|
+| `metadata.annotations` | `meta.crossplane.io/type` | `template` |
+| `metadata.labels` | `template` | Template id used in AP claims (e.g. `fastgpt`, `AllinSSL`) |
+| `metadata.annotations` | `meta.crossplane.io/display-name` | Human title |
+| `metadata.annotations` | `meta.crossplane.io/description` | Short blurb |
+| `metadata.annotations` | `template/instance` | **Starter AP claim YAML** — same role as `meta.crossplane.io/template` on the generic deployment composition |
+
+A template AP claim still uses kind **`AP`** and the same **`spec.input` + `spec.resource`**
+layout. It selects the template composition via **`spec.crossplane.compositionSelector.matchLabels.template`**
+(or explicit **`spec.crossplane.compositionRef.name`**) and sets **`spec.template`** to the same
+label value. Template-specific parameters (passwords, API keys, host slugs, etc.) live under
+**`spec.input`**; scale and CPU/memory under **`spec.resource`**.
+
+#### Token cost warning — do not bulk-fetch templates
+
+There are **100+** template compositions. Each full object includes a large inline Go-templating
+pipeline. **Never** run `kubectl get compositions -n crossplane-system -o yaml` (or read every
+`*-composite.yaml` in the repo) during discovery — it will consume a huge number of tokens and
+slow the agent down for no benefit.
+
+**Discovery (cheap):** list **names and partial metadata only** — enough to help the user pick an app:
+
+```bash
+kubectl get compositions.apiextensions.crossplane.io -n crossplane-system \
+  -o go-template='{{range .items}}{{if eq (index .metadata.annotations "meta.crossplane.io/type") "template"}}{{.metadata.name}}{{"\t"}}{{index .metadata.labels "template"}}{{"\t"}}{{index .metadata.annotations "meta.crossplane.io/display-name"}}{{"\t"}}{{index .metadata.annotations "meta.crossplane.io/description"}}{{"\n"}}{{end}}{{end}}' \
+  | column -t -s $'\t'
+```
+
+Filter further with `grep -i` on the output (e.g. `grep -i dify`). Optionally fetch
+`meta.crossplane.io/readme` or `meta.crossplane.io/url` for **one** candidate via jsonpath — still
+avoid pulling `spec.pipeline` until the template is chosen.
+
+**Selection (one template only):** after the user (or you) picks a template, fetch **that**
+composition's claim skeleton — not the full pipeline unless debugging:
+
+```bash
+TEMPLATE=aps-fastgpt-go-templating   # lowercase metadata.name
+kubectl get composition "$TEMPLATE" -n crossplane-system \
+  -o jsonpath='{.metadata.annotations.template/instance}{"\n"}'
+```
+
+Read comments inside `template/instance` (lines starting with `#`, or empty-string placeholders)
+to learn **required vs optional** `spec.input` fields. If the annotation is missing, fall back to
+`kubectl get composition "$TEMPLATE" -n crossplane-system -o yaml` for **that single object only**.
+
+#### Drafting and asking for parameters
+
+1. Start from **`template/instance`**: substitute `{{ name }}`, `{{ region }}`, `<your-namespace>`,
+   and `<base-host>` with validated values ([§6.2](#62-pick-the-namespace), [§6.3](#63-derive-the-ingress-base-host)).
+2. Set **`metadata.labels.region`** to **`BASE_HOST`** when using region-derived ingress hosts
+   ([§1](#1-ap--deploy-one-docker-image)).
+3. Fill **`spec.input`** with template-specific keys; keep **`spec.resource`** for replicas/requests/limits.
+4. **Before apply:** if any required `spec.input` fields are unknown (empty defaults, commented
+   `# (required)`, secrets, passwords, external URLs), **stop and ask the user**. Present them in a
+   **markdown table** — do not invent production secrets:
+
+   | Field (`spec.input…`) | Required | Description / notes |
+   |-----------------------|----------|---------------------|
+   | `rootPassword`        | yes      | Initial admin password |
+   | `openaiApiKey`        | yes      | OpenAI-compatible API key |
+
+5. Apply with the same flow as a generic AP ([§5](#5-apply-flow), [§6.4](#64-apply-and-watch)).
+
+**Example** (structure only — values come from the chosen template's `template/instance`):
+
+```yaml
+apiVersion: example.crossplane.io/v1
+kind: AP
+metadata:
+  name: <your-app>
+  namespace: <your-namespace>
+  labels:
+    region: <base-host>
+spec:
+  crossplane:
+    compositionSelector:
+      matchLabels:
+        template: fastgpt
+  template: fastgpt
+  name: <your-app>
+  input:
+    # template-specific keys from template/instance …
+  resource:
+    replicas: 1
+    requests:
+      cpu: 100m
+      memory: 102Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+```
 
 **Config backup / rollback:** the composition snapshots an *effective* spec into ConfigMap
 `{name}-config-snapshot-{hash}` key `config.yaml` with top-level `name`, `namespace`, `input`,
@@ -317,6 +424,10 @@ user's cluster. Read it to make decisions; never assume a value.
      **`spec.resource`** ([§1](#1-ap--deploy-one-docker-image)).
    - Pick a host strategy ([§6.3](#63-derive-the-ingress-base-host)): explicit
      `spec.input.endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
+   - **Template / app store:** discover templates via metadata-only listing in
+     `crossplane-system` ([§1.1](#11-template-ap-app-store)); fetch **one** `template/instance`
+     annotation; draft the claim; tabulate missing required `spec.input` fields and ask the user
+     before apply.
 4. For a `DB`:
    - Pick the matching `compositionRef.name` for `spec.engine` ([§3](#3-db--provision-a-kubeblocks-database-cluster)).
    - Set `metadata.labels.region: <base-host>` **only** if you also set `exposeNodePort: true`

@@ -1,15 +1,12 @@
 import "server-only";
 
 import { applyGhcrSecret } from "@workspace/api/api.actions";
+import {
+  KUBECONFIG_DEFAULT_NAMESPACE,
+  namespaceFromKubeconfigText,
+} from "@/lib/chat-runtime/kubeconfig-namespace";
 
 const GITHUB_USER_API = "https://api.github.com/user";
-const NAMESPACE_RE = /^\s+namespace:\s*(\S+)/gm;
-
-/** Resolve active namespace from raw kubeconfig text (Sealos/kubeconfig YAML). */
-function namespaceFromKubeconfig(kubeconfig: string): string {
-  const matches = [...kubeconfig.matchAll(NAMESPACE_RE)];
-  return matches.at(-1)?.[1] ?? "default";
-}
 
 function safeDecodeKubeconfig(value: string): string {
   try {
@@ -49,9 +46,11 @@ export async function applyGhcrSecretIfAuthenticated(
       return;
     }
     const owner = await fetchGithubLogin(accessToken);
+    const namespace =
+      namespaceFromKubeconfigText(kubeconfig) ?? KUBECONFIG_DEFAULT_NAMESPACE;
     await applyGhcrSecret(kubeconfig, {
       githubToken: accessToken,
-      namespace: namespaceFromKubeconfig(kubeconfig),
+      namespace,
       owner,
     });
   } catch (error) {

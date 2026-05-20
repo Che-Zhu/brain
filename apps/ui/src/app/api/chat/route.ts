@@ -1,5 +1,13 @@
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
-import { resolveChatOpenAiConnection } from "@/lib/ai-proxy/resolve-chat-open-ai-connection";
+import {
+  type ChatBillingMode,
+  resolveChatOpenAiConnection,
+} from "@/lib/ai-proxy/resolve-chat-open-ai-connection";
+import {
+  consumeFreeTurnIfAvailable,
+  getFreeTierSnapshot,
+  isSystemOpenAiConfigured,
+} from "@/lib/chat-persistence/free-tier";
 import {
   appendMessage,
   loadThreadMessages,
@@ -19,6 +27,7 @@ import {
   chatLanguageModel,
   threadTitleLanguageModel,
 } from "@/lib/chat-runtime/model";
+import { resolveAuthoritativeChatNamespace } from "@/lib/chat-runtime/resolve-chat-namespace";
 import { buildChatToolset } from "@/lib/chat-runtime/tools";
 
 export const maxDuration = 120;
@@ -46,25 +55,39 @@ export async function POST(req: Request) {
     return jsonError("Missing or invalid kubeconfig", 400);
   }
 
+  const namespaceResolved = await resolveAuthoritativeChatNamespace({
+    encodedKubeconfig,
+    clientNamespace: namespace,
+  });
+  if (!namespaceResolved.ok) {
+    return jsonError(namespaceResolved.message, namespaceResolved.status);
+  }
+  const authoritativeNamespace = namespaceResolved.namespace;
+
   try {
-    if (!(await threadBelongsToNamespace(chatId, namespace))) {
+    if (!(await threadBelongsToNamespace(chatId, authoritativeNamespace))) {
       return jsonError(
         "Unknown or inaccessible assistant thread for this namespace.",
         403
       );
     }
 
+    const freeTier = await getFreeTierSnapshot(authoritativeNamespace);
+    const billing: ChatBillingMode =
+      freeTier.remaining > 0 && isSystemOpenAiConfigured() ? "free" : "user";
+
     await appendMessage(chatId, message);
     const history = await loadThreadMessages(chatId);
     const { tools, systemPrompt } = await buildChatToolset({
       assistantContext,
       kubeconfig,
-      kubernetesNamespace: namespace,
+      kubernetesNamespace: authoritativeNamespace,
     });
 
     const openAi = await resolveChatOpenAiConnection({
       encodedKubeconfig,
       kubeconfigText: kubeconfig,
+      billing,
     });
     if (!openAi.ok) {
       return jsonError(openAi.message, openAi.status);
@@ -88,14 +111,36 @@ export async function POST(req: Request) {
       },
     });
 
+    const responseHeaders: Record<string, string> = {
+      "X-Chat-Billing": billing,
+      "X-Chat-Free-Remaining": String(
+        billing === "free"
+          ? Math.max(0, freeTier.remaining - 1)
+          : freeTier.remaining
+      ),
+      "X-Chat-Free-Limit": String(freeTier.limit),
+    };
+
     return result.toUIMessageStreamResponse({
       originalMessages: history,
+      headers: responseHeaders,
       onFinish: async ({ responseMessage }) => {
         try {
           await appendMessage(
             chatId,
             attachToolDurationMetrics(responseMessage, toolDurationMsByCallId)
           );
+          if (billing === "free") {
+            const consumed = await consumeFreeTurnIfAvailable(
+              authoritativeNamespace
+            );
+            if (!consumed) {
+              console.warn(
+                "[api/chat] free turn not recorded (limit reached concurrently):",
+                authoritativeNamespace
+              );
+            }
+          }
           await maybeAutoTitleThread({
             chatId,
             languageModel: titleModel,

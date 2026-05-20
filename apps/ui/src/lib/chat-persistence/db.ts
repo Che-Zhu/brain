@@ -3,11 +3,16 @@ import "server-only";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { assistantChatMessages, assistantChats } from "./schema";
+import {
+  assistantChatMessages,
+  assistantChats,
+  assistantEntitlements,
+} from "./schema";
 
 const assistantSchema = {
   assistantChatMessages,
   assistantChats,
+  assistantEntitlements,
 };
 
 export type AssistantPgDatabase = NodePgDatabase<typeof assistantSchema>;

@@ -4,6 +4,7 @@ import type { UIMessage } from "ai";
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgSchema,
   text,
@@ -71,5 +72,24 @@ export const assistantChatMessages = ns.table(
   ]
 );
 
+/**
+ * Per-namespace free chat turns (system OpenAI token). Key matches
+ * {@link resolveAuthoritativeChatNamespace} / `assistant_chats.namespace`.
+ */
+export const assistantEntitlements = ns.table(
+  "assistant_entitlements",
+  {
+    namespace: text("namespace").primaryKey(),
+    freeTurnsUsed: integer("free_turns_used").notNull().default(0),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("assistant_entitlements_updated_at_idx").on(table.updatedAt),
+  ]
+);
+
 export type AssistantChatRow = typeof assistantChats.$inferSelect;
 export type AssistantChatMessageRow = typeof assistantChatMessages.$inferSelect;
+export type AssistantEntitlementRow = typeof assistantEntitlements.$inferSelect;

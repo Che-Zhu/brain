@@ -46,6 +46,19 @@ export function hasDevCredentialBypass(): boolean {
   );
 }
 
+/** Local dev overrides (`AuthBootstrap`); not used in production auth. */
+export function devCredentialsFromEnv(): {
+  encodedKubeconfig: string;
+  namespace: string;
+} {
+  return {
+    encodedKubeconfig: envTrimDecoded(
+      process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG
+    ),
+    namespace: (process.env.NEXT_PUBLIC_DEV_NS ?? "").trim(),
+  };
+}
+
 /**
  * Loads cluster credentials or invokes Next.js {@link unauthorized} when there is
  * no kubeconfig from the region token API and no dev env bypass.
