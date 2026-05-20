@@ -159,19 +159,23 @@
   transition: opacity 150ms ease;
 }
 
-.react-flow__handle.canvas-node-rf-handle::before,
-.react-flow__handle.canvas-node-rf-handle::after {
+.react-flow__handle.canvas-node-rf-handle::before {
   position: absolute;
   content: "";
-}
-
-.react-flow__handle.canvas-node-rf-handle::before {
   background: transparent;
 }
 
-.react-flow__handle.canvas-node-rf-handle::after {
+.canvas-node-connection-affordance {
+  width: var(--canvas-node-connection-size);
+  height: var(--canvas-node-connection-size);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.canvas-node-connection-affordance::after {
+  position: absolute;
   inset: 0;
-  z-index: 0;
+  content: "";
   background:
     linear-gradient(
       90deg,
@@ -203,7 +207,16 @@
   opacity: 1;
 }
 
-.react-flow__handle.canvas-node-rf-handle:hover::after {
+.canvas-node-frame[data-state="expanded"]:not([data-dragging]):is(
+    [data-hover-intent],
+    [data-selected]
+  )
+  .canvas-node-connection-affordance {
+  opacity: 1;
+}
+
+.react-flow__handle.canvas-node-rf-handle:hover
+  + .canvas-node-connection-affordance::after {
   background: color-mix(in oklab, var(--color-white) 5%, transparent);
   border: 1px solid var(--color-blue-400);
   scale: 1;
@@ -217,60 +230,98 @@
   transition: opacity 150ms ease;
 }
 
-.react-flow__handle.canvas-node-rf-handle:hover .canvas-node-connection-icon {
+.react-flow__handle.canvas-node-rf-handle:hover
+  + .canvas-node-connection-affordance
+  .canvas-node-connection-icon {
   opacity: 1;
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="top"] {
   top: 0;
   left: 50%;
-  translate: -50% calc(-100% - var(--canvas-node-connection-gap));
+  translate: -50% -50%;
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="top"]::before {
-  top: 100%;
   right: 0;
+  bottom: 100%;
   left: 0;
-  height: var(--canvas-node-connection-gap);
+  height: calc(
+    var(--canvas-node-connection-size) +
+    var(--canvas-node-connection-gap)
+  );
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="right"] {
   top: 50%;
   right: 0;
-  translate: calc(100% + var(--canvas-node-connection-gap)) -50%;
+  translate: 50% -50%;
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="right"]::before {
   top: 0;
-  right: 100%;
   bottom: 0;
-  width: var(--canvas-node-connection-gap);
+  left: 100%;
+  width: calc(
+    var(--canvas-node-connection-size) +
+    var(--canvas-node-connection-gap)
+  );
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="bottom"] {
   bottom: 0;
   left: 50%;
-  translate: -50% calc(100% + var(--canvas-node-connection-gap));
+  translate: -50% 50%;
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="bottom"]::before {
+  top: 100%;
   right: 0;
-  bottom: 100%;
   left: 0;
-  height: var(--canvas-node-connection-gap);
+  height: calc(
+    var(--canvas-node-connection-size) +
+    var(--canvas-node-connection-gap)
+  );
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="left"] {
   top: 50%;
   left: 0;
-  translate: calc(-100% - var(--canvas-node-connection-gap)) -50%;
+  translate: -50% -50%;
 }
 
 .react-flow__handle.canvas-node-rf-handle[data-side="left"]::before {
   top: 0;
+  right: 100%;
   bottom: 0;
-  left: 100%;
-  width: var(--canvas-node-connection-gap);
+  width: calc(
+    var(--canvas-node-connection-size) +
+    var(--canvas-node-connection-gap)
+  );
+}
+
+.canvas-node-connection-affordance[data-side="top"] {
+  top: 0;
+  left: 50%;
+  translate: -50% calc(-100% - var(--canvas-node-connection-gap));
+}
+
+.canvas-node-connection-affordance[data-side="right"] {
+  top: 50%;
+  right: 0;
+  translate: calc(100% + var(--canvas-node-connection-gap)) -50%;
+}
+
+.canvas-node-connection-affordance[data-side="bottom"] {
+  bottom: 0;
+  left: 50%;
+  translate: -50% calc(100% + var(--canvas-node-connection-gap));
+}
+
+.canvas-node-connection-affordance[data-side="left"] {
+  top: 50%;
+  left: 0;
+  translate: calc(-100% - var(--canvas-node-connection-gap)) -50%;
 }
 
 .canvas-node-action-button:hover,

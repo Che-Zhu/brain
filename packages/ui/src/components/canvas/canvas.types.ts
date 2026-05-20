@@ -6,6 +6,7 @@ import type {
   ReactFlowProps,
 } from "@xyflow/react";
 import type { ComponentType, ReactNode } from "react";
+import type { CanvasEdgeAnchorResolver } from "./canvas.edge-anchors";
 
 /** Body content for {@link CanvasPanel}; receives the selected React Flow node. */
 export interface CanvasPanelBodyProps {
@@ -74,6 +75,11 @@ export interface CanvasActions {
 }
 
 export interface CanvasMeta {
+  /**
+   * Optional render-layer edge anchor resolver. When provided, edges with missing endpoint nodes
+   * are skipped and resolved pairs are applied as React Flow source/target handles.
+   */
+  edgeAnchorResolver?: CanvasEdgeAnchorResolver;
   edgeTypes?: EdgeTypes;
   nodeTypes?: NodeTypes;
   /**

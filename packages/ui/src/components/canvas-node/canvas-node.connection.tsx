@@ -3,6 +3,7 @@
 import { cn } from "@workspace/ui/lib/utils";
 import { Handle, type HandleType, Position, useNodeId } from "@xyflow/react";
 import { Plus } from "lucide-react";
+import { Fragment } from "react";
 
 import type { CanvasNodeConnectionSide } from "./canvas-node.types";
 
@@ -41,44 +42,41 @@ export function CanvasNodeConnectionAnchor({
       )}
       data-slot="canvas-node-connection-anchor"
     >
-      {CONNECTION_SIDE_CONFIG.map(({ position, side }) =>
-        nodeId ? (
-          <Handle
-            aria-label={`Connect at ${side}`}
-            className="nodrag nopan canvas-node-rf-handle absolute flex cursor-pointer items-center justify-center rounded-full p-0"
-            data-side={side}
-            data-slot="canvas-node-rf-handle"
-            id={side}
-            key={side}
-            onMouseEnter={(event) => {
-              setFrameHoverSide(event.currentTarget, side);
-            }}
-            onMouseLeave={(event) => {
-              setFrameHoverSide(event.currentTarget, null);
-            }}
-            position={position}
-            type={type}
-          >
-            <CanvasNodeConnectionIcon />
-          </Handle>
-        ) : (
-          <span
-            aria-hidden
-            className="nodrag nopan canvas-node-rf-handle absolute flex cursor-pointer items-center justify-center rounded-full p-0"
-            data-side={side}
-            data-slot="canvas-node-rf-handle"
-            key={side}
-            onMouseEnter={(event) => {
-              setFrameHoverSide(event.currentTarget, side);
-            }}
-            onMouseLeave={(event) => {
-              setFrameHoverSide(event.currentTarget, null);
-            }}
-          >
-            <CanvasNodeConnectionIcon />
-          </span>
-        )
-      )}
+      {CONNECTION_SIDE_CONFIG.map(({ position, side }) => (
+        <Fragment key={side}>
+          {nodeId ? (
+            <Handle
+              aria-label={`Connect at ${side}`}
+              className="nodrag nopan canvas-node-rf-handle absolute cursor-pointer rounded-full p-0"
+              data-side={side}
+              data-slot="canvas-node-rf-handle"
+              id={side}
+              onMouseEnter={(event) => {
+                setFrameHoverSide(event.currentTarget, side);
+              }}
+              onMouseLeave={(event) => {
+                setFrameHoverSide(event.currentTarget, null);
+              }}
+              position={position}
+              type={type}
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="nodrag nopan canvas-node-rf-handle absolute cursor-pointer rounded-full p-0"
+              data-side={side}
+              data-slot="canvas-node-rf-handle"
+              onMouseEnter={(event) => {
+                setFrameHoverSide(event.currentTarget, side);
+              }}
+              onMouseLeave={(event) => {
+                setFrameHoverSide(event.currentTarget, null);
+              }}
+            />
+          )}
+          <CanvasNodeConnectionAffordance side={side} />
+        </Fragment>
+      ))}
     </div>
   );
 }
@@ -100,12 +98,23 @@ function setFrameHoverSide(
   }
 }
 
-function CanvasNodeConnectionIcon() {
+function CanvasNodeConnectionAffordance({
+  side,
+}: {
+  side: CanvasNodeConnectionSide;
+}) {
   return (
-    <Plus
+    <span
       aria-hidden
-      className="canvas-node-connection-icon pointer-events-none"
-      size={10}
-    />
+      className="canvas-node-connection-affordance pointer-events-none absolute flex items-center justify-center rounded-full"
+      data-side={side}
+      data-slot="canvas-node-connection-affordance"
+    >
+      <CanvasNodeConnectionIcon />
+    </span>
   );
+}
+
+function CanvasNodeConnectionIcon() {
+  return <Plus aria-hidden className="canvas-node-connection-icon" size={10} />;
 }

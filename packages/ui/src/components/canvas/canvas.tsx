@@ -20,6 +20,10 @@ import {
 } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  type CanvasEdgeAnchorPair,
+  resolveCanvasEdgeAnchors,
+} from "./canvas.edge-anchors";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -104,6 +108,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const flowWidth = useStore((store) => store.width);
   const initializedRef = useRef(false);
   const openingFitAppliedKeyRef = useRef<number | string | null>(null);
+  const edgeAnchorPairsRef = useRef(new Map<string, CanvasEdgeAnchorPair>());
 
   useLayoutEffect(() => {
     if (initializedRef.current) {
@@ -139,6 +144,33 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       };
     });
   }, [edges, state.selectedEdge]);
+  const edgeAnchorResolver = meta.edgeAnchorResolver;
+  const nodeDragging = nodes.some((node) => node.dragging === true);
+  const edgeAnchorResolution = useMemo(() => {
+    if (edgeAnchorResolver == null) {
+      return {
+        anchorPairs: edgeAnchorPairsRef.current,
+        edges: edgesWithSelectionStyle,
+      };
+    }
+
+    return resolveCanvasEdgeAnchors({
+      dragging: nodeDragging,
+      edges: edgesWithSelectionStyle,
+      nodes,
+      previousPairs: edgeAnchorPairsRef.current,
+      resolver: edgeAnchorResolver,
+    });
+  }, [edgeAnchorResolver, edgesWithSelectionStyle, nodeDragging, nodes]);
+
+  useEffect(() => {
+    if (edgeAnchorResolver == null) {
+      edgeAnchorPairsRef.current.clear();
+      return;
+    }
+
+    edgeAnchorPairsRef.current = edgeAnchorResolution.anchorPairs;
+  }, [edgeAnchorResolver, edgeAnchorResolution.anchorPairs]);
 
   const userReactFlowProps = meta.reactFlowProps ?? {};
   const userDefaultEdgeOptions = userReactFlowProps.defaultEdgeOptions;
@@ -223,7 +255,7 @@ function CanvasFlow({ children }: CanvasFlowProps) {
         <div className="canvas-surface">
           <ReactFlow
             {...passThrough}
-            edges={edgesWithSelectionStyle}
+            edges={edgeAnchorResolution.edges}
             edgeTypes={meta.edgeTypes}
             nodes={nodes}
             nodeTypes={meta.nodeTypes}

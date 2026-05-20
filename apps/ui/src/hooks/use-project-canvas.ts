@@ -19,6 +19,10 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
+import {
+  canvasNodeGeometryFromNode,
+  selectCanvasAnchorPair,
+} from "@/lib/project-canvas/flow/anchor-pair";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
 import {
@@ -494,6 +498,18 @@ export function useProjectCanvas(
 
   const meta = useMemo<CanvasMeta>(
     () => ({
+      edgeAnchorResolver: ({
+        dragging,
+        previousPair,
+        sourceNode,
+        targetNode,
+      }) =>
+        selectCanvasAnchorPair({
+          dragging,
+          previousPair,
+          source: canvasNodeGeometryFromNode(sourceNode),
+          target: canvasNodeGeometryFromNode(targetNode),
+        }),
       nodeTypes: projectCanvasFlowNodeTypes,
       panelTabSync: { tabValue: panelTab, setTabValue: setPanelTab },
       panelTabs: {
