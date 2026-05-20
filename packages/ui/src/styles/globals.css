@@ -112,8 +112,8 @@
   --background-selected: oklch(0.94 0 0);
   --background-tertiary: oklch(0.955 0 0);
   /** Runtime tokens consumed directly by `packages/ui` canvas CSS. */
-  --color-canvas-surface: oklch(0.09 0.006 264);
-  --color-canvas-glow: var(--color-theme-blue);
+  --color-canvas-surface: var(--color-neutral-950);
+  --color-canvas-glow: var(--color-blue-700);
   --color-canvas-dot: color-mix(
     in oklab,
     var(--color-theme-gray) 55%,

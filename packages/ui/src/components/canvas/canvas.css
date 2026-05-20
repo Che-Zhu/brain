@@ -3,11 +3,26 @@
   inset: 0;
   overflow: hidden;
   background-color: var(--color-canvas-surface);
+  isolation: isolate;
+}
+
+/* Locked 1205:784 aspect from Figma — height fills container, may overflow horizontally. */
+.canvas-surface::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: -1;
+  aspect-ratio: 1205 / 784;
+  pointer-events: none;
+  content: "";
   background-image: radial-gradient(
-    ellipse 83.7% 93.3% at 50% 50%,
-    color-mix(in oklab, var(--color-canvas-glow) 22%, transparent) 0%,
-    transparent 70%
+    ellipse closest-side at 50% 50%,
+    color-mix(in oklab, var(--color-canvas-glow) 20%, transparent) 0%,
+    color-mix(in oklab, var(--color-canvas-surface) 20%, transparent) 95%,
+    transparent 100%
   );
+  transform: translateX(-50%);
 }
 
 .canvas-surface > .react-flow {
