@@ -132,3 +132,9 @@ export function classifyProjectCanvasConnectionCommand({
 
   return { kind: "discard", reason: "unsupported" };
 }
+
+export function isProjectCanvasConnectionSupported(
+  options: ClassifyProjectCanvasConnectionCommandOptions
+): boolean {
+  return classifyProjectCanvasConnectionCommand(options).kind !== "discard";
+}

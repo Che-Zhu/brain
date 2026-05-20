@@ -7,6 +7,7 @@ import {
   containerEnvDbDsnFieldOptions,
   containerEnvDbDsnReferenceFromValue,
   containerEnvRowsEqual,
+  containerEnvRowsModelEqual,
   deleteContainerEnvRow,
   normalizeContainerEnvRowsForSave,
   updateContainerEnvRow,
@@ -134,6 +135,35 @@ test("container env rows compare primitive DB references by saved Secret ref", (
       ]
     ),
     false
+  );
+});
+
+test("container env rows model comparison preserves editor reference rows", () => {
+  const direct = [{ name: "DATABASE_URL", value: "postgres://private" }];
+  const reference = [
+    {
+      dbDsn: {
+        dbName: "postgres",
+        dbNamespace: "default",
+        field: "private" as const,
+      },
+      name: "DATABASE_URL",
+      value: "postgres://private",
+      valueSource: "dbDsn" as const,
+    },
+  ];
+
+  assert.equal(containerEnvRowsEqual(direct, reference), true);
+  assert.equal(containerEnvRowsModelEqual(direct, reference), false);
+  assert.equal(
+    containerEnvRowsModelEqual(direct, [
+      {
+        name: "DATABASE_URL",
+        value: "postgres://private",
+        valueSource: "direct",
+      },
+    ]),
+    true
   );
 });
 

@@ -256,6 +256,20 @@ function valueFromKey(valueFrom: unknown): string {
   return valueFrom == null ? "" : JSON.stringify(valueFrom);
 }
 
+function dbDsnReferencesEqual(
+  a: ContainerEnvDbDsnReference | undefined,
+  b: ContainerEnvDbDsnReference | undefined
+): boolean {
+  if (a == null || b == null) {
+    return a == null && b == null;
+  }
+  return (
+    a.dbName === b.dbName &&
+    a.dbNamespace === b.dbNamespace &&
+    a.field === b.field
+  );
+}
+
 function containerEnvDbReferenceValuePatch(
   field: ContainerEnvDbDsnFieldOption
 ): Pick<ContainerEnvRow, "value" | "valueFrom"> {
@@ -394,6 +408,28 @@ export function containerEnvRowsEqual(
       return valueFromKey(row.valueFrom) === valueFromKey(other.valueFrom);
     }
     return row.value === other.value;
+  });
+}
+
+export function containerEnvRowsModelEqual(
+  a: readonly ContainerEnvRow[],
+  b: readonly ContainerEnvRow[]
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((row, index) => {
+    const other = b[index];
+    if (other == null) {
+      return false;
+    }
+    return (
+      row.name === other.name &&
+      row.value === other.value &&
+      (row.valueSource ?? "direct") === (other.valueSource ?? "direct") &&
+      valueFromKey(row.valueFrom) === valueFromKey(other.valueFrom) &&
+      dbDsnReferencesEqual(row.dbDsn, other.dbDsn)
+    );
   });
 }
 

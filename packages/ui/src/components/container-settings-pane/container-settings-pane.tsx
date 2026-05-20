@@ -31,6 +31,7 @@ import {
   containerEnvDbDsnFieldOptions,
   containerEnvDbReferenceRowPatch,
   containerEnvRowsEqual,
+  containerEnvRowsModelEqual,
   deleteContainerEnvRow,
   normalizeContainerEnvRowsForSave,
   updateContainerEnvRow,
@@ -662,6 +663,7 @@ export function ContainerSettingsPane({
     initialEnvDraft.consumedIntentId ?? null
   );
   const envDraftSyncMounted = useRef(false);
+  const syncedEnvRef = useRef<readonly ContainerEnvVar[]>(env);
   const [envDraft, setEnvDraft] = useState<EnvDraftRow[]>(
     () => initialEnvDraft.rows
   );
@@ -693,8 +695,13 @@ export function ContainerSettingsPane({
   useEffect(() => {
     if (!envDraftSyncMounted.current) {
       envDraftSyncMounted.current = true;
+      syncedEnvRef.current = env;
       return;
     }
+    if (containerEnvRowsModelEqual(env, syncedEnvRef.current)) {
+      return;
+    }
+    syncedEnvRef.current = env;
     setEnvDraft(env);
     setEnvDraftKeys(
       createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)

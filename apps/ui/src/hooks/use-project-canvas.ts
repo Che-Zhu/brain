@@ -16,7 +16,7 @@ import type {
   DatabaseNodeLifecycleActionKey,
   DatabaseNodeTogglePublicConnectionHandler,
 } from "@workspace/ui/components/database-node/database-node";
-import type { Edge, Node } from "@xyflow/react";
+import type { Connection, Edge, Node } from "@xyflow/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,9 +26,19 @@ import {
   canvasNodeGeometryFromNode,
   selectCanvasAnchorPair,
 } from "@/lib/project-canvas/flow/anchor-pair";
-import { classifyProjectCanvasConnectionCommand } from "@/lib/project-canvas/flow/connection-command";
+import {
+  classifyProjectCanvasConnectionCommand,
+  isProjectCanvasConnectionSupported,
+} from "@/lib/project-canvas/flow/connection-command";
+import { createProjectCanvasConnectionLine } from "@/lib/project-canvas/flow/connection-line";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
-import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
+import {
+  connectionFromProjectCanvasReleaseEvent,
+  connectionFromSnappedProjectCanvasState,
+  connectionHandleFromConnectStartParams,
+  type ProjectCanvasConnectionHandle,
+  projectCanvasInteractionProps,
+} from "@/lib/project-canvas/flow/interaction";
 import type { PendingApDbCanvasReference } from "@/lib/project-canvas/flow/pending-connections";
 import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/db-dsn-reference-sources";
 import {
@@ -159,6 +169,12 @@ export function useProjectCanvas(
   const selectedEdge = useAtomValue(selectedEdgeAtom);
   const readOnly = options?.readOnly === true;
   const addDbDsnReferenceIntentCounter = useRef(0);
+  const connectHandledInGestureRef = useRef(false);
+  const connectingFromHandleRef = useRef<ProjectCanvasConnectionHandle | null>(
+    null
+  );
+  const snappedConnectionInGestureRef = useRef<Connection | null>(null);
+  const [connectionGestureActive, setConnectionGestureActive] = useState(false);
   const [pendingAddDbDsnReferenceIntent, setPendingAddDbDsnReferenceIntent] =
     useState<PendingAddDbDsnReferenceIntent | null>(null);
 
@@ -567,6 +583,7 @@ export function useProjectCanvas(
     NonNullable<CanvasReactFlowProps["onConnect"]>
   >(
     (connection) => {
+      connectHandledInGestureRef.current = true;
       const command = classifyProjectCanvasConnectionCommand({
         connection,
         nodes,
@@ -605,6 +622,79 @@ export function useProjectCanvas(
       setSelectedEdge,
       setServiceUid,
     ]
+  );
+  const isSupportedCanvasConnection = useCallback(
+    (connection: Connection) =>
+      isProjectCanvasConnectionSupported({
+        connection,
+        nodes,
+        readOnly,
+      }),
+    [nodes, readOnly]
+  );
+  const handleConnectStart = useCallback<
+    NonNullable<CanvasReactFlowProps["onConnectStart"]>
+  >((_event, params) => {
+    connectHandledInGestureRef.current = false;
+    connectingFromHandleRef.current =
+      connectionHandleFromConnectStartParams(params);
+    snappedConnectionInGestureRef.current = null;
+    setConnectionGestureActive(true);
+  }, []);
+  const handleConnectEnd = useCallback<
+    NonNullable<CanvasReactFlowProps["onConnectEnd"]>
+  >(
+    (event, connectionState) => {
+      if (!connectHandledInGestureRef.current) {
+        const fromHandle =
+          connectionState.fromHandle ?? connectingFromHandleRef.current;
+        const connection =
+          connectionFromSnappedProjectCanvasState({
+            fromHandle,
+            isValid: connectionState.isValid,
+            toHandle: connectionState.toHandle,
+          }) ??
+          snappedConnectionInGestureRef.current ??
+          connectionFromProjectCanvasReleaseEvent({
+            event,
+            fromHandle,
+            isSupportedConnection: isSupportedCanvasConnection,
+          });
+        if (
+          connection !== undefined &&
+          isSupportedCanvasConnection(connection)
+        ) {
+          handleConnect(connection);
+        }
+      }
+      connectHandledInGestureRef.current = false;
+      connectingFromHandleRef.current = null;
+      snappedConnectionInGestureRef.current = null;
+      setConnectionGestureActive(false);
+    },
+    [handleConnect, isSupportedCanvasConnection]
+  );
+  const isValidCanvasConnection = useCallback<
+    NonNullable<CanvasReactFlowProps["isValidConnection"]>
+  >(
+    (connection) =>
+      isSupportedCanvasConnection({
+        source: connection.source,
+        sourceHandle: connection.sourceHandle ?? null,
+        target: connection.target,
+        targetHandle: connection.targetHandle ?? null,
+      }),
+    [isSupportedCanvasConnection]
+  );
+  const projectCanvasConnectionLine = useMemo(
+    () =>
+      createProjectCanvasConnectionLine({
+        isSupportedConnection: isSupportedCanvasConnection,
+        onSnappedConnectionChange: (connection) => {
+          snappedConnectionInGestureRef.current = connection;
+        },
+      }),
+    [isSupportedCanvasConnection]
   );
 
   const isStale =
@@ -677,9 +767,18 @@ export function useProjectCanvas(
       },
       reactFlowProps: {
         ...projectCanvasInteractionProps({
+          isValidConnection: isValidCanvasConnection,
           onConnect: handleConnect,
+          onConnectEnd: handleConnectEnd,
+          onConnectStart: handleConnectStart,
           readOnly,
         }),
+        className: connectionGestureActive
+          ? "project-canvas-connection-active"
+          : undefined,
+        connectionLineComponent: readOnly
+          ? undefined
+          : projectCanvasConnectionLine,
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
@@ -704,9 +803,14 @@ export function useProjectCanvas(
     }),
     [
       clearSelection,
+      connectionGestureActive,
       handleConnect,
+      handleConnectEnd,
+      handleConnectStart,
+      isValidCanvasConnection,
       onNodePositionChange,
       panelTab,
+      projectCanvasConnectionLine,
       readOnly,
       setDatabasePane,
       setPanelTab,

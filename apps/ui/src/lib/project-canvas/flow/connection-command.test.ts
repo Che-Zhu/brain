@@ -8,7 +8,10 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
-import { classifyProjectCanvasConnectionCommand } from "./connection-command";
+import {
+  classifyProjectCanvasConnectionCommand,
+  isProjectCanvasConnectionSupported,
+} from "./connection-command";
 
 const apNode = {
   data: {
@@ -147,6 +150,14 @@ test("unsupported Connecting Edges are discarded", () => {
     }),
     { kind: "discard", reason: "unsupported" }
   );
+  assert.equal(
+    isProjectCanvasConnectionSupported({
+      connection,
+      nodes: [entryNode, dbNode],
+      readOnly: false,
+    }),
+    false
+  );
 });
 
 test("read-only canvases discard AP-to-DB Connecting Edge commands", () => {
@@ -164,5 +175,29 @@ test("read-only canvases discard AP-to-DB Connecting Edge commands", () => {
       readOnly: true,
     }),
     { kind: "discard", reason: "readOnly" }
+  );
+  assert.equal(
+    isProjectCanvasConnectionSupported({
+      connection,
+      nodes: [apNode, dbNode],
+      readOnly: true,
+    }),
+    false
+  );
+});
+
+test("supported AP-to-DB Connecting Edges are valid for React Flow", () => {
+  assert.equal(
+    isProjectCanvasConnectionSupported({
+      connection: {
+        source: apNode.id,
+        sourceHandle: "right",
+        target: dbNode.id,
+        targetHandle: "left",
+      },
+      nodes: [apNode, dbNode],
+      readOnly: false,
+    }),
+    true
   );
 });

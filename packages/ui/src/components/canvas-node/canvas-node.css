@@ -207,6 +207,11 @@
   opacity: 1;
 }
 
+.react-flow.project-canvas-connection-active
+  .react-flow__handle.canvas-node-rf-handle.connectionindicator[data-side] {
+  pointer-events: auto;
+}
+
 .canvas-node-frame[data-state="expanded"]:not([data-dragging]):is(
     [data-hover-intent],
     [data-selected]
