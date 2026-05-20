@@ -110,9 +110,15 @@ export function TimeRangeSelector({
               selected={draftRange}
             />
             <div className="flex items-center gap-2 px-1 text-sm">
-              <label className="text-muted-foreground">Start</label>
+              <label
+                className="text-muted-foreground"
+                htmlFor="time-range-start"
+              >
+                Start
+              </label>
               <input
                 className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                id="time-range-start"
                 onChange={(e) => setDraftStartTime(e.target.value)}
                 step="1"
                 type="time"
@@ -120,9 +126,12 @@ export function TimeRangeSelector({
               />
             </div>
             <div className="flex items-center gap-2 px-1 text-sm">
-              <label className="text-muted-foreground">End&nbsp;&nbsp;</label>
+              <label className="text-muted-foreground" htmlFor="time-range-end">
+                End&nbsp;&nbsp;
+              </label>
               <input
                 className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                id="time-range-end"
                 onChange={(e) => setDraftEndTime(e.target.value)}
                 step="1"
                 type="time"
@@ -160,6 +169,7 @@ export function TimeRangeSelector({
                 )}
                 key={r.ms}
                 onClick={() => handleQuickRange(r.ms)}
+                type="button"
               >
                 {r.label}
               </button>

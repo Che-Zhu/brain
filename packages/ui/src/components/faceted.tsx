@@ -340,13 +340,13 @@ function FacetedFilterAll({
   icon,
 }: FacetedFilterAllProps) {
   const isAll = value.length === 0;
-  const displayText = isAll
-    ? showLabel
-      ? "All"
-      : label
-    : value.length === 1
-      ? value[0]
-      : `${value.length} selected`;
+  let displayText = `${value.length} selected`;
+
+  if (isAll) {
+    displayText = showLabel ? "All" : label;
+  } else if (value.length === 1) {
+    displayText = value[0] ?? "";
+  }
 
   return (
     <div
