@@ -49,7 +49,11 @@ The per-node expanded or collapsed presentation state of a canvas node card.
 
 ### Canvas Connection
 
-A canvas edge that represents a real runtime dependency between resources. In the first version, Canvas Connections are detected from existing resource state rather than created by user-drawn edges.
+A canvas edge that represents an established runtime dependency between resources.
+
+### Connecting Edge
+
+A temporary canvas interaction created when a user drags a line between canvas nodes. A Connecting Edge may become a domain command only when its endpoints match a supported resource relationship, regardless of drag direction.
 
 ### Workload Telemetry Series
 
@@ -91,10 +95,6 @@ The AP Composition conditionally creates an EntryPoint (via provider-kubernetes 
 ### Entry node only appears for public APs
 
 On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only services (no public endpoints) do not produce EntryPoints or entry nodes.
-
-### Canvas edges and layout are deferred
-
-Entry node and container node are not connected by edges and have no special layout rules for now. Edge generation and node arrangement will be addressed as a unified system when more node-to-node relationships (AP-to-DB, AP-to-AP) are introduced.
 
 ### Canvas Layout is shared per Project
 
@@ -152,25 +152,37 @@ Canvas Layout belongs to the application persistence layer, not the Crossplane r
 
 Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
 
-### Canvas edges are not freeform annotations
+### Canvas connections are resource-backed
 
-Users do not draw arbitrary diagram lines on the canvas. In the first version, edges are rendered only when the system detects a real runtime dependency such as EntryPoint-to-AP or AP-to-DB.
+Users may freely drag lines between canvas nodes, but unsupported Connecting Edges are discarded after lightweight feedback. Established Canvas Connections are derived from AP, DB, and EntryPoint resource state rather than stored as separate App Postgres records.
 
 ### Database Binding belongs to AP desired state
 
-The source of truth for a Database Binding is the AP's desired state. DB does not store reverse ownership of bound APs, and Canvas Connections only visualize bindings detected from resource state.
+The source of truth for a Database Binding is the AP's desired state. DB does not store reverse ownership of bound APs, and the canvas visualizes AP-DB connections detected from resource state.
 
 ### Database Binding v1 is expressed through AP environment variables
 
-The first version of Database Binding is represented by AP `spec.input.env` entries that reference a DB connection Secret. AP does not introduce a separate `spec.databaseBindings` field until binding metadata or ownership semantics require it.
+Database Binding v1 is represented by one or more AP `spec.input.env` entries. Environment variable names are user-provided and unique within one AP; removing a binding entry removes the corresponding environment variable row.
 
-### Database Binding injects Secret references, not plaintext connection strings
+### Database Binding is authored from the Environment editor
 
-Database Binding v1 writes only AP environment variables backed by DB connection Secret references. Plaintext DB connection strings may be displayed or copied, but they are not written into AP desired state by default.
+Database Binding v1 is created through the AP Environment editor. The structured editor lets users add ordinary environment values or use Add Reference to select a Project DB field such as Private DSN, Public DSN, Username, Password, Host, or Port.
 
-### Only established Canvas Connections are persisted
+### Add Reference stores standard Kubernetes env
 
-Connecting edges are temporary UI feedback for a future in-flight connection operation. App Postgres stores only established Canvas Connections whose required resource changes have succeeded. The first version does not support user-initiated connecting edges.
+After an Add Reference row is saved, AP desired state stores only standard Kubernetes environment variables. DSN references become ordinary `value` entries, primitive fields become `valueFrom.secretKeyRef` entries, and no separate reference metadata is persisted.
+
+### Environment editor reconstructs DB references from exact evidence
+
+When editing existing AP environment variables, the Environment editor displays a row as a Project DB reference only when the saved env has exact evidence: a Secret reference to a DB credential Secret, or a value equal to a DB private or public DSN. Otherwise the row is shown as an ordinary value.
+
+### Canvas Database Binding delegates to Environment editor
+
+Dragging between an AP and a DB in either direction opens the AP Environment editor's add-variable flow with Add Reference preselected for that DB. Repeated AP-DB drags may add another environment variable referencing a different field from the same DB.
+
+### External databases are ordinary Environment variables
+
+External database credentials are not modeled as Database Bindings in v1. Users enter external database values directly in the AP Environment editor, and the product does not create a separate external database form, node, or Canvas Connection for them.
 
 ### Canvas telemetry is store-mediated
 
