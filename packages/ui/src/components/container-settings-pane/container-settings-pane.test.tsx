@@ -5,8 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import type { ContainerEnvVar } from "./container-settings-pane";
 import {
-  confirmedAddDbDsnReferencesFromEnvDraft,
   ContainerSettingsPane,
+  confirmedAddDbDsnReferencesFromEnvDraft,
 } from "./container-settings-pane";
 
 const noop = () => {
@@ -27,6 +27,8 @@ const UNAVAILABLE_DB_RE = /empty \(unavailable\)/;
 const REMOVE_ENV_RE = /aria-label="Remove environment variable"/;
 const SAVE_ENV_RE = /Save environment/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
+const MYSQL_OPTION_SELECTED_RE =
+  /<option value="default\/mysql" selected="">mysql/;
 
 function renderPane(
   readOnly = false,
@@ -153,7 +155,7 @@ test("container settings pane opens dragged DB Add Reference intent preselected"
   );
 
   assert.match(html, NEW_VARIABLE_RE);
-  assert.match(html, /<option value="default\/mysql" selected="">mysql/);
+  assert.match(html, MYSQL_OPTION_SELECTED_RE);
   assert.match(html, DB_FIELD_SELECT_RE);
   assert.match(html, SAVE_ENV_RE);
 });
@@ -171,8 +173,7 @@ test("container settings pane reports confirmed dragged DB reference rows from t
     valueSource: "dbDsn",
   } satisfies ContainerEnvVar & { canvasAddDbDsnReferenceIntentId: string };
 
-  assert.deepEqual(
-    confirmedAddDbDsnReferencesFromEnvDraft([draftRow]),
-    [{ dbName: "mysql", dbNamespace: "default", id: "drag-1" }]
-  );
+  assert.deepEqual(confirmedAddDbDsnReferencesFromEnvDraft([draftRow]), [
+    { dbName: "mysql", dbNamespace: "default", id: "drag-1" },
+  ]);
 });

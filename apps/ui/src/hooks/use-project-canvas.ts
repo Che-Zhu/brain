@@ -98,7 +98,7 @@ function dbReferenceIntentDataForContainerNode({
   };
 }
 
-function pendingApDbReferenceMutationStartHandler({
+function createPendingApDbReferenceMutationStartHandler({
   apName,
   apNamespace,
   onPendingApDbReferencesStart,
@@ -221,11 +221,7 @@ export function useProjectCanvas(
         (async (): Promise<void> => {
           try {
             await mutation();
-            try {
-              await afterLifecycle();
-            } catch {
-              //
-            }
+            await afterLifecycle();
           } finally {
             options?.onSettled?.();
           }
@@ -398,7 +394,7 @@ export function useProjectCanvas(
         onConsumed: handleAddDbDsnReferenceIntentConsumed,
       });
       const onAddDbDsnReferenceMutationStart =
-        pendingApDbReferenceMutationStartHandler({
+        createPendingApDbReferenceMutationStartHandler({
           apName: name,
           apNamespace: ns,
           onPendingApDbReferencesStart,

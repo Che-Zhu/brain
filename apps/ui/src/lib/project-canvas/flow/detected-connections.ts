@@ -73,12 +73,16 @@ function metadataNamespace(
   );
 }
 
-function resourceKey(ref: CanvasConnectionResourceRef): string {
+export function canvasConnectionResourceKey(
+  ref: CanvasConnectionResourceRef
+): string {
   return `${ref.kind}:${ref.namespace}:${ref.name}`;
 }
 
 function connectionKey(connection: CanvasDetectedConnection): string {
-  return `${resourceKey(connection.source)}->${resourceKey(connection.target)}`;
+  const sourceKey = canvasConnectionResourceKey(connection.source);
+  const targetKey = canvasConnectionResourceKey(connection.target);
+  return `${sourceKey}->${targetKey}`;
 }
 
 function resourceRef(
@@ -115,7 +119,9 @@ function resourceRefFromMetadata(
   );
 }
 
-function nodeResourceRef(node: Node): CanvasConnectionResourceRef | undefined {
+export function canvasConnectionNodeResourceRef(
+  node: Node
+): CanvasConnectionResourceRef | undefined {
   const data = asRecord(node.data);
 
   switch (node.type) {
@@ -191,7 +197,7 @@ function apResourceKeySet(
   for (const ap of aps) {
     const ref = resourceRefFromMetadata("AP", ap, namespaceFallback);
     if (ref !== undefined) {
-      refs.add(resourceKey(ref));
+      refs.add(canvasConnectionResourceKey(ref));
     }
   }
   return refs;
@@ -215,7 +221,7 @@ function addEntryPointConnections(
     if (
       source === undefined ||
       target === undefined ||
-      !apRefs.has(resourceKey(target))
+      !apRefs.has(canvasConnectionResourceKey(target))
     ) {
       continue;
     }
@@ -359,17 +365,17 @@ export function canvasConnectionEdgesFromDetectedConnections(
 ): Edge[] {
   const nodeIdByResourceKey = new Map<string, string>();
   for (const node of nodes) {
-    const ref = nodeResourceRef(node);
+    const ref = canvasConnectionNodeResourceRef(node);
     if (ref !== undefined) {
-      nodeIdByResourceKey.set(resourceKey(ref), node.id);
+      nodeIdByResourceKey.set(canvasConnectionResourceKey(ref), node.id);
     }
   }
 
   const edges: Edge[] = [];
   const seenEdgeIds = new Set<string>();
   for (const connection of connections) {
-    const sourceKey = resourceKey(connection.source);
-    const targetKey = resourceKey(connection.target);
+    const sourceKey = canvasConnectionResourceKey(connection.source);
+    const targetKey = canvasConnectionResourceKey(connection.target);
     const source = nodeIdByResourceKey.get(sourceKey);
     const target = nodeIdByResourceKey.get(targetKey);
     if (source === undefined || target === undefined) {

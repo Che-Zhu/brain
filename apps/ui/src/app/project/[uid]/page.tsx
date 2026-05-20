@@ -54,38 +54,32 @@ export default function ProjectUidPage() {
   });
   const beginPendingApDbReferences = useCallback(
     (references: readonly PendingApDbCanvasReference[]) => {
-      const ids = references.map((reference) => reference.id);
+      const referenceIds = references.map((reference) => reference.id);
       setPendingApDbReferences((current) =>
         addPendingApDbCanvasReferences(current, references)
       );
       return () => {
         setPendingApDbReferences((current) =>
-          removePendingApDbCanvasReferences(current, ids)
+          removePendingApDbCanvasReferences(current, referenceIds)
         );
       };
     },
     []
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pending edges are scoped to this project route.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset pending edges when the canvas route scope changes.
   useEffect(() => {
     setPendingApDbReferences([]);
   }, [namespace, uid]);
-  const pendingEdges = useMemo(
-    () =>
-      pendingApDbCanvasConnectionEdges({
-        existingEdges: canvasState.edges,
-        nodes: canvasState.nodes,
-        pendingReferences: pendingApDbReferences,
-      }),
-    [canvasState.edges, canvasState.nodes, pendingApDbReferences]
-  );
-  const canvasStateWithPendingEdges = useMemo(
-    () => ({
-      ...canvasState,
-      edges: [...canvasState.edges, ...pendingEdges],
-    }),
-    [canvasState, pendingEdges]
-  );
+  const canvasEdges = useMemo(() => {
+    const pendingEdges = pendingApDbCanvasConnectionEdges({
+      existingEdges: canvasState.edges,
+      nodes: canvasState.nodes,
+      pendingReferences: pendingApDbReferences,
+    });
+    return pendingEdges.length === 0
+      ? canvasState.edges
+      : [...canvasState.edges, ...pendingEdges];
+  }, [canvasState.edges, canvasState.nodes, pendingApDbReferences]);
 
   const {
     clearSelection,
@@ -95,7 +89,7 @@ export default function ProjectUidPage() {
     nodes,
     selectedEdge,
     selectedNode,
-  } = useProjectCanvas(canvasStateWithPendingEdges.nodes, {
+  } = useProjectCanvas(canvasState.nodes, {
     dbsData: projectServicesData.dbs,
     kubeconfig,
     namespace,
@@ -132,7 +126,7 @@ export default function ProjectUidPage() {
               meta={meta}
               state={{
                 ...canvasState,
-                edges: canvasStateWithPendingEdges.edges,
+                edges: canvasEdges,
                 nodes,
                 selectedEdge,
                 selectedNode,
