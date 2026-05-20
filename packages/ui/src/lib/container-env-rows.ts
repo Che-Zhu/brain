@@ -71,28 +71,26 @@ export function isKubernetesEnvName(name: string): boolean {
 export function containerEnvDbDsnFieldOptions(
   source: ContainerEnvDbDsnSource | undefined
 ): ContainerEnvDbDsnFieldOption[] {
+  const options: ContainerEnvDbDsnFieldOption[] = [];
   const privateDsn = nonEmptyValue(source?.privateDsn);
+  if (privateDsn !== undefined) {
+    options.push({
+      field: "private",
+      label: "Private DSN",
+      value: privateDsn,
+    });
+  }
+
   const publicDsn = nonEmptyValue(source?.publicDsn);
-  return [
-    ...(privateDsn === undefined
-      ? []
-      : [
-          {
-            field: "private" as const,
-            label: "Private DSN",
-            value: privateDsn,
-          },
-        ]),
-    ...(publicDsn === undefined
-      ? []
-      : [
-          {
-            field: "public" as const,
-            label: "Public DSN",
-            value: publicDsn,
-          },
-        ]),
-  ];
+  if (publicDsn !== undefined) {
+    options.push({
+      field: "public",
+      label: "Public DSN",
+      value: publicDsn,
+    });
+  }
+
+  return options;
 }
 
 export function containerEnvDbDsnReferenceFromValue(
@@ -148,26 +146,27 @@ export function addContainerEnvDbDsnReferenceRow(
   rows: readonly ContainerEnvRow[],
   sources: readonly ContainerEnvDbDsnSource[]
 ): ContainerEnvRow[] {
-  const source = sources.find(
-    (item) => containerEnvDbDsnFieldOptions(item).length > 0
-  );
-  const field = containerEnvDbDsnFieldOptions(source)[0];
-  if (source === undefined || field === undefined) {
-    return [...rows];
-  }
-  return [
-    ...rows,
-    {
-      dbDsn: {
-        dbName: source.name,
-        dbNamespace: source.namespace,
-        field: field.field,
+  for (const source of sources) {
+    const field = containerEnvDbDsnFieldOptions(source)[0];
+    if (field === undefined) {
+      continue;
+    }
+    return [
+      ...rows,
+      {
+        dbDsn: {
+          dbName: source.name,
+          dbNamespace: source.namespace,
+          field: field.field,
+        },
+        name: nextDefaultRowName(rows),
+        value: field.value,
+        valueSource: "dbDsn",
       },
-      name: nextDefaultRowName(rows),
-      value: field.value,
-      valueSource: "dbDsn",
-    },
-  ];
+    ];
+  }
+
+  return [...rows];
 }
 
 export function updateContainerEnvRow(

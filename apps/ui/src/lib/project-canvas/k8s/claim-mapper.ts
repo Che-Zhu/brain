@@ -1,4 +1,3 @@
-import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
@@ -113,46 +112,6 @@ export function parseMemoryToMib(q: unknown): number | undefined {
   }
   const plain = Number(s);
   return Number.isFinite(plain) ? Math.round(plain) : undefined;
-}
-
-export function dbDsnReferenceSourcesFromDbsData(
-  dbsData: K8sGetResponse | undefined,
-  namespaceFallback?: string
-): ContainerEnvDbDsnSource[] {
-  return apItemsFromList(dbsData)
-    .map((item) => dbDsnReferenceSourceFromDb(item, namespaceFallback))
-    .filter(
-      (source): source is ContainerEnvDbDsnSource => source !== undefined
-    );
-}
-
-function dbDsnReferenceSourceFromDb(
-  item: unknown,
-  namespaceFallback?: string
-): ContainerEnvDbDsnSource | undefined {
-  const root = asRecord(item) ?? {};
-  const metadata = asRecord(root.metadata) ?? {};
-  const status = asRecord(root.status) ?? {};
-  const name = typeof metadata.name === "string" ? metadata.name : "";
-  const namespace =
-    typeof metadata.namespace === "string" && metadata.namespace !== ""
-      ? metadata.namespace
-      : (namespaceFallback ?? "");
-  if (name === "" || namespace === "") {
-    return undefined;
-  }
-  const privateDsn = nonEmptyStatusString(status.connectionStringPrivate);
-  const publicDsn = nonEmptyStatusString(status.connectionStringPublic);
-  return {
-    name,
-    namespace,
-    ...(privateDsn === undefined ? {} : { privateDsn }),
-    ...(publicDsn === undefined ? {} : { publicDsn }),
-  };
-}
-
-function nonEmptyStatusString(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 function envFromSpecEnvList(

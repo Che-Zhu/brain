@@ -24,6 +24,7 @@ import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
   type ContainerEnvDbDsnField,
+  type ContainerEnvDbDsnFieldOption,
   type ContainerEnvDbDsnSource,
   type ContainerEnvRow,
   containerEnvDbDsnFieldOptions,
@@ -254,6 +255,25 @@ function sourceFromDbDsnRow(
   return sources.find((source) => dbDsnSourceKey(source) === key);
 }
 
+function dbDsnSourceHasFields(source: ContainerEnvDbDsnSource): boolean {
+  return containerEnvDbDsnFieldOptions(source).length > 0;
+}
+
+function dbDsnRowPatch(
+  source: ContainerEnvDbDsnSource,
+  field: ContainerEnvDbDsnFieldOption
+): Partial<ContainerEnvRow> {
+  return {
+    dbDsn: {
+      dbName: source.name,
+      dbNamespace: source.namespace,
+      field: field.field,
+    },
+    value: field.value,
+    valueSource: "dbDsn",
+  };
+}
+
 const envReferenceSelectClassName =
   "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
@@ -326,6 +346,18 @@ function EditableEnvValueControl({
   }
 
   if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+    const selectedSource = sourceFromDbDsnRow(row, addableDbDsnSources);
+    const selectedFields = containerEnvDbDsnFieldOptions(selectedSource);
+    const updateReference = (
+      source: ContainerEnvDbDsnSource | undefined,
+      field: ContainerEnvDbDsnFieldOption | undefined
+    ) => {
+      if (source === undefined || field === undefined) {
+        return;
+      }
+      onUpdateRow(index, dbDsnRowPatch(source, field));
+    };
+
     return (
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] gap-2">
         <select
@@ -335,19 +367,7 @@ function EditableEnvValueControl({
             const source = addableDbDsnSources.find(
               (item) => dbDsnSourceKey(item) === event.target.value
             );
-            const field = containerEnvDbDsnFieldOptions(source)[0];
-            if (source == null || field == null) {
-              return;
-            }
-            onUpdateRow(index, {
-              dbDsn: {
-                dbName: source.name,
-                dbNamespace: source.namespace,
-                field: field.field,
-              },
-              value: field.value,
-              valueSource: "dbDsn",
-            });
+            updateReference(source, containerEnvDbDsnFieldOptions(source)[0]);
           }}
           value={dbDsnRowKey(row)}
         >
@@ -361,28 +381,14 @@ function EditableEnvValueControl({
           aria-label="Project DB DSN field"
           className={envReferenceSelectClassName}
           onChange={(event) => {
-            const source = sourceFromDbDsnRow(row, addableDbDsnSources);
-            const field = containerEnvDbDsnFieldOptions(source).find(
+            const field = selectedFields.find(
               (item) => item.field === event.target.value
             );
-            if (source == null || field == null) {
-              return;
-            }
-            onUpdateRow(index, {
-              dbDsn: {
-                dbName: source.name,
-                dbNamespace: source.namespace,
-                field: field.field,
-              },
-              value: field.value,
-              valueSource: "dbDsn",
-            });
+            updateReference(selectedSource, field);
           }}
           value={row.dbDsn.field}
         >
-          {containerEnvDbDsnFieldOptions(
-            sourceFromDbDsnRow(row, addableDbDsnSources)
-          ).map((field) => (
+          {selectedFields.map((field) => (
             <option key={field.field} value={field.field}>
               {field.label}
             </option>
@@ -417,9 +423,8 @@ function EditableEnvRows({
   onDeleteRow,
   onUpdateRow,
 }: EditableEnvRowsProps) {
-  const addableDbDsnSources = dbDsnReferenceSources.filter(
-    (source) => containerEnvDbDsnFieldOptions(source).length > 0
-  );
+  const addableDbDsnSources =
+    dbDsnReferenceSources.filter(dbDsnSourceHasFields);
 
   return (
     <div
@@ -726,9 +731,7 @@ export function ContainerSettingsPane({
     ]);
   };
 
-  const canAddDbDsnReference = dbDsnReferenceSources.some(
-    (source) => containerEnvDbDsnFieldOptions(source).length > 0
-  );
+  const canAddDbDsnReference = dbDsnReferenceSources.some(dbDsnSourceHasFields);
 
   const handleAddDbDsnReferenceRow = () => {
     setEnvDraft((rows) =>

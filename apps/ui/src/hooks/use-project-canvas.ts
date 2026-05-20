@@ -26,7 +26,7 @@ import {
 } from "@/lib/project-canvas/flow/anchor-pair";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
-import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/claim-mapper";
+import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/db-dsn-reference-sources";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,

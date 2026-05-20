@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  claimToContainerSettings,
-  dbDsnReferenceSourcesFromDbsData,
-} from "./claim-mapper";
+import { claimToContainerSettings } from "./claim-mapper";
+import { dbDsnReferenceSourcesFromDbsData } from "./db-dsn-reference-sources";
 
 test("AP claim settings reconstruct direct and non-direct environment rows", () => {
   const secretKeyRef = {

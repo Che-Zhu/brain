@@ -6,6 +6,7 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 import type { Edge, Node } from "@xyflow/react";
 
+import { dbDsnReferenceSourceFromDb } from "../k8s/db-dsn-reference-sources";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
@@ -136,34 +137,6 @@ function connectionSecretName(db: unknown): string | undefined {
   return nonEmptyString(specRecord(db)?.connectionSecretName);
 }
 
-function dbDsnSourceFromResource(
-  db: unknown,
-  namespaceFallback: string | undefined
-): ContainerEnvDbDsnSource | undefined {
-  const name = metadataName(db);
-  const namespace = metadataNamespace(db, namespaceFallback);
-  if (name === undefined || namespace === undefined) {
-    return undefined;
-  }
-  const status = asRecord(asRecord(db)?.status) ?? {};
-  const privateDsn =
-    typeof status.connectionStringPrivate === "string" &&
-    status.connectionStringPrivate !== ""
-      ? status.connectionStringPrivate
-      : undefined;
-  const publicDsn =
-    typeof status.connectionStringPublic === "string" &&
-    status.connectionStringPublic !== ""
-      ? status.connectionStringPublic
-      : undefined;
-  return {
-    name,
-    namespace,
-    ...(privateDsn === undefined ? {} : { privateDsn }),
-    ...(publicDsn === undefined ? {} : { publicDsn }),
-  };
-}
-
 function entryPointApRef(entryPoint: unknown): string | undefined {
   return nonEmptyString(specRecord(entryPoint)?.apRef);
 }
@@ -275,7 +248,7 @@ function dbConnectionEvidence(
   const dbDsnSources: ContainerEnvDbDsnSource[] = [];
   for (const db of dbs) {
     const ref = resourceRefFromMetadata("DB", db, namespaceFallback);
-    const dsnSource = dbDsnSourceFromResource(db, namespaceFallback);
+    const dsnSource = dbDsnReferenceSourceFromDb(db, namespaceFallback);
     if (dsnSource !== undefined) {
       dbDsnSources.push(dsnSource);
     }
