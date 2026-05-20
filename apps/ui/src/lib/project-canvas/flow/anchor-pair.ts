@@ -57,22 +57,8 @@ const SIDE_AXIS = {
   top: "vertical",
 } as const satisfies Record<CanvasAnchorSide, "horizontal" | "vertical">;
 
-const CROSS_AXIS_PAIR_KEYS = new Set(
-  CANVAS_ANCHOR_PAIRS.filter(
-    ({ sourceSide, targetSide }) =>
-      SIDE_AXIS[sourceSide] !== SIDE_AXIS[targetSide]
-  ).map(({ sourceSide, targetSide }) => pairKey(sourceSide, targetSide))
-);
-
-function pairKey(
-  sourceSide: CanvasAnchorSide,
-  targetSide: CanvasAnchorSide
-): string {
-  return `${sourceSide}:${targetSide}`;
-}
-
 export function isCrossAxisAnchorPair(pair: CanvasAnchorPair): boolean {
-  return CROSS_AXIS_PAIR_KEYS.has(pairKey(pair.sourceSide, pair.targetSide));
+  return SIDE_AXIS[pair.sourceSide] !== SIDE_AXIS[pair.targetSide];
 }
 
 function anchorPoint(
@@ -137,11 +123,7 @@ function pairScore({
   source: CanvasNodeGeometry;
   target: CanvasNodeGeometry;
 }): number {
-  const multiplier = CROSS_AXIS_PAIR_KEYS.has(
-    pairKey(pair.sourceSide, pair.targetSide)
-  )
-    ? crossAxisPenalty
-    : 1;
+  const multiplier = isCrossAxisAnchorPair(pair) ? crossAxisPenalty : 1;
 
   return (
     distance(
@@ -159,31 +141,31 @@ export function selectCanvasAnchorPair({
   source,
   target,
 }: SelectCanvasAnchorPairOptions): CanvasAnchorPair {
-  let bestPair = CANVAS_ANCHOR_PAIRS[0];
-  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestPair: CanvasAnchorPair = { sourceSide: "top", targetSide: "right" };
+  let bestScore = Number.POSITIVE_INFINITY;
 
   for (const pair of CANVAS_ANCHOR_PAIRS) {
-    const nextDistance = pairScore({
+    const nextScore = pairScore({
       crossAxisPenalty,
       pair,
       source,
       target,
     });
 
-    if (nextDistance < bestDistance) {
+    if (nextScore < bestScore) {
       bestPair = pair;
-      bestDistance = nextDistance;
+      bestScore = nextScore;
     }
   }
 
   if (dragging && previousPair !== undefined) {
-    const previousDistance = pairScore({
+    const previousScore = pairScore({
       crossAxisPenalty,
       pair: previousPair,
       source,
       target,
     });
-    if (bestDistance >= hysteresisThreshold * previousDistance) {
+    if (bestScore >= hysteresisThreshold * previousScore) {
       return previousPair;
     }
   }

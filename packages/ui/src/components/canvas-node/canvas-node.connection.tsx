@@ -3,7 +3,7 @@
 import { cn } from "@workspace/ui/lib/utils";
 import { Handle, type HandleType, Position, useNodeId } from "@xyflow/react";
 import { Plus } from "lucide-react";
-import { Fragment } from "react";
+import type { MouseEvent } from "react";
 
 import type { CanvasNodeConnectionSide } from "./canvas-node.types";
 
@@ -32,7 +32,7 @@ export function CanvasNodeConnectionAnchor({
   className,
   type = "source",
 }: CanvasNodeConnectionAnchorProps) {
-  const nodeId = useNodeId();
+  const hasNodeContext = useNodeId() != null;
 
   return (
     <div
@@ -43,51 +43,23 @@ export function CanvasNodeConnectionAnchor({
       data-slot="canvas-node-connection-anchor"
     >
       {CONNECTION_SIDE_CONFIG.map(({ position, side }) => (
-        <Fragment key={side}>
-          {nodeId ? (
-            <Handle
-              aria-label={`Connect at ${side}`}
-              className="nodrag nopan canvas-node-rf-handle absolute cursor-pointer rounded-full p-0"
-              data-side={side}
-              data-slot="canvas-node-rf-handle"
-              id={side}
-              onMouseEnter={(event) => {
-                setFrameHoverSide(event.currentTarget, side);
-              }}
-              onMouseLeave={(event) => {
-                setFrameHoverSide(event.currentTarget, null);
-              }}
-              position={position}
-              type={type}
-            />
-          ) : (
-            <span
-              aria-hidden
-              className="nodrag nopan canvas-node-rf-handle absolute cursor-pointer rounded-full p-0"
-              data-side={side}
-              data-slot="canvas-node-rf-handle"
-              onMouseEnter={(event) => {
-                setFrameHoverSide(event.currentTarget, side);
-              }}
-              onMouseLeave={(event) => {
-                setFrameHoverSide(event.currentTarget, null);
-              }}
-            />
-          )}
-          <CanvasNodeConnectionAffordance side={side} />
-        </Fragment>
+        <CanvasNodeConnectionSideAnchor
+          hasNodeContext={hasNodeContext}
+          key={side}
+          position={position}
+          side={side}
+          type={type}
+        />
       ))}
     </div>
   );
 }
 
 function setFrameHoverSide(
-  target: EventTarget,
+  target: HTMLElement,
   side: CanvasNodeConnectionSide | null
 ) {
-  const frame = (target as HTMLElement).closest(
-    '[data-slot="canvas-node-frame"]'
-  );
+  const frame = target.closest('[data-slot="canvas-node-frame"]');
   if (!(frame instanceof HTMLElement)) {
     return;
   }
@@ -96,6 +68,71 @@ function setFrameHoverSide(
   } else {
     delete frame.dataset.hoverSide;
   }
+}
+
+function CanvasNodeConnectionSideAnchor({
+  hasNodeContext,
+  position,
+  side,
+  type,
+}: {
+  hasNodeContext: boolean;
+  position: Position;
+  side: CanvasNodeConnectionSide;
+  type: HandleType;
+}) {
+  return (
+    <>
+      <CanvasNodeConnectionTarget
+        hasNodeContext={hasNodeContext}
+        position={position}
+        side={side}
+        type={type}
+      />
+      <CanvasNodeConnectionAffordance side={side} />
+    </>
+  );
+}
+
+function CanvasNodeConnectionTarget({
+  hasNodeContext,
+  position,
+  side,
+  type,
+}: {
+  hasNodeContext: boolean;
+  position: Position;
+  side: CanvasNodeConnectionSide;
+  type: HandleType;
+}) {
+  const handleMouseEnter = (event: MouseEvent<HTMLElement>) => {
+    setFrameHoverSide(event.currentTarget, side);
+  };
+  const handleMouseLeave = (event: MouseEvent<HTMLElement>) => {
+    setFrameHoverSide(event.currentTarget, null);
+  };
+  const targetProps = {
+    className:
+      "nodrag nopan canvas-node-rf-handle absolute cursor-pointer rounded-full p-0",
+    "data-side": side,
+    "data-slot": "canvas-node-rf-handle",
+    onMouseEnter: handleMouseEnter,
+    onMouseLeave: handleMouseLeave,
+  };
+
+  if (hasNodeContext) {
+    return (
+      <Handle
+        aria-label={`Connect at ${side}`}
+        id={side}
+        position={position}
+        type={type}
+        {...targetProps}
+      />
+    );
+  }
+
+  return <span aria-hidden {...targetProps} />;
 }
 
 function CanvasNodeConnectionAffordance({
