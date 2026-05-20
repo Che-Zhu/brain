@@ -8,6 +8,7 @@ import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
+import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
@@ -22,11 +23,19 @@ export default function ProjectUidPage() {
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
+  const projectCanvasLayout = useProjectCanvasLayout({
+    enabled: kubeconfig.trim() !== "",
+    namespace,
+    projectUid: uid,
+  });
 
   const { canvasState, error, isEmptyGraphLoading, refreshWorkloadLists } =
     useProjectServices({
+      canvasLayout: projectCanvasLayout.layout,
+      canvasLayoutReady: projectCanvasLayout.layoutReady,
       kubeconfig,
       namespace,
+      onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
       uid,
     });
 
@@ -34,17 +43,28 @@ export default function ProjectUidPage() {
     clearSelection,
     closeDatabasePane,
     databasePane,
-    meta,
+    meta: canvasMeta,
     nodes,
     selectedEdge,
     selectedNode,
   } = useProjectCanvas(canvasState.nodes, {
     kubeconfig,
+    onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
+    onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     refreshWorkloadLists,
   });
   const selectedTelemetryTarget = useMemo(
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
+  );
+  const meta = useMemo(
+    () => ({
+      ...canvasMeta,
+      openingFitView: {
+        key: `${namespace}:${uid}`,
+      },
+    }),
+    [canvasMeta, namespace, uid]
   );
 
   return (
@@ -57,6 +77,7 @@ export default function ProjectUidPage() {
           >
             <Canvas.Root
               actions={{ onPanelClose: clearSelection }}
+              key={`${namespace}:${uid}`}
               meta={meta}
               state={{
                 ...canvasState,

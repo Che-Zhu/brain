@@ -17,6 +17,12 @@ import {
   dbsToCanvasState,
   entryPointsToCanvasState,
 } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { detectedCanvasConnectionEdges } from "@/lib/project-canvas/flow/detected-connections";
+import { mergeCanvasLayoutWithDetectedNodes } from "@/lib/project-canvas/layout/merge";
+import type {
+  CanvasLayoutDocument,
+  CanvasLayoutNode,
+} from "@/lib/project-canvas/layout/types";
 import {
   entryPointRefreshIntervalForLifecycle,
   hasTransientWorkloadPhase,
@@ -26,10 +32,13 @@ const WORKLOAD_RECONCILE_POLL_MS = 1000;
 const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
 
 export function useProjectServices(options: {
+  canvasLayout?: CanvasLayoutDocument;
+  canvasLayoutReady?: boolean;
   /** URL-encoded kubeconfig (Authorization bearer body). */
   kubeconfig: string;
   /** K8s namespace for AP, DB, and entrypoint discovery. */
   namespace: string;
+  onCanvasLayoutMerge?: (nodes: CanvasLayoutNode[]) => void;
   /** Project UID from the route (decoded). */
   uid: string;
 }): {
@@ -47,7 +56,14 @@ export function useProjectServices(options: {
   /** Refetch AP + DB list SWR caches (e.g. after lifecycle mutations). */
   refreshWorkloadLists: () => Promise<unknown>;
 } {
-  const { kubeconfig, namespace, uid } = options;
+  const {
+    canvasLayout,
+    canvasLayoutReady = true,
+    kubeconfig,
+    namespace,
+    onCanvasLayoutMerge,
+    uid,
+  } = options;
 
   const labelSelector = useMemo(() => `${PROJECT_UID_LABEL}=${uid}`, [uid]);
 
@@ -155,7 +171,7 @@ export function useProjectServices(options: {
     return map;
   }, [dbCompositionRows]);
 
-  const canvasState = useMemo((): CanvasState => {
+  const layoutMerge = useMemo(() => {
     const apBlock = apsToCanvasState(apsData, {
       gridIndexOffset: 0,
       namespaceFallback: namespace,
@@ -167,14 +183,59 @@ export function useProjectServices(options: {
     });
     const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
       gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
+      namespaceFallback: namespace,
     });
+    const detectedNodes = [
+      ...apBlock.nodes,
+      ...dbBlock.nodes,
+      ...entryPointBlock.nodes,
+    ];
+    const merge = canvasLayoutReady
+      ? mergeCanvasLayoutWithDetectedNodes({
+          layout: canvasLayout,
+          nodes: detectedNodes,
+        })
+      : { changed: false, layout: canvasLayout, nodes: [] };
+    const edges = canvasLayoutReady
+      ? detectedCanvasConnectionEdges({
+          apsData,
+          dbsData,
+          entryPointsData,
+          namespaceFallback: namespace,
+          nodes: merge.nodes,
+        })
+      : [];
     return {
-      edges: [...apBlock.edges, ...dbBlock.edges, ...entryPointBlock.edges],
-      nodes: [...apBlock.nodes, ...dbBlock.nodes, ...entryPointBlock.nodes],
+      changed: merge.changed,
+      edges,
+      layout: merge.layout,
+      nodes: merge.nodes,
+    };
+  }, [
+    apsData,
+    canvasLayout,
+    canvasLayoutReady,
+    dbsData,
+    entryPointsData,
+    dbCompositionIconByName,
+    namespace,
+  ]);
+
+  useEffect(() => {
+    if (!layoutMerge.changed || layoutMerge.layout === undefined) {
+      return;
+    }
+    onCanvasLayoutMerge?.(layoutMerge.layout.nodes);
+  }, [layoutMerge.changed, layoutMerge.layout, onCanvasLayoutMerge]);
+
+  const canvasState = useMemo((): CanvasState => {
+    return {
+      edges: layoutMerge.edges,
+      nodes: layoutMerge.nodes,
       selectedEdge: null,
       selectedNode: null,
     };
-  }, [apsData, dbsData, entryPointsData, dbCompositionIconByName, namespace]);
+  }, [layoutMerge.edges, layoutMerge.nodes]);
 
   const error = apsError ?? dbsError ?? entryPointsError;
   const isLoading = apsLoading || dbsLoading || entryPointsLoading;

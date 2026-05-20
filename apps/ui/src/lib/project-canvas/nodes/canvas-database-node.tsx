@@ -11,11 +11,15 @@ import {
 } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { useWorkloadTelemetrySnapshot } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import type { CanvasDatabaseRfNode } from "./types";
+import { useCanvasNodeExpansion } from "./use-canvas-node-expansion";
 
 export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
   data,
   dragging,
   id,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  type,
 }: NodeProps<CanvasDatabaseRfNode>) {
   const { actions = {}, connections, states } = data;
   const telemetryTarget = useMemo(
@@ -31,13 +35,22 @@ export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
   const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
+  const expansion = useCanvasNodeExpansion({
+    data,
+    id,
+    positionAbsoluteX,
+    positionAbsoluteY,
+    type,
+  });
 
   return (
     <DatabaseNode.Root
       connections={connections}
+      defaultExpanded={expansion.defaultExpanded}
       interaction={{ dragging, selected }}
       lifecycleActions={actions.lifecycleActions}
       onCopyConnection={actions.copyConnection}
+      onExpandedChange={expansion.onExpandedChange}
       onTogglePublicConnection={actions.togglePublicConnection}
       quickActions={actions.quickActions}
       states={statesWithTelemetry}

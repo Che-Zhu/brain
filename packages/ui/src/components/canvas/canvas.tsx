@@ -13,10 +13,13 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
+  useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -42,24 +45,65 @@ const CANVAS_DEFAULT_EDGE_STYLE = {
   stroke: "var(--color-blue-400)",
   strokeDasharray: "6 6",
 };
+const DEFAULT_OPENING_FIT_KEY = "__default__";
+const OPENING_FIT_ANIMATION_MS = 300;
+const OPENING_FIT_SETTLE_MS = 150;
 
 function mergeNodes(prev: Node[], next: Node[]): Node[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
   const merged = next.map((incoming) => {
     const existing = prevById.get(incoming.id);
     if (existing) {
-      return { ...incoming, position: existing.position };
+      return {
+        ...incoming,
+        data: mergeNodeData(existing, incoming),
+        position: existing.position,
+      };
     }
     return incoming;
   });
   return merged;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function nodeLayoutExpanded(node: Node): boolean | undefined {
+  const data = asRecord(node.data);
+  const layout = asRecord(data?.layout);
+  return typeof layout?.expanded === "boolean" ? layout.expanded : undefined;
+}
+
+function mergeNodeData(existing: Node, incoming: Node): Node["data"] {
+  const existingExpanded = nodeLayoutExpanded(existing);
+  if (existingExpanded === undefined) {
+    return incoming.data;
+  }
+
+  const incomingData = asRecord(incoming.data) ?? {};
+  const incomingLayout = asRecord(incomingData.layout) ?? {};
+  return {
+    ...incomingData,
+    layout: {
+      ...incomingLayout,
+      expanded: existingExpanded,
+    },
+  };
+}
+
 function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
+  const { fitView, viewportInitialized } = useReactFlow<Node, Edge>();
+  const nodesInitialized = useNodesInitialized();
+  const flowHeight = useStore((store) => store.height);
+  const flowWidth = useStore((store) => store.width);
   const initializedRef = useRef(false);
+  const openingFitAppliedKeyRef = useRef<number | string | null>(null);
 
   useLayoutEffect(() => {
     if (initializedRef.current) {
@@ -96,10 +140,12 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     });
   }, [edges, state.selectedEdge]);
 
-  const userDefaultEdgeOptions = meta.reactFlowProps?.defaultEdgeOptions;
-  const userConnectionLineStyle = meta.reactFlowProps?.connectionLineStyle;
+  const userReactFlowProps = meta.reactFlowProps ?? {};
+  const userDefaultEdgeOptions = userReactFlowProps.defaultEdgeOptions;
+  const userConnectionLineStyle = userReactFlowProps.connectionLineStyle;
+  const openingFitViewOptions = userReactFlowProps.fitViewOptions;
+  const shouldFitOpeningView = userReactFlowProps.fitView !== false;
   const passThrough: CanvasReactFlowProps = {
-    fitView: true,
     connectionMode: ConnectionMode.Loose,
     maxZoom: 1.2,
     minZoom: 0.2,
@@ -109,7 +155,8 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     selectNodesOnDrag: false,
     snapGrid: [16, 16],
     snapToGrid: true,
-    ...meta.reactFlowProps,
+    ...userReactFlowProps,
+    fitView: false,
     connectionLineStyle: {
       ...CANVAS_DEFAULT_EDGE_STYLE,
       ...(userConnectionLineStyle ?? {}),
@@ -122,6 +169,52 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       },
     },
   };
+  const openingFitKey = meta.openingFitView?.key ?? DEFAULT_OPENING_FIT_KEY;
+  const nodeCount = nodes.length;
+
+  useEffect(() => {
+    if (
+      openingFitAppliedKeyRef.current === openingFitKey ||
+      !shouldFitOpeningView ||
+      !viewportInitialized ||
+      !nodesInitialized ||
+      flowHeight <= 0 ||
+      flowWidth <= 0 ||
+      nodeCount === 0
+    ) {
+      return;
+    }
+
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const settleTimer = window.setTimeout(() => {
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
+          openingFitAppliedKeyRef.current = openingFitKey;
+          fitView({
+            duration: OPENING_FIT_ANIMATION_MS,
+            ...openingFitViewOptions,
+          });
+        });
+      });
+    }, OPENING_FIT_SETTLE_MS);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [
+    fitView,
+    flowHeight,
+    flowWidth,
+    nodeCount,
+    nodesInitialized,
+    openingFitKey,
+    openingFitViewOptions,
+    shouldFitOpeningView,
+    viewportInitialized,
+  ]);
 
   return (
     <CanvasUpperRightProvider>

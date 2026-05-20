@@ -1,17 +1,23 @@
 import dotenv from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
+import { ASSISTANT_DB_SCHEMA } from "./src/lib/chat-persistence/types";
+import { PROJECT_DB_SCHEMA } from "./src/lib/project-persistence/types";
+
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
 /** Run from `apps/ui`: `bun run db:push` */
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./src/lib/chat-persistence/schema.ts",
+  schema: [
+    "./src/lib/chat-persistence/schema.ts",
+    "./src/lib/project-persistence/schema.ts",
+  ],
   dbCredentials: { url: process.env.DATABASE_URL ?? "" },
   out: "./drizzle",
-  /** Only reconcile `pgSchema('sealai_assistant')` — avoids drizzle trying to DROP `public` objects (e.g. `postgres_log`) on managed PG. */
-  schemaFilter: ["sealai_assistant"],
+  /** Only reconcile app-owned schemas — avoids drizzle trying to DROP `public` objects (e.g. `postgres_log`) on managed PG. */
+  schemaFilter: [ASSISTANT_DB_SCHEMA, PROJECT_DB_SCHEMA],
   tablesFilter: [
     "!pg_auth_mon",
     "!pg_stat_kcache",

@@ -6,11 +6,15 @@ import type { NodeProps } from "@xyflow/react";
 import { memo } from "react";
 
 import type { CanvasEntryRfNode } from "./types";
+import { useCanvasNodeExpansion } from "./use-canvas-node-expansion";
 
 export const CanvasEntryNode = memo(function CanvasEntryNode({
   data,
   dragging,
   id,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  type,
 }: NodeProps<CanvasEntryRfNode>) {
   const { accessDomain, actions = {}, states, targets } = data;
   const { state } = useCanvas();
@@ -20,12 +24,21 @@ export const CanvasEntryNode = memo(function CanvasEntryNode({
   const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
+  const expansion = useCanvasNodeExpansion({
+    data,
+    id,
+    positionAbsoluteX,
+    positionAbsoluteY,
+    type,
+  });
 
   return (
     <EntryNode.Root
       accessDomain={accessDomain}
+      defaultExpanded={expansion.defaultExpanded}
       interaction={{ dragging, selected }}
       onCopyTarget={actions.copyTarget}
+      onExpandedChange={expansion.onExpandedChange}
       states={states}
       targets={targets}
     >

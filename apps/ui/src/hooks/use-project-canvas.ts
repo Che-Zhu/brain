@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
+import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
@@ -27,6 +28,7 @@ import {
 import type {
   CanvasContainerNodeData,
   CanvasDatabaseNodeData,
+  CanvasNodeLayoutState,
 } from "@/lib/project-canvas/nodes/types";
 import {
   CANVAS_SERVICE_QUERY_KEY,
@@ -42,6 +44,9 @@ import {
 
 export interface UseProjectCanvasOptions {
   kubeconfig?: string;
+  onNodeExpansionChange?: (node: Node) => void;
+  onNodePositionChange?: (node: Node) => void;
+  readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
   shareToken?: string;
@@ -69,6 +74,7 @@ export function useProjectCanvas(
   );
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
+  const readOnly = options?.readOnly === true;
 
   const {
     authReady: apAuthReady,
@@ -77,8 +83,8 @@ export function useProjectCanvas(
     restartWorkload,
     startWorkload,
   } = useApLifecycleOperations({
-    kubeconfig: options?.kubeconfig,
-    shareToken: options?.shareToken,
+    kubeconfig: readOnly ? undefined : options?.kubeconfig,
+    shareToken: readOnly ? undefined : options?.shareToken,
   });
   const {
     authReady: dbAuthReady,
@@ -91,11 +97,13 @@ export function useProjectCanvas(
     stopWorkload: stopDbWorkload,
     togglePublicAccess,
   } = useDbLifecycleOperations({
-    kubeconfig: options?.kubeconfig,
-    shareToken: options?.shareToken,
+    kubeconfig: readOnly ? undefined : options?.kubeconfig,
+    shareToken: readOnly ? undefined : options?.shareToken,
   });
 
   const refreshWorkloadLists = options?.refreshWorkloadLists;
+  const onNodeExpansionChange = options?.onNodeExpansionChange;
+  const onNodePositionChange = options?.onNodePositionChange;
 
   const afterLifecycle = useCallback(async () => {
     try {
@@ -383,20 +391,47 @@ export function useProjectCanvas(
     ]
   );
 
+  const decorateLayoutNode = useCallback(
+    (node: Node): Node => {
+      if (readOnly || onNodeExpansionChange === undefined) {
+        return node;
+      }
+
+      const data = node.data as Record<string, unknown> & {
+        layout?: CanvasNodeLayoutState;
+      };
+      return {
+        ...node,
+        data: {
+          ...data,
+          layout: {
+            ...(data.layout ?? {}),
+            onExpandedChange: (nextNode: Node) => {
+              onNodeExpansionChange(nextNode);
+            },
+          },
+        },
+      };
+    },
+    [onNodeExpansionChange, readOnly]
+  );
+
   const nodes = useMemo(
     () =>
       rawNodes.map((node): Node => {
-        if (node.type === CANVAS_DATABASE_NODE_TYPE) {
-          return decorateDatabaseNode(node);
+        const layoutNode = decorateLayoutNode(node);
+
+        if (layoutNode.type === CANVAS_DATABASE_NODE_TYPE) {
+          return decorateDatabaseNode(layoutNode);
         }
 
-        if (node.type === CANVAS_CONTAINER_NODE_TYPE) {
-          return decorateContainerNode(node);
+        if (layoutNode.type === CANVAS_CONTAINER_NODE_TYPE) {
+          return decorateContainerNode(layoutNode);
         }
 
-        return node;
+        return layoutNode;
       }),
-    [decorateContainerNode, decorateDatabaseNode, rawNodes]
+    [decorateContainerNode, decorateDatabaseNode, decorateLayoutNode, rawNodes]
   );
 
   const selectedNode = useMemo<CanvasSelectedNode>(() => {
@@ -465,6 +500,7 @@ export function useProjectCanvas(
         [CANVAS_CONTAINER_NODE_TYPE]: projectCanvasWorkloadPanelTabs,
       },
       reactFlowProps: {
+        ...projectCanvasInteractionProps({ readOnly }),
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
@@ -479,12 +515,19 @@ export function useProjectCanvas(
           setServiceUid(null).catch(() => undefined);
           setDatabasePane(null).catch(() => undefined);
         },
+        onNodeDragStop: (_, node: Node) => {
+          if (!readOnly) {
+            onNodePositionChange?.(node);
+          }
+        },
         onPaneClick: () => clearSelection(),
       },
     }),
     [
       clearSelection,
+      onNodePositionChange,
       panelTab,
+      readOnly,
       setDatabasePane,
       setPanelTab,
       setSelectedEdge,

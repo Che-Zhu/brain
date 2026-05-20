@@ -1,0 +1,131 @@
+import { type NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { validatePreviewShareAccess } from "@/lib/preview/share";
+import {
+  assertCanvasLayoutPatchMatchesOwner,
+  parseCanvasLayoutGetQuery,
+  parseCanvasLayoutPatchRequest,
+} from "@/lib/project-canvas/layout/contract";
+import { CanvasLayoutValidationError } from "@/lib/project-canvas/layout/patch";
+import {
+  loadProjectCanvasLayout,
+  patchProjectCanvasLayout,
+} from "@/lib/project-canvas/layout/repository";
+import {
+  fetchServerCredentials,
+  hasDevCredentialBypass,
+} from "@/lib/server-credentials";
+
+export const runtime = "nodejs";
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ error: message }, { status });
+}
+
+async function authorizeNamespace(namespace: string): Promise<Response | null> {
+  if (hasDevCredentialBypass()) {
+    return null;
+  }
+
+  const credentials = await fetchServerCredentials();
+  if (credentials.serverEncodedKubeconfig.trim() === "") {
+    return jsonError("Authentication is required.", 401);
+  }
+  if (credentials.serverNamespace.trim() !== namespace) {
+    return jsonError("Canvas layout namespace is not accessible.", 403);
+  }
+  return null;
+}
+
+async function authorizeLayoutRead(
+  query: ReturnType<typeof parseCanvasLayoutGetQuery>,
+  request: NextRequest
+): Promise<Response | null> {
+  const shareToken =
+    query.shareToken?.trim() || request.headers.get("X-Share-Token")?.trim();
+  if (shareToken) {
+    const result = await validatePreviewShareAccess({
+      namespace: query.namespace,
+      projectUid: query.projectUid,
+      shareToken,
+    });
+    if (!result.ok) {
+      return jsonError(
+        "Canvas layout share token is not authorized.",
+        result.status
+      );
+    }
+    return null;
+  }
+
+  return authorizeNamespace(query.namespace);
+}
+
+function validationError(error: unknown): Response | null {
+  if (
+    error instanceof ZodError ||
+    error instanceof CanvasLayoutValidationError
+  ) {
+    return jsonError("Invalid canvas layout request.", 400);
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  let query: ReturnType<typeof parseCanvasLayoutGetQuery>;
+  try {
+    query = parseCanvasLayoutGetQuery({
+      namespace: request.nextUrl.searchParams.get("namespace") ?? "",
+      projectUid: request.nextUrl.searchParams.get("projectUid") ?? "",
+      shareToken:
+        request.nextUrl.searchParams.get("shareToken") ??
+        request.headers.get("X-Share-Token") ??
+        undefined,
+    });
+  } catch (error) {
+    return validationError(error) ?? jsonError("Invalid request.", 400);
+  }
+
+  const denied = await authorizeLayoutRead(query, request);
+  if (denied !== null) {
+    return denied;
+  }
+
+  try {
+    const { namespace, projectUid } = query;
+    return NextResponse.json(
+      await loadProjectCanvasLayout({ namespace, projectUid })
+    );
+  } catch {
+    return jsonError("Canvas layout persistence is unavailable.", 503);
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  let body: ReturnType<typeof parseCanvasLayoutPatchRequest>;
+  try {
+    body = parseCanvasLayoutPatchRequest(await request.json());
+    assertCanvasLayoutPatchMatchesOwner(body);
+  } catch (error) {
+    return (
+      validationError(error) ?? jsonError("Invalid canvas layout request.", 400)
+    );
+  }
+
+  const denied = await authorizeNamespace(body.namespace);
+  if (denied !== null) {
+    return denied;
+  }
+
+  try {
+    const { namespace, projectUid, ...patch } = body;
+    return NextResponse.json(
+      await patchProjectCanvasLayout({ namespace, projectUid }, patch)
+    );
+  } catch (error) {
+    return (
+      validationError(error) ??
+      jsonError("Canvas layout persistence is unavailable.", 503)
+    );
+  }
+}

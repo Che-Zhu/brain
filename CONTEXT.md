@@ -31,6 +31,18 @@ Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that compo
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
 
+### Canvas Layout
+
+A Project-scoped visual arrangement of the canvas, shared by everyone who opens that Project.
+
+### Canvas Node Expansion State
+
+The per-node expanded or collapsed presentation state of a canvas node card.
+
+### Canvas Connection
+
+A canvas edge that represents a real runtime dependency between resources. In the first version, Canvas Connections are detected from existing resource state rather than created by user-drawn edges.
+
 ### Workload Telemetry Series
 
 A normalized time-series representation of workload resource usage for AP and DB workloads. It is consumed by both compact canvas node summaries and detailed metrics panels.
@@ -75,6 +87,70 @@ On the canvas, an entry node card is only rendered when the AP has a correspondi
 ### Canvas edges and layout are deferred
 
 Entry node and container node are not connected by edges and have no special layout rules for now. Edge generation and node arrangement will be addressed as a unified system when more node-to-node relationships (AP-to-DB, AP-to-AP) are introduced.
+
+### Canvas Layout is shared per Project
+
+Canvas Layout is not a personal browser preference. It belongs to the Project and should be reused when the same Project is opened by another user, browser, or share preview. Node positions and Canvas Node Expansion State are shared; ephemeral UI state such as the selected node, open panel, and temporary zoom can remain local.
+
+### Canvas Layout v1 stores positions and node expansion, not viewport or names
+
+The first persisted Canvas Layout stores node positions and Canvas Node Expansion State. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, Resource Display Names, or other non-layout state.
+
+### Canvas Node Expansion State defaults to collapsed
+
+When a Canvas Layout item has no saved Canvas Node Expansion State, the node should render collapsed. This covers newly detected nodes and older saved layouts created before node expansion was persisted.
+
+### Canvas Node Expansion State belongs to each layout node
+
+Canvas Node Expansion State is stored on the same Canvas Layout item as the node position. It is absent when unknown and interpreted as collapsed.
+
+### Canvas Node Expansion State applies to all project canvas node types
+
+Canvas Node Expansion State applies to every Project canvas node type that supports card expansion, including AP, DB, and EntryPoint nodes.
+
+### Share previews may expand nodes locally
+
+Share previews read shared Canvas Layout, including Canvas Node Expansion State, but do not persist layout changes. Preview users may temporarily expand or collapse nodes for reading without changing the Project's shared layout.
+
+### Auto-expanded nodes are saved in editable Projects
+
+In an editable Project canvas, hover-driven node auto-expansion updates the shared Canvas Node Expansion State and is saved through the debounced Canvas Layout save flow. In share previews, the same interaction remains local and unsaved.
+
+### Canvas Layout is not live-synchronized
+
+Canvas Layout is shared through persistence, not through real-time collaboration. Users who already have the same Project open do not need to see another user's position or Canvas Node Expansion State changes until the layout is reloaded or fetched again.
+
+### Pending local layout edits take precedence
+
+After a local user changes a node position or Canvas Node Expansion State, that pending local layout edit should remain visible until the debounced save completes. Freshly fetched shared layout should not immediately overwrite pending local edits.
+
+### Canvas Layout saves are debounced and merge by node
+
+Canvas Layout saves should be debounced and merge changes by node resource reference instead of replacing the whole layout document. Concurrent edits to different nodes should both survive; concurrent edits to the same node may use last-write-wins for that node.
+
+### Canvas Layout node saves send complete layout items
+
+Each saved Canvas Layout node item should include the node reference, position, Canvas Node Expansion State when known, and resource identity snapshots such as last seen UID. The server may replace that node's saved layout item as a whole because concurrent edits to the same node are already last-write-wins.
+
+### Orphan Canvas Layout items are retained temporarily
+
+When a resource no longer appears in the detected graph, its Canvas Layout item should be hidden rather than deleted immediately. If the resource reappears, its layout is restored. Orphan layout items are purged after seven days.
+
+### Canvas Layout is persisted in App Postgres
+
+Canvas Layout belongs to the application persistence layer, not the Crossplane resource model. K8s and Crossplane remain the source of truth for Project, AP, DB, and EntryPoint resources; App Postgres stores the Project's visual arrangement.
+
+### Canvas Layout is keyed by Project UID
+
+Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
+
+### Canvas edges are not freeform annotations
+
+Users do not draw arbitrary diagram lines on the canvas. In the first version, edges are rendered only when the system detects a real runtime dependency such as EntryPoint-to-AP or AP-to-DB.
+
+### Only established Canvas Connections are persisted
+
+Connecting edges are temporary UI feedback for a future in-flight connection operation. App Postgres stores only established Canvas Connections whose required resource changes have succeeded. The first version does not support user-initiated connecting edges.
 
 ### Canvas telemetry is store-mediated
 

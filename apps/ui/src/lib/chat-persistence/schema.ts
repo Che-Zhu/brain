@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { UIMessage } from "ai";
 import {
   boolean,
