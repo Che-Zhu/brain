@@ -33,8 +33,7 @@ import {
 import { createProjectCanvasConnectionLine } from "@/lib/project-canvas/flow/connection-line";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import {
-  connectionFromProjectCanvasReleaseEvent,
-  connectionFromSnappedProjectCanvasState,
+  connectionFromProjectCanvasConnectEndGesture,
   connectionHandleFromConnectStartParams,
   type ProjectCanvasConnectionHandle,
   projectCanvasInteractionProps,
@@ -646,24 +645,14 @@ export function useProjectCanvas(
   >(
     (event, connectionState) => {
       if (!connectHandledInGestureRef.current) {
-        const fromHandle =
-          connectionState.fromHandle ?? connectingFromHandleRef.current;
-        const connection =
-          connectionFromSnappedProjectCanvasState({
-            fromHandle,
-            isValid: connectionState.isValid,
-            toHandle: connectionState.toHandle,
-          }) ??
-          snappedConnectionInGestureRef.current ??
-          connectionFromProjectCanvasReleaseEvent({
-            event,
-            fromHandle,
-            isSupportedConnection: isSupportedCanvasConnection,
-          });
-        if (
-          connection !== undefined &&
-          isSupportedCanvasConnection(connection)
-        ) {
+        const connection = connectionFromProjectCanvasConnectEndGesture({
+          event,
+          fallbackFromHandle: connectingFromHandleRef.current,
+          isSupportedConnection: isSupportedCanvasConnection,
+          snappedConnection: snappedConnectionInGestureRef.current,
+          state: connectionState,
+        });
+        if (connection !== undefined) {
           handleConnect(connection);
         }
       }

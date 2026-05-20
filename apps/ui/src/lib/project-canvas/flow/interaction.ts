@@ -38,6 +38,19 @@ export interface ProjectCanvasSnappedConnectionState {
   toHandle?: ProjectCanvasConnectionHandle | null;
 }
 
+export interface ProjectCanvasPoint {
+  x: number;
+  y: number;
+}
+
+export interface ProjectCanvasClosestHandleConnection {
+  connection: Connection;
+  distance: number;
+  handle: ProjectCanvasConnectionHandle;
+  x: number;
+  y: number;
+}
+
 function handleId(handle: ProjectCanvasConnectionHandle): string | null {
   return handle.id ?? null;
 }
@@ -167,31 +180,15 @@ export function closestProjectCanvasHandleConnection({
   doc: Pick<Document, "querySelectorAll">;
   fromHandle?: ProjectCanvasConnectionHandle | null;
   isSupportedConnection: (connection: Connection) => boolean;
-  point: { x: number; y: number };
+  point: ProjectCanvasPoint;
   radius?: number;
-  resolveHandleCenter?: (element: Element) => { x: number; y: number };
-}):
-  | {
-      connection: Connection;
-      distance: number;
-      handle: ProjectCanvasConnectionHandle;
-      x: number;
-      y: number;
-    }
-  | undefined {
+  resolveHandleCenter?: (element: Element) => ProjectCanvasPoint;
+}): ProjectCanvasClosestHandleConnection | undefined {
   if (fromHandle == null) {
     return undefined;
   }
 
-  let closest:
-    | {
-        connection: Connection;
-        distance: number;
-        handle: ProjectCanvasConnectionHandle;
-        x: number;
-        y: number;
-      }
-    | undefined;
+  let closest: ProjectCanvasClosestHandleConnection | undefined;
 
   for (const candidate of doc.querySelectorAll(
     PROJECT_CANVAS_HANDLE_SELECTOR
@@ -273,6 +270,42 @@ export function connectionFromProjectCanvasReleaseEvent({
     point,
     radius,
   })?.connection;
+}
+
+export function connectionFromProjectCanvasConnectEndGesture({
+  event,
+  fallbackFromHandle,
+  isSupportedConnection,
+  radius = PROJECT_CANVAS_CONNECTION_RADIUS,
+  snappedConnection,
+  state,
+}: {
+  event: MouseEvent | TouchEvent;
+  fallbackFromHandle?: ProjectCanvasConnectionHandle | null;
+  isSupportedConnection: (connection: Connection) => boolean;
+  radius?: number;
+  snappedConnection?: Connection | null;
+  state: ProjectCanvasSnappedConnectionState;
+}): Connection | undefined {
+  const fromHandle = state.fromHandle ?? fallbackFromHandle;
+  const connection =
+    connectionFromSnappedProjectCanvasState({
+      fromHandle,
+      isValid: state.isValid,
+      toHandle: state.toHandle,
+    }) ??
+    snappedConnection ??
+    connectionFromProjectCanvasReleaseEvent({
+      event,
+      fromHandle,
+      isSupportedConnection,
+      radius,
+    });
+
+  if (connection === undefined || !isSupportedConnection(connection)) {
+    return undefined;
+  }
+  return connection;
 }
 
 export function projectCanvasInteractionProps({

@@ -42,19 +42,27 @@ function projectCanvasConnectionLinePath<NodeType extends Node>({
     targetY: toY,
   };
 
-  if (connectionLineType === ConnectionLineType.SmoothStep) {
-    return getSmoothStepPath(pathParams)[0];
+  switch (connectionLineType) {
+    case ConnectionLineType.SmoothStep:
+      return getSmoothStepPath(pathParams)[0];
+    case ConnectionLineType.Step:
+      return getSmoothStepPath({ ...pathParams, borderRadius: 0 })[0];
+    case ConnectionLineType.Straight:
+      return getStraightPath(pathParams)[0];
+    default:
+      return getBezierPath(pathParams)[0];
   }
+}
 
-  if (connectionLineType === ConnectionLineType.Step) {
-    return getSmoothStepPath({ ...pathParams, borderRadius: 0 })[0];
-  }
-
-  if (connectionLineType === ConnectionLineType.Straight) {
-    return getStraightPath(pathParams)[0];
-  }
-
-  return getBezierPath(pathParams)[0];
+function handleCenterRelativeToRect(
+  element: Element,
+  origin: Pick<DOMRectReadOnly, "left" | "top">
+): { x: number; y: number } {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2 - origin.left,
+    y: rect.top + rect.height / 2 - origin.top,
+  };
 }
 
 export function createProjectCanvasConnectionLine<
@@ -82,13 +90,8 @@ export function createProjectCanvasConnectionLine<
             isSupportedConnection,
             point: props.pointer,
             radius,
-            resolveHandleCenter: (element) => {
-              const rect = element.getBoundingClientRect();
-              return {
-                x: rect.left + rect.width / 2 - svgRect.left,
-                y: rect.top + rect.height / 2 - svgRect.top,
-              };
-            },
+            resolveHandleCenter: (element) =>
+              handleCenterRelativeToRect(element, svgRect),
           })
         : undefined;
     const snappedConnection =

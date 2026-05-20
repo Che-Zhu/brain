@@ -5,6 +5,7 @@ import type { Connection } from "@xyflow/react";
 
 import {
   closestProjectCanvasHandleConnection,
+  connectionFromProjectCanvasConnectEndGesture,
   connectionFromProjectCanvasHandles,
   connectionFromSnappedProjectCanvasState,
   connectionFromValidProjectCanvasLine,
@@ -126,6 +127,43 @@ test("connect start params preserve the origin handle for release fallback", () 
       nodeId: "ap-api",
     }),
     null
+  );
+});
+
+test("connect end gesture resolves snapped fallbacks in one place", () => {
+  const connection = {
+    source: "ap-api",
+    sourceHandle: "right",
+    target: "db-postgres",
+    targetHandle: "left",
+  } satisfies Connection;
+  const unsupportedConnection = {
+    ...connection,
+    target: "entry-api",
+  } satisfies Connection;
+  const event = { clientX: 0, clientY: 0 } as MouseEvent;
+  const isSupportedConnection = (candidate: Connection) =>
+    candidate.target === "db-postgres";
+
+  assert.deepEqual(
+    connectionFromProjectCanvasConnectEndGesture({
+      event,
+      fallbackFromHandle: { id: "right", nodeId: "ap-api", type: "source" },
+      isSupportedConnection,
+      snappedConnection: connection,
+      state: { isValid: false },
+    }),
+    connection
+  );
+
+  assert.equal(
+    connectionFromProjectCanvasConnectEndGesture({
+      event,
+      isSupportedConnection,
+      snappedConnection: unsupportedConnection,
+      state: { isValid: false },
+    }),
+    undefined
   );
 });
 

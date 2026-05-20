@@ -270,6 +270,12 @@ function dbDsnReferencesEqual(
   );
 }
 
+function rowValueSource(
+  row: ContainerEnvRow
+): NonNullable<ContainerEnvRow["valueSource"]> {
+  return row.valueSource ?? "direct";
+}
+
 function containerEnvDbReferenceValuePatch(
   field: ContainerEnvDbDsnFieldOption
 ): Pick<ContainerEnvRow, "value" | "valueFrom"> {
@@ -426,7 +432,7 @@ export function containerEnvRowsModelEqual(
     return (
       row.name === other.name &&
       row.value === other.value &&
-      (row.valueSource ?? "direct") === (other.valueSource ?? "direct") &&
+      rowValueSource(row) === rowValueSource(other) &&
       valueFromKey(row.valueFrom) === valueFromKey(other.valueFrom) &&
       dbDsnReferencesEqual(row.dbDsn, other.dbDsn)
     );
