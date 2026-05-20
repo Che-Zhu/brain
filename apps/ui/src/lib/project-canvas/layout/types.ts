@@ -12,6 +12,7 @@ export interface CanvasLayoutPosition {
 }
 
 export interface CanvasLayoutNode {
+  expanded?: boolean;
   lastSeenUid?: string;
   orphanedAt?: string;
   position: CanvasLayoutPosition;

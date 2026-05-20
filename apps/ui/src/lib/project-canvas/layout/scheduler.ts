@@ -9,18 +9,18 @@ interface TimerApi {
   ) => unknown;
 }
 
-export interface CanvasLayoutNodePositionSaveScheduler {
+export interface CanvasLayoutNodeSaveScheduler {
   cancel: () => void;
   flush: () => Promise<void>;
   schedule: (node: CanvasLayoutNode) => void;
 }
 
-export function createCanvasLayoutNodePositionSaveScheduler(
+export function createCanvasLayoutNodeSaveScheduler(
   options: TimerApi & {
     delayMs: number;
     save: (nodes: CanvasLayoutNode[]) => Promise<void>;
   }
-): CanvasLayoutNodePositionSaveScheduler {
+): CanvasLayoutNodeSaveScheduler {
   const pending = new Map<string, CanvasLayoutNode>();
   let timer: unknown;
 
@@ -50,3 +50,6 @@ export function createCanvasLayoutNodePositionSaveScheduler(
     },
   };
 }
+
+export const createCanvasLayoutNodePositionSaveScheduler =
+  createCanvasLayoutNodeSaveScheduler;

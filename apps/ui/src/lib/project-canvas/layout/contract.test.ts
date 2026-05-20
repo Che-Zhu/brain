@@ -8,6 +8,7 @@ test("patch contract preserves orphan metadata but drops non-layout state", () =
     namespace: "ns-a",
     nodes: [
       {
+        expanded: true,
         lastSeenUid: "uid-a",
         orphanedAt: "2026-05-19T00:00:00.000Z",
         position: { x: 100, y: 200 },
@@ -23,6 +24,7 @@ test("patch contract preserves orphan metadata but drops non-layout state", () =
     namespace: "ns-a",
     nodes: [
       {
+        expanded: true,
         lastSeenUid: "uid-a",
         orphanedAt: "2026-05-19T00:00:00.000Z",
         position: { x: 100, y: 200 },

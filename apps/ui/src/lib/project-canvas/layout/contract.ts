@@ -21,6 +21,7 @@ export const canvasLayoutResourceRefSchema = z.object({
 });
 
 export const canvasLayoutNodeSchema = z.object({
+  expanded: z.boolean().optional(),
   lastSeenUid: optionalBoundedString,
   orphanedAt: optionalTimestamp,
   position: z.object({

@@ -54,11 +54,44 @@ function mergeNodes(prev: Node[], next: Node[]): Node[] {
   const merged = next.map((incoming) => {
     const existing = prevById.get(incoming.id);
     if (existing) {
-      return { ...incoming, position: existing.position };
+      return {
+        ...incoming,
+        data: mergeNodeData(existing, incoming),
+        position: existing.position,
+      };
     }
     return incoming;
   });
   return merged;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function nodeLayoutExpanded(node: Node): boolean | undefined {
+  const data = asRecord(node.data);
+  const layout = asRecord(data?.layout);
+  return typeof layout?.expanded === "boolean" ? layout.expanded : undefined;
+}
+
+function mergeNodeData(existing: Node, incoming: Node): Node["data"] {
+  const existingExpanded = nodeLayoutExpanded(existing);
+  if (existingExpanded === undefined) {
+    return incoming.data;
+  }
+
+  const incomingData = asRecord(incoming.data) ?? {};
+  const incomingLayout = asRecord(incomingData.layout) ?? {};
+  return {
+    ...incomingData,
+    layout: {
+      ...incomingLayout,
+      expanded: existingExpanded,
+    },
+  };
 }
 
 function CanvasFlow({ children }: CanvasFlowProps) {

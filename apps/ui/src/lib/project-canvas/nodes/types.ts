@@ -23,8 +23,14 @@ import {
   CANVAS_ENTRY_NODE_TYPE,
 } from "./constants";
 
+export interface CanvasNodeLayoutState {
+  expanded?: boolean;
+  onExpandedChange?: (node: Node, expanded: boolean) => void;
+}
+
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  layout?: CanvasNodeLayoutState;
   onWorkloadMutation?: () => Promise<unknown>;
   states: ContainerNodeStates;
 }
@@ -42,6 +48,7 @@ export interface CanvasDatabaseWorkloadRef {
 export interface CanvasDatabaseNodeData extends Record<string, unknown> {
   actions?: DatabaseNodeActions;
   connections: DatabaseNodeConnection[];
+  layout?: CanvasNodeLayoutState;
   states: DatabaseNodeStates;
   uid?: string;
   workload: CanvasDatabaseWorkloadRef;
@@ -55,6 +62,7 @@ export type CanvasDatabaseRfNode = Node<
 export interface CanvasEntryNodeData extends Record<string, unknown> {
   accessDomain?: EntryNodeAccessDomain;
   actions?: EntryNodeActions;
+  layout?: CanvasNodeLayoutState;
   resource: {
     name: string;
     namespace: string;

@@ -73,6 +73,34 @@ function finitePosition(
   return { x: position.x, y: position.y };
 }
 
+function canvasLayoutExpandedFromNode(node: Node): boolean | undefined {
+  const data = asRecord(node.data);
+  const layout = asRecord(data?.layout);
+  return typeof layout?.expanded === "boolean" ? layout.expanded : undefined;
+}
+
+function withCanvasLayoutExpansion(
+  node: Node,
+  expanded: boolean | undefined
+): Node {
+  if (expanded === undefined) {
+    return node;
+  }
+
+  const data = asRecord(node.data) ?? {};
+  const layout = asRecord(data.layout) ?? {};
+  return {
+    ...node,
+    data: {
+      ...data,
+      layout: {
+        ...layout,
+        expanded,
+      },
+    },
+  };
+}
+
 export function canvasLayoutResourceRefFromNode(
   node: Node
 ): CanvasLayoutResourceRef | undefined {
@@ -113,8 +141,10 @@ export function canvasLayoutNodeFromNode(
   if (ref === undefined || position === undefined) {
     return undefined;
   }
+  const expanded = canvasLayoutExpandedFromNode(node) ?? false;
   const lastSeenUid = lastSeenUidFromNode(node);
   return {
+    expanded,
     ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
     position,
     ref,
@@ -143,6 +173,7 @@ function layoutDocumentsEqual(
 
 function layoutNodesEqual(a: CanvasLayoutNode, b: CanvasLayoutNode): boolean {
   return (
+    a.expanded === b.expanded &&
     a.lastSeenUid === b.lastSeenUid &&
     a.orphanedAt === b.orphanedAt &&
     a.position.x === b.position.x &&
@@ -162,6 +193,9 @@ function restoredLayoutNodeFromDetectedNode(
     position: { x: saved.position.x, y: saved.position.y },
     ref: { ...saved.ref },
   };
+  if (saved.expanded !== undefined) {
+    restored.expanded = saved.expanded;
+  }
   if (lastSeenUid !== undefined) {
     restored.lastSeenUid = lastSeenUid;
   }
@@ -215,9 +249,11 @@ export function mergeCanvasLayoutWithDetectedNodes({
     nextLayoutByRef.set(key, restoredLayoutNodeFromDetectedNode(saved, node));
 
     const savedPosition = finitePosition(saved.position);
-    return savedPosition === undefined
-      ? { ...node }
-      : { ...node, position: savedPosition };
+    const positioned =
+      savedPosition === undefined
+        ? { ...node }
+        : { ...node, position: savedPosition };
+    return withCanvasLayoutExpansion(positioned, saved.expanded);
   });
 
   const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);

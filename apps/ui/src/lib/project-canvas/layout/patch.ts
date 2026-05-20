@@ -62,6 +62,7 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
   const lastSeenUid = optionalTrimmed(node.lastSeenUid);
   const orphanedAt = normalizeOptionalTimestamp(node.orphanedAt, "orphanedAt");
   return {
+    ...(node.expanded === undefined ? {} : { expanded: node.expanded }),
     ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
     ...(orphanedAt === undefined ? {} : { orphanedAt }),
     position: { x, y },

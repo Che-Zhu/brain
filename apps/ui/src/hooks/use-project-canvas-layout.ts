@@ -11,9 +11,9 @@ import {
   patchProjectCanvasLayoutNodes,
 } from "@/lib/project-canvas/layout/client";
 import { canvasLayoutNodeFromNode } from "@/lib/project-canvas/layout/merge";
-import { createCanvasLayoutNodePositionSaveScheduler } from "@/lib/project-canvas/layout/scheduler";
+import { createCanvasLayoutNodeSaveScheduler } from "@/lib/project-canvas/layout/scheduler";
 
-const NODE_POSITION_SAVE_DEBOUNCE_MS = 600;
+const NODE_LAYOUT_SAVE_DEBOUNCE_MS = 600;
 
 export function useProjectCanvasLayout(options: {
   enabled?: boolean;
@@ -81,10 +81,10 @@ export function useProjectCanvasLayout(options: {
 
   const scheduler = useMemo(
     () =>
-      createCanvasLayoutNodePositionSaveScheduler({
+      createCanvasLayoutNodeSaveScheduler({
         clearTimeout: (handle) =>
           clearTimeout(handle as ReturnType<typeof setTimeout>),
-        delayMs: NODE_POSITION_SAVE_DEBOUNCE_MS,
+        delayMs: NODE_LAYOUT_SAVE_DEBOUNCE_MS,
         save: saveNodes,
         setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
       }),
@@ -93,7 +93,7 @@ export function useProjectCanvasLayout(options: {
 
   useEffect(() => () => scheduler.cancel(), [scheduler]);
 
-  const scheduleNodePositionSave = useCallback(
+  const scheduleNodeLayoutSave = useCallback(
     (node: Node) => {
       if (!enabled || shareToken !== "") {
         return;
@@ -111,6 +111,7 @@ export function useProjectCanvasLayout(options: {
     layoutLoadError: error instanceof Error ? error : undefined,
     layoutReady: !(enabled && isLoading) || error != null,
     saveLayoutNodes: saveNodes,
-    scheduleNodePositionSave,
+    scheduleNodeLayoutSave,
+    scheduleNodePositionSave: scheduleNodeLayoutSave,
   };
 }

@@ -13,6 +13,9 @@ export function cloneCanvasLayoutNode(
     position: { x: node.position.x, y: node.position.y },
     ref: { ...node.ref },
   };
+  if (node.expanded !== undefined) {
+    clone.expanded = node.expanded;
+  }
   if (node.lastSeenUid !== undefined) {
     clone.lastSeenUid = node.lastSeenUid;
   }

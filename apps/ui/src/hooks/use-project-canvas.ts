@@ -28,6 +28,7 @@ import {
 import type {
   CanvasContainerNodeData,
   CanvasDatabaseNodeData,
+  CanvasNodeLayoutState,
 } from "@/lib/project-canvas/nodes/types";
 import {
   CANVAS_SERVICE_QUERY_KEY,
@@ -43,6 +44,7 @@ import {
 
 export interface UseProjectCanvasOptions {
   kubeconfig?: string;
+  onNodeExpansionChange?: (node: Node) => void;
   onNodePositionChange?: (node: Node) => void;
   readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
@@ -100,6 +102,7 @@ export function useProjectCanvas(
   });
 
   const refreshWorkloadLists = options?.refreshWorkloadLists;
+  const onNodeExpansionChange = options?.onNodeExpansionChange;
   const onNodePositionChange = options?.onNodePositionChange;
 
   const afterLifecycle = useCallback(async () => {
@@ -388,20 +391,47 @@ export function useProjectCanvas(
     ]
   );
 
+  const decorateLayoutNode = useCallback(
+    (node: Node): Node => {
+      if (readOnly || onNodeExpansionChange === undefined) {
+        return node;
+      }
+
+      const data = node.data as Record<string, unknown> & {
+        layout?: CanvasNodeLayoutState;
+      };
+      return {
+        ...node,
+        data: {
+          ...data,
+          layout: {
+            ...(data.layout ?? {}),
+            onExpandedChange: (nextNode: Node) => {
+              onNodeExpansionChange(nextNode);
+            },
+          },
+        },
+      };
+    },
+    [onNodeExpansionChange, readOnly]
+  );
+
   const nodes = useMemo(
     () =>
       rawNodes.map((node): Node => {
-        if (node.type === CANVAS_DATABASE_NODE_TYPE) {
-          return decorateDatabaseNode(node);
+        const layoutNode = decorateLayoutNode(node);
+
+        if (layoutNode.type === CANVAS_DATABASE_NODE_TYPE) {
+          return decorateDatabaseNode(layoutNode);
         }
 
-        if (node.type === CANVAS_CONTAINER_NODE_TYPE) {
-          return decorateContainerNode(node);
+        if (layoutNode.type === CANVAS_CONTAINER_NODE_TYPE) {
+          return decorateContainerNode(layoutNode);
         }
 
-        return node;
+        return layoutNode;
       }),
-    [decorateContainerNode, decorateDatabaseNode, rawNodes]
+    [decorateContainerNode, decorateDatabaseNode, decorateLayoutNode, rawNodes]
   );
 
   const selectedNode = useMemo<CanvasSelectedNode>(() => {

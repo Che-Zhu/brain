@@ -49,7 +49,8 @@ export default function ProjectUidPage() {
     selectedNode,
   } = useProjectCanvas(canvasState.nodes, {
     kubeconfig,
-    onNodePositionChange: projectCanvasLayout.scheduleNodePositionSave,
+    onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
+    onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     refreshWorkloadLists,
   });
   const selectedTelemetryTarget = useMemo(

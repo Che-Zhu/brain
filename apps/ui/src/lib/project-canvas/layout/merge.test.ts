@@ -9,6 +9,7 @@ import {
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
 import {
+  canvasLayoutNodeFromNode,
   canvasLayoutResourceRefFromNode,
   mergeCanvasLayoutWithDetectedNodes,
 } from "./merge";
@@ -73,9 +74,11 @@ test("applies saved positions without changing resource identity", () => {
     namespace: "ns-a",
     nodes: [
       layoutNode("AP", "web", {
+        expanded: true,
         position: { x: 100, y: 200 },
       }),
       layoutNode("DB", "postgres", {
+        expanded: false,
         position: { x: 300, y: 400 },
       }),
       layoutNode("EntryPoint", "public-web", {
@@ -102,6 +105,13 @@ test("applies saved positions without changing resource identity", () => {
   );
   assert.deepEqual(
     result.nodes.map((node) => {
+      const data = node.data as { layout?: { expanded?: boolean } };
+      return data.layout?.expanded;
+    }),
+    [true, false, undefined]
+  );
+  assert.deepEqual(
+    result.nodes.map((node) => {
       const data = node.data as { states?: { name?: string } };
       return data.states?.name;
     }),
@@ -115,6 +125,20 @@ test("applies saved positions without changing resource identity", () => {
       { kind: "EntryPoint", name: "public-web", namespace: "ns-a" },
     ]
   );
+});
+
+test("extracts node expansion state with collapsed default", () => {
+  const collapsed = canvasLayoutNodeFromNode(apNode("web"));
+  const expanded = canvasLayoutNodeFromNode({
+    ...dbNode("postgres"),
+    data: {
+      ...dbNode("postgres").data,
+      layout: { expanded: true },
+    },
+  });
+
+  assert.equal(collapsed?.expanded, false);
+  assert.equal(expanded?.expanded, true);
 });
 
 test("marks layout items missing from the detected graph as hidden orphans", () => {

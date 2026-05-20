@@ -27,6 +27,7 @@ test("cleanup purges stale orphans and preserves live layout metadata", () => {
     namespace: "ns-a",
     nodes: [
       layoutNode("AP", "web", {
+        expanded: true,
         lastSeenUid: "web-uid",
         position: { x: 100, y: 200 },
       }),
@@ -50,6 +51,7 @@ test("cleanup purges stale orphans and preserves live layout metadata", () => {
     namespace: "ns-a",
     nodes: [
       layoutNode("AP", "web", {
+        expanded: true,
         lastSeenUid: "web-uid",
         position: { x: 100, y: 200 },
       }),

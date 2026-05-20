@@ -27,6 +27,7 @@ test("patch save purges stale orphans while preserving version and owner metadat
     namespace: "ns-a",
     nodes: [
       layoutNode("AP", "web", {
+        expanded: true,
         position: { x: 100, y: 200 },
       }),
       layoutNode("DB", "postgres", {
@@ -44,6 +45,7 @@ test("patch save purges stale orphans while preserving version and owner metadat
     {
       nodes: [
         layoutNode("AP", "web", {
+          expanded: false,
           position: { x: 120, y: 220 },
         }),
       ],
@@ -55,6 +57,7 @@ test("patch save purges stale orphans while preserving version and owner metadat
     namespace: "ns-a",
     nodes: [
       layoutNode("AP", "web", {
+        expanded: false,
         position: { x: 120, y: 220 },
       }),
     ],
