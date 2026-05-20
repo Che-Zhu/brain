@@ -31,6 +31,15 @@
           "performance": { "noBarrelFile": "off" }
         }
       }
+    },
+    {
+      // WhoDB gqlgen enum values are PascalCase as part of the public GraphQL contract.
+      "includes": ["apps/whodb/core/graph/schema.graphqls"],
+      "linter": {
+        "rules": {
+          "style": { "useGraphqlNamingConvention": "off" }
+        }
+      }
     }
   ]
 }

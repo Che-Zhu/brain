@@ -42,7 +42,9 @@ export function readApImage(spec: Record<string, unknown>): string | undefined {
   return typeof img === "string" && img.trim() !== "" ? img.trim() : undefined;
 }
 
-export function readApReplicas(spec: Record<string, unknown>): number | undefined {
+export function readApReplicas(
+  spec: Record<string, unknown>
+): number | undefined {
   const r = readApResource(spec).replicas;
   return typeof r === "number" && Number.isFinite(r) ? r : undefined;
 }
@@ -66,7 +68,9 @@ export function readApEndpoints(
   return Array.isArray(raw) ? raw : undefined;
 }
 
-export function readApEnv(spec: Record<string, unknown>): unknown[] | undefined {
+export function readApEnv(
+  spec: Record<string, unknown>
+): unknown[] | undefined {
   const raw = readApInput(spec).env;
   return Array.isArray(raw) ? raw : undefined;
 }

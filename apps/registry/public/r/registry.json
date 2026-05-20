@@ -696,6 +696,11 @@
           "target": "components/canvas/canvas.css"
         },
         {
+          "path": "../../packages/ui/src/components/canvas/canvas.edge-anchors.ts",
+          "type": "registry:lib",
+          "target": "components/canvas/canvas.edge-anchors.ts"
+        },
+        {
           "path": "../../packages/ui/src/components/canvas/canvas.upper-right.tsx",
           "type": "registry:component",
           "target": "components/canvas/canvas.upper-right.tsx"

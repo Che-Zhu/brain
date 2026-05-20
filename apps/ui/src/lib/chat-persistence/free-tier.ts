@@ -27,8 +27,8 @@ export function isSystemOpenAiConfigured(): boolean {
 
 export interface FreeTierSnapshot {
   limit: number;
-  used: number;
   remaining: number;
+  used: number;
 }
 
 /** Read current free-turn usage for a namespace (does not consume). */
