@@ -23,12 +23,12 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
-  CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
   type ContainerEnvDbDsnFieldOption,
   type ContainerEnvDbDsnSource,
   type ContainerEnvDbReferenceField,
   type ContainerEnvRow,
   containerEnvDbDsnFieldOptions,
+  containerEnvDbReferenceRowPatch,
   containerEnvRowsEqual,
   deleteContainerEnvRow,
   normalizeContainerEnvRowsForSave,
@@ -270,22 +270,6 @@ function dbDsnSourceHasFields(source: ContainerEnvDbDsnSource): boolean {
   return containerEnvDbDsnFieldOptions(source).length > 0;
 }
 
-function dbDsnRowPatch(
-  source: ContainerEnvDbDsnSource,
-  field: ContainerEnvDbDsnFieldOption
-): Partial<ContainerEnvRow> {
-  return {
-    dbDsn: {
-      dbName: source.name,
-      dbNamespace: source.namespace,
-      field: field.field,
-    },
-    value: field.value ?? CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
-    ...(field.valueFrom === undefined ? {} : { valueFrom: field.valueFrom }),
-    valueSource: "dbDsn",
-  };
-}
-
 const envReferenceSelectClassName =
   "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
@@ -367,7 +351,7 @@ function EditableEnvValueControl({
       if (source === undefined || field === undefined) {
         return;
       }
-      onUpdateRow(index, dbDsnRowPatch(source, field));
+      onUpdateRow(index, containerEnvDbReferenceRowPatch(source, field));
     };
 
     return (
@@ -383,17 +367,18 @@ function EditableEnvValueControl({
           }}
           value={dbDsnRowKey(row)}
         >
-          {dbDsnReferenceSources.map((source) => (
-            <option
-              disabled={!dbDsnSourceHasFields(source)}
-              key={dbDsnSourceKey(source)}
-              value={dbDsnSourceKey(source)}
-            >
-              {dbDsnSourceHasFields(source)
-                ? source.name
-                : `${source.name} (unavailable)`}
-            </option>
-          ))}
+          {dbDsnReferenceSources.map((source) => {
+            const hasFields = dbDsnSourceHasFields(source);
+            return (
+              <option
+                disabled={!hasFields}
+                key={dbDsnSourceKey(source)}
+                value={dbDsnSourceKey(source)}
+              >
+                {hasFields ? source.name : `${source.name} (unavailable)`}
+              </option>
+            );
+          })}
         </select>
         <select
           aria-label="Project DB field"

@@ -44,6 +44,11 @@ export interface ContainerEnvDbDsnFieldOption {
   valueFrom?: { secretKeyRef: ContainerEnvSecretKeyRef };
 }
 
+export type ContainerEnvDbReferenceRowPatch = Pick<
+  ContainerEnvRow,
+  "dbDsn" | "value" | "valueFrom" | "valueSource"
+>;
+
 export type ContainerEnvRowValidationErrorType =
   | "duplicate-name"
   | "invalid-name"
@@ -134,19 +139,7 @@ export function containerEnvDbDsnFieldOptions(
     });
   }
 
-  for (const field of CONTAINER_ENV_DB_PRIMITIVE_FIELD_ORDER) {
-    const secretKeyRef = source?.primitiveSecretRefs?.[field];
-    if (secretKeyRef === undefined) {
-      continue;
-    }
-    options.push({
-      field,
-      label: PRIMITIVE_FIELD_LABELS[field],
-      valueFrom: { secretKeyRef },
-    });
-  }
-
-  return options;
+  return [...options, ...containerEnvDbPrimitiveFieldOptions(source)];
 }
 
 export function containerEnvDbDsnReferenceFromValue(
@@ -221,17 +214,8 @@ export function addContainerEnvDbDsnReferenceRow(
     return [
       ...rows,
       {
-        dbDsn: {
-          dbName: source.name,
-          dbNamespace: source.namespace,
-          field: field.field,
-        },
         name: nextDefaultRowName(rows),
-        value: valueForDbReferenceField(field),
-        ...(field.valueFrom === undefined
-          ? {}
-          : { valueFrom: field.valueFrom }),
-        valueSource: "dbDsn",
+        ...containerEnvDbReferenceRowPatch(source, field),
       },
     ];
   }
@@ -258,6 +242,33 @@ export function deleteContainerEnvRow(
 
 function valueFromKey(valueFrom: unknown): string {
   return valueFrom == null ? "" : JSON.stringify(valueFrom);
+}
+
+function containerEnvDbReferenceValuePatch(
+  field: ContainerEnvDbDsnFieldOption
+): Pick<ContainerEnvRow, "value" | "valueFrom"> {
+  if (field.valueFrom === undefined) {
+    return { value: valueForDbReferenceField(field) };
+  }
+  return {
+    value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+    valueFrom: field.valueFrom,
+  };
+}
+
+export function containerEnvDbReferenceRowPatch(
+  source: ContainerEnvDbDsnSource,
+  field: ContainerEnvDbDsnFieldOption
+): ContainerEnvDbReferenceRowPatch {
+  return {
+    dbDsn: {
+      dbName: source.name,
+      dbNamespace: source.namespace,
+      field: field.field,
+    },
+    ...containerEnvDbReferenceValuePatch(field),
+    valueSource: "dbDsn",
+  };
 }
 
 function rowSavesAsValueFrom(row: ContainerEnvRow): boolean {
@@ -306,6 +317,24 @@ export function containerEnvDbPrimitiveFieldForSecretKey(
   return undefined;
 }
 
+function containerEnvDbPrimitiveFieldOptions(
+  source: ContainerEnvDbDsnSource | undefined
+): ContainerEnvDbDsnFieldOption[] {
+  const options: ContainerEnvDbDsnFieldOption[] = [];
+  for (const field of CONTAINER_ENV_DB_PRIMITIVE_FIELD_ORDER) {
+    const secretKeyRef = source?.primitiveSecretRefs?.[field];
+    if (secretKeyRef === undefined) {
+      continue;
+    }
+    options.push({
+      field,
+      label: PRIMITIVE_FIELD_LABELS[field],
+      valueFrom: { secretKeyRef },
+    });
+  }
+  return options;
+}
+
 export function containerEnvDbSecretReferenceFromValueFrom(
   valueFrom: unknown,
   sources: readonly ContainerEnvDbDsnSource[]
@@ -317,20 +346,14 @@ export function containerEnvDbSecretReferenceFromValueFrom(
     return undefined;
   }
   for (const source of sources) {
-    for (const field of containerEnvDbDsnFieldOptions(source)) {
+    for (const field of containerEnvDbPrimitiveFieldOptions(source)) {
       const fieldRef = field.valueFrom?.secretKeyRef;
       if (fieldRef?.name !== ref.name || fieldRef.key !== ref.key) {
         continue;
       }
       return {
-        dbDsn: {
-          dbName: source.name,
-          dbNamespace: source.namespace,
-          field: field.field,
-        },
-        value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+        ...containerEnvDbReferenceRowPatch(source, field),
         valueFrom,
-        valueSource: "dbDsn",
       };
     }
   }

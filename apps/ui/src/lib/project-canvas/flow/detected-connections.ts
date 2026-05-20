@@ -227,12 +227,10 @@ function addEntryPointConnections(
   }
 }
 
-function dbConnectionEvidence(
+function dbDsnReferenceSourcesFromDbs(
   dbs: readonly unknown[],
   namespaceFallback: string | undefined
-): {
-  dbDsnSources: ContainerEnvDbDsnSource[];
-} {
+): ContainerEnvDbDsnSource[] {
   const dbDsnSources: ContainerEnvDbDsnSource[] = [];
   for (const db of dbs) {
     const dsnSource = dbDsnReferenceSourceFromDb(db, namespaceFallback);
@@ -240,7 +238,7 @@ function dbConnectionEvidence(
       dbDsnSources.push(dsnSource);
     }
   }
-  return { dbDsnSources };
+  return dbDsnSources;
 }
 
 function addSecretBackedApDbConnections(
@@ -301,7 +299,7 @@ function addApDbConnections(
   connections: CanvasDetectedConnection[],
   seenConnectionKeys: Set<string>,
   aps: readonly unknown[],
-  evidence: ReturnType<typeof dbConnectionEvidence>,
+  dbDsnSources: readonly ContainerEnvDbDsnSource[],
   namespaceFallback: string | undefined
 ): void {
   for (const ap of aps) {
@@ -313,14 +311,14 @@ function addApDbConnections(
       connections,
       seenConnectionKeys,
       source,
-      evidence.dbDsnSources,
+      dbDsnSources,
       ap
     );
     addDsnBackedApDbConnections(
       connections,
       seenConnectionKeys,
       source,
-      evidence.dbDsnSources,
+      dbDsnSources,
       ap
     );
   }
@@ -348,7 +346,7 @@ export function detectCanvasConnections({
     connections,
     seenConnectionKeys,
     aps,
-    dbConnectionEvidence(dbs, namespaceFallback),
+    dbDsnReferenceSourcesFromDbs(dbs, namespaceFallback),
     namespaceFallback
   );
 
