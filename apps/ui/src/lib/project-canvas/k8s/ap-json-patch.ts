@@ -6,10 +6,10 @@ import type {
 import { parse as parseYaml } from "yaml";
 
 import {
-  readApInput,
   patchOpsForApInput,
   patchOpsForApResource,
   patchOpsFromEffectiveSnapshot,
+  readApInput,
 } from "./ap-spec-access";
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
