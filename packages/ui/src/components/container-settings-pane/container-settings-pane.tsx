@@ -21,8 +21,12 @@ import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.u
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
 import {
+  addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
+  type ContainerEnvDbDsnField,
+  type ContainerEnvDbDsnSource,
   type ContainerEnvRow,
+  containerEnvDbDsnFieldOptions,
   containerEnvRowsEqual,
   deleteContainerEnvRow,
   normalizeContainerEnvRowsForSave,
@@ -100,6 +104,8 @@ export interface ContainerPort {
 export interface ContainerSettingsPaneProps {
   className?: string;
   cpuQuota: ContainerSettingsControlledQuotaProps;
+  /** Project DB connection strings that can be saved into AP env values as DSN references. */
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   /** Environment variables shown and edited as structured rows. */
   env: ContainerEnvVar[];
   /** Full image reference (repository + tag/digest). */
@@ -178,7 +184,14 @@ function containerPortsToTableRows(
   });
 }
 
+function envDbDsnFieldLabel(field: ContainerEnvDbDsnField): string {
+  return field === "private" ? "Private DSN" : "Public DSN";
+}
+
 function envRowDisplayValue(row: ContainerEnvVar): string {
+  if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+    return `${row.dbDsn.dbName} ${envDbDsnFieldLabel(row.dbDsn.field)}`;
+  }
   return row.valueSource === "valueFrom" ? "External reference" : row.value;
 }
 
@@ -214,6 +227,36 @@ function ExternalEnvBadge({ className }: { className?: string }) {
   );
 }
 
+function ReferenceEnvBadge({ className }: { className?: string }) {
+  return (
+    <Badge className={className} variant="outline">
+      Reference
+    </Badge>
+  );
+}
+
+function dbDsnSourceKey(source: ContainerEnvDbDsnSource): string {
+  return `${source.namespace}/${source.name}`;
+}
+
+function dbDsnRowKey(row: ContainerEnvRow): string {
+  if (row.dbDsn == null) {
+    return "";
+  }
+  return `${row.dbDsn.dbNamespace}/${row.dbDsn.dbName}`;
+}
+
+function sourceFromDbDsnRow(
+  row: ContainerEnvRow,
+  sources: readonly ContainerEnvDbDsnSource[]
+): ContainerEnvDbDsnSource | undefined {
+  const key = dbDsnRowKey(row);
+  return sources.find((source) => dbDsnSourceKey(source) === key);
+}
+
+const envReferenceSelectClassName =
+  "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+
 function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
   return (
     <div
@@ -238,6 +281,9 @@ function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
               {row.valueSource === "valueFrom" ? (
                 <ExternalEnvBadge className="ml-2 align-middle" />
               ) : null}
+              {row.valueSource === "dbDsn" ? (
+                <ReferenceEnvBadge className="ml-2 align-middle" />
+              ) : null}
             </span>
           </div>
         ))
@@ -247,6 +293,7 @@ function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
 }
 
 interface EditableEnvRowsProps {
+  dbDsnReferenceSources: ContainerEnvDbDsnSource[];
   envDirty: boolean;
   envDraft: ContainerEnvVar[];
   envErrorsByIndex: ReadonlyMap<number, string>;
@@ -256,7 +303,112 @@ interface EditableEnvRowsProps {
   onUpdateRow: (index: number, patch: Partial<ContainerEnvRow>) => void;
 }
 
+interface EditableEnvValueControlProps {
+  addableDbDsnSources: ContainerEnvDbDsnSource[];
+  index: number;
+  onUpdateRow: (index: number, patch: Partial<ContainerEnvRow>) => void;
+  row: ContainerEnvVar;
+}
+
+function EditableEnvValueControl({
+  addableDbDsnSources,
+  index,
+  onUpdateRow,
+  row,
+}: EditableEnvValueControlProps) {
+  if (row.valueSource === "valueFrom") {
+    return (
+      <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
+        <span className="min-w-0 truncate font-mono">External reference</span>
+        <ExternalEnvBadge className="shrink-0" />
+      </div>
+    );
+  }
+
+  if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+    return (
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] gap-2">
+        <select
+          aria-label="Project DB"
+          className={envReferenceSelectClassName}
+          onChange={(event) => {
+            const source = addableDbDsnSources.find(
+              (item) => dbDsnSourceKey(item) === event.target.value
+            );
+            const field = containerEnvDbDsnFieldOptions(source)[0];
+            if (source == null || field == null) {
+              return;
+            }
+            onUpdateRow(index, {
+              dbDsn: {
+                dbName: source.name,
+                dbNamespace: source.namespace,
+                field: field.field,
+              },
+              value: field.value,
+              valueSource: "dbDsn",
+            });
+          }}
+          value={dbDsnRowKey(row)}
+        >
+          {addableDbDsnSources.map((source) => (
+            <option key={dbDsnSourceKey(source)} value={dbDsnSourceKey(source)}>
+              {source.name}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Project DB DSN field"
+          className={envReferenceSelectClassName}
+          onChange={(event) => {
+            const source = sourceFromDbDsnRow(row, addableDbDsnSources);
+            const field = containerEnvDbDsnFieldOptions(source).find(
+              (item) => item.field === event.target.value
+            );
+            if (source == null || field == null) {
+              return;
+            }
+            onUpdateRow(index, {
+              dbDsn: {
+                dbName: source.name,
+                dbNamespace: source.namespace,
+                field: field.field,
+              },
+              value: field.value,
+              valueSource: "dbDsn",
+            });
+          }}
+          value={row.dbDsn.field}
+        >
+          {containerEnvDbDsnFieldOptions(
+            sourceFromDbDsnRow(row, addableDbDsnSources)
+          ).map((field) => (
+            <option key={field.field} value={field.field}>
+              {field.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  return (
+    <Input
+      aria-label="Environment variable value"
+      className="h-8 font-mono text-xs"
+      onChange={(event) =>
+        onUpdateRow(index, {
+          value: event.target.value,
+          valueSource: "direct",
+        })
+      }
+      value={row.value}
+    />
+  );
+}
+
 function EditableEnvRows({
+  dbDsnReferenceSources,
   envDirty,
   envDraft,
   envErrorsByIndex,
@@ -265,6 +417,10 @@ function EditableEnvRows({
   onDeleteRow,
   onUpdateRow,
 }: EditableEnvRowsProps) {
+  const addableDbDsnSources = dbDsnReferenceSources.filter(
+    (source) => containerEnvDbDsnFieldOptions(source).length > 0
+  );
+
   return (
     <div
       className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
@@ -292,26 +448,12 @@ function EditableEnvRows({
                   }
                   value={row.name}
                 />
-                {row.valueSource === "valueFrom" ? (
-                  <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
-                    <span className="min-w-0 truncate font-mono">
-                      External reference
-                    </span>
-                    <ExternalEnvBadge className="shrink-0" />
-                  </div>
-                ) : (
-                  <Input
-                    aria-label="Environment variable value"
-                    className="h-8 font-mono text-xs"
-                    onChange={(event) =>
-                      onUpdateRow(index, {
-                        value: event.target.value,
-                        valueSource: "direct",
-                      })
-                    }
-                    value={row.value}
-                  />
-                )}
+                <EditableEnvValueControl
+                  addableDbDsnSources={addableDbDsnSources}
+                  index={index}
+                  onUpdateRow={onUpdateRow}
+                  row={row}
+                />
                 <Button
                   aria-label="Remove environment variable"
                   onClick={() => onDeleteRow(index)}
@@ -358,6 +500,7 @@ export function ContainerSettingsPane({
   replicasQuota,
   onResourceQuotasCommit,
   readOnly = false,
+  dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageDraft, setImageDraft] = useState(image);
@@ -577,6 +720,20 @@ export function ContainerSettingsPane({
 
   const handleAddEnvRow = () => {
     setEnvDraft((rows) => addContainerEnvRow(rows));
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  };
+
+  const canAddDbDsnReference = dbDsnReferenceSources.some(
+    (source) => containerEnvDbDsnFieldOptions(source).length > 0
+  );
+
+  const handleAddDbDsnReferenceRow = () => {
+    setEnvDraft((rows) =>
+      addContainerEnvDbDsnReferenceRow(rows, dbDsnReferenceSources)
+    );
     setEnvDraftKeys((keys) => [
       ...keys,
       nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
@@ -812,6 +969,18 @@ export function ContainerSettingsPane({
                   <Plus aria-hidden data-icon="inline-start" />
                   Add
                 </Button>
+                {canAddDbDsnReference ? (
+                  <Button
+                    aria-label="Add Project DB DSN reference"
+                    onClick={handleAddDbDsnReferenceRow}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus aria-hidden data-icon="inline-start" />
+                    Add Reference
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>
@@ -819,6 +988,7 @@ export function ContainerSettingsPane({
             <ReadOnlyEnvRows env={env} />
           ) : (
             <EditableEnvRows
+              dbDsnReferenceSources={dbDsnReferenceSources}
               envDirty={envDirty}
               envDraft={envDraft}
               envErrorsByIndex={envErrorsByIndex}

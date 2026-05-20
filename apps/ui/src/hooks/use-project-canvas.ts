@@ -4,6 +4,7 @@ import {
   useApLifecycleOperations,
   useDbLifecycleOperations,
 } from "@workspace/api/hooks";
+import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   CanvasMeta,
   CanvasSelectedNode,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/project-canvas/flow/anchor-pair";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
+import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/claim-mapper";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
@@ -47,7 +49,9 @@ import {
 } from "@/store/canvas-store";
 
 export interface UseProjectCanvasOptions {
+  dbsData?: K8sGetResponse;
   kubeconfig?: string;
+  namespace?: string;
   onNodeExpansionChange?: (node: Node) => void;
   onNodePositionChange?: (node: Node) => void;
   readOnly?: boolean;
@@ -108,6 +112,11 @@ export function useProjectCanvas(
   const refreshWorkloadLists = options?.refreshWorkloadLists;
   const onNodeExpansionChange = options?.onNodeExpansionChange;
   const onNodePositionChange = options?.onNodePositionChange;
+  const dbDsnReferenceSources = useMemo(
+    () =>
+      dbDsnReferenceSourcesFromDbsData(options?.dbsData, options?.namespace),
+    [options?.dbsData, options?.namespace]
+  );
 
   const afterLifecycle = useCallback(async () => {
     try {
@@ -300,7 +309,13 @@ export function useProjectCanvas(
       const hasUrlActions = uid != null && uid !== "";
 
       if (!(hasUrlActions || isApLifecycle)) {
-        return node;
+        return {
+          ...node,
+          data: {
+            ...data,
+            dbDsnReferenceSources,
+          },
+        };
       }
 
       const select = (tab: string) => {
@@ -372,6 +387,7 @@ export function useProjectCanvas(
         ...node,
         data: {
           ...data,
+          dbDsnReferenceSources,
           onWorkloadMutation: afterLifecycle,
           actions: {
             ...(data.actions ?? {}),
@@ -384,6 +400,7 @@ export function useProjectCanvas(
     [
       apAuthReady,
       afterLifecycle,
+      dbDsnReferenceSources,
       deleteWorkload,
       pauseWorkload,
       restartWorkload,

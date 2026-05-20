@@ -13,6 +13,7 @@ import type {
   EntryNodeStates,
   EntryNodeTarget,
 } from "@workspace/ui/components/entry-node/entry-node";
+import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
 import type { Node } from "@xyflow/react";
 
 // `Node`'s second type parameter must match the node type constants in ./constants.
@@ -30,6 +31,7 @@ export interface CanvasNodeLayoutState {
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   layout?: CanvasNodeLayoutState;
   onWorkloadMutation?: () => Promise<unknown>;
   states: ContainerNodeStates;

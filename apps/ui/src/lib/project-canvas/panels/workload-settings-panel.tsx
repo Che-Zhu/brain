@@ -44,6 +44,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       onResourceQuotasCommit,
       claimPayload,
     } = useWorkloadClaimSettings({
+      dbDsnReferenceSources: data?.dbDsnReferenceSources,
       kubeconfig,
       name,
       namespace: ns,
@@ -90,6 +91,7 @@ export const WorkloadSettingsCanvasPanel = memo(
             step: 0.25,
             value: display.cpuCores,
           }}
+          dbDsnReferenceSources={data?.dbDsnReferenceSources}
           env={display.env}
           image={display.image}
           memoryQuota={{

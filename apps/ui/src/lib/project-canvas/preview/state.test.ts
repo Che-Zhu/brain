@@ -1,0 +1,45 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { buildPreviewProjectCanvasState } from "./state";
+
+test("preview canvas state renders DSN-backed AP to DB connections from resource state", () => {
+  const state = buildPreviewProjectCanvasState({
+    apsData: {
+      items: [
+        {
+          metadata: { name: "api", namespace: "default", uid: "ap-uid" },
+          spec: {
+            input: {
+              env: [{ name: "DATABASE_URL", value: "postgres://private" }],
+              image: "ghcr.io/acme/api:latest",
+            },
+          },
+        },
+      ],
+    },
+    canvasLayout: undefined,
+    dbsData: {
+      items: [
+        {
+          metadata: { name: "postgres", namespace: "default", uid: "db-uid" },
+          status: { connectionStringPrivate: "postgres://private" },
+        },
+      ],
+    },
+    entryPointsData: undefined,
+    namespace: "default",
+  });
+
+  assert.deepEqual(state.edges, [
+    {
+      id: "detected:AP:default:api->DB:default:postgres",
+      source: "ap-api",
+      target: "db-postgres",
+    },
+  ]);
+  assert.equal(
+    state.nodes.some((node) => "actions" in node.data),
+    false
+  );
+});

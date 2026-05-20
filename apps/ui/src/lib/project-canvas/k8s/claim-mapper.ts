@@ -1,10 +1,15 @@
+import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
-import { CONTAINER_ENV_VALUE_FROM_PLACEHOLDER } from "@workspace/ui/lib/container-env-rows";
+import {
+  CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+  type ContainerEnvDbDsnSource,
+  containerEnvDbDsnReferenceFromValue,
+} from "@workspace/ui/lib/container-env-rows";
 
 import {
   readApCpuLimit,
@@ -110,7 +115,50 @@ export function parseMemoryToMib(q: unknown): number | undefined {
   return Number.isFinite(plain) ? Math.round(plain) : undefined;
 }
 
-function envFromSpecEnvList(raw: unknown): ContainerEnvVar[] {
+export function dbDsnReferenceSourcesFromDbsData(
+  dbsData: K8sGetResponse | undefined,
+  namespaceFallback?: string
+): ContainerEnvDbDsnSource[] {
+  return apItemsFromList(dbsData)
+    .map((item) => dbDsnReferenceSourceFromDb(item, namespaceFallback))
+    .filter(
+      (source): source is ContainerEnvDbDsnSource => source !== undefined
+    );
+}
+
+function dbDsnReferenceSourceFromDb(
+  item: unknown,
+  namespaceFallback?: string
+): ContainerEnvDbDsnSource | undefined {
+  const root = asRecord(item) ?? {};
+  const metadata = asRecord(root.metadata) ?? {};
+  const status = asRecord(root.status) ?? {};
+  const name = typeof metadata.name === "string" ? metadata.name : "";
+  const namespace =
+    typeof metadata.namespace === "string" && metadata.namespace !== ""
+      ? metadata.namespace
+      : (namespaceFallback ?? "");
+  if (name === "" || namespace === "") {
+    return undefined;
+  }
+  const privateDsn = nonEmptyStatusString(status.connectionStringPrivate);
+  const publicDsn = nonEmptyStatusString(status.connectionStringPublic);
+  return {
+    name,
+    namespace,
+    ...(privateDsn === undefined ? {} : { privateDsn }),
+    ...(publicDsn === undefined ? {} : { publicDsn }),
+  };
+}
+
+function nonEmptyStatusString(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function envFromSpecEnvList(
+  raw: unknown,
+  dbDsnReferenceSources: readonly ContainerEnvDbDsnSource[] = []
+): ContainerEnvVar[] {
   if (!Array.isArray(raw)) {
     return [];
   }
@@ -125,7 +173,13 @@ function envFromSpecEnvList(raw: unknown): ContainerEnvVar[] {
       continue;
     }
     if (typeof e.value === "string") {
-      out.push({ name, value: e.value });
+      out.push({
+        name,
+        ...(containerEnvDbDsnReferenceFromValue(
+          e.value,
+          dbDsnReferenceSources
+        ) ?? { value: e.value }),
+      });
     } else if (e.valueFrom != null) {
       out.push({
         name,
@@ -340,9 +394,14 @@ function clampReplicas(raw: unknown): number {
   return clampScale(n, REPLICAS_MIN, REPLICAS_MAX);
 }
 
+export interface ClaimToContainerSettingsOptions {
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
+}
+
 function mapApClaim(
   spec: Record<string, unknown>,
-  status: Record<string, unknown>
+  status: Record<string, unknown>,
+  options?: ClaimToContainerSettingsOptions
 ): ClaimContainerSettings {
   const image = readApImage(spec) ?? "—";
   const cpuRaw = parseCpuToCores(readApCpuLimit(spec));
@@ -352,7 +411,7 @@ function mapApClaim(
   const replicas = clampReplicas(readApReplicas(spec));
   return {
     cpuCores,
-    env: envFromSpecEnvList(readApEnv(spec)),
+    env: envFromSpecEnvList(readApEnv(spec), options?.dbDsnReferenceSources),
     image,
     memoryMib,
     ports: mergeApPorts(spec, status),
@@ -379,7 +438,8 @@ function mapDbSpec(spec: Record<string, unknown>): ClaimContainerSettings {
 
 export function claimToContainerSettings(
   claim: Record<string, unknown> | undefined,
-  workloadKind: WorkloadClaimKind
+  workloadKind: WorkloadClaimKind,
+  options?: ClaimToContainerSettingsOptions
 ): ClaimContainerSettings {
   if (claim == null) {
     return {
@@ -393,5 +453,7 @@ export function claimToContainerSettings(
   }
   const spec = asRecord(claim.spec) ?? {};
   const status = asRecord(claim.status) ?? {};
-  return workloadKind === "DB" ? mapDbSpec(spec) : mapApClaim(spec, status);
+  return workloadKind === "DB"
+    ? mapDbSpec(spec)
+    : mapApClaim(spec, status, options);
 }

@@ -6,6 +6,7 @@ import type {
   ContainerEnvVar,
   ContainerSettingsPane,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
 import {
   type ComponentProps,
   useCallback,
@@ -35,6 +36,7 @@ export type ContainerSettingsOnPortsChange = NonNullable<
 >;
 
 export interface UseWorkloadClaimSettingsOptions {
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   kubeconfig: string;
   name: string;
   namespace: string;
@@ -51,6 +53,7 @@ export function useWorkloadClaimSettings(
 ) {
   const { kubeconfig, name, namespace, onWorkloadMutation, workloadKind } =
     options;
+  const dbDsnReferenceSources = options.dbDsnReferenceSources ?? [];
   const isApWorkload = workloadKind === "AP";
 
   const {
@@ -88,8 +91,11 @@ export function useWorkloadClaimSettings(
   }, [claimResourceVersion]);
 
   const mapped = useMemo(
-    () => claimToContainerSettings(k8sGetClaimBody(claimPayload), workloadKind),
-    [claimPayload, workloadKind]
+    () =>
+      claimToContainerSettings(k8sGetClaimBody(claimPayload), workloadKind, {
+        dbDsnReferenceSources,
+      }),
+    [claimPayload, dbDsnReferenceSources, workloadKind]
   );
 
   const display = useMemo(

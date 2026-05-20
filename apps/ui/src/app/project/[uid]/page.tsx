@@ -29,15 +29,20 @@ export default function ProjectUidPage() {
     projectUid: uid,
   });
 
-  const { canvasState, error, isEmptyGraphLoading, refreshWorkloadLists } =
-    useProjectServices({
-      canvasLayout: projectCanvasLayout.layout,
-      canvasLayoutReady: projectCanvasLayout.layoutReady,
-      kubeconfig,
-      namespace,
-      onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
-      uid,
-    });
+  const {
+    canvasState,
+    data: projectServicesData,
+    error,
+    isEmptyGraphLoading,
+    refreshWorkloadLists,
+  } = useProjectServices({
+    canvasLayout: projectCanvasLayout.layout,
+    canvasLayoutReady: projectCanvasLayout.layoutReady,
+    kubeconfig,
+    namespace,
+    onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
+    uid,
+  });
 
   const {
     clearSelection,
@@ -48,7 +53,9 @@ export default function ProjectUidPage() {
     selectedEdge,
     selectedNode,
   } = useProjectCanvas(canvasState.nodes, {
+    dbsData: projectServicesData.dbs,
     kubeconfig,
+    namespace,
     onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     refreshWorkloadLists,

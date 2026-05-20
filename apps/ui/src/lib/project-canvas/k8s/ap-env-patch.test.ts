@@ -43,6 +43,49 @@ test("AP env settings reject duplicate row names before patching", () => {
   );
 });
 
+test("AP env settings patch DB DSN references as plain value entries", () => {
+  const ops = patchOpsForApEnvSettings({ input: { env: [] } }, [
+    {
+      dbDsn: {
+        dbName: "postgres",
+        dbNamespace: "default",
+        field: "private",
+      },
+      name: "DATABASE_URL",
+      value: "postgres://private",
+      valueSource: "dbDsn",
+    },
+  ]);
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/env",
+      value: [{ name: "DATABASE_URL", value: "postgres://private" }],
+    },
+  ]);
+});
+
+test("AP env settings reject duplicate names across direct and DB DSN reference rows", () => {
+  assert.throws(
+    () =>
+      patchOpsForApEnvSettings({ input: { env: [] } }, [
+        { name: "DATABASE_URL", value: "postgres://manual" },
+        {
+          dbDsn: {
+            dbName: "postgres",
+            dbNamespace: "default",
+            field: "private",
+          },
+          name: "DATABASE_URL",
+          value: "postgres://private",
+          valueSource: "dbDsn",
+        },
+      ]),
+    DUPLICATE_ENV_NAME_RE
+  );
+});
+
 test("AP env settings preserve non-direct rows unless they are deleted", () => {
   const secretKeyRef = { key: "password", name: "external-db" };
   const spec = {
