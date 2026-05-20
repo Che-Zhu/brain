@@ -125,8 +125,8 @@ export interface ContainerSettingsPaneProps {
   /** Full image reference (repository + tag/digest). */
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
-  onEnvChange: (env: ContainerEnvVar[]) => void;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
+  onEnvChange: (env: ContainerEnvVar[]) => void;
   onImageChange: (image: string) => void;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
@@ -310,6 +310,15 @@ function dbDsnSourceFromAddReferenceIntent(
   );
 }
 
+function appendDbDsnReferenceIntentRow(
+  rows: readonly ContainerEnvVar[],
+  source: ContainerEnvDbDsnSource,
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent
+): ContainerEnvVar[] {
+  const target = addDbDsnReferenceIntentTarget(intent);
+  return addContainerEnvDbDsnReferenceRow(rows, [source], target);
+}
+
 function envDraftWithAddReferenceIntent({
   intent,
   readOnly,
@@ -336,11 +345,7 @@ function envDraftWithAddReferenceIntent({
   }
   return {
     consumedIntentId: intent.id,
-    rows: addContainerEnvDbDsnReferenceRow(
-      rows,
-      [source],
-      addDbDsnReferenceIntentTarget(intent)
-    ),
+    rows: appendDbDsnReferenceIntentRow(rows, source, intent),
   };
 }
 
@@ -666,13 +671,7 @@ export function ContainerSettingsPane({
       return;
     }
 
-    setEnvDraft((rows) =>
-      addContainerEnvDbDsnReferenceRow(
-        rows,
-        [source],
-        addDbDsnReferenceIntentTarget(intent)
-      )
-    );
+    setEnvDraft((rows) => appendDbDsnReferenceIntentRow(rows, source, intent));
     setEnvDraftKeys((keys) => [
       ...keys,
       nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),

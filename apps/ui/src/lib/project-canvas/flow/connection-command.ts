@@ -41,7 +41,7 @@ export interface ClassifyProjectCanvasConnectionCommandOptions {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value != null && typeof value === "object"
+  return value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
 }
@@ -68,13 +68,12 @@ function apFromNode(
   if (name === undefined || namespace === undefined) {
     return undefined;
   }
+  const uid = nonEmptyString(states?.uid);
   return {
     name,
     namespace,
     nodeId: node.id,
-    ...(nonEmptyString(states?.uid) === undefined
-      ? {}
-      : { uid: nonEmptyString(states?.uid) }),
+    ...(uid === undefined ? {} : { uid }),
   };
 }
 
@@ -93,6 +92,22 @@ function dbFromNode(
   return { name, namespace, nodeId: node.id };
 }
 
+function commandFromApDbNodePair(
+  apNode: Node | undefined,
+  dbNode: Node | undefined
+): ProjectCanvasConnectionCommand | undefined {
+  const ap = apFromNode(apNode);
+  const db = dbFromNode(dbNode);
+  if (ap === undefined || db === undefined) {
+    return undefined;
+  }
+  return {
+    ap,
+    db,
+    kind: "openApDbAddReference",
+  };
+}
+
 export function classifyProjectCanvasConnectionCommand({
   connection,
   nodes,
@@ -107,23 +122,12 @@ export function classifyProjectCanvasConnectionCommand({
     connection.source == null ? undefined : nodeById.get(connection.source);
   const targetNode =
     connection.target == null ? undefined : nodeById.get(connection.target);
-  const sourceAp = apFromNode(sourceNode);
-  const targetDb = dbFromNode(targetNode);
-  if (sourceAp !== undefined && targetDb !== undefined) {
-    return {
-      ap: sourceAp,
-      db: targetDb,
-      kind: "openApDbAddReference",
-    };
-  }
-  const sourceDb = dbFromNode(sourceNode);
-  const targetAp = apFromNode(targetNode);
-  if (sourceDb !== undefined && targetAp !== undefined) {
-    return {
-      ap: targetAp,
-      db: sourceDb,
-      kind: "openApDbAddReference",
-    };
+
+  const command =
+    commandFromApDbNodePair(sourceNode, targetNode) ??
+    commandFromApDbNodePair(targetNode, sourceNode);
+  if (command !== undefined) {
+    return command;
   }
 
   return { kind: "discard", reason: "unsupported" };
