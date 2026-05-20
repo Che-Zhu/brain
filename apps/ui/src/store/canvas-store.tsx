@@ -55,7 +55,14 @@ export function projectCanvasNodeServiceUid(node: Node): string | null {
     return topLevelUid;
   }
   const uid = (data as { states?: { uid?: unknown } } | undefined)?.states?.uid;
-  return typeof uid === "string" && uid !== "" ? uid : null;
+  if (typeof uid === "string" && uid !== "") {
+    return uid;
+  }
+  const resourceUid = (data as { resource?: { uid?: unknown } } | undefined)
+    ?.resource?.uid;
+  return typeof resourceUid === "string" && resourceUid !== ""
+    ? resourceUid
+    : null;
 }
 
 export const projectCanvasFlowNodeTypes = {
