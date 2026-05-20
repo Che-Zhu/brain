@@ -27,6 +27,14 @@ One accessible public endpoint within an EntryPoint. Maps 1:1 to a public AP end
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, basic networking, and triggers EntryPoint creation for public endpoints.
 
+### DB (Database)
+
+Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
+
+### Database Binding
+
+A runtime dependency where an AP is configured to consume one DB's connection credentials.
+
 ### Container Node
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
@@ -147,6 +155,14 @@ Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.
 ### Canvas edges are not freeform annotations
 
 Users do not draw arbitrary diagram lines on the canvas. In the first version, edges are rendered only when the system detects a real runtime dependency such as EntryPoint-to-AP or AP-to-DB.
+
+### Database Binding belongs to AP desired state
+
+The source of truth for a Database Binding is the AP's desired state. DB does not store reverse ownership of bound APs, and Canvas Connections only visualize bindings detected from resource state.
+
+### Database Binding v1 is expressed through AP environment variables
+
+The first version of Database Binding is represented by AP `spec.input.env` entries that reference a DB connection Secret. AP does not introduce a separate `spec.databaseBindings` field until binding metadata or ownership semantics require it.
 
 ### Only established Canvas Connections are persisted
 
