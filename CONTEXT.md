@@ -164,6 +164,10 @@ The source of truth for a Database Binding is the AP's desired state. DB does no
 
 The first version of Database Binding is represented by AP `spec.input.env` entries that reference a DB connection Secret. AP does not introduce a separate `spec.databaseBindings` field until binding metadata or ownership semantics require it.
 
+### Database Binding injects Secret references, not plaintext connection strings
+
+Database Binding v1 writes only AP environment variables backed by DB connection Secret references. Plaintext DB connection strings may be displayed or copied, but they are not written into AP desired state by default.
+
 ### Only established Canvas Connections are persisted
 
 Connecting edges are temporary UI feedback for a future in-flight connection operation. App Postgres stores only established Canvas Connections whose required resource changes have succeeded. The first version does not support user-initiated connecting edges.
