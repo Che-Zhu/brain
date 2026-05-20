@@ -126,7 +126,12 @@ function envFromSpecEnvList(raw: unknown): ContainerEnvVar[] {
     if (typeof e.value === "string") {
       out.push({ name, value: e.value });
     } else if (e.valueFrom != null) {
-      out.push({ name, value: "(valueFrom)" });
+      out.push({
+        name,
+        value: "(valueFrom)",
+        valueFrom: e.valueFrom,
+        valueSource: "valueFrom",
+      });
     }
   }
   return out;

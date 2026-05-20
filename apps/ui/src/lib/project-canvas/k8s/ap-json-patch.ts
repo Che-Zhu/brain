@@ -2,6 +2,10 @@ import type {
   ContainerEnvVar,
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import {
+  normalizeContainerEnvRowsForSave,
+  validateContainerEnvRows,
+} from "@workspace/ui/lib/container-env-rows";
 
 import { parse as parseYaml } from "yaml";
 
@@ -109,6 +113,9 @@ function buildEnvArray(
   }
 
   return edited.map((e) => {
+    if (e.valueSource === "valueFrom" && e.valueFrom != null) {
+      return { name: e.name, valueFrom: e.valueFrom };
+    }
     if (e.value === VALUE_FROM_PLACEHOLDER) {
       const prev = byName.get(e.name);
       if (prev != null && prev.valueFrom != null) {
@@ -244,14 +251,26 @@ export async function applyApResourceQuotas(
   await patchAp(kubeconfig, claim, patchOpsForApResource(spec, merge));
 }
 
+export function patchOpsForApEnvSettings(
+  spec: Record<string, unknown> | undefined,
+  env: ContainerEnvVar[]
+): K8sJsonPatchOp[] {
+  const normalized = normalizeContainerEnvRowsForSave(env);
+  const validation = validateContainerEnvRows(normalized);
+  if (!validation.valid) {
+    throw new Error(validation.errors[0]?.message ?? "Invalid environment.");
+  }
+  const list = buildEnvArray(readApInput(spec ?? {}).env, normalized);
+  return patchOpsForApInput(spec, { env: list });
+}
+
 export async function applyApEnv(
   kubeconfig: string,
   claim: Record<string, unknown>,
   env: ContainerEnvVar[]
 ): Promise<void> {
   const spec = asRecord(claim.spec);
-  const list = buildEnvArray(readApInput(spec ?? {}).env, env);
-  await patchAp(kubeconfig, claim, patchOpsForApInput(spec, { env: list }));
+  await patchAp(kubeconfig, claim, patchOpsForApEnvSettings(spec, env));
 }
 
 export async function applyApPorts(
