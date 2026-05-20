@@ -3,6 +3,7 @@ import type {
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import {
+  CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
   normalizeContainerEnvRowsForSave,
   validateContainerEnvRows,
 } from "@workspace/ui/lib/container-env-rows";
@@ -93,8 +94,6 @@ export function mibToMemoryLimit(mib: number): string {
   return `${safe}Mi`;
 }
 
-const VALUE_FROM_PLACEHOLDER = "(valueFrom)";
-
 function buildEnvArray(
   originalEnv: unknown,
   edited: ContainerEnvVar[]
@@ -116,7 +115,7 @@ function buildEnvArray(
     if (e.valueSource === "valueFrom" && e.valueFrom != null) {
       return { name: e.name, valueFrom: e.valueFrom };
     }
-    if (e.value === VALUE_FROM_PLACEHOLDER) {
+    if (e.value === CONTAINER_ENV_VALUE_FROM_PLACEHOLDER) {
       const prev = byName.get(e.name);
       if (prev != null && prev.valueFrom != null) {
         return { name: e.name, valueFrom: prev.valueFrom };

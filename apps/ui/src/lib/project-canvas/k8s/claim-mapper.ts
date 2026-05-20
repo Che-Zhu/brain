@@ -4,6 +4,7 @@ import type {
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
+import { CONTAINER_ENV_VALUE_FROM_PLACEHOLDER } from "@workspace/ui/lib/container-env-rows";
 
 import {
   readApCpuLimit,
@@ -128,7 +129,7 @@ function envFromSpecEnvList(raw: unknown): ContainerEnvVar[] {
     } else if (e.valueFrom != null) {
       out.push({
         name,
-        value: "(valueFrom)",
+        value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
         valueFrom: e.valueFrom,
         valueSource: "valueFrom",
       });

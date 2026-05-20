@@ -21,6 +21,8 @@ export interface ContainerEnvRowValidationResult {
   valid: boolean;
 }
 
+export const CONTAINER_ENV_VALUE_FROM_PLACEHOLDER = "(valueFrom)";
+
 const K8S_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 const DEFAULT_ROW_NAME = "NEW_VARIABLE";
 
@@ -43,10 +45,18 @@ export function isKubernetesEnvName(name: string): boolean {
 export function normalizeContainerEnvRowsForSave(
   rows: readonly ContainerEnvRow[]
 ): ContainerEnvRow[] {
-  return rows.map((row) => ({
-    ...row,
-    name: row.name.trim(),
-  }));
+  return rows.map((row) => {
+    const name = row.name.trim();
+    if (row.valueSource === "valueFrom" && row.valueFrom != null) {
+      return {
+        name,
+        value: CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+        valueFrom: row.valueFrom,
+        valueSource: "valueFrom",
+      };
+    }
+    return { name, value: row.value };
+  });
 }
 
 export function addContainerEnvRow(
@@ -70,6 +80,37 @@ export function deleteContainerEnvRow(
   index: number
 ): ContainerEnvRow[] {
   return rows.filter((_, rowIndex) => rowIndex !== index);
+}
+
+function valueFromKey(valueFrom: unknown): string {
+  return valueFrom == null ? "" : JSON.stringify(valueFrom);
+}
+
+export function containerEnvRowsEqual(
+  a: readonly ContainerEnvRow[],
+  b: readonly ContainerEnvRow[]
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((row, index) => {
+    const other = b[index];
+    if (other == null || row.name !== other.name) {
+      return false;
+    }
+
+    const rowIsExternal =
+      row.valueSource === "valueFrom" && row.valueFrom != null;
+    const otherIsExternal =
+      other.valueSource === "valueFrom" && other.valueFrom != null;
+    if (rowIsExternal !== otherIsExternal) {
+      return false;
+    }
+    if (rowIsExternal) {
+      return valueFromKey(row.valueFrom) === valueFromKey(other.valueFrom);
+    }
+    return row.value === other.value;
+  });
 }
 
 export function validateContainerEnvRows(

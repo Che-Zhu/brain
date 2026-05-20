@@ -3,7 +3,9 @@ import { test } from "node:test";
 
 import {
   addContainerEnvRow,
+  containerEnvRowsEqual,
   deleteContainerEnvRow,
+  normalizeContainerEnvRowsForSave,
   updateContainerEnvRow,
   validateContainerEnvRows,
 } from "./container-env-rows";
@@ -37,4 +39,53 @@ test("container env rows reject duplicate names", () => {
       type: "duplicate-name",
     },
   ]);
+});
+
+test("container env rows normalize direct rows and compare by saved shape", () => {
+  assert.deepEqual(
+    normalizeContainerEnvRowsForSave([
+      {
+        name: " DATABASE_URL ",
+        value: "postgres://db:5432/app",
+        valueSource: "direct",
+      },
+    ]),
+    [{ name: "DATABASE_URL", value: "postgres://db:5432/app" }]
+  );
+
+  assert.equal(
+    containerEnvRowsEqual(
+      [{ name: "DATABASE_URL", value: "postgres://db:5432/app" }],
+      [
+        {
+          name: "DATABASE_URL",
+          value: "postgres://db:5432/app",
+          valueSource: "direct",
+        },
+      ]
+    ),
+    true
+  );
+
+  assert.equal(
+    containerEnvRowsEqual(
+      [
+        {
+          name: "DATABASE_PASSWORD",
+          value: "(valueFrom)",
+          valueFrom: { secretKeyRef: { key: "password", name: "db" } },
+          valueSource: "valueFrom",
+        },
+      ],
+      [
+        {
+          name: "DATABASE_PASSWORD",
+          value: "External reference",
+          valueFrom: { secretKeyRef: { key: "password", name: "db" } },
+          valueSource: "valueFrom",
+        },
+      ]
+    ),
+    true
+  );
 });

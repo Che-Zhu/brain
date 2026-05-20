@@ -23,6 +23,7 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import {
   addContainerEnvRow,
   type ContainerEnvRow,
+  containerEnvRowsEqual,
   deleteContainerEnvRow,
   normalizeContainerEnvRowsForSave,
   updateContainerEnvRow,
@@ -40,7 +41,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
 
@@ -177,36 +178,166 @@ function containerPortsToTableRows(
   });
 }
 
-function envRowsEqual(
-  a: readonly ContainerEnvVar[],
-  b: readonly ContainerEnvVar[]
-): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every((row, index) => {
-    const other = b[index];
-    return (
-      other != null &&
-      row.name === other.name &&
-      row.value === other.value &&
-      row.valueSource === other.valueSource &&
-      row.valueFrom === other.valueFrom
-    );
-  });
-}
-
 function envRowDisplayValue(row: ContainerEnvVar): string {
   return row.valueSource === "valueFrom" ? "External reference" : row.value;
 }
 
-function envRowKey(row: ContainerEnvVar): string {
+function envRowKey(row: ContainerEnvVar, index: number): string {
   return [
+    index,
     row.name,
     row.value,
     row.valueSource ?? "direct",
     row.valueFrom == null ? "" : JSON.stringify(row.valueFrom),
   ].join("\u0000");
+}
+
+function nextEnvDraftKey(prefix: string, counter: { current: number }): string {
+  const key = `${prefix}-${counter.current}`;
+  counter.current += 1;
+  return key;
+}
+
+function createEnvDraftKeys(
+  count: number,
+  prefix: string,
+  counter: { current: number }
+): string[] {
+  return Array.from({ length: count }, () => nextEnvDraftKey(prefix, counter));
+}
+
+function ExternalEnvBadge({ className }: { className?: string }) {
+  return (
+    <Badge className={className} variant="outline">
+      External
+    </Badge>
+  );
+}
+
+function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
+  return (
+    <div
+      className="flex max-h-56 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/30 p-2"
+      data-slot="container-env-rows"
+    >
+      {env.length === 0 ? (
+        <span className="text-muted-foreground text-sm italic">
+          No variables
+        </span>
+      ) : (
+        env.map((row, index) => (
+          <div
+            className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2 rounded-md border border-border bg-background/50 px-2.5 py-2"
+            key={envRowKey(row, index)}
+          >
+            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+              {row.name}
+            </span>
+            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+              {envRowDisplayValue(row)}
+              {row.valueSource === "valueFrom" ? (
+                <ExternalEnvBadge className="ml-2 align-middle" />
+              ) : null}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+interface EditableEnvRowsProps {
+  envDirty: boolean;
+  envDraft: ContainerEnvVar[];
+  envErrorsByIndex: ReadonlyMap<number, string>;
+  envRowKeys: readonly string[];
+  envValidation: ReturnType<typeof validateContainerEnvRows>;
+  onDeleteRow: (index: number) => void;
+  onUpdateRow: (index: number, patch: Partial<ContainerEnvRow>) => void;
+}
+
+function EditableEnvRows({
+  envDirty,
+  envDraft,
+  envErrorsByIndex,
+  envRowKeys,
+  envValidation,
+  onDeleteRow,
+  onUpdateRow,
+}: EditableEnvRowsProps) {
+  return (
+    <div
+      className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
+      data-slot="container-env-rows"
+    >
+      {envDraft.length === 0 ? (
+        <div className="flex min-h-16 items-center text-muted-foreground text-sm italic">
+          No variables
+        </div>
+      ) : (
+        envDraft.map((row, index) => {
+          const error = envErrorsByIndex.get(index);
+          const rowKey = envRowKeys[index] ?? envRowKey(row, index);
+          return (
+            <div className="grid min-w-0 gap-1.5" key={rowKey}>
+              <div className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_auto] gap-2">
+                <Input
+                  aria-invalid={error != null}
+                  aria-label="Environment variable name"
+                  className="h-8 font-mono text-xs"
+                  onChange={(event) =>
+                    onUpdateRow(index, {
+                      name: event.target.value,
+                    })
+                  }
+                  value={row.name}
+                />
+                {row.valueSource === "valueFrom" ? (
+                  <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
+                    <span className="min-w-0 truncate font-mono">
+                      External reference
+                    </span>
+                    <ExternalEnvBadge className="shrink-0" />
+                  </div>
+                ) : (
+                  <Input
+                    aria-label="Environment variable value"
+                    className="h-8 font-mono text-xs"
+                    onChange={(event) =>
+                      onUpdateRow(index, {
+                        value: event.target.value,
+                        valueSource: "direct",
+                      })
+                    }
+                    value={row.value}
+                  />
+                )}
+                <Button
+                  aria-label="Remove environment variable"
+                  onClick={() => onDeleteRow(index)}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2 aria-hidden />
+                </Button>
+              </div>
+              {error == null ? null : (
+                <p className="text-destructive text-xs" role="status">
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        })
+      )}
+      {!envValidation.valid && envDirty ? (
+        <p className="text-destructive text-xs" role="status">
+          Fix environment variable names before saving.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -230,9 +361,14 @@ export function ContainerSettingsPane({
 }: ContainerSettingsPaneProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageDraft, setImageDraft] = useState(image);
-  const [envDraft, setEnvDraft] = useState<ContainerEnvVar[]>(() => env);
   const [quotaSavePending, setQuotaSavePending] = useState(false);
   const inputId = useId();
+  const envDraftKeyPrefix = useId();
+  const envDraftKeyCounter = useRef(0);
+  const [envDraft, setEnvDraft] = useState<ContainerEnvVar[]>(() => env);
+  const [envDraftKeys, setEnvDraftKeys] = useState<string[]>(() =>
+    createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+  );
 
   const quotaCommitMode = onResourceQuotasCommit != null && readOnly !== true;
 
@@ -253,7 +389,10 @@ export function ContainerSettingsPane({
 
   useEffect(() => {
     setEnvDraft(env);
-  }, [env]);
+    setEnvDraftKeys(
+      createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+    );
+  }, [env, envDraftKeyPrefix]);
 
   const quotasDirty = resourceQuotasDirty(
     draftCpu,
@@ -308,7 +447,7 @@ export function ContainerSettingsPane({
     }
     return byIndex;
   }, [envValidation]);
-  const envDirty = !envRowsEqual(envDraft, env);
+  const envDirty = !containerEnvRowsEqual(envDraft, env);
   const canSaveEnv = envDirty && envValidation.valid;
 
   const cpuSlider = useMemo(() => {
@@ -427,6 +566,33 @@ export function ContainerSettingsPane({
     const normalized = normalizeContainerEnvRowsForSave(envDraft);
     onEnvChange(normalized);
     setEnvDraft(normalized);
+  };
+
+  const handleCancelEnvRows = () => {
+    setEnvDraft(env);
+    setEnvDraftKeys(
+      createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+    );
+  };
+
+  const handleAddEnvRow = () => {
+    setEnvDraft((rows) => addContainerEnvRow(rows));
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  };
+
+  const handleDeleteEnvRow = (index: number) => {
+    setEnvDraft((rows) => deleteContainerEnvRow(rows, index));
+    setEnvDraftKeys((keys) => keys.filter((_, keyIndex) => keyIndex !== index));
+  };
+
+  const handleUpdateEnvRow = (
+    index: number,
+    patch: Partial<ContainerEnvRow>
+  ) => {
+    setEnvDraft((rows) => updateContainerEnvRow(rows, index, patch));
   };
 
   const portsTableMutationProps = {
@@ -616,7 +782,7 @@ export function ContainerSettingsPane({
                   <>
                     <Button
                       aria-label="Cancel environment changes"
-                      onClick={() => setEnvDraft(env)}
+                      onClick={handleCancelEnvRows}
                       size="sm"
                       type="button"
                       variant="ghost"
@@ -638,9 +804,7 @@ export function ContainerSettingsPane({
                 ) : null}
                 <Button
                   aria-label="Add environment variable"
-                  onClick={() =>
-                    setEnvDraft((rows) => addContainerEnvRow(rows))
-                  }
+                  onClick={handleAddEnvRow}
                   size="sm"
                   type="button"
                   variant="outline"
@@ -652,116 +816,17 @@ export function ContainerSettingsPane({
             )}
           </div>
           {readOnly ? (
-            <div
-              className="flex max-h-56 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/30 p-2"
-              data-slot="container-env-rows"
-            >
-              {env.length === 0 ? (
-                <span className="text-muted-foreground text-sm italic">
-                  No variables
-                </span>
-              ) : (
-                env.map((row) => (
-                  <div
-                    className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2 rounded-md border border-border bg-background/50 px-2.5 py-2"
-                    key={envRowKey(row)}
-                  >
-                    <span className="min-w-0 truncate font-mono text-foreground text-xs">
-                      {row.name}
-                    </span>
-                    <span className="min-w-0 truncate font-mono text-foreground text-xs">
-                      {envRowDisplayValue(row)}
-                      {row.valueSource === "valueFrom" ? (
-                        <Badge className="ml-2 align-middle" variant="outline">
-                          External
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+            <ReadOnlyEnvRows env={env} />
           ) : (
-            <div
-              className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
-              data-slot="container-env-rows"
-            >
-              {envDraft.length === 0 ? (
-                <div className="flex min-h-16 items-center text-muted-foreground text-sm italic">
-                  No variables
-                </div>
-              ) : (
-                envDraft.map((row, index) => {
-                  const error = envErrorsByIndex.get(index);
-                  return (
-                    <div className="grid min-w-0 gap-1.5" key={envRowKey(row)}>
-                      <div className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_auto] gap-2">
-                        <Input
-                          aria-invalid={error != null}
-                          aria-label="Environment variable name"
-                          className="h-8 font-mono text-xs"
-                          onChange={(event) =>
-                            setEnvDraft((rows) =>
-                              updateContainerEnvRow(rows, index, {
-                                name: event.target.value,
-                              })
-                            )
-                          }
-                          value={row.name}
-                        />
-                        {row.valueSource === "valueFrom" ? (
-                          <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
-                            <span className="min-w-0 truncate font-mono">
-                              External reference
-                            </span>
-                            <Badge className="shrink-0" variant="outline">
-                              External
-                            </Badge>
-                          </div>
-                        ) : (
-                          <Input
-                            aria-label="Environment variable value"
-                            className="h-8 font-mono text-xs"
-                            onChange={(event) =>
-                              setEnvDraft((rows) =>
-                                updateContainerEnvRow(rows, index, {
-                                  value: event.target.value,
-                                  valueSource: "direct",
-                                })
-                              )
-                            }
-                            value={row.value}
-                          />
-                        )}
-                        <Button
-                          aria-label="Remove environment variable"
-                          onClick={() =>
-                            setEnvDraft((rows) =>
-                              deleteContainerEnvRow(rows, index)
-                            )
-                          }
-                          size="icon-sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <Trash2 aria-hidden />
-                        </Button>
-                      </div>
-                      {error == null ? null : (
-                        <p className="text-destructive text-xs" role="status">
-                          {error}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-              {!envValidation.valid && envDirty ? (
-                <p className="text-destructive text-xs" role="status">
-                  Fix environment variable names before saving.
-                </p>
-              ) : null}
-            </div>
+            <EditableEnvRows
+              envDirty={envDirty}
+              envDraft={envDraft}
+              envErrorsByIndex={envErrorsByIndex}
+              envRowKeys={envDraftKeys}
+              envValidation={envValidation}
+              onDeleteRow={handleDeleteEnvRow}
+              onUpdateRow={handleUpdateEnvRow}
+            />
           )}
         </section>
 
