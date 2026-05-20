@@ -6,10 +6,16 @@ import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
+import {
+  addPendingApDbCanvasReferences,
+  type PendingApDbCanvasReference,
+  pendingApDbCanvasConnectionEdges,
+  removePendingApDbCanvasReferences,
+} from "@/lib/project-canvas/flow/pending-connections";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
@@ -23,6 +29,9 @@ export default function ProjectUidPage() {
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
+  const [pendingApDbReferences, setPendingApDbReferences] = useState<
+    PendingApDbCanvasReference[]
+  >([]);
   const projectCanvasLayout = useProjectCanvasLayout({
     enabled: kubeconfig.trim() !== "",
     namespace,
@@ -43,6 +52,40 @@ export default function ProjectUidPage() {
     onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
     uid,
   });
+  const beginPendingApDbReferences = useCallback(
+    (references: readonly PendingApDbCanvasReference[]) => {
+      const ids = references.map((reference) => reference.id);
+      setPendingApDbReferences((current) =>
+        addPendingApDbCanvasReferences(current, references)
+      );
+      return () => {
+        setPendingApDbReferences((current) =>
+          removePendingApDbCanvasReferences(current, ids)
+        );
+      };
+    },
+    []
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pending edges are scoped to this project route.
+  useEffect(() => {
+    setPendingApDbReferences([]);
+  }, [namespace, uid]);
+  const pendingEdges = useMemo(
+    () =>
+      pendingApDbCanvasConnectionEdges({
+        existingEdges: canvasState.edges,
+        nodes: canvasState.nodes,
+        pendingReferences: pendingApDbReferences,
+      }),
+    [canvasState.edges, canvasState.nodes, pendingApDbReferences]
+  );
+  const canvasStateWithPendingEdges = useMemo(
+    () => ({
+      ...canvasState,
+      edges: [...canvasState.edges, ...pendingEdges],
+    }),
+    [canvasState, pendingEdges]
+  );
 
   const {
     clearSelection,
@@ -52,12 +95,13 @@ export default function ProjectUidPage() {
     nodes,
     selectedEdge,
     selectedNode,
-  } = useProjectCanvas(canvasState.nodes, {
+  } = useProjectCanvas(canvasStateWithPendingEdges.nodes, {
     dbsData: projectServicesData.dbs,
     kubeconfig,
     namespace,
     onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
+    onPendingApDbReferencesStart: beginPendingApDbReferences,
     refreshWorkloadLists,
   });
   const selectedTelemetryTarget = useMemo(
@@ -88,6 +132,7 @@ export default function ProjectUidPage() {
               meta={meta}
               state={{
                 ...canvasState,
+                edges: canvasStateWithPendingEdges.edges,
                 nodes,
                 selectedEdge,
                 selectedNode,

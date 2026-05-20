@@ -48,6 +48,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       kubeconfig,
       name,
       namespace: ns,
+      onAddDbDsnReferenceMutationStart: data?.onAddDbDsnReferenceMutationStart,
       onWorkloadMutation: data?.onWorkloadMutation,
       workloadKind,
     });

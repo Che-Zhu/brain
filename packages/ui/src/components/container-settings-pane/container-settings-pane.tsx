@@ -110,6 +110,16 @@ export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
   id: string;
 }
 
+export interface ContainerSettingsPaneConfirmedAddDbDsnReference {
+  dbName: string;
+  dbNamespace: string;
+  id: string;
+}
+
+export interface ContainerSettingsPaneEnvChangeMeta {
+  confirmedAddDbDsnReferences: ContainerSettingsPaneConfirmedAddDbDsnReference[];
+}
+
 export interface ContainerSettingsPaneProps {
   /**
    * One-shot request from a Canvas Connecting Edge to append an Add Reference row
@@ -126,7 +136,10 @@ export interface ContainerSettingsPaneProps {
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
-  onEnvChange: (env: ContainerEnvVar[]) => void;
+  onEnvChange: (
+    env: ContainerEnvVar[],
+    meta?: ContainerSettingsPaneEnvChangeMeta
+  ) => void;
   onImageChange: (image: string) => void;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
@@ -151,6 +164,12 @@ export interface ContainerSettingsPaneProps {
    */
   replicasQuota?: ContainerSettingsControlledQuotaProps;
 }
+
+interface AddDbDsnReferenceIntentDraftMetadata {
+  canvasAddDbDsnReferenceIntentId?: string;
+}
+
+type EnvDraftRow = ContainerEnvVar & AddDbDsnReferenceIntentDraftMetadata;
 
 function SectionTitle({
   children,
@@ -314,9 +333,17 @@ function appendDbDsnReferenceIntentRow(
   rows: readonly ContainerEnvVar[],
   source: ContainerEnvDbDsnSource,
   intent: ContainerSettingsPaneAddDbDsnReferenceIntent
-): ContainerEnvVar[] {
+): EnvDraftRow[] {
   const target = addDbDsnReferenceIntentTarget(intent);
-  return addContainerEnvDbDsnReferenceRow(rows, [source], target);
+  const nextRows = addContainerEnvDbDsnReferenceRow(rows, [source], target);
+  if (nextRows.length <= rows.length) {
+    return [...nextRows];
+  }
+  return nextRows.map((row, index) =>
+    index === nextRows.length - 1
+      ? { ...row, canvasAddDbDsnReferenceIntentId: intent.id }
+      : row
+  );
 }
 
 function envDraftWithAddReferenceIntent({
@@ -331,7 +358,7 @@ function envDraftWithAddReferenceIntent({
   sources: readonly ContainerEnvDbDsnSource[];
 }): {
   consumedIntentId?: string;
-  rows: ContainerEnvVar[];
+  rows: EnvDraftRow[];
 } {
   if (intent == null) {
     return { rows: [...rows] };
@@ -347,6 +374,29 @@ function envDraftWithAddReferenceIntent({
     consumedIntentId: intent.id,
     rows: appendDbDsnReferenceIntentRow(rows, source, intent),
   };
+}
+
+export function confirmedAddDbDsnReferencesFromEnvDraft(
+  rows: readonly ContainerEnvVar[]
+): ContainerSettingsPaneConfirmedAddDbDsnReference[] {
+  const byIntentId = new Map<
+    string,
+    ContainerSettingsPaneConfirmedAddDbDsnReference
+  >();
+
+  for (const row of rows) {
+    const intentId = (row as EnvDraftRow).canvasAddDbDsnReferenceIntentId;
+    if (intentId == null || intentId === "" || row.dbDsn == null) {
+      continue;
+    }
+    byIntentId.set(intentId, {
+      dbName: row.dbDsn.dbName,
+      dbNamespace: row.dbDsn.dbNamespace,
+      id: intentId,
+    });
+  }
+
+  return Array.from(byIntentId.values());
 }
 
 const envReferenceSelectClassName =
@@ -612,7 +662,7 @@ export function ContainerSettingsPane({
     initialEnvDraft.consumedIntentId ?? null
   );
   const envDraftSyncMounted = useRef(false);
-  const [envDraft, setEnvDraft] = useState<ContainerEnvVar[]>(
+  const [envDraft, setEnvDraft] = useState<EnvDraftRow[]>(
     () => initialEnvDraft.rows
   );
   const [envDraftKeys, setEnvDraftKeys] = useState<string[]>(() =>
@@ -854,8 +904,22 @@ export function ContainerSettingsPane({
       return;
     }
     const normalized = normalizeContainerEnvRowsForSave(envDraft);
-    onEnvChange(normalized);
-    setEnvDraft(normalized);
+    const confirmedAddDbDsnReferences =
+      confirmedAddDbDsnReferencesFromEnvDraft(envDraft);
+    onEnvChange(
+      normalized,
+      confirmedAddDbDsnReferences.length === 0
+        ? undefined
+        : { confirmedAddDbDsnReferences }
+    );
+    setEnvDraft(
+      normalized.map((row, index) => {
+        const intentId = envDraft[index]?.canvasAddDbDsnReferenceIntentId;
+        return intentId == null
+          ? row
+          : { ...row, canvasAddDbDsnReferenceIntentId: intentId };
+      })
+    );
   };
 
   const handleCancelEnvRows = () => {

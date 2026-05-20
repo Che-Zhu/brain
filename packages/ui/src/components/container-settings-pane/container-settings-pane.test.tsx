@@ -4,7 +4,10 @@ import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { ContainerEnvVar } from "./container-settings-pane";
-import { ContainerSettingsPane } from "./container-settings-pane";
+import {
+  confirmedAddDbDsnReferencesFromEnvDraft,
+  ContainerSettingsPane,
+} from "./container-settings-pane";
 
 const noop = () => {
   /* test noop */
@@ -153,4 +156,23 @@ test("container settings pane opens dragged DB Add Reference intent preselected"
   assert.match(html, /<option value="default\/mysql" selected="">mysql/);
   assert.match(html, DB_FIELD_SELECT_RE);
   assert.match(html, SAVE_ENV_RE);
+});
+
+test("container settings pane reports confirmed dragged DB reference rows from the saved draft", () => {
+  const draftRow = {
+    canvasAddDbDsnReferenceIntentId: "drag-1",
+    dbDsn: {
+      dbName: "mysql",
+      dbNamespace: "default",
+      field: "private",
+    },
+    name: "DATABASE_URL",
+    value: "mysql://private",
+    valueSource: "dbDsn",
+  } satisfies ContainerEnvVar & { canvasAddDbDsnReferenceIntentId: string };
+
+  assert.deepEqual(
+    confirmedAddDbDsnReferencesFromEnvDraft([draftRow]),
+    [{ dbName: "mysql", dbNamespace: "default", id: "drag-1" }]
+  );
 });

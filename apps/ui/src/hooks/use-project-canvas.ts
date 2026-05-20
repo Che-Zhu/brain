@@ -29,6 +29,7 @@ import {
 import { classifyProjectCanvasConnectionCommand } from "@/lib/project-canvas/flow/connection-command";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
+import type { PendingApDbCanvasReference } from "@/lib/project-canvas/flow/pending-connections";
 import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/db-dsn-reference-sources";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
@@ -57,6 +58,9 @@ export interface UseProjectCanvasOptions {
   namespace?: string;
   onNodeExpansionChange?: (node: Node) => void;
   onNodePositionChange?: (node: Node) => void;
+  onPendingApDbReferencesStart?: (
+    references: readonly PendingApDbCanvasReference[]
+  ) => (() => void) | undefined;
   readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
@@ -92,6 +96,43 @@ function dbReferenceIntentDataForContainerNode({
     },
     onAddDbDsnReferenceIntentConsumed: onConsumed,
   };
+}
+
+function pendingApDbReferenceMutationStartHandler({
+  apName,
+  apNamespace,
+  onPendingApDbReferencesStart,
+}: {
+  apName: string;
+  apNamespace: string;
+  onPendingApDbReferencesStart:
+    | UseProjectCanvasOptions["onPendingApDbReferencesStart"]
+    | undefined;
+}): CanvasContainerNodeData["onAddDbDsnReferenceMutationStart"] {
+  if (
+    onPendingApDbReferencesStart === undefined ||
+    apName === "" ||
+    apNamespace === ""
+  ) {
+    return undefined;
+  }
+
+  return (references) =>
+    onPendingApDbReferencesStart(
+      references.map((reference) => ({
+        id: reference.id,
+        source: {
+          kind: "AP",
+          name: apName,
+          namespace: apNamespace,
+        },
+        target: {
+          kind: "DB",
+          name: reference.dbName,
+          namespace: reference.dbNamespace,
+        },
+      }))
+    );
 }
 
 /**
@@ -147,6 +188,7 @@ export function useProjectCanvas(
   });
 
   const refreshWorkloadLists = options?.refreshWorkloadLists;
+  const onPendingApDbReferencesStart = options?.onPendingApDbReferencesStart;
   const onNodeExpansionChange = options?.onNodeExpansionChange;
   const onNodePositionChange = options?.onNodePositionChange;
   const dbDsnReferenceSources = useMemo(
@@ -355,6 +397,12 @@ export function useProjectCanvas(
         nodeId: node.id,
         onConsumed: handleAddDbDsnReferenceIntentConsumed,
       });
+      const onAddDbDsnReferenceMutationStart =
+        pendingApDbReferenceMutationStartHandler({
+          apName: name,
+          apNamespace: ns,
+          onPendingApDbReferencesStart,
+        });
 
       if (!(hasUrlActions || isApLifecycle)) {
         return {
@@ -363,6 +411,7 @@ export function useProjectCanvas(
             ...data,
             dbDsnReferenceSources,
             ...dbReferenceIntentData,
+            onAddDbDsnReferenceMutationStart,
           },
         };
       }
@@ -438,6 +487,7 @@ export function useProjectCanvas(
           ...data,
           ...dbReferenceIntentData,
           dbDsnReferenceSources,
+          onAddDbDsnReferenceMutationStart,
           onWorkloadMutation: afterLifecycle,
           actions: {
             ...(data.actions ?? {}),
@@ -453,6 +503,7 @@ export function useProjectCanvas(
       dbDsnReferenceSources,
       deleteWorkload,
       handleAddDbDsnReferenceIntentConsumed,
+      onPendingApDbReferencesStart,
       pendingAddDbDsnReferenceIntent,
       pauseWorkload,
       restartWorkload,

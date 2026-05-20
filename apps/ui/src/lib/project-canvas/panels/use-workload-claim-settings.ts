@@ -5,6 +5,8 @@ import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
   ContainerSettingsPane,
+  ContainerSettingsPaneConfirmedAddDbDsnReference,
+  ContainerSettingsPaneEnvChangeMeta,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
 import {
@@ -40,6 +42,9 @@ export interface UseWorkloadClaimSettingsOptions {
   kubeconfig: string;
   name: string;
   namespace: string;
+  onAddDbDsnReferenceMutationStart?: (
+    references: readonly ContainerSettingsPaneConfirmedAddDbDsnReference[]
+  ) => (() => void) | undefined;
   onWorkloadMutation?: () => Promise<unknown>;
   workloadKind: WorkloadClaimKind;
 }
@@ -51,8 +56,14 @@ export interface UseWorkloadClaimSettingsOptions {
 export function useWorkloadClaimSettings(
   options: UseWorkloadClaimSettingsOptions
 ) {
-  const { kubeconfig, name, namespace, onWorkloadMutation, workloadKind } =
-    options;
+  const {
+    kubeconfig,
+    name,
+    namespace,
+    onAddDbDsnReferenceMutationStart,
+    onWorkloadMutation,
+    workloadKind,
+  } = options;
   const dbDsnReferenceSources = options.dbDsnReferenceSources ?? [];
   const isApWorkload = workloadKind === "AP";
 
@@ -150,7 +161,10 @@ export function useWorkloadClaimSettings(
   );
 
   const onEnvChange = useCallback(
-    async (env: ContainerEnvVar[]) => {
+    async (
+      env: ContainerEnvVar[],
+      meta?: ContainerSettingsPaneEnvChangeMeta
+    ) => {
       if (!isApWorkload) {
         return;
       }
@@ -161,6 +175,11 @@ export function useWorkloadClaimSettings(
         return;
       }
       setLocalOverride((prev) => ({ ...(prev ?? {}), env }));
+      const confirmedReferences = meta?.confirmedAddDbDsnReferences ?? [];
+      const clearPendingReferences =
+        confirmedReferences.length === 0
+          ? undefined
+          : onAddDbDsnReferenceMutationStart?.(confirmedReferences);
       try {
         await applyApEnv(kc, body, env);
         toast.success("Environment applied.");
@@ -168,9 +187,16 @@ export function useWorkloadClaimSettings(
       } catch (e) {
         setLocalOverride(null);
         toast.error(e instanceof Error ? e.message : "Apply failed");
+      } finally {
+        clearPendingReferences?.();
       }
     },
-    [isApWorkload, kubeconfig, revalidateAfterApMutation]
+    [
+      isApWorkload,
+      kubeconfig,
+      onAddDbDsnReferenceMutationStart,
+      revalidateAfterApMutation,
+    ]
   );
 
   const onPortsChange = useCallback<ContainerSettingsOnPortsChange>(

@@ -43,3 +43,34 @@ test("preview canvas state renders DSN-backed AP to DB connections from resource
     false
   );
 });
+
+test("preview canvas state does not render AP to DB connections without exact resource evidence", () => {
+  const state = buildPreviewProjectCanvasState({
+    apsData: {
+      items: [
+        {
+          metadata: { name: "api", namespace: "default", uid: "ap-uid" },
+          spec: {
+            input: {
+              env: [{ name: "DATABASE_URL", value: "postgres://stale" }],
+              image: "ghcr.io/acme/api:latest",
+            },
+          },
+        },
+      ],
+    },
+    canvasLayout: undefined,
+    dbsData: {
+      items: [
+        {
+          metadata: { name: "postgres", namespace: "default", uid: "db-uid" },
+          status: { connectionStringPrivate: "postgres://private" },
+        },
+      ],
+    },
+    entryPointsData: undefined,
+    namespace: "default",
+  });
+
+  assert.deepEqual(state.edges, []);
+});
