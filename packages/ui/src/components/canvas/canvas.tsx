@@ -13,8 +13,10 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
@@ -43,6 +45,9 @@ const CANVAS_DEFAULT_EDGE_STYLE = {
   stroke: "var(--color-blue-400)",
   strokeDasharray: "6 6",
 };
+const DEFAULT_OPENING_FIT_KEY = "__default__";
+const OPENING_FIT_ANIMATION_MS = 300;
+const OPENING_FIT_SETTLE_MS = 150;
 
 function mergeNodes(prev: Node[], next: Node[]): Node[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
@@ -60,9 +65,12 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
-  const { fitView } = useReactFlow<Node, Edge>();
+  const { fitView, viewportInitialized } = useReactFlow<Node, Edge>();
+  const nodesInitialized = useNodesInitialized();
+  const flowHeight = useStore((store) => store.height);
+  const flowWidth = useStore((store) => store.width);
   const initializedRef = useRef(false);
-  const openingFitAppliedRef = useRef(false);
+  const openingFitAppliedKeyRef = useRef<number | string | null>(null);
 
   useLayoutEffect(() => {
     if (initializedRef.current) {
@@ -99,10 +107,12 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     });
   }, [edges, state.selectedEdge]);
 
-  const userDefaultEdgeOptions = meta.reactFlowProps?.defaultEdgeOptions;
-  const userConnectionLineStyle = meta.reactFlowProps?.connectionLineStyle;
+  const userReactFlowProps = meta.reactFlowProps ?? {};
+  const userDefaultEdgeOptions = userReactFlowProps.defaultEdgeOptions;
+  const userConnectionLineStyle = userReactFlowProps.connectionLineStyle;
+  const openingFitViewOptions = userReactFlowProps.fitViewOptions;
+  const shouldFitOpeningView = userReactFlowProps.fitView !== false;
   const passThrough: CanvasReactFlowProps = {
-    fitView: true,
     connectionMode: ConnectionMode.Loose,
     maxZoom: 1.2,
     minZoom: 0.2,
@@ -112,7 +122,8 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     selectNodesOnDrag: false,
     snapGrid: [16, 16],
     snapToGrid: true,
-    ...meta.reactFlowProps,
+    ...userReactFlowProps,
+    fitView: false,
     connectionLineStyle: {
       ...CANVAS_DEFAULT_EDGE_STYLE,
       ...(userConnectionLineStyle ?? {}),
@@ -125,25 +136,52 @@ function CanvasFlow({ children }: CanvasFlowProps) {
       },
     },
   };
-  const openingFitViewOptions = passThrough.fitViewOptions;
-  const shouldFitOpeningView = passThrough.fitView !== false;
+  const openingFitKey = meta.openingFitView?.key ?? DEFAULT_OPENING_FIT_KEY;
+  const nodeCount = nodes.length;
 
   useEffect(() => {
     if (
-      openingFitAppliedRef.current ||
+      openingFitAppliedKeyRef.current === openingFitKey ||
       !shouldFitOpeningView ||
-      nodes.length === 0
+      !viewportInitialized ||
+      !nodesInitialized ||
+      flowHeight <= 0 ||
+      flowWidth <= 0 ||
+      nodeCount === 0
     ) {
       return;
     }
 
-    openingFitAppliedRef.current = true;
-    const frame = window.requestAnimationFrame(() => {
-      fitView(openingFitViewOptions);
-    });
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const settleTimer = window.setTimeout(() => {
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
+          openingFitAppliedKeyRef.current = openingFitKey;
+          fitView({
+            duration: OPENING_FIT_ANIMATION_MS,
+            ...openingFitViewOptions,
+          });
+        });
+      });
+    }, OPENING_FIT_SETTLE_MS);
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [fitView, nodes.length, openingFitViewOptions, shouldFitOpeningView]);
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [
+    fitView,
+    flowHeight,
+    flowWidth,
+    nodeCount,
+    nodesInitialized,
+    openingFitKey,
+    openingFitViewOptions,
+    shouldFitOpeningView,
+    viewportInitialized,
+  ]);
 
   return (
     <CanvasUpperRightProvider>

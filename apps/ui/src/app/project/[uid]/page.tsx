@@ -43,7 +43,7 @@ export default function ProjectUidPage() {
     clearSelection,
     closeDatabasePane,
     databasePane,
-    meta,
+    meta: canvasMeta,
     nodes,
     selectedEdge,
     selectedNode,
@@ -55,6 +55,15 @@ export default function ProjectUidPage() {
   const selectedTelemetryTarget = useMemo(
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
+  );
+  const meta = useMemo(
+    () => ({
+      ...canvasMeta,
+      openingFitView: {
+        key: `${namespace}:${uid}`,
+      },
+    }),
+    [canvasMeta, namespace, uid]
   );
 
   return (

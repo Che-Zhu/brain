@@ -77,6 +77,12 @@ export interface CanvasMeta {
   edgeTypes?: EdgeTypes;
   nodeTypes?: NodeTypes;
   /**
+   * Controls the one-shot fit-to-view that runs when a canvas opens.
+   */
+  openingFitView?: {
+    key?: number | string;
+  };
+  /**
    * Syncs multi-tab panels to host state / URL (typically backed by `nuqs`).
    * Omit for uncontrolled default tab (first tab's `name`).
    */
