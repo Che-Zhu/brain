@@ -2,6 +2,7 @@ import type {
   ContainerNodeActions,
   ContainerNodeStates,
 } from "@workspace/ui/components/container-node/container-node";
+import type { ContainerSettingsPaneAddDbDsnReferenceIntent } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type {
   DatabaseNodeActions,
   DatabaseNodeConnection,
@@ -31,8 +32,10 @@ export interface CanvasNodeLayoutState {
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  addDbDsnReferenceIntent?: ContainerSettingsPaneAddDbDsnReferenceIntent | null;
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   layout?: CanvasNodeLayoutState;
+  onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
   onWorkloadMutation?: () => Promise<unknown>;
   states: ContainerNodeStates;
 }

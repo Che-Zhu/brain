@@ -83,6 +83,7 @@ export const WorkloadSettingsCanvasPanel = memo(
     return (
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <ContainerSettingsPane
+          addDbDsnReferenceIntent={data?.addDbDsnReferenceIntent}
           className="gap-4"
           cpuQuota={{
             max: 8,
@@ -101,6 +102,9 @@ export const WorkloadSettingsCanvasPanel = memo(
             step: 128,
             value: display.memoryMib,
           }}
+          onAddDbDsnReferenceIntentConsumed={
+            data?.onAddDbDsnReferenceIntentConsumed
+          }
           onEnvChange={isApWorkload ? onEnvChange : ignoreEnv}
           onImageChange={isApWorkload ? onImageChange : ignoreImage}
           onPortsChange={isApWorkload ? onPortsChange : ignorePorts}

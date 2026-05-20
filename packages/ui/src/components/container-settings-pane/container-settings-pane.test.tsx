@@ -23,6 +23,7 @@ const PASSWORD_FIELD_RE = /Password/;
 const UNAVAILABLE_DB_RE = /empty \(unavailable\)/;
 const REMOVE_ENV_RE = /aria-label="Remove environment variable"/;
 const SAVE_ENV_RE = /Save environment/;
+const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
 
 function renderPane(
   readOnly = false,
@@ -115,4 +116,41 @@ test("container settings pane renders primitive DB fields and unavailable DB opt
   assert.match(html, DB_FIELD_SELECT_RE);
   assert.match(html, PASSWORD_FIELD_RE);
   assert.match(html, UNAVAILABLE_DB_RE);
+});
+
+test("container settings pane opens dragged DB Add Reference intent preselected", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      addDbDsnReferenceIntent={{
+        dbName: "mysql",
+        dbNamespace: "default",
+        id: "drag-1",
+      }}
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      dbDsnReferenceSources={[
+        {
+          name: "postgres",
+          namespace: "default",
+          privateDsn: "postgres://private",
+        },
+        {
+          name: "mysql",
+          namespace: "default",
+          privateDsn: "mysql://private",
+        },
+      ]}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, NEW_VARIABLE_RE);
+  assert.match(html, /<option value="default\/mysql" selected="">mysql/);
+  assert.match(html, DB_FIELD_SELECT_RE);
+  assert.match(html, SAVE_ENV_RE);
 });

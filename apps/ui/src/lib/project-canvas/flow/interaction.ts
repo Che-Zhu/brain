@@ -1,6 +1,7 @@
 import type { CanvasReactFlowProps } from "@workspace/ui/components/canvas/canvas.types";
 
 export interface ProjectCanvasInteractionOptions {
+  onConnect?: NonNullable<CanvasReactFlowProps["onConnect"]>;
   readOnly: boolean;
 }
 
@@ -14,13 +15,14 @@ type ProjectCanvasInteractionProps = Pick<
 >;
 
 export function projectCanvasInteractionProps({
+  onConnect,
   readOnly,
 }: ProjectCanvasInteractionOptions): ProjectCanvasInteractionProps {
   return {
     connectOnClick: false,
     edgesReconnectable: false,
-    nodesConnectable: false,
+    nodesConnectable: !readOnly,
     nodesDraggable: !readOnly,
-    onConnect: () => undefined,
+    onConnect: readOnly ? () => undefined : onConnect,
   };
 }

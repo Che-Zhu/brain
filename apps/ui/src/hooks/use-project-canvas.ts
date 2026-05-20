@@ -7,8 +7,10 @@ import {
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   CanvasMeta,
+  CanvasReactFlowProps,
   CanvasSelectedNode,
 } from "@workspace/ui/components/canvas/canvas.types";
+import type { ContainerSettingsPaneAddDbDsnReferenceIntent } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type {
   DatabaseNodeCopyConnectionHandler,
   DatabaseNodeLifecycleActionKey,
@@ -17,13 +19,14 @@ import type {
 import type { Edge, Node } from "@xyflow/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { parseAsString, useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
   canvasNodeGeometryFromNode,
   selectCanvasAnchorPair,
 } from "@/lib/project-canvas/flow/anchor-pair";
+import { classifyProjectCanvasConnectionCommand } from "@/lib/project-canvas/flow/connection-command";
 import { resolveDatabasePublicConnections } from "@/lib/project-canvas/flow/database-public-connection";
 import { projectCanvasInteractionProps } from "@/lib/project-canvas/flow/interaction";
 import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/db-dsn-reference-sources";
@@ -60,6 +63,37 @@ export interface UseProjectCanvasOptions {
   shareToken?: string;
 }
 
+interface PendingAddDbDsnReferenceIntent
+  extends ContainerSettingsPaneAddDbDsnReferenceIntent {
+  apNodeId: string;
+}
+
+function dbReferenceIntentDataForContainerNode({
+  intent,
+  nodeId,
+  onConsumed,
+}: {
+  intent: PendingAddDbDsnReferenceIntent | null;
+  nodeId: string;
+  onConsumed: (id: string) => void;
+}): Pick<
+  CanvasContainerNodeData,
+  "addDbDsnReferenceIntent" | "onAddDbDsnReferenceIntentConsumed"
+> {
+  if (intent?.apNodeId !== nodeId) {
+    return {};
+  }
+
+  return {
+    addDbDsnReferenceIntent: {
+      dbName: intent.dbName,
+      dbNamespace: intent.dbNamespace,
+      id: intent.id,
+    },
+    onAddDbDsnReferenceIntentConsumed: onConsumed,
+  };
+}
+
 /**
  * Wires URL-driven workload selection (`?service=`), panel tab (`?tab=`),
  * edge selection (Jotai), node toolbar actions, **AP** lifecycle menu actions, and canvas `meta` for `<Canvas.Root />`.
@@ -83,6 +117,9 @@ export function useProjectCanvas(
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
   const readOnly = options?.readOnly === true;
+  const addDbDsnReferenceIntentCounter = useRef(0);
+  const [pendingAddDbDsnReferenceIntent, setPendingAddDbDsnReferenceIntent] =
+    useState<PendingAddDbDsnReferenceIntent | null>(null);
 
   const {
     authReady: apAuthReady,
@@ -125,6 +162,12 @@ export function useProjectCanvas(
       // ignore refresh failures; list will reconcile on next poll
     }
   }, [refreshWorkloadLists]);
+
+  const handleAddDbDsnReferenceIntentConsumed = useCallback((id: string) => {
+    setPendingAddDbDsnReferenceIntent((current) =>
+      current?.id === id ? null : current
+    );
+  }, []);
 
   const runMutationThenRefresh = useCallback(
     (
@@ -307,6 +350,11 @@ export function useProjectCanvas(
         apAuthReady && states.kind === "AP" && ns !== "" && name !== "";
 
       const hasUrlActions = uid != null && uid !== "";
+      const dbReferenceIntentData = dbReferenceIntentDataForContainerNode({
+        intent: pendingAddDbDsnReferenceIntent,
+        nodeId: node.id,
+        onConsumed: handleAddDbDsnReferenceIntentConsumed,
+      });
 
       if (!(hasUrlActions || isApLifecycle)) {
         return {
@@ -314,6 +362,7 @@ export function useProjectCanvas(
           data: {
             ...data,
             dbDsnReferenceSources,
+            ...dbReferenceIntentData,
           },
         };
       }
@@ -387,6 +436,7 @@ export function useProjectCanvas(
         ...node,
         data: {
           ...data,
+          ...dbReferenceIntentData,
           dbDsnReferenceSources,
           onWorkloadMutation: afterLifecycle,
           actions: {
@@ -402,6 +452,8 @@ export function useProjectCanvas(
       afterLifecycle,
       dbDsnReferenceSources,
       deleteWorkload,
+      handleAddDbDsnReferenceIntentConsumed,
+      pendingAddDbDsnReferenceIntent,
       pauseWorkload,
       restartWorkload,
       runMutationThenRefresh,
@@ -463,6 +515,50 @@ export function useProjectCanvas(
       nodes.find((n) => projectCanvasNodeServiceUid(n) === serviceUid) ?? null
     );
   }, [serviceUid, nodes]);
+
+  const handleConnect = useCallback<
+    NonNullable<CanvasReactFlowProps["onConnect"]>
+  >(
+    (connection) => {
+      const command = classifyProjectCanvasConnectionCommand({
+        connection,
+        nodes,
+        readOnly,
+      });
+
+      if (command.kind === "discard") {
+        if (command.reason === "unsupported") {
+          toast.info("That canvas connection is not supported yet.");
+        }
+        return;
+      }
+
+      if (command.ap.uid == null || command.ap.uid === "") {
+        toast.error("Could not open AP settings for this connection.");
+        return;
+      }
+
+      addDbDsnReferenceIntentCounter.current += 1;
+      setPendingAddDbDsnReferenceIntent({
+        apNodeId: command.ap.nodeId,
+        dbName: command.db.name,
+        dbNamespace: command.db.namespace,
+        id: `ap-db-${addDbDsnReferenceIntentCounter.current}`,
+      });
+      setSelectedEdge(null);
+      setDatabasePane(null).catch(() => undefined);
+      setPanelTab(WORKLOAD_PANEL_TAB.settings).catch(() => undefined);
+      setServiceUid(command.ap.uid).catch(() => undefined);
+    },
+    [
+      nodes,
+      readOnly,
+      setDatabasePane,
+      setPanelTab,
+      setSelectedEdge,
+      setServiceUid,
+    ]
+  );
 
   const isStale =
     serviceUid != null &&
@@ -533,7 +629,10 @@ export function useProjectCanvas(
         [CANVAS_CONTAINER_NODE_TYPE]: projectCanvasWorkloadPanelTabs,
       },
       reactFlowProps: {
-        ...projectCanvasInteractionProps({ readOnly }),
+        ...projectCanvasInteractionProps({
+          onConnect: handleConnect,
+          readOnly,
+        }),
         onNodeClick: (_, node: Node) => {
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
@@ -558,6 +657,7 @@ export function useProjectCanvas(
     }),
     [
       clearSelection,
+      handleConnect,
       onNodePositionChange,
       panelTab,
       readOnly,

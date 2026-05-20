@@ -24,6 +24,7 @@ import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
   type ContainerEnvDbDsnFieldOption,
+  type ContainerEnvDbDsnReferenceTarget,
   type ContainerEnvDbDsnSource,
   type ContainerEnvDbReferenceField,
   type ContainerEnvRow,
@@ -103,7 +104,18 @@ export interface ContainerPort {
   publicAddress?: string;
 }
 
+export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
+  dbName: string;
+  dbNamespace: string;
+  id: string;
+}
+
 export interface ContainerSettingsPaneProps {
+  /**
+   * One-shot request from a Canvas Connecting Edge to append an Add Reference row
+   * with the dragged DB preselected.
+   */
+  addDbDsnReferenceIntent?: ContainerSettingsPaneAddDbDsnReferenceIntent | null;
   className?: string;
   cpuQuota: ContainerSettingsControlledQuotaProps;
   /** Project DB connection strings that can be saved into AP env values as DSN references. */
@@ -114,6 +126,7 @@ export interface ContainerSettingsPaneProps {
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
   onEnvChange: (env: ContainerEnvVar[]) => void;
+  onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
   onImageChange: (image: string) => void;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
@@ -268,6 +281,67 @@ function sourceFromDbDsnRow(
 
 function dbDsnSourceHasFields(source: ContainerEnvDbDsnSource): boolean {
   return containerEnvDbDsnFieldOptions(source).length > 0;
+}
+
+function dbDsnSourceMatchesTarget(
+  source: ContainerEnvDbDsnSource,
+  target: ContainerEnvDbDsnReferenceTarget
+): boolean {
+  return source.name === target.name && source.namespace === target.namespace;
+}
+
+function addDbDsnReferenceIntentTarget(
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent
+): ContainerEnvDbDsnReferenceTarget {
+  return { name: intent.dbName, namespace: intent.dbNamespace };
+}
+
+function dbDsnSourceFromAddReferenceIntent(
+  sources: readonly ContainerEnvDbDsnSource[],
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent | null | undefined
+): ContainerEnvDbDsnSource | undefined {
+  if (intent == null) {
+    return undefined;
+  }
+  const target = addDbDsnReferenceIntentTarget(intent);
+  return sources.find(
+    (source) =>
+      dbDsnSourceMatchesTarget(source, target) && dbDsnSourceHasFields(source)
+  );
+}
+
+function envDraftWithAddReferenceIntent({
+  intent,
+  readOnly,
+  rows,
+  sources,
+}: {
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent | null | undefined;
+  readOnly: boolean;
+  rows: readonly ContainerEnvVar[];
+  sources: readonly ContainerEnvDbDsnSource[];
+}): {
+  consumedIntentId?: string;
+  rows: ContainerEnvVar[];
+} {
+  if (intent == null) {
+    return { rows: [...rows] };
+  }
+  if (readOnly) {
+    return { rows: [...rows] };
+  }
+  const source = dbDsnSourceFromAddReferenceIntent(sources, intent);
+  if (source === undefined) {
+    return { consumedIntentId: intent.id, rows: [...rows] };
+  }
+  return {
+    consumedIntentId: intent.id,
+    rows: addContainerEnvDbDsnReferenceRow(
+      rows,
+      [source],
+      addDbDsnReferenceIntentTarget(intent)
+    ),
+  };
 }
 
 const envReferenceSelectClassName =
@@ -497,10 +571,12 @@ function EditableEnvRows({
  * All fields are controlled by the host.
  */
 export function ContainerSettingsPane({
+  addDbDsnReferenceIntent,
   className,
   image,
   onImageChange,
   onEnvChange,
+  onAddDbDsnReferenceIntentConsumed,
   onPortsChange,
   cpuQuota,
   memoryQuota,
@@ -517,9 +593,29 @@ export function ContainerSettingsPane({
   const inputId = useId();
   const envDraftKeyPrefix = useId();
   const envDraftKeyCounter = useRef(0);
-  const [envDraft, setEnvDraft] = useState<ContainerEnvVar[]>(() => env);
+  const initialEnvDraft = useMemo(
+    () =>
+      envDraftWithAddReferenceIntent({
+        intent: addDbDsnReferenceIntent,
+        readOnly,
+        rows: env,
+        sources: dbDsnReferenceSources,
+      }),
+    [addDbDsnReferenceIntent, dbDsnReferenceSources, env, readOnly]
+  );
+  const processedAddDbDsnReferenceIntentId = useRef<string | null>(
+    initialEnvDraft.consumedIntentId ?? null
+  );
+  const envDraftSyncMounted = useRef(false);
+  const [envDraft, setEnvDraft] = useState<ContainerEnvVar[]>(
+    () => initialEnvDraft.rows
+  );
   const [envDraftKeys, setEnvDraftKeys] = useState<string[]>(() =>
-    createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+    createEnvDraftKeys(
+      initialEnvDraft.rows.length,
+      envDraftKeyPrefix,
+      envDraftKeyCounter
+    )
   );
 
   const quotaCommitMode = onResourceQuotasCommit != null && readOnly !== true;
@@ -540,11 +636,54 @@ export function ContainerSettingsPane({
   }, [cpuQuota.value, memoryQuota.value, replicasQuota]);
 
   useEffect(() => {
+    if (!envDraftSyncMounted.current) {
+      envDraftSyncMounted.current = true;
+      return;
+    }
     setEnvDraft(env);
     setEnvDraftKeys(
       createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
     );
   }, [env, envDraftKeyPrefix]);
+
+  useEffect(() => {
+    const intent = addDbDsnReferenceIntent;
+    if (intent == null || readOnly) {
+      return;
+    }
+    if (processedAddDbDsnReferenceIntentId.current === intent.id) {
+      onAddDbDsnReferenceIntentConsumed?.(intent.id);
+      return;
+    }
+
+    const source = dbDsnSourceFromAddReferenceIntent(
+      dbDsnReferenceSources,
+      intent
+    );
+    processedAddDbDsnReferenceIntentId.current = intent.id;
+    onAddDbDsnReferenceIntentConsumed?.(intent.id);
+    if (source === undefined) {
+      return;
+    }
+
+    setEnvDraft((rows) =>
+      addContainerEnvDbDsnReferenceRow(
+        rows,
+        [source],
+        addDbDsnReferenceIntentTarget(intent)
+      )
+    );
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  }, [
+    addDbDsnReferenceIntent,
+    dbDsnReferenceSources,
+    envDraftKeyPrefix,
+    onAddDbDsnReferenceIntentConsumed,
+    readOnly,
+  ]);
 
   const quotasDirty = resourceQuotasDirty(
     draftCpu,

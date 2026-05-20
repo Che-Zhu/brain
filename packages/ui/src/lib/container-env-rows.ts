@@ -37,6 +37,11 @@ export interface ContainerEnvDbDsnSource {
   publicDsn?: string;
 }
 
+export interface ContainerEnvDbDsnReferenceTarget {
+  name: string;
+  namespace: string;
+}
+
 export interface ContainerEnvDbDsnFieldOption {
   field: ContainerEnvDbReferenceField;
   label: string;
@@ -204,9 +209,16 @@ export function addContainerEnvRow(
 
 export function addContainerEnvDbDsnReferenceRow(
   rows: readonly ContainerEnvRow[],
-  sources: readonly ContainerEnvDbDsnSource[]
+  sources: readonly ContainerEnvDbDsnSource[],
+  target?: ContainerEnvDbDsnReferenceTarget
 ): ContainerEnvRow[] {
   for (const source of sources) {
+    if (
+      target !== undefined &&
+      (source.name !== target.name || source.namespace !== target.namespace)
+    ) {
+      continue;
+    }
     const field = containerEnvDbDsnFieldOptions(source)[0];
     if (field === undefined) {
       continue;
