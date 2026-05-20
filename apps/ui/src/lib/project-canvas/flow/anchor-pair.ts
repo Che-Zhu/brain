@@ -39,7 +39,7 @@ interface AnchorPoint {
 }
 
 const ANCHOR_SIDES = ["top", "right", "bottom", "left"] as const;
-export const CROSS_AXIS_PENALTY = 1;
+export const CROSS_AXIS_PENALTY = 2;
 export const HYSTERESIS_THRESHOLD = 0.88;
 export const CANVAS_NODE_FALLBACK_WIDTH = 272;
 export const CANVAS_NODE_FALLBACK_HEIGHT = 62;
