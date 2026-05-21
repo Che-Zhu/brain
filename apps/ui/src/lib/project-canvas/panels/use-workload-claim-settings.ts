@@ -23,6 +23,7 @@ import { k8sPluralKindForWorkload } from "@/lib/project-canvas/flow/container-no
 import {
   applyApEnv,
   applyApImage,
+  applyApNetwork,
   applyApPorts,
   applyApResourceQuotas,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
@@ -129,6 +130,9 @@ export function useWorkloadClaimSettings(
   const ignorePorts = useCallback<ContainerSettingsOnPortsChange>((_ports) => {
     /* read-only: pane is controlled from K8s claim */
   }, []);
+  const ignoreNetwork = useCallback(() => {
+    /* read-only */
+  }, []);
   const ignoreQuota = useCallback((_n: number) => {
     /* read-only */
   }, []);
@@ -223,6 +227,30 @@ export function useWorkloadClaimSettings(
     [isApWorkload, kubeconfig, revalidateAfterApMutation]
   );
 
+  const onNetworkChange = useCallback(
+    async (network: NonNullable<ClaimContainerSettings["network"]>) => {
+      if (!isApWorkload) {
+        return;
+      }
+      const body = claimBodyRef.current;
+      const kc = kubeconfig.trim();
+      if (body == null || kc === "") {
+        toast.error("Claim or kubeconfig missing.");
+        return;
+      }
+      setLocalOverride((prev) => ({ ...(prev ?? {}), network }));
+      try {
+        await applyApNetwork(kc, body, network);
+        toast.success("Network applied.");
+        await revalidateAfterApMutation();
+      } catch (e) {
+        setLocalOverride(null);
+        toast.error(e instanceof Error ? e.message : "Apply failed");
+      }
+    },
+    [isApWorkload, kubeconfig, revalidateAfterApMutation]
+  );
+
   const onResourceQuotasCommit = useCallback(
     async (next: { cpu: number; memory: number; replicas?: number }) => {
       if (!isApWorkload) {
@@ -284,6 +312,7 @@ export function useWorkloadClaimSettings(
     error,
     ignoreEnv,
     ignoreImage,
+    ignoreNetwork,
     ignorePorts,
     ignoreQuota,
     ignoreReplicas,
@@ -291,6 +320,7 @@ export function useWorkloadClaimSettings(
     isLoading,
     onEnvChange,
     onImageChange,
+    onNetworkChange,
     onPortsChange,
     onResourceQuotasCommit,
     revalidateClaim,

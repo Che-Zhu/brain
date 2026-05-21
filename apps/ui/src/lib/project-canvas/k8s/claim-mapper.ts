@@ -1,6 +1,7 @@
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
+  ContainerNetwork,
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
@@ -287,6 +288,25 @@ function apPortsFromInput(input: Record<string, unknown>): ContainerPort[] {
   return [];
 }
 
+function apNetworkFromSpecAndStatus(
+  spec: Record<string, unknown>,
+  status: Record<string, unknown>
+): ContainerNetwork | undefined {
+  const inputNetwork = asRecord(readApInput(spec).network);
+  const statusNetwork = asRecord(status.network);
+  const privatePort =
+    portNum(statusNetwork?.privatePort) ?? portNum(inputNetwork?.privatePort);
+  if (privatePort == null || privatePort < 1 || privatePort > 65_535) {
+    return undefined;
+  }
+  const privateAddress = trimStr(statusNetwork?.privateAddress);
+  return {
+    ...(privateAddress === "" ? {} : { privateAddress }),
+    privatePort,
+    publicAddresses: [],
+  };
+}
+
 /** Prefer observed `status.endpoints` URLs; fall back to spec shape for the same port. */
 function mergeApPorts(
   spec: Record<string, unknown>,
@@ -336,6 +356,7 @@ export interface ClaimContainerSettings {
   env: ContainerEnvVar[];
   image: string;
   memoryMib: number;
+  network?: ContainerNetwork;
   ports: ContainerPort[];
   /** AP `spec.resource.replicas` (1–20 in UI); omitted meaning uses default for DB mapping. */
   replicas: number;
@@ -379,6 +400,7 @@ function mapApClaim(
     env: envFromSpecEnvList(readApEnv(spec), options?.dbDsnReferenceSources),
     image,
     memoryMib,
+    network: apNetworkFromSpecAndStatus(spec, status),
     ports: mergeApPorts(spec, status),
     replicas,
   };

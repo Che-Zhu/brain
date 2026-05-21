@@ -9,16 +9,18 @@ spec:
   crossplane:
     compositionRef:
       name: aps-deployment-ingress-go-templating
-  image: nginx:latest
   # Optional: Project claim name in this namespace (see spec.projectName on AP XRD)
   projectName: demo-project
-  replicas: 1
-  # One Service per port; Ingress for public ports (default). With metadata.labels.region, host optional.
-  endpoints:
-    - port: 80
-  cpuRequest: 250m
-  memoryRequest: 512Mi
-  cpuLimit: 500m
-  memoryLimit: 1024Mi
-
+  input:
+    image: nginx:latest
+    network:
+      privatePort: 80
+  resource:
+    replicas: 1
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1024Mi
 

@@ -29,6 +29,16 @@ const SAVE_ENV_RE = /Save environment/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
 const MYSQL_OPTION_SELECTED_RE =
   /<option value="default\/mysql" selected="">mysql/;
+const NETWORK_SECTION_RE = /Network/;
+const PRIVATE_ADDRESS_RE = /Private Address/;
+const PRIVATE_ADDRESS_TARGET_RE = /Private Address target port/;
+const PRIVATE_ADDRESS_VALUE_RE =
+  /http:\/\/api-service-port-8080.default.svc:8080/;
+const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
+const PUBLIC_ADDRESSES_RE = /Public Addresses/;
+const NO_PUBLIC_ADDRESSES_RE = /No public addresses/;
+const PORTS_TABLE_RE = /data-slot="ports-table"/;
+const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 
 function renderPane(
   readOnly = false,
@@ -75,6 +85,37 @@ test("container settings pane renders editable structured environment rows", () 
   assert.match(html, ENV_NAME_INPUT_RE);
   assert.match(html, ENV_VALUE_INPUT_RE);
   assert.doesNotMatch(html, RAW_ENV_EDITOR_RE);
+});
+
+test("container settings pane renders Network instead of Ports for private-only APs", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        privateAddress: "http://api-service-port-8080.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[{ port: 80, protocol: "tcp" }]}
+    />
+  );
+
+  assert.match(html, NETWORK_SECTION_RE);
+  assert.match(html, PRIVATE_ADDRESS_RE);
+  assert.match(html, PRIVATE_ADDRESS_VALUE_RE);
+  assert.match(html, PRIVATE_ADDRESS_TARGET_RE);
+  assert.match(html, PRIVATE_PORT_VALUE_RE);
+  assert.match(html, COPY_PRIVATE_ADDRESS_RE);
+  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, NO_PUBLIC_ADDRESSES_RE);
+  assert.doesNotMatch(html, PORTS_TABLE_RE);
 });
 
 test("read-only container settings view cannot mutate environment rows", () => {

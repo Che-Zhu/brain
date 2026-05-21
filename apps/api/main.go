@@ -98,29 +98,30 @@ metadata:
   name: my-app
 spec:
   name: my-app
-  image: nginx:1.27
-  replicas: 1
-  endpoints:
-    - port: 80
-      host: my-app.example.com
-  probes:
-    startup:
-      httpGet:
-        path: /
-        port: 80
-      failureThreshold: 30
-    liveness:
-      httpGet:
-        path: /
-        port: 80
-      initialDelaySeconds: 15
-      failureThreshold: 3
-    readiness:
-      httpGet:
-        path: /
-        port: 80
-      initialDelaySeconds: 5
-      failureThreshold: 3`
+  input:
+    image: nginx:1.27
+    network:
+      privatePort: 80
+    probes:
+      startup:
+        httpGet:
+          path: /
+          port: 80
+        failureThreshold: 30
+      liveness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 15
+        failureThreshold: 3
+      readiness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        failureThreshold: 3
+  resource:
+    replicas: 1`
 	exampleValue := map[string]any{"yaml": exampleYAML}
 
 	// Set on RequestBody Content (application/json)

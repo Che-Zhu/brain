@@ -39,6 +39,7 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 import { cn } from "@workspace/ui/lib/utils";
 import {
+  Copy,
   Cpu,
   Layers,
   MemoryStick,
@@ -50,6 +51,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+
+import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
 
@@ -105,6 +108,17 @@ export interface ContainerPort {
   publicAddress?: string;
 }
 
+export interface ContainerNetworkPublicAddress {
+  address: string;
+  port: number;
+}
+
+export interface ContainerNetwork {
+  privateAddress?: string;
+  privatePort: number;
+  publicAddresses: ContainerNetworkPublicAddress[];
+}
+
 export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
   dbName: string;
   dbNamespace: string;
@@ -136,12 +150,15 @@ export interface ContainerSettingsPaneProps {
   /** Full image reference (repository + tag/digest). */
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
+  /** AP network model; when present, renders Network instead of the legacy Ports table. */
+  network?: ContainerNetwork;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
   onEnvChange: (
     env: ContainerEnvVar[],
     meta?: ContainerSettingsPaneEnvChangeMeta
   ) => void;
   onImageChange: (image: string) => void;
+  onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
    * When set (and not `readOnly`), CPU/memory/replicas sliders keep local drafts until Save; Cancel reverts.
@@ -621,6 +638,167 @@ function EditableEnvRows({
   );
 }
 
+interface NetworkSettingsSectionProps {
+  network: ContainerNetwork;
+  onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
+  readOnly: boolean;
+}
+
+function NetworkSettingsSection({
+  network,
+  onNetworkChange,
+  readOnly,
+}: NetworkSettingsSectionProps) {
+  const networkInputId = useId();
+  const [draftPort, setDraftPort] = useState(() => String(network.privatePort));
+  const [portError, setPortError] = useState<string | null>(null);
+  const [savePending, setSavePending] = useState(false);
+
+  useEffect(() => {
+    setDraftPort(String(network.privatePort));
+    setPortError(null);
+  }, [network]);
+
+  const parsedPort = parsePortNumberDigits(draftPort.trim());
+  const portDirty = draftPort.trim() !== String(network.privatePort);
+  const canSave =
+    onNetworkChange != null && portDirty && parsedPort.ok && !savePending;
+
+  const handleCancel = () => {
+    setDraftPort(String(network.privatePort));
+    setPortError(null);
+  };
+
+  const handleSave = async () => {
+    if (onNetworkChange == null) {
+      return;
+    }
+    const parsed = parsePortNumberDigits(draftPort.trim());
+    if (!parsed.ok) {
+      setPortError(parsed.message);
+      return;
+    }
+    setSavePending(true);
+    try {
+      await onNetworkChange({ ...network, privatePort: parsed.n });
+    } finally {
+      setSavePending(false);
+    }
+  };
+
+  const handleCopyPrivateAddress = async () => {
+    if (network.privateAddress == null || network.privateAddress === "") {
+      return;
+    }
+    await navigator.clipboard?.writeText(network.privateAddress);
+  };
+
+  return (
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <SectionTitle>Network</SectionTitle>
+        {readOnly || !portDirty ? null : (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              className="h-7 px-2 text-xs"
+              disabled={savePending}
+              onClick={handleCancel}
+              type="button"
+              variant="ghost"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-7 px-2 text-xs"
+              disabled={!canSave}
+              onClick={async () => {
+                await handleSave();
+              }}
+              type="button"
+              variant="secondary"
+            >
+              Save
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-2.5">
+        <div className="grid min-w-0 gap-1.5">
+          <Label className="text-muted-foreground text-xs">
+            Private Address
+          </Label>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
+              {network.privateAddress ?? "Pending"}
+            </div>
+            <Button
+              aria-label="Copy Private Address"
+              disabled={network.privateAddress == null}
+              onClick={handleCopyPrivateAddress}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <Copy aria-hidden />
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-1.5">
+          <Label htmlFor={networkInputId}>Private Address target port</Label>
+          <Input
+            aria-describedby={
+              portError == null ? undefined : `${networkInputId}-error`
+            }
+            aria-invalid={portError != null}
+            className="h-8 max-w-32 font-mono text-xs"
+            disabled={readOnly}
+            id={networkInputId}
+            inputMode="numeric"
+            onChange={(event) => {
+              setDraftPort(event.target.value);
+              setPortError(null);
+            }}
+            value={draftPort}
+          />
+          {portError == null ? null : (
+            <p
+              className="text-destructive text-xs"
+              id={`${networkInputId}-error`}
+              role="alert"
+            >
+              {portError}
+            </p>
+          )}
+        </div>
+
+        <div className="grid min-w-0 gap-1.5">
+          <Label className="text-muted-foreground text-xs">
+            Public Addresses
+          </Label>
+          {network.publicAddresses.length === 0 ? (
+            <div className="rounded-md border border-border border-dashed px-2.5 py-2 text-muted-foreground text-xs">
+              No public addresses
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {network.publicAddresses.map((address) => (
+                <div
+                  className="min-w-0 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs"
+                  key={`${address.address}:${address.port}`}
+                >
+                  {address.address}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
  * optional replica count, environment variables, and exposed ports (`PortsTable`).
@@ -631,12 +809,14 @@ export function ContainerSettingsPane({
   className,
   image,
   onImageChange,
+  onNetworkChange,
   onEnvChange,
   onAddDbDsnReferenceIntentConsumed,
   onPortsChange,
   cpuQuota,
   memoryQuota,
   env,
+  network,
   ports,
   replicasQuota,
   onResourceQuotasCommit,
@@ -1212,18 +1392,26 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        <section className="flex min-w-0 flex-col gap-2">
-          <PortsTable.Variant0
-            ports={portsTableRows}
-            {...(readOnly
-              ? {}
-              : {
-                  onAdd: portsTableMutationProps.onAdd,
-                  onDelete: portsTableMutationProps.onDelete,
-                  onUpdate: portsTableMutationProps.onUpdate,
-                })}
+        {network == null ? (
+          <section className="flex min-w-0 flex-col gap-2">
+            <PortsTable.Variant0
+              ports={portsTableRows}
+              {...(readOnly
+                ? {}
+                : {
+                    onAdd: portsTableMutationProps.onAdd,
+                    onDelete: portsTableMutationProps.onDelete,
+                    onUpdate: portsTableMutationProps.onUpdate,
+                  })}
+            />
+          </section>
+        ) : (
+          <NetworkSettingsSection
+            network={network}
+            onNetworkChange={onNetworkChange}
+            readOnly={readOnly}
           />
-        </section>
+        )}
       </div>
 
       {readOnly ? null : (

@@ -38,6 +38,37 @@ test("AP claim settings reconstruct direct and non-direct environment rows", () 
   ]);
 });
 
+test("AP claim settings maps private-only network from desired and observed AP state", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080,
+          },
+        },
+      },
+      status: {
+        network: {
+          privateAddress: "http://api-service-port-8080.default.svc:8080",
+          privatePort: 8080,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network, {
+    privateAddress: "http://api-service-port-8080.default.svc:8080",
+    privatePort: 8080,
+    publicAddresses: [],
+  });
+  assert.deepEqual(settings.ports, []);
+});
+
 test("AP claim settings reconstruct DB DSN references only from exact current DB connection strings", () => {
   const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
     {

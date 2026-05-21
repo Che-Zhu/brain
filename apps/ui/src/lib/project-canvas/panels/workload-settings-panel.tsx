@@ -33,6 +33,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       error,
       ignoreEnv,
       ignoreImage,
+      ignoreNetwork,
       ignorePorts,
       ignoreQuota,
       ignoreReplicas,
@@ -40,6 +41,7 @@ export const WorkloadSettingsCanvasPanel = memo(
       isLoading,
       onEnvChange,
       onImageChange,
+      onNetworkChange,
       onPortsChange,
       onResourceQuotasCommit,
       claimPayload,
@@ -103,11 +105,13 @@ export const WorkloadSettingsCanvasPanel = memo(
             step: 128,
             value: display.memoryMib,
           }}
+          network={display.network}
           onAddDbDsnReferenceIntentConsumed={
             data?.onAddDbDsnReferenceIntentConsumed
           }
           onEnvChange={isApWorkload ? onEnvChange : ignoreEnv}
           onImageChange={isApWorkload ? onImageChange : ignoreImage}
+          onNetworkChange={isApWorkload ? onNetworkChange : ignoreNetwork}
           onPortsChange={isApWorkload ? onPortsChange : ignorePorts}
           onResourceQuotasCommit={
             isApWorkload ? onResourceQuotasCommit : undefined

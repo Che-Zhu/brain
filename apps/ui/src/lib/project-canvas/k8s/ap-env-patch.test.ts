@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { patchOpsForApEnvSettings } from "./ap-json-patch";
+import {
+  patchOpsForApEnvSettings,
+  patchOpsForApNetworkSettings,
+} from "./ap-json-patch";
 
 const DUPLICATE_ENV_NAME_RE = /Environment variable names must be unique/;
+const PRIVATE_PORT_RANGE_RE =
+  /Private Address target port must be an integer from 1 through 65535/;
 
 test("AP env settings patch direct rows as standard Kubernetes value entries", () => {
   const ops = patchOpsForApEnvSettings(
@@ -30,6 +35,47 @@ test("AP env settings patch direct rows as standard Kubernetes value entries", (
       ],
     },
   ]);
+});
+
+test("AP network settings patch privatePort without writing legacy endpoints", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        endpoints: [{ host: "old.example.com", port: 80 }],
+        host: "old.example.com",
+        image: "ghcr.io/acme/app:old",
+        port: 80,
+      },
+    },
+    { privatePort: 8080 }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "add",
+      path: "/spec/input/network",
+      value: { privatePort: 8080 },
+    },
+    { op: "remove", path: "/spec/input/endpoints" },
+    { op: "remove", path: "/spec/input/port" },
+    { op: "remove", path: "/spec/input/host" },
+  ]);
+});
+
+test("AP network settings validate App Listening Ports", () => {
+  for (const privatePort of [1, 65_535]) {
+    assert.deepEqual(
+      patchOpsForApNetworkSettings({ input: {} }, { privatePort })[0]?.value,
+      { privatePort }
+    );
+  }
+
+  for (const privatePort of [0, 65_536, 8080.5]) {
+    assert.throws(
+      () => patchOpsForApNetworkSettings({ input: {} }, { privatePort }),
+      PRIVATE_PORT_RANGE_RE
+    );
+  }
 });
 
 test("AP env settings reject duplicate row names before patching", () => {

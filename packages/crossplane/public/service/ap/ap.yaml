@@ -103,6 +103,17 @@ spec:
                           default: true
                           description: >
                             When true (default), compose an Ingress rule when a hostname resolves.
+                  network:
+                    type: object
+                    description: >
+                      AP Network contract. privatePort is the App Listening Port targeted by the single
+                      cluster-internal Private Address. Public Addresses are managed through EntryPoint.
+                    properties:
+                      privatePort:
+                        type: integer
+                        minimum: 1
+                        maximum: 65535
+                        description: App Listening Port for the Private Address target.
                   port:
                     type: integer
                     description: >
@@ -291,6 +302,20 @@ spec:
                       description: >
                         http(s) URL when this port is public on Ingress. Omitted when spec.input.endpoints[].public
                         is false or no hostname was resolved for the Ingress rule.
+              network:
+                type: object
+                description: AP Network observed state for the Settings Network section.
+                properties:
+                  privateAddress:
+                    type: string
+                    description: >
+                      Cluster-internal Private Address. Omits :80 for App Listening Port 80 and includes
+                      :<port> for non-default ports.
+                  privatePort:
+                    type: integer
+                    minimum: 1
+                    maximum: 65535
+                    description: App Listening Port targeted by the Private Address.
               conditions:
                 type: array
                 items:

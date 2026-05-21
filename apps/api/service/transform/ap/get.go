@@ -74,9 +74,100 @@ func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, se
 		endpoints = buildEndpointsFromSpec(ap, ingresses, services)
 	}
 	statusCopy["variables"] = buildVariablesFromEndpoints(endpoints)
+	mergePrivateNetworkStatus(ap, statusCopy, services)
 	out["status"] = statusCopy
 
 	return out
+}
+
+func mergePrivateNetworkStatus(ap map[string]interface{}, status map[string]interface{}, services []map[string]interface{}) {
+	privatePort, ok := apPrivatePort(ap)
+	if !ok {
+		return
+	}
+
+	network, _ := status["network"].(map[string]interface{})
+	networkCopy := make(map[string]interface{})
+	for k, v := range network {
+		networkCopy[k] = v
+	}
+	if _, exists := networkCopy["privatePort"]; !exists {
+		networkCopy["privatePort"] = privatePort
+	}
+	if _, exists := networkCopy["privateAddress"]; !exists {
+		apNamespace := getString(ap, "metadata", "namespace")
+		if addr := privateNetworkAddressForPort(services, apNamespace, privatePort); addr != "" {
+			networkCopy["privateAddress"] = addr
+		}
+	}
+	status["network"] = networkCopy
+}
+
+func apPrivatePort(ap map[string]interface{}) (int, bool) {
+	spec, _ := ap["spec"].(map[string]interface{})
+	if spec == nil {
+		return 0, false
+	}
+	input, _ := spec["input"].(map[string]interface{})
+	if input == nil {
+		return 0, false
+	}
+	network, _ := input["network"].(map[string]interface{})
+	if network == nil {
+		return 0, false
+	}
+	port, ok := intFromValue(network["privatePort"])
+	if !ok || port < 1 || port > 65535 {
+		return 0, false
+	}
+	return port, true
+}
+
+func privateNetworkAddressForPort(services []map[string]interface{}, namespace string, privatePort int) string {
+	for _, svc := range services {
+		svcName := getString(svc, "metadata", "name")
+		if svcName == "" {
+			continue
+		}
+		svcNamespace := getString(svc, "metadata", "namespace")
+		if svcNamespace == "" {
+			svcNamespace = namespace
+		}
+		if svcNamespace == "" {
+			continue
+		}
+		for _, port := range getPorts(svc) {
+			if port != privatePort {
+				continue
+			}
+			if privatePort == 80 {
+				return fmt.Sprintf("http://%s.%s.svc.cluster.local", svcName, svcNamespace)
+			}
+			return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", svcName, svcNamespace, privatePort)
+		}
+	}
+	return ""
+}
+
+func intFromValue(value interface{}) (int, bool) {
+	switch v := value.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case int32:
+		return int(v), true
+	case string:
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, false
+		}
+		return p, true
+	default:
+		return 0, false
+	}
 }
 
 // buildEndpoints composes internal and external addresses for each service port.

@@ -1,5 +1,6 @@
 import type {
   ContainerEnvVar,
+  ContainerNetwork,
   ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import {
@@ -263,6 +264,37 @@ export function patchOpsForApEnvSettings(
   return patchOpsForApInput(spec, { env: list });
 }
 
+function validatedPrivatePort(privatePort: number): number {
+  const n = Number(privatePort);
+  if (!Number.isInteger(n) || n < 1 || n > 65_535) {
+    throw new Error(
+      "Private Address target port must be an integer from 1 through 65535."
+    );
+  }
+  return n;
+}
+
+export function patchOpsForApNetworkSettings(
+  spec: Record<string, unknown> | undefined,
+  network: Pick<ContainerNetwork, "privatePort">
+): K8sJsonPatchOp[] {
+  const privatePort = validatedPrivatePort(network.privatePort);
+  const input = asRecord(spec?.input);
+  const ops = patchOpsForApInput(spec, {
+    network: { privatePort },
+  });
+  if (input != null && Object.hasOwn(input, "endpoints")) {
+    ops.push({ op: "remove", path: "/spec/input/endpoints" });
+  }
+  if (input != null && Object.hasOwn(input, "port")) {
+    ops.push({ op: "remove", path: "/spec/input/port" });
+  }
+  if (input != null && Object.hasOwn(input, "host")) {
+    ops.push({ op: "remove", path: "/spec/input/host" });
+  }
+  return ops;
+}
+
 export async function applyApEnv(
   kubeconfig: string,
   claim: Record<string, unknown>,
@@ -270,6 +302,15 @@ export async function applyApEnv(
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(kubeconfig, claim, patchOpsForApEnvSettings(spec, env));
+}
+
+export async function applyApNetwork(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  network: Pick<ContainerNetwork, "privatePort">
+): Promise<void> {
+  const spec = asRecord(claim.spec);
+  await patchAp(kubeconfig, claim, patchOpsForApNetworkSettings(spec, network));
 }
 
 export async function applyApPorts(

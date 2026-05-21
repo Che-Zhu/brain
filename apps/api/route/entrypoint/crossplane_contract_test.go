@@ -82,7 +82,7 @@ func TestEntryPointMinimalCompositionSurfacesAggregateStatus(t *testing.T) {
 }
 
 func TestAPCompositionRendersEntryPointForPublicTargets(t *testing.T) {
-	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml"))
+	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"))
 
 	for _, fragment := range []string{
 		`composition-resource-name: app-entrypoint`,
@@ -126,11 +126,13 @@ func TestAPCompositionCreatesEntryPointForPublicAPEndpoints(t *testing.T) {
 						"uid":       "ap-uid-1",
 					},
 					"spec": map[string]interface{}{
-						"image": "nginx:1.27",
-						"endpoints": []interface{}{
-							map[string]interface{}{"port": 80},
-							map[string]interface{}{"port": 8080},
-							map[string]interface{}{"port": 9000, "public": false},
+						"input": map[string]interface{}{
+							"image": "nginx:1.27",
+							"endpoints": []interface{}{
+								map[string]interface{}{"port": 80},
+								map[string]interface{}{"port": 8080},
+								map[string]interface{}{"port": 9000, "public": false},
+							},
 						},
 					},
 				},
@@ -233,6 +235,67 @@ func TestAPCompositionOmitsEntryPointWithoutPublicPlatformHostname(t *testing.T)
 	}
 }
 
+func TestAPCompositionRendersPrivateOnlyNetworkPath(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"input": map[string]interface{}{
+						"network": map[string]interface{}{
+							"privatePort": 8080,
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	if got := entryPointObjects(t, out); len(got) != 0 {
+		t.Fatalf("EntryPoint manifest count = %d, want 0", len(got))
+	}
+	if got := ingressObjects(t, out); len(got) != 0 {
+		t.Fatalf("Ingress manifest count = %d, want 0", len(got))
+	}
+
+	services := serviceObjects(t, out)
+	if got := len(services); got != 1 {
+		t.Fatalf("Service manifest count = %d, want 1", got)
+	}
+	serviceSpec := asMap(t, services[0]["spec"], "service.spec")
+	servicePorts := asSlice(t, serviceSpec["ports"], "service.spec.ports")
+	servicePort := asMap(t, servicePorts[0], "service.spec.ports[0]")
+	if got := numberAsInt(t, servicePort["port"], "service.spec.ports[0].port"); got != 8080 {
+		t.Fatalf("Service port = %d, want 8080", got)
+	}
+	if got := numberAsInt(t, servicePort["targetPort"], "service.spec.ports[0].targetPort"); got != 8080 {
+		t.Fatalf("Service targetPort = %d, want 8080", got)
+	}
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	templateSpec := asMap(t, asMap(t, deploymentSpec["template"], "deployment.spec.template")["spec"], "deployment.spec.template.spec")
+	containers := asSlice(t, templateSpec["containers"], "deployment.spec.template.spec.containers")
+	container := asMap(t, containers[0], "deployment.spec.template.spec.containers[0]")
+	containerPorts := asSlice(t, container["ports"], "deployment container ports")
+	containerPort := asMap(t, containerPorts[0], "deployment container ports[0]")
+	if got := numberAsInt(t, containerPort["containerPort"], "containerPort"); got != 8080 {
+		t.Fatalf("Deployment containerPort = %d, want 8080", got)
+	}
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	network := asMap(t, status["network"], "ap.status.network")
+	if got := network["privateAddress"]; got != "http://web-service-port-8080.project-a.svc:8080" {
+		t.Fatalf("status.network.privateAddress = %v, want private service address", got)
+	}
+	if got := numberAsInt(t, network["privatePort"], "ap.status.network.privatePort"); got != 8080 {
+		t.Fatalf("status.network.privatePort = %d, want 8080", got)
+	}
+}
+
 func TestProviderKubernetesRBACAllowsEntryPointWrites(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "packages/crossplane/public/provider-kubernetes-rbac.yaml"))
 	if err != nil {
@@ -288,11 +351,26 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 	if labels != nil {
 		metadata["labels"] = labels
 	}
-	fullSpec := map[string]interface{}{
+	input := map[string]interface{}{
 		"image": "nginx:1.27",
 	}
+	fullSpec := map[string]interface{}{
+		"input": input,
+	}
 	for key, value := range spec {
-		fullSpec[key] = value
+		if key == "input" {
+			inputMap, _ := value.(map[string]interface{})
+			for inputKey, inputValue := range inputMap {
+				input[inputKey] = inputValue
+			}
+			continue
+		}
+		switch key {
+		case "endpoints", "env", "host", "image", "imagePullPolicy", "network", "port", "probes":
+			input[key] = value
+		default:
+			fullSpec[key] = value
+		}
 	}
 	return map[string]interface{}{
 		"metadata": metadata,
@@ -302,7 +380,7 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 
 func renderAPComposition(t *testing.T, data map[string]interface{}, composed map[string]map[string]interface{}) string {
 	t.Helper()
-	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml"))
+	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"))
 	funcs := sprig.TxtFuncMap()
 	funcs["getComposedResource"] = func(_ interface{}, name string) map[string]interface{} {
 		return composed[name]
@@ -348,6 +426,42 @@ func singleEntryPointObject(t *testing.T, output string) map[string]interface{} 
 
 func entryPointObjects(t *testing.T, output string) []map[string]interface{} {
 	t.Helper()
+	return kindObjects(t, output, func(obj map[string]interface{}) bool {
+		if obj["kind"] != "Object" {
+			return false
+		}
+		manifest := manifestFromObject(t, obj, "entrypoint object")
+		return manifest["kind"] == "EntryPoint"
+	})
+}
+
+func ingressObjects(t *testing.T, output string) []map[string]interface{} {
+	t.Helper()
+	return kindObjects(t, output, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "Ingress"
+	})
+}
+
+func serviceObjects(t *testing.T, output string) []map[string]interface{} {
+	t.Helper()
+	return kindObjects(t, output, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "Service"
+	})
+}
+
+func singleKindObject(t *testing.T, output string, kind string) map[string]interface{} {
+	t.Helper()
+	objects := kindObjects(t, output, func(obj map[string]interface{}) bool {
+		return obj["kind"] == kind
+	})
+	if got := len(objects); got != 1 {
+		t.Fatalf("%s manifest count = %d, want 1", kind, got)
+	}
+	return objects[0]
+}
+
+func kindObjects(t *testing.T, output string, match func(map[string]interface{}) bool) []map[string]interface{} {
+	t.Helper()
 	var objects []map[string]interface{}
 	for i, doc := range strings.Split(output, "\n---") {
 		doc = strings.TrimSpace(doc)
@@ -358,11 +472,7 @@ func entryPointObjects(t *testing.T, output string) []map[string]interface{} {
 		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
 			t.Fatalf("parse rendered YAML document %d: %v\n%s", i, err, doc)
 		}
-		if obj["kind"] != "Object" {
-			continue
-		}
-		manifest := manifestFromObject(t, obj, fmt.Sprintf("rendered[%d]", i))
-		if manifest["kind"] == "EntryPoint" {
+		if match(obj) {
 			objects = append(objects, obj)
 		}
 	}
