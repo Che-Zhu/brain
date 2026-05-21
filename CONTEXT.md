@@ -96,6 +96,12 @@ The AP Composition conditionally creates an EntryPoint (via provider-kubernetes 
 
 On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only services (no public endpoints) do not produce EntryPoints or entry nodes.
 
+### Newly detected entry nodes anchor to their AP's left side
+
+When an EntryPoint has no saved Canvas Layout entry, its initial canvas position is one fallback grid cell to the left of its AP — `{ x: AP.position.x - 340, y: AP.position.y }`. This rule applies in every "no saved layout" case: first appearance, return after orphan cleanup, or any future scenario where the saved entry is absent. Once the user moves the EntryPoint, the saved position takes precedence on subsequent loads.
+
+The fallback grid used for APs and DBs extends rightward from the origin, so anchoring EntryPoints to the AP's left side keeps them off the fallback grid and avoids collisions with other unplaced nodes. The rule preserves the visual coupling between AP and EntryPoint, mirrors the resource-level 1:1 relationship, and avoids Canvas Connections that cross the canvas.
+
 ### Canvas Layout is shared per Project
 
 Canvas Layout is not a personal browser preference. It belongs to the Project and should be reused when the same Project is opened by another user, browser, or share preview. Node positions and Canvas Node Expansion State are shared; ephemeral UI state such as the selected node, open panel, and temporary zoom can remain local.
@@ -115,6 +121,18 @@ Canvas Node Expansion State is stored on the same Canvas Layout item as the node
 ### Canvas Node Expansion State applies to all project canvas node types
 
 Canvas Node Expansion State applies to every Project canvas node type that supports card expansion, including AP, DB, and EntryPoint nodes.
+
+### Unplaced AP and DB nodes use fallback grid raster-scan placement
+
+When an AP or DB node has no saved Canvas Layout entry, its initial canvas position is the first 340×280 grid slot (3 columns from origin, then row by row) whose rectangle does not intersect any already-allocated node rectangle. Multiple unplaced nodes detected in the same render are placed in `kind:namespace:name` lexicographic order to keep ordering deterministic across users.
+
+The slot search is a pure function of the saved Canvas Layout plus the currently detected nodes — viewport state is never an input. EntryPoints are excluded from the search; they anchor to their AP's left side at `x < 0` and never occupy fallback grid slots. Placement is in-memory only and does not write to Canvas Layout — once the user moves a placed node, the existing debounced save path takes over.
+
+### Newly detected unplaced nodes pull the viewport to follow
+
+When a SWR refresh produces previously-unseen unplaced nodes, the canvas follows them: a single new node uses `setCenter` (preserving zoom); multiple simultaneous new nodes use `fitView` framed to the new subset. This applies regardless of trigger source — the product's main creation path is in-UI where viewport-follow is expected, and rare external triggers (kubectl/API) accept the same follow rather than carrying a per-trigger flag through the detection pipeline.
+
+The first detect after opening the canvas is not a follow event — opening `fitView` (keyed on Project UID) already handles initial framing.
 
 ### Share previews may expand nodes locally
 
