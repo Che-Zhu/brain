@@ -36,6 +36,10 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
+  const highlightedConnectionSide =
+    state.connectionOrigin?.nodeId === id
+      ? state.connectionOrigin.side
+      : undefined;
   const expansion = useCanvasNodeExpansion({
     data,
     id,
@@ -47,7 +51,7 @@ export const CanvasContainerNode = memo(function CanvasContainerNode({
   return (
     <ContainerNode.Root
       defaultExpanded={expansion.defaultExpanded}
-      interaction={{ dragging, selected }}
+      interaction={{ dragging, highlightedConnectionSide, selected }}
       lifecycleActions={actions.lifecycleActions}
       onExpandedChange={expansion.onExpandedChange}
       quickActions={actions.quickActions}

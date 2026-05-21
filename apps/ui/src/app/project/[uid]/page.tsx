@@ -6,10 +6,17 @@ import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
+import {
+  addPendingApDbCanvasReferences,
+  type PendingApDbCanvasReference,
+  pendingApDbCanvasConnectionEdges,
+  removePendingApDbCanvasReferences,
+} from "@/lib/project-canvas/flow/pending-connections";
+import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
@@ -23,34 +30,74 @@ export default function ProjectUidPage() {
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
+  const [pendingApDbReferences, setPendingApDbReferences] = useState<
+    PendingApDbCanvasReference[]
+  >([]);
   const projectCanvasLayout = useProjectCanvasLayout({
     enabled: kubeconfig.trim() !== "",
     namespace,
     projectUid: uid,
   });
 
-  const { canvasState, error, isEmptyGraphLoading, refreshWorkloadLists } =
-    useProjectServices({
-      canvasLayout: projectCanvasLayout.layout,
-      canvasLayoutReady: projectCanvasLayout.layoutReady,
-      kubeconfig,
-      namespace,
-      onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
-      uid,
+  const {
+    canvasState,
+    data: projectServicesData,
+    error,
+    isEmptyGraphLoading,
+    refreshWorkloadLists,
+  } = useProjectServices({
+    canvasLayout: projectCanvasLayout.layout,
+    canvasLayoutReady: projectCanvasLayout.layoutReady,
+    kubeconfig,
+    namespace,
+    onCanvasLayoutMerge: projectCanvasLayout.saveLayoutNodes,
+    uid,
+  });
+  const beginPendingApDbReferences = useCallback(
+    (references: readonly PendingApDbCanvasReference[]) => {
+      const referenceIds = references.map((reference) => reference.id);
+      setPendingApDbReferences((current) =>
+        addPendingApDbCanvasReferences(current, references)
+      );
+      return () => {
+        setPendingApDbReferences((current) =>
+          removePendingApDbCanvasReferences(current, referenceIds)
+        );
+      };
+    },
+    []
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset pending edges when the canvas route scope changes.
+  useEffect(() => {
+    setPendingApDbReferences([]);
+  }, [namespace, uid]);
+  const canvasEdges = useMemo(() => {
+    const pendingEdges = pendingApDbCanvasConnectionEdges({
+      existingEdges: canvasState.edges,
+      nodes: canvasState.nodes,
+      pendingReferences: pendingApDbReferences,
     });
+    return pendingEdges.length === 0
+      ? canvasState.edges
+      : [...canvasState.edges, ...pendingEdges];
+  }, [canvasState.edges, canvasState.nodes, pendingApDbReferences]);
 
   const {
     clearSelection,
     closeDatabasePane,
+    connectionOrigin,
     databasePane,
     meta: canvasMeta,
     nodes,
     selectedEdge,
     selectedNode,
   } = useProjectCanvas(canvasState.nodes, {
+    dbsData: projectServicesData.dbs,
     kubeconfig,
+    namespace,
     onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
+    onPendingApDbReferencesStart: beginPendingApDbReferences,
     refreshWorkloadLists,
   });
   const selectedTelemetryTarget = useMemo(
@@ -61,6 +108,10 @@ export default function ProjectUidPage() {
     () => ({
       ...canvasMeta,
       openingFitView: {
+        key: `${namespace}:${uid}`,
+      },
+      viewportFollow: {
+        isFollowTarget: isCanvasNodeGeneratedPosition,
         key: `${namespace}:${uid}`,
       },
     }),
@@ -81,6 +132,8 @@ export default function ProjectUidPage() {
               meta={meta}
               state={{
                 ...canvasState,
+                connectionOrigin,
+                edges: canvasEdges,
                 nodes,
                 selectedEdge,
                 selectedNode,

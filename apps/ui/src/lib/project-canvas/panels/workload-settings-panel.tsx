@@ -44,9 +44,11 @@ export const WorkloadSettingsCanvasPanel = memo(
       onResourceQuotasCommit,
       claimPayload,
     } = useWorkloadClaimSettings({
+      dbDsnReferenceSources: data?.dbDsnReferenceSources,
       kubeconfig,
       name,
       namespace: ns,
+      onAddDbDsnReferenceMutationStart: data?.onAddDbDsnReferenceMutationStart,
       onWorkloadMutation: data?.onWorkloadMutation,
       workloadKind,
     });
@@ -82,6 +84,7 @@ export const WorkloadSettingsCanvasPanel = memo(
     return (
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <ContainerSettingsPane
+          addDbDsnReferenceIntent={data?.addDbDsnReferenceIntent}
           className="gap-4"
           cpuQuota={{
             max: 8,
@@ -90,6 +93,7 @@ export const WorkloadSettingsCanvasPanel = memo(
             step: 0.25,
             value: display.cpuCores,
           }}
+          dbDsnReferenceSources={data?.dbDsnReferenceSources}
           env={display.env}
           image={display.image}
           memoryQuota={{
@@ -99,6 +103,9 @@ export const WorkloadSettingsCanvasPanel = memo(
             step: 128,
             value: display.memoryMib,
           }}
+          onAddDbDsnReferenceIntentConsumed={
+            data?.onAddDbDsnReferenceIntentConsumed
+          }
           onEnvChange={isApWorkload ? onEnvChange : ignoreEnv}
           onImageChange={isApWorkload ? onImageChange : ignoreImage}
           onPortsChange={isApWorkload ? onPortsChange : ignorePorts}

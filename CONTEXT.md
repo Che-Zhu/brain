@@ -27,6 +27,14 @@ One accessible public endpoint within an EntryPoint. Maps 1:1 to a public AP end
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, basic networking, and triggers EntryPoint creation for public endpoints.
 
+### DB (Database)
+
+Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
+
+### Database Binding
+
+A runtime dependency where an AP is configured to consume one DB's connection credentials.
+
 ### Container Node
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
@@ -41,7 +49,11 @@ The per-node expanded or collapsed presentation state of a canvas node card.
 
 ### Canvas Connection
 
-A canvas edge that represents a real runtime dependency between resources. In the first version, Canvas Connections are detected from existing resource state rather than created by user-drawn edges.
+A canvas edge that represents an established runtime dependency between resources.
+
+### Connecting Edge
+
+A temporary canvas interaction created when a user drags a line between canvas nodes. A Connecting Edge may become a domain command only when its endpoints match a supported resource relationship, regardless of drag direction.
 
 ### Workload Telemetry Series
 
@@ -84,9 +96,11 @@ The AP Composition conditionally creates an EntryPoint (via provider-kubernetes 
 
 On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only services (no public endpoints) do not produce EntryPoints or entry nodes.
 
-### Canvas edges and layout are deferred
+### Newly detected entry nodes anchor to their AP's left side
 
-Entry node and container node are not connected by edges and have no special layout rules for now. Edge generation and node arrangement will be addressed as a unified system when more node-to-node relationships (AP-to-DB, AP-to-AP) are introduced.
+When an EntryPoint has no saved Canvas Layout entry, its initial canvas position is one fallback grid cell to the left of its AP — `{ x: AP.position.x - 340, y: AP.position.y }`. This rule applies in every "no saved layout" case: first appearance, return after orphan cleanup, or any future scenario where the saved entry is absent. Once the user moves the EntryPoint, the saved position takes precedence on subsequent loads.
+
+The fallback grid used for APs and DBs extends rightward from the origin, so anchoring EntryPoints to the AP's left side keeps them off the fallback grid and avoids collisions with other unplaced nodes. The rule preserves the visual coupling between AP and EntryPoint, mirrors the resource-level 1:1 relationship, and avoids Canvas Connections that cross the canvas.
 
 ### Canvas Layout is shared per Project
 
@@ -107,6 +121,18 @@ Canvas Node Expansion State is stored on the same Canvas Layout item as the node
 ### Canvas Node Expansion State applies to all project canvas node types
 
 Canvas Node Expansion State applies to every Project canvas node type that supports card expansion, including AP, DB, and EntryPoint nodes.
+
+### Unplaced AP and DB nodes use fallback grid raster-scan placement
+
+When an AP or DB node has no saved Canvas Layout entry, its initial canvas position is the first 340×280 grid slot (3 columns from origin, then row by row) whose rectangle does not intersect any already-allocated node rectangle. Multiple unplaced nodes detected in the same render are placed in `kind:namespace:name` lexicographic order to keep ordering deterministic across users.
+
+The slot search is a pure function of the saved Canvas Layout plus the currently detected nodes — viewport state is never an input. EntryPoints are excluded from the search; they anchor to their AP's left side at `x < 0` and never occupy fallback grid slots. Placement is in-memory only and does not write to Canvas Layout — once the user moves a placed node, the existing debounced save path takes over.
+
+### Newly detected unplaced nodes pull the viewport to follow
+
+When a SWR refresh produces previously-unseen unplaced nodes, the canvas follows them: a single new node uses `setCenter` (preserving zoom); multiple simultaneous new nodes use `fitView` framed to the new subset. This applies regardless of trigger source — the product's main creation path is in-UI where viewport-follow is expected, and rare external triggers (kubectl/API) accept the same follow rather than carrying a per-trigger flag through the detection pipeline.
+
+The first detect after opening the canvas is not a follow event — opening `fitView` (keyed on Project UID) already handles initial framing.
 
 ### Share previews may expand nodes locally
 
@@ -144,13 +170,37 @@ Canvas Layout belongs to the application persistence layer, not the Crossplane r
 
 Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
 
-### Canvas edges are not freeform annotations
+### Canvas connections are resource-backed
 
-Users do not draw arbitrary diagram lines on the canvas. In the first version, edges are rendered only when the system detects a real runtime dependency such as EntryPoint-to-AP or AP-to-DB.
+Users may freely drag lines between canvas nodes, but unsupported Connecting Edges are discarded after lightweight feedback. Established Canvas Connections are derived from AP, DB, and EntryPoint resource state rather than stored as separate App Postgres records.
 
-### Only established Canvas Connections are persisted
+### Database Binding belongs to AP desired state
 
-Connecting edges are temporary UI feedback for a future in-flight connection operation. App Postgres stores only established Canvas Connections whose required resource changes have succeeded. The first version does not support user-initiated connecting edges.
+The source of truth for a Database Binding is the AP's desired state. DB does not store reverse ownership of bound APs, and the canvas visualizes AP-DB connections detected from resource state.
+
+### Database Binding v1 is expressed through AP environment variables
+
+Database Binding v1 is represented by one or more AP `spec.input.env` entries. Environment variable names are user-provided and unique within one AP; removing a binding entry removes the corresponding environment variable row.
+
+### Database Binding is authored from the Environment editor
+
+Database Binding v1 is created through the AP Environment editor. The structured editor lets users add ordinary environment values or use Add Reference to select a Project DB field such as Private DSN, Public DSN, Username, Password, Host, or Port.
+
+### Add Reference stores standard Kubernetes env
+
+After an Add Reference row is saved, AP desired state stores only standard Kubernetes environment variables. DSN references become ordinary `value` entries, primitive fields become `valueFrom.secretKeyRef` entries, and no separate reference metadata is persisted.
+
+### Environment editor reconstructs DB references from exact evidence
+
+When editing existing AP environment variables, the Environment editor displays a row as a Project DB reference only when the saved env has exact evidence: a Secret reference to a DB credential Secret, or a value equal to a DB private or public DSN. Otherwise the row is shown as an ordinary value.
+
+### Canvas Database Binding delegates to Environment editor
+
+Dragging between an AP and a DB in either direction opens the AP Environment editor's add-variable flow with Add Reference preselected for that DB. Repeated AP-DB drags may add another environment variable referencing a different field from the same DB.
+
+### External databases are ordinary Environment variables
+
+External database credentials are not modeled as Database Bindings in v1. Users enter external database values directly in the AP Environment editor, and the product does not create a separate external database form, node, or Canvas Connection for them.
 
 ### Canvas telemetry is store-mediated
 

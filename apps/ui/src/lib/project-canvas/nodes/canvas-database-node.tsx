@@ -35,6 +35,10 @@ export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
   const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
+  const highlightedConnectionSide =
+    state.connectionOrigin?.nodeId === id
+      ? state.connectionOrigin.side
+      : undefined;
   const expansion = useCanvasNodeExpansion({
     data,
     id,
@@ -47,7 +51,7 @@ export const CanvasDatabaseNode = memo(function CanvasDatabaseNode({
     <DatabaseNode.Root
       connections={connections}
       defaultExpanded={expansion.defaultExpanded}
-      interaction={{ dragging, selected }}
+      interaction={{ dragging, highlightedConnectionSide, selected }}
       lifecycleActions={actions.lifecycleActions}
       onCopyConnection={actions.copyConnection}
       onExpandedChange={expansion.onExpandedChange}

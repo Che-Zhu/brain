@@ -6,6 +6,7 @@ import type {
   ReactFlowProps,
 } from "@xyflow/react";
 import type { ComponentType, ReactNode } from "react";
+import type { CanvasNodeConnectionSide } from "../canvas-node/canvas-node.types";
 import type { CanvasEdgeAnchorResolver } from "./canvas.edge-anchors";
 
 /** Body content for {@link CanvasPanel}; receives the selected React Flow node. */
@@ -60,6 +61,10 @@ export type CanvasReactFlowProps = Omit<
 >;
 
 export interface CanvasState {
+  connectionOrigin?: {
+    nodeId: string;
+    side: CanvasNodeConnectionSide;
+  } | null;
   edges: Edge[];
   nodes: Node[];
   selectedEdge: Edge | null;
@@ -100,6 +105,14 @@ export interface CanvasMeta {
   panelTabs?: Partial<Record<string, CanvasPanelTab[]>>;
   panelTypes?: CanvasPanelTypes;
   reactFlowProps?: CanvasReactFlowProps;
+  /**
+   * Optional follow behavior for newly seen nodes selected by the host app.
+   * The first node-set observed for each key is treated as opening state.
+   */
+  viewportFollow?: {
+    isFollowTarget: (node: Node) => boolean;
+    key?: number | string;
+  };
 }
 
 export interface CanvasContextValue {

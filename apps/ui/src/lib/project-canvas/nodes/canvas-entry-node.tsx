@@ -24,6 +24,10 @@ export const CanvasEntryNode = memo(function CanvasEntryNode({
   const selected =
     (state.selectedNode != null && state.selectedNode.id === id) ||
     isEndpointOfSelectedEdge;
+  const highlightedConnectionSide =
+    state.connectionOrigin?.nodeId === id
+      ? state.connectionOrigin.side
+      : undefined;
   const expansion = useCanvasNodeExpansion({
     data,
     id,
@@ -36,7 +40,7 @@ export const CanvasEntryNode = memo(function CanvasEntryNode({
     <EntryNode.Root
       accessDomain={accessDomain}
       defaultExpanded={expansion.defaultExpanded}
-      interaction={{ dragging, selected }}
+      interaction={{ dragging, highlightedConnectionSide, selected }}
       onCopyTarget={actions.copyTarget}
       onExpandedChange={expansion.onExpandedChange}
       states={states}

@@ -54,6 +54,7 @@ export function CanvasNodeFrame({
   } = useCanvasNode();
   const selected = interaction?.selected ?? false;
   const dragging = interaction?.dragging ?? false;
+  const highlightedConnectionSide = interaction?.highlightedConnectionSide;
   const [hoverIntent, setHoverIntent] = useState(false);
   const hoverIntentRef = useRef(false);
   const hoverIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -153,6 +154,7 @@ export function CanvasNodeFrame({
     <div
       className={cn("canvas-node-frame relative", className)}
       data-dragging={dragging || undefined}
+      data-highlighted-connection-side={highlightedConnectionSide}
       data-hover-intent={hoverIntent || undefined}
       data-selected={selected || undefined}
       data-slot="canvas-node-frame"

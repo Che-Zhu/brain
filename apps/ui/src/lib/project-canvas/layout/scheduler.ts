@@ -1,4 +1,4 @@
-import { canvasLayoutResourceKey } from "./merge";
+import { canvasLayoutResourceKey } from "./placement";
 import type { CanvasLayoutNode } from "./types";
 
 interface TimerApi {

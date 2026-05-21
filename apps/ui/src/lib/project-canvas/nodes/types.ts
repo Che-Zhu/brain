@@ -3,6 +3,10 @@ import type {
   ContainerNodeStates,
 } from "@workspace/ui/components/container-node/container-node";
 import type {
+  ContainerSettingsPaneAddDbDsnReferenceIntent,
+  ContainerSettingsPaneConfirmedAddDbDsnReference,
+} from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import type {
   DatabaseNodeActions,
   DatabaseNodeConnection,
   DatabaseNodeStates,
@@ -13,6 +17,7 @@ import type {
   EntryNodeStates,
   EntryNodeTarget,
 } from "@workspace/ui/components/entry-node/entry-node";
+import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
 import type { Node } from "@xyflow/react";
 
 // `Node`'s second type parameter must match the node type constants in ./constants.
@@ -25,12 +30,20 @@ import {
 
 export interface CanvasNodeLayoutState {
   expanded?: boolean;
+  generatedPosition?: { x: number; y: number };
   onExpandedChange?: (node: Node, expanded: boolean) => void;
+  positionSource?: "generated";
 }
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
+  addDbDsnReferenceIntent?: ContainerSettingsPaneAddDbDsnReferenceIntent | null;
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   layout?: CanvasNodeLayoutState;
+  onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
+  onAddDbDsnReferenceMutationStart?: (
+    references: readonly ContainerSettingsPaneConfirmedAddDbDsnReference[]
+  ) => (() => void) | undefined;
   onWorkloadMutation?: () => Promise<unknown>;
   states: ContainerNodeStates;
 }
@@ -64,6 +77,7 @@ export interface CanvasEntryNodeData extends Record<string, unknown> {
   actions?: EntryNodeActions;
   layout?: CanvasNodeLayoutState;
   resource: {
+    apRef?: string;
     name: string;
     namespace: string;
     uid?: string;

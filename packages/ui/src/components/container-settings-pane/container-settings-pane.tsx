@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Dialog,
@@ -9,25 +10,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
+import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import {
   PortsTable,
   type PortRow as PortsTableDisplayRow,
 } from "@workspace/ui/components/ports-table/ports-table";
-import { RawEditor } from "@workspace/ui/components/raw-editor";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
 import {
-  envToText,
-  type ParsedEnvPair,
-  parseEnvText,
-} from "@workspace/ui/lib/parse-env-text";
+  addContainerEnvDbDsnReferenceRow,
+  addContainerEnvRow,
+  type ContainerEnvDbDsnFieldOption,
+  type ContainerEnvDbDsnReferenceTarget,
+  type ContainerEnvDbDsnSource,
+  type ContainerEnvDbReferenceField,
+  type ContainerEnvRow,
+  containerEnvDbDsnFieldOptions,
+  containerEnvDbReferenceRowPatch,
+  containerEnvRowsEqual,
+  containerEnvRowsModelEqual,
+  deleteContainerEnvRow,
+  normalizeContainerEnvRowsForSave,
+  updateContainerEnvRow,
+  validateContainerEnvRows,
+} from "@workspace/ui/lib/container-env-rows";
 import { cn } from "@workspace/ui/lib/utils";
-import { Cpu, Layers, MemoryStick, SquarePen } from "lucide-react";
+import {
+  Cpu,
+  Layers,
+  MemoryStick,
+  Plus,
+  Save,
+  SquarePen,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
 
@@ -49,24 +71,6 @@ function resourceQuotasDirty(
   );
 }
 
-/** True when re-serializing and parsing would keep the same ordered name/value rows. */
-function envRoundTripsCleanly(entries: ContainerEnvVar[]): boolean {
-  if (entries.length === 0) {
-    return true;
-  }
-  const text = envToText(entries);
-  const parsed = parseEnvText(text);
-  if (parsed.length !== entries.length) {
-    return false;
-  }
-  return entries.every(
-    (e, i) =>
-      parsed[i] != null &&
-      parsed[i].name === e.name &&
-      parsed[i].value === e.value
-  );
-}
-
 /** Quota sliders are controlled: parent owns `value` and receives `onValueChange`. */
 export interface ContainerSettingsControlledQuotaProps {
   disabled?: boolean;
@@ -82,10 +86,7 @@ export interface ContainerSettingsControlledQuotaProps {
 export type ContainerSettingsQuotaSliderProps =
   ContainerSettingsControlledQuotaProps;
 
-export interface ContainerEnvVar {
-  name: string;
-  value: string;
-}
+export interface ContainerEnvVar extends ContainerEnvRow {}
 
 export interface ContainerPort {
   /** Optional ingress or public host (Public address column when no explicit publicAddress URL). */
@@ -104,15 +105,42 @@ export interface ContainerPort {
   publicAddress?: string;
 }
 
+export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
+  dbName: string;
+  dbNamespace: string;
+  id: string;
+}
+
+export interface ContainerSettingsPaneConfirmedAddDbDsnReference {
+  dbName: string;
+  dbNamespace: string;
+  id: string;
+}
+
+export interface ContainerSettingsPaneEnvChangeMeta {
+  confirmedAddDbDsnReferences: ContainerSettingsPaneConfirmedAddDbDsnReference[];
+}
+
 export interface ContainerSettingsPaneProps {
+  /**
+   * One-shot request from a Canvas Connecting Edge to append an Add Reference row
+   * with the dragged DB preselected.
+   */
+  addDbDsnReferenceIntent?: ContainerSettingsPaneAddDbDsnReferenceIntent | null;
   className?: string;
   cpuQuota: ContainerSettingsControlledQuotaProps;
-  /** Environment variables; shown as raw KEY=value preview. Edit via dialog. */
+  /** Project DB connection strings that can be saved into AP env values as DSN references. */
+  dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
+  /** Environment variables shown and edited as structured rows. */
   env: ContainerEnvVar[];
   /** Full image reference (repository + tag/digest). */
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
-  onEnvChange: (env: ContainerEnvVar[]) => void;
+  onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
+  onEnvChange: (
+    env: ContainerEnvVar[],
+    meta?: ContainerSettingsPaneEnvChangeMeta
+  ) => void;
   onImageChange: (image: string) => void;
   onPortsChange: (ports: ContainerPort[]) => void;
   /**
@@ -137,6 +165,12 @@ export interface ContainerSettingsPaneProps {
    */
   replicasQuota?: ContainerSettingsControlledQuotaProps;
 }
+
+interface AddDbDsnReferenceIntentDraftMetadata {
+  canvasAddDbDsnReferenceIntentId?: string;
+}
+
+type EnvDraftRow = ContainerEnvVar & AddDbDsnReferenceIntentDraftMetadata;
 
 function SectionTitle({
   children,
@@ -185,16 +219,420 @@ function containerPortsToTableRows(
   });
 }
 
+const DB_REFERENCE_FIELD_LABELS: Record<ContainerEnvDbReferenceField, string> =
+  {
+    host: "Host",
+    password: "Password",
+    port: "Port",
+    private: "Private DSN",
+    public: "Public DSN",
+    username: "Username",
+  };
+
+function envDbDsnFieldLabel(field: ContainerEnvDbReferenceField): string {
+  return DB_REFERENCE_FIELD_LABELS[field];
+}
+
+function envRowDisplayValue(row: ContainerEnvVar): string {
+  if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+    return `${row.dbDsn.dbName} ${envDbDsnFieldLabel(row.dbDsn.field)}`;
+  }
+  return row.valueSource === "valueFrom" ? "External reference" : row.value;
+}
+
+function envRowKey(row: ContainerEnvVar, index: number): string {
+  return [
+    index,
+    row.name,
+    row.value,
+    row.valueSource ?? "direct",
+    row.valueFrom == null ? "" : JSON.stringify(row.valueFrom),
+  ].join("\u0000");
+}
+
+function nextEnvDraftKey(prefix: string, counter: { current: number }): string {
+  const key = `${prefix}-${counter.current}`;
+  counter.current += 1;
+  return key;
+}
+
+function createEnvDraftKeys(
+  count: number,
+  prefix: string,
+  counter: { current: number }
+): string[] {
+  return Array.from({ length: count }, () => nextEnvDraftKey(prefix, counter));
+}
+
+function ExternalEnvBadge({ className }: { className?: string }) {
+  return (
+    <Badge className={className} variant="outline">
+      External
+    </Badge>
+  );
+}
+
+function ReferenceEnvBadge({ className }: { className?: string }) {
+  return (
+    <Badge className={className} variant="outline">
+      Reference
+    </Badge>
+  );
+}
+
+function dbDsnSourceKey(source: ContainerEnvDbDsnSource): string {
+  return `${source.namespace}/${source.name}`;
+}
+
+function dbDsnRowKey(row: ContainerEnvRow): string {
+  if (row.dbDsn == null) {
+    return "";
+  }
+  return `${row.dbDsn.dbNamespace}/${row.dbDsn.dbName}`;
+}
+
+function sourceFromDbDsnRow(
+  row: ContainerEnvRow,
+  sources: readonly ContainerEnvDbDsnSource[]
+): ContainerEnvDbDsnSource | undefined {
+  const key = dbDsnRowKey(row);
+  return sources.find((source) => dbDsnSourceKey(source) === key);
+}
+
+function dbDsnSourceHasFields(source: ContainerEnvDbDsnSource): boolean {
+  return containerEnvDbDsnFieldOptions(source).length > 0;
+}
+
+function dbDsnSourceMatchesTarget(
+  source: ContainerEnvDbDsnSource,
+  target: ContainerEnvDbDsnReferenceTarget
+): boolean {
+  return source.name === target.name && source.namespace === target.namespace;
+}
+
+function addDbDsnReferenceIntentTarget(
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent
+): ContainerEnvDbDsnReferenceTarget {
+  return { name: intent.dbName, namespace: intent.dbNamespace };
+}
+
+function dbDsnSourceFromAddReferenceIntent(
+  sources: readonly ContainerEnvDbDsnSource[],
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent | null | undefined
+): ContainerEnvDbDsnSource | undefined {
+  if (intent == null) {
+    return undefined;
+  }
+  const target = addDbDsnReferenceIntentTarget(intent);
+  return sources.find(
+    (source) =>
+      dbDsnSourceMatchesTarget(source, target) && dbDsnSourceHasFields(source)
+  );
+}
+
+function appendDbDsnReferenceIntentRow(
+  rows: readonly ContainerEnvVar[],
+  source: ContainerEnvDbDsnSource,
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent
+): EnvDraftRow[] {
+  const target = addDbDsnReferenceIntentTarget(intent);
+  const nextRows = addContainerEnvDbDsnReferenceRow(rows, [source], target);
+  if (nextRows.length <= rows.length) {
+    return [...nextRows];
+  }
+  return nextRows.map((row, index) =>
+    index === nextRows.length - 1
+      ? { ...row, canvasAddDbDsnReferenceIntentId: intent.id }
+      : row
+  );
+}
+
+function envDraftWithAddReferenceIntent({
+  intent,
+  readOnly,
+  rows,
+  sources,
+}: {
+  intent: ContainerSettingsPaneAddDbDsnReferenceIntent | null | undefined;
+  readOnly: boolean;
+  rows: readonly ContainerEnvVar[];
+  sources: readonly ContainerEnvDbDsnSource[];
+}): {
+  consumedIntentId?: string;
+  rows: EnvDraftRow[];
+} {
+  if (intent == null) {
+    return { rows: [...rows] };
+  }
+  if (readOnly) {
+    return { rows: [...rows] };
+  }
+  const source = dbDsnSourceFromAddReferenceIntent(sources, intent);
+  if (source === undefined) {
+    return { consumedIntentId: intent.id, rows: [...rows] };
+  }
+  return {
+    consumedIntentId: intent.id,
+    rows: appendDbDsnReferenceIntentRow(rows, source, intent),
+  };
+}
+
+export function confirmedAddDbDsnReferencesFromEnvDraft(
+  rows: readonly ContainerEnvVar[]
+): ContainerSettingsPaneConfirmedAddDbDsnReference[] {
+  const byIntentId = new Map<
+    string,
+    ContainerSettingsPaneConfirmedAddDbDsnReference
+  >();
+
+  for (const row of rows) {
+    const intentId = (row as EnvDraftRow).canvasAddDbDsnReferenceIntentId;
+    if (intentId == null || intentId === "" || row.dbDsn == null) {
+      continue;
+    }
+    byIntentId.set(intentId, {
+      dbName: row.dbDsn.dbName,
+      dbNamespace: row.dbDsn.dbNamespace,
+      id: intentId,
+    });
+  }
+
+  return Array.from(byIntentId.values());
+}
+
+const envReferenceSelectClassName =
+  "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+
+function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
+  return (
+    <div
+      className="flex max-h-56 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/30 p-2"
+      data-slot="container-env-rows"
+    >
+      {env.length === 0 ? (
+        <span className="text-muted-foreground text-sm italic">
+          No variables
+        </span>
+      ) : (
+        env.map((row, index) => (
+          <div
+            className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2 rounded-md border border-border bg-background/50 px-2.5 py-2"
+            key={envRowKey(row, index)}
+          >
+            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+              {row.name}
+            </span>
+            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+              {envRowDisplayValue(row)}
+              {row.valueSource === "valueFrom" ? (
+                <ExternalEnvBadge className="ml-2 align-middle" />
+              ) : null}
+              {row.valueSource === "dbDsn" ? (
+                <ReferenceEnvBadge className="ml-2 align-middle" />
+              ) : null}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+interface EditableEnvRowsProps {
+  dbDsnReferenceSources: ContainerEnvDbDsnSource[];
+  envDirty: boolean;
+  envDraft: ContainerEnvVar[];
+  envErrorsByIndex: ReadonlyMap<number, string>;
+  envRowKeys: readonly string[];
+  envValidation: ReturnType<typeof validateContainerEnvRows>;
+  onDeleteRow: (index: number) => void;
+  onUpdateRow: (index: number, patch: Partial<ContainerEnvRow>) => void;
+}
+
+interface EditableEnvValueControlProps {
+  dbDsnReferenceSources: ContainerEnvDbDsnSource[];
+  index: number;
+  onUpdateRow: (index: number, patch: Partial<ContainerEnvRow>) => void;
+  row: ContainerEnvVar;
+}
+
+function EditableEnvValueControl({
+  dbDsnReferenceSources,
+  index,
+  onUpdateRow,
+  row,
+}: EditableEnvValueControlProps) {
+  if (row.valueSource === "valueFrom") {
+    return (
+      <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
+        <span className="min-w-0 truncate font-mono">External reference</span>
+        <ExternalEnvBadge className="shrink-0" />
+      </div>
+    );
+  }
+
+  if (row.valueSource === "dbDsn" && row.dbDsn != null) {
+    const selectedSource = sourceFromDbDsnRow(row, dbDsnReferenceSources);
+    const selectedFields = containerEnvDbDsnFieldOptions(selectedSource);
+    const updateReference = (
+      source: ContainerEnvDbDsnSource | undefined,
+      field: ContainerEnvDbDsnFieldOption | undefined
+    ) => {
+      if (source === undefined || field === undefined) {
+        return;
+      }
+      onUpdateRow(index, containerEnvDbReferenceRowPatch(source, field));
+    };
+
+    return (
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] gap-2">
+        <select
+          aria-label="Project DB"
+          className={envReferenceSelectClassName}
+          onChange={(event) => {
+            const source = dbDsnReferenceSources.find(
+              (item) => dbDsnSourceKey(item) === event.target.value
+            );
+            updateReference(source, containerEnvDbDsnFieldOptions(source)[0]);
+          }}
+          value={dbDsnRowKey(row)}
+        >
+          {dbDsnReferenceSources.map((source) => {
+            const hasFields = dbDsnSourceHasFields(source);
+            return (
+              <option
+                disabled={!hasFields}
+                key={dbDsnSourceKey(source)}
+                value={dbDsnSourceKey(source)}
+              >
+                {hasFields ? source.name : `${source.name} (unavailable)`}
+              </option>
+            );
+          })}
+        </select>
+        <select
+          aria-label="Project DB field"
+          className={envReferenceSelectClassName}
+          disabled={selectedFields.length === 0}
+          onChange={(event) => {
+            const field = selectedFields.find(
+              (item) => item.field === event.target.value
+            );
+            updateReference(selectedSource, field);
+          }}
+          value={row.dbDsn.field}
+        >
+          {selectedFields.length === 0 ? (
+            <option value="">No fields available</option>
+          ) : null}
+          {selectedFields.map((field) => (
+            <option key={field.field} value={field.field}>
+              {field.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  return (
+    <Input
+      aria-label="Environment variable value"
+      className="h-8 font-mono text-xs"
+      onChange={(event) =>
+        onUpdateRow(index, {
+          value: event.target.value,
+          valueSource: "direct",
+        })
+      }
+      value={row.value}
+    />
+  );
+}
+
+function EditableEnvRows({
+  dbDsnReferenceSources,
+  envDirty,
+  envDraft,
+  envErrorsByIndex,
+  envRowKeys,
+  envValidation,
+  onDeleteRow,
+  onUpdateRow,
+}: EditableEnvRowsProps) {
+  return (
+    <div
+      className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
+      data-slot="container-env-rows"
+    >
+      {envDraft.length === 0 ? (
+        <div className="flex min-h-16 items-center text-muted-foreground text-sm italic">
+          No variables
+        </div>
+      ) : (
+        envDraft.map((row, index) => {
+          const error = envErrorsByIndex.get(index);
+          const rowKey = envRowKeys[index] ?? envRowKey(row, index);
+          return (
+            <div className="grid min-w-0 gap-1.5" key={rowKey}>
+              <div className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_auto] gap-2">
+                <Input
+                  aria-invalid={error != null}
+                  aria-label="Environment variable name"
+                  className="h-8 font-mono text-xs"
+                  onChange={(event) =>
+                    onUpdateRow(index, {
+                      name: event.target.value,
+                    })
+                  }
+                  value={row.name}
+                />
+                <EditableEnvValueControl
+                  dbDsnReferenceSources={dbDsnReferenceSources}
+                  index={index}
+                  onUpdateRow={onUpdateRow}
+                  row={row}
+                />
+                <Button
+                  aria-label="Remove environment variable"
+                  onClick={() => onDeleteRow(index)}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2 aria-hidden />
+                </Button>
+              </div>
+              {error == null ? null : (
+                <p className="text-destructive text-xs" role="status">
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        })
+      )}
+      {!envValidation.valid && envDirty ? (
+        <p className="text-destructive text-xs" role="status">
+          Fix environment variable names before saving.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
  * optional replica count, environment variables, and exposed ports (`PortsTable`).
  * All fields are controlled by the host.
  */
 export function ContainerSettingsPane({
+  addDbDsnReferenceIntent,
   className,
   image,
   onImageChange,
   onEnvChange,
+  onAddDbDsnReferenceIntentConsumed,
   onPortsChange,
   cpuQuota,
   memoryQuota,
@@ -203,13 +641,38 @@ export function ContainerSettingsPane({
   replicasQuota,
   onResourceQuotasCommit,
   readOnly = false,
+  dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageDraft, setImageDraft] = useState(image);
-  const [envDialogOpen, setEnvDialogOpen] = useState(false);
-  const [envEditorNonce, setEnvEditorNonce] = useState(0);
   const [quotaSavePending, setQuotaSavePending] = useState(false);
   const inputId = useId();
+  const envDraftKeyPrefix = useId();
+  const envDraftKeyCounter = useRef(0);
+  const initialEnvDraft = useMemo(
+    () =>
+      envDraftWithAddReferenceIntent({
+        intent: addDbDsnReferenceIntent,
+        readOnly,
+        rows: env,
+        sources: dbDsnReferenceSources,
+      }),
+    [addDbDsnReferenceIntent, dbDsnReferenceSources, env, readOnly]
+  );
+  const processedAddDbDsnReferenceIntentId = useRef<string | null>(
+    initialEnvDraft.consumedIntentId ?? null
+  );
+  const syncedEnvRef = useRef<readonly ContainerEnvVar[]>(env);
+  const [envDraft, setEnvDraft] = useState<EnvDraftRow[]>(
+    () => initialEnvDraft.rows
+  );
+  const [envDraftKeys, setEnvDraftKeys] = useState<string[]>(() =>
+    createEnvDraftKeys(
+      initialEnvDraft.rows.length,
+      envDraftKeyPrefix,
+      envDraftKeyCounter
+    )
+  );
 
   const quotaCommitMode = onResourceQuotasCommit != null && readOnly !== true;
 
@@ -227,6 +690,50 @@ export function ContainerSettingsPane({
     }
     setDraftReplicas(replicasQuota.value);
   }, [cpuQuota.value, memoryQuota.value, replicasQuota]);
+
+  useEffect(() => {
+    if (containerEnvRowsModelEqual(env, syncedEnvRef.current)) {
+      return;
+    }
+    syncedEnvRef.current = env;
+    setEnvDraft(env);
+    setEnvDraftKeys(
+      createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+    );
+  }, [env, envDraftKeyPrefix]);
+
+  useEffect(() => {
+    const intent = addDbDsnReferenceIntent;
+    if (intent == null || readOnly) {
+      return;
+    }
+    if (processedAddDbDsnReferenceIntentId.current === intent.id) {
+      onAddDbDsnReferenceIntentConsumed?.(intent.id);
+      return;
+    }
+
+    const source = dbDsnSourceFromAddReferenceIntent(
+      dbDsnReferenceSources,
+      intent
+    );
+    processedAddDbDsnReferenceIntentId.current = intent.id;
+    onAddDbDsnReferenceIntentConsumed?.(intent.id);
+    if (source === undefined) {
+      return;
+    }
+
+    setEnvDraft((rows) => appendDbDsnReferenceIntentRow(rows, source, intent));
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  }, [
+    addDbDsnReferenceIntent,
+    dbDsnReferenceSources,
+    envDraftKeyPrefix,
+    onAddDbDsnReferenceIntentConsumed,
+    readOnly,
+  ]);
 
   const quotasDirty = resourceQuotasDirty(
     draftCpu,
@@ -268,11 +775,21 @@ export function ContainerSettingsPane({
     [ports]
   );
 
-  const envPreviewInvalid = !envRoundTripsCleanly(env);
-  const envPreviewText =
-    env.length === 0
-      ? "# No variables — open editor to add KEY=value lines."
-      : envToText(env);
+  const envValidation = useMemo(
+    () => validateContainerEnvRows(envDraft),
+    [envDraft]
+  );
+  const envErrorsByIndex = useMemo(() => {
+    const byIndex = new Map<number, string>();
+    for (const error of envValidation.errors) {
+      if (!byIndex.has(error.index)) {
+        byIndex.set(error.index, error.message);
+      }
+    }
+    return byIndex;
+  }, [envValidation]);
+  const envDirty = !containerEnvRowsEqual(envDraft, env);
+  const canSaveEnv = envDirty && envValidation.valid;
 
   const cpuSlider = useMemo(() => {
     const base = {
@@ -383,17 +900,66 @@ export function ContainerSettingsPane({
     setImageDialogOpen(false);
   };
 
-  const handleEnvDialogChange = (open: boolean) => {
-    setEnvDialogOpen(open);
-    if (open) {
-      setEnvEditorNonce((n) => n + 1);
+  const handleSaveEnvRows = () => {
+    if (!canSaveEnv) {
+      return;
     }
+    const normalized = normalizeContainerEnvRowsForSave(envDraft);
+    const confirmedAddDbDsnReferences =
+      confirmedAddDbDsnReferencesFromEnvDraft(envDraft);
+    onEnvChange(
+      normalized,
+      confirmedAddDbDsnReferences.length === 0
+        ? undefined
+        : { confirmedAddDbDsnReferences }
+    );
+    setEnvDraft(
+      normalized.map((row, index) => {
+        const intentId = envDraft[index]?.canvasAddDbDsnReferenceIntentId;
+        return intentId == null
+          ? row
+          : { ...row, canvasAddDbDsnReferenceIntentId: intentId };
+      })
+    );
   };
 
-  const handleSaveEnvFromRaw = (parsed: ParsedEnvPair[]) => {
-    onEnvChange(parsed.map((p) => ({ name: p.name, value: p.value })));
-    setEnvDialogOpen(false);
-    return Promise.resolve();
+  const handleCancelEnvRows = () => {
+    setEnvDraft(env);
+    setEnvDraftKeys(
+      createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
+    );
+  };
+
+  const handleAddEnvRow = () => {
+    setEnvDraft((rows) => addContainerEnvRow(rows));
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  };
+
+  const canAddDbDsnReference = dbDsnReferenceSources.some(dbDsnSourceHasFields);
+
+  const handleAddDbDsnReferenceRow = () => {
+    setEnvDraft((rows) =>
+      addContainerEnvDbDsnReferenceRow(rows, dbDsnReferenceSources)
+    );
+    setEnvDraftKeys((keys) => [
+      ...keys,
+      nextEnvDraftKey(envDraftKeyPrefix, envDraftKeyCounter),
+    ]);
+  };
+
+  const handleDeleteEnvRow = (index: number) => {
+    setEnvDraft((rows) => deleteContainerEnvRow(rows, index));
+    setEnvDraftKeys((keys) => keys.filter((_, keyIndex) => keyIndex !== index));
+  };
+
+  const handleUpdateEnvRow = (
+    index: number,
+    patch: Partial<ContainerEnvRow>
+  ) => {
+    setEnvDraft((rows) => updateContainerEnvRow(rows, index, patch));
   };
 
   const portsTableMutationProps = {
@@ -574,64 +1140,74 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        <section className="flex flex-col gap-2">
+        <section className="flex flex-col gap-3">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <SectionTitle>Environment</SectionTitle>
+            {readOnly ? null : (
+              <div className="flex shrink-0 items-center gap-1">
+                {envDirty ? (
+                  <>
+                    <Button
+                      aria-label="Cancel environment changes"
+                      onClick={handleCancelEnvRows}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <X aria-hidden data-icon="inline-start" />
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={!canSaveEnv}
+                      onClick={handleSaveEnvRows}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      <Save aria-hidden data-icon="inline-start" />
+                      Save environment
+                    </Button>
+                  </>
+                ) : null}
+                <Button
+                  aria-label="Add environment variable"
+                  onClick={handleAddEnvRow}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Plus aria-hidden data-icon="inline-start" />
+                  Add
+                </Button>
+                {canAddDbDsnReference ? (
+                  <Button
+                    aria-label="Add Project DB reference"
+                    onClick={handleAddDbDsnReferenceRow}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus aria-hidden data-icon="inline-start" />
+                    Add Reference
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </div>
           {readOnly ? (
-            <div
-              aria-invalid={envPreviewInvalid}
-              className={cn(
-                "flex max-h-48 min-h-[120px] w-full items-start overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm leading-snug",
-                "aria-invalid:border-destructive/70"
-              )}
-            >
-              <span className="min-w-0 flex-1">
-                {env.length === 0 ? (
-                  <span className="text-muted-foreground italic">
-                    {envPreviewText}
-                  </span>
-                ) : (
-                  envPreviewText
-                )}
-              </span>
-            </div>
+            <ReadOnlyEnvRows env={env} />
           ) : (
-            <button
-              aria-invalid={envPreviewInvalid}
-              aria-label="Edit environment variables"
-              className={cn(
-                "flex max-h-48 min-h-[120px] w-full items-start justify-between gap-1.5 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 text-left font-mono text-foreground text-sm leading-snug",
-                "cursor-pointer transition-colors hover:bg-muted/60",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                "aria-invalid:border-destructive/70 aria-invalid:focus-visible:ring-destructive/30"
-              )}
-              onClick={() => handleEnvDialogChange(true)}
-              type="button"
-            >
-              <span className="min-w-0 flex-1">
-                {env.length === 0 ? (
-                  <span className="text-muted-foreground italic">
-                    {envPreviewText}
-                  </span>
-                ) : (
-                  envPreviewText
-                )}
-              </span>
-              <SquarePen
-                aria-hidden
-                className="size-3.5 shrink-0 text-muted-foreground"
-                strokeWidth={2}
-              />
-            </button>
+            <EditableEnvRows
+              dbDsnReferenceSources={dbDsnReferenceSources}
+              envDirty={envDirty}
+              envDraft={envDraft}
+              envErrorsByIndex={envErrorsByIndex}
+              envRowKeys={envDraftKeys}
+              envValidation={envValidation}
+              onDeleteRow={handleDeleteEnvRow}
+              onUpdateRow={handleUpdateEnvRow}
+            />
           )}
-          {envPreviewInvalid && !readOnly ? (
-            <p className="text-destructive text-xs" role="status">
-              Some variables use names or lines that cannot be encoded as
-              Kubernetes env (or would be dropped on save). Edit to fix
-              KEY=value syntax.
-            </p>
-          ) : null}
         </section>
 
         <Separator />
@@ -651,80 +1227,38 @@ export function ContainerSettingsPane({
       </div>
 
       {readOnly ? null : (
-        <>
-          <Dialog onOpenChange={handleImageDialogChange} open={imageDialogOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Container image</DialogTitle>
-                <DialogDescription>
-                  Registry path, tag, or digest for this workload.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-2">
-                <Label htmlFor={inputId}>Image reference</Label>
-                <Textarea
-                  className="min-h-24 font-mono text-sm"
-                  id={inputId}
-                  onChange={(e) => setImageDraft(e.target.value)}
-                  placeholder="e.g. ghcr.io/org/app:1.0.0"
-                  value={imageDraft}
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={() => handleImageDialogChange(false)}
-                  type="button"
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveImage} type="button">
-                  Save
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog onOpenChange={handleEnvDialogChange} open={envDialogOpen}>
-            <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden">
-              <DialogHeader className="shrink-0">
-                <DialogTitle>Environment variables</DialogTitle>
-                <DialogDescription>
-                  One KEY=value per line. Lines with invalid Kubernetes env
-                  names are ignored when you Save. Comments start with #.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex min-h-[min(340px,50vh)] flex-1 shrink flex-col py-2">
-                {envDialogOpen ? (
-                  <RawEditor.Provider
-                    initialEnv={env}
-                    key={envEditorNonce}
-                    onSubmit={handleSaveEnvFromRaw}
-                  >
-                    <RawEditor.Root className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-                      <RawEditor.Input
-                        className="min-h-0 flex-1"
-                        textareaClassName="min-h-[min(260px,45vh)]"
-                      />
-                    </RawEditor.Root>
-                    <DialogFooter>
-                      <Button
-                        onClick={() => handleEnvDialogChange(false)}
-                        type="button"
-                        variant="outline"
-                      >
-                        Cancel
-                      </Button>
-                      <RawEditor.Submit variant="default">
-                        Save
-                      </RawEditor.Submit>
-                    </DialogFooter>
-                  </RawEditor.Provider>
-                ) : null}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </>
+        <Dialog onOpenChange={handleImageDialogChange} open={imageDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Container image</DialogTitle>
+              <DialogDescription>
+                Registry path, tag, or digest for this workload.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2">
+              <Label htmlFor={inputId}>Image reference</Label>
+              <Textarea
+                className="min-h-24 font-mono text-sm"
+                id={inputId}
+                onChange={(e) => setImageDraft(e.target.value)}
+                placeholder="e.g. ghcr.io/org/app:1.0.0"
+                value={imageDraft}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => handleImageDialogChange(false)}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveImage} type="button">
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

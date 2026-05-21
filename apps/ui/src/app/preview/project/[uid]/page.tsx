@@ -143,12 +143,18 @@ export default function PreviewProjectPage() {
       uid,
     });
 
-  const { clearSelection, meta, nodes, selectedEdge, selectedNode } =
-    useProjectCanvas(canvasState.nodes, {
-      readOnly: true,
-      refreshWorkloadLists,
-      shareToken,
-    });
+  const {
+    clearSelection,
+    connectionOrigin,
+    meta,
+    nodes,
+    selectedEdge,
+    selectedNode,
+  } = useProjectCanvas(canvasState.nodes, {
+    readOnly: true,
+    refreshWorkloadLists,
+    shareToken,
+  });
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
@@ -172,7 +178,13 @@ export default function PreviewProjectPage() {
           actions={{ onPanelClose: clearSelection }}
           key={`${ns}:${uid}:${shareToken}`}
           meta={meta}
-          state={{ ...canvasState, nodes, selectedEdge, selectedNode }}
+          state={{
+            ...canvasState,
+            connectionOrigin,
+            nodes,
+            selectedEdge,
+            selectedNode,
+          }}
         >
           <Canvas.Flow>
             <Canvas.Panel />
