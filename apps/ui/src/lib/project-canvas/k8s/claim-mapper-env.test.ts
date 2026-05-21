@@ -69,6 +69,26 @@ test("AP claim settings maps private-only network from desired and observed AP s
   assert.deepEqual(settings.ports, []);
 });
 
+test("AP claim settings ignores invalid private-only network ports", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080.5,
+          },
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.equal(settings.network, undefined);
+});
+
 test("AP claim settings reconstruct DB DSN references only from exact current DB connection strings", () => {
   const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
     {

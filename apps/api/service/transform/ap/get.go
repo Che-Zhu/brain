@@ -2,6 +2,7 @@ package ap
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -116,11 +117,7 @@ func apPrivatePort(ap map[string]interface{}) (int, bool) {
 	if network == nil {
 		return 0, false
 	}
-	port, ok := intFromValue(network["privatePort"])
-	if !ok || port < 1 || port > 65535 {
-		return 0, false
-	}
-	return port, true
+	return privatePortFromValue(network["privatePort"])
 }
 
 func privateNetworkAddressForPort(services []map[string]interface{}, namespace string, privatePort int) string {
@@ -149,25 +146,33 @@ func privateNetworkAddressForPort(services []map[string]interface{}, namespace s
 	return ""
 }
 
-func intFromValue(value interface{}) (int, bool) {
+func privatePortFromValue(value interface{}) (int, bool) {
+	var port int
 	switch v := value.(type) {
 	case float64:
-		return int(v), true
+		if v != math.Trunc(v) || v < 1 || v > 65535 {
+			return 0, false
+		}
+		port = int(v)
 	case int:
-		return v, true
+		port = v
 	case int64:
-		return int(v), true
+		port = int(v)
 	case int32:
-		return int(v), true
+		port = int(v)
 	case string:
 		p, err := strconv.Atoi(v)
 		if err != nil {
 			return 0, false
 		}
-		return p, true
+		port = p
 	default:
 		return 0, false
 	}
+	if port < 1 || port > 65535 {
+		return 0, false
+	}
+	return port, true
 }
 
 // buildEndpoints composes internal and external addresses for each service port.

@@ -653,11 +653,13 @@ function NetworkSettingsSection({
   const [draftPort, setDraftPort] = useState(() => String(network.privatePort));
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
+  const privateAddress = network.privateAddress ?? "";
+  const hasPrivateAddress = privateAddress !== "";
 
   useEffect(() => {
     setDraftPort(String(network.privatePort));
     setPortError(null);
-  }, [network]);
+  }, [network.privatePort]);
 
   const parsedPort = parsePortNumberDigits(draftPort.trim());
   const portDirty = draftPort.trim() !== String(network.privatePort);
@@ -687,10 +689,10 @@ function NetworkSettingsSection({
   };
 
   const handleCopyPrivateAddress = async () => {
-    if (network.privateAddress == null || network.privateAddress === "") {
+    if (!hasPrivateAddress) {
       return;
     }
-    await navigator.clipboard?.writeText(network.privateAddress);
+    await navigator.clipboard?.writeText(privateAddress);
   };
 
   return (
@@ -730,11 +732,11 @@ function NetworkSettingsSection({
           </Label>
           <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
-              {network.privateAddress ?? "Pending"}
+              {hasPrivateAddress ? privateAddress : "Pending"}
             </div>
             <Button
               aria-label="Copy Private Address"
-              disabled={network.privateAddress == null}
+              disabled={!hasPrivateAddress}
               onClick={handleCopyPrivateAddress}
               size="icon-sm"
               type="button"

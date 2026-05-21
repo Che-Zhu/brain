@@ -169,6 +169,14 @@ function portNum(v: unknown): number | undefined {
   return undefined;
 }
 
+function privatePortNum(v: unknown): number | undefined {
+  const n = portNum(v);
+  if (n == null || !Number.isInteger(n) || n < 1 || n > 65_535) {
+    return undefined;
+  }
+  return n;
+}
+
 function trimStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -295,8 +303,9 @@ function apNetworkFromSpecAndStatus(
   const inputNetwork = asRecord(readApInput(spec).network);
   const statusNetwork = asRecord(status.network);
   const privatePort =
-    portNum(statusNetwork?.privatePort) ?? portNum(inputNetwork?.privatePort);
-  if (privatePort == null || privatePort < 1 || privatePort > 65_535) {
+    privatePortNum(statusNetwork?.privatePort) ??
+    privatePortNum(inputNetwork?.privatePort);
+  if (privatePort == null) {
     return undefined;
   }
   const privateAddress = trimStr(statusNetwork?.privateAddress);

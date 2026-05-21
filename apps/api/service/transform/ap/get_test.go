@@ -1,6 +1,7 @@
 package ap
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 )
@@ -108,6 +109,47 @@ func TestAPTransformPreservesExistingPrivateNetworkAddress(t *testing.T) {
 	network := status["network"].(map[string]interface{})
 	if got := network["privateAddress"]; got != "http://api.default.svc:8080" {
 		t.Fatalf("status.network.privateAddress = %v, want preserved address", got)
+	}
+}
+
+func TestAPTransformIgnoresInvalidPrivateNetworkPort(t *testing.T) {
+	for _, privatePort := range []interface{}{0, 65536, 8080.5} {
+		t.Run(fmt.Sprint(privatePort), func(t *testing.T) {
+			out := APWithIngressesAndServicesFromList(
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "api",
+						"namespace": "default",
+					},
+					"spec": map[string]interface{}{
+						"input": map[string]interface{}{
+							"network": map[string]interface{}{
+								"privatePort": privatePort,
+							},
+						},
+					},
+				},
+				nil,
+				[]map[string]interface{}{
+					{
+						"metadata": map[string]interface{}{
+							"name":      "api-service-port-8080",
+							"namespace": "default",
+						},
+						"spec": map[string]interface{}{
+							"ports": []interface{}{
+								map[string]interface{}{"port": 8080},
+							},
+						},
+					},
+				},
+			)
+
+			status := out["status"].(map[string]interface{})
+			if _, ok := status["network"]; ok {
+				t.Fatalf("status.network exists for invalid privatePort %v", privatePort)
+			}
+		})
 	}
 }
 

@@ -20,6 +20,8 @@ import {
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
+const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
+const LEGACY_AP_SINGLE_ENDPOINT_FIELDS = ["port", "host"] as const;
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
@@ -73,6 +75,21 @@ async function patchAp(
     namespace,
     patch: ops,
   });
+}
+
+function removeExistingApInputFields(
+  ops: K8sJsonPatchOp[],
+  input: Record<string, unknown> | undefined,
+  fields: readonly string[]
+): void {
+  if (input == null) {
+    return;
+  }
+  for (const field of fields) {
+    if (Object.hasOwn(input, field)) {
+      ops.push({ op: "remove", path: `/spec/input/${field}` });
+    }
+  }
 }
 
 /** Kubernetes container cpu limit string from UI cores (e.g. 0.25 → `250m`, 2 → `2`). */
@@ -283,15 +300,7 @@ export function patchOpsForApNetworkSettings(
   const ops = patchOpsForApInput(spec, {
     network: { privatePort },
   });
-  if (input != null && Object.hasOwn(input, "endpoints")) {
-    ops.push({ op: "remove", path: "/spec/input/endpoints" });
-  }
-  if (input != null && Object.hasOwn(input, "port")) {
-    ops.push({ op: "remove", path: "/spec/input/port" });
-  }
-  if (input != null && Object.hasOwn(input, "host")) {
-    ops.push({ op: "remove", path: "/spec/input/host" });
-  }
+  removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
   return ops;
 }
 
@@ -322,12 +331,7 @@ export async function applyApPorts(
   const input = asRecord(spec?.input);
   const endpoints = portsToEndpoints(ports, readApInput(spec ?? {}));
   const ops = patchOpsForApInput(spec, { endpoints });
-  if (input != null && Object.hasOwn(input, "port")) {
-    ops.push({ op: "remove", path: "/spec/input/port" });
-  }
-  if (input != null && Object.hasOwn(input, "host")) {
-    ops.push({ op: "remove", path: "/spec/input/host" });
-  }
+  removeExistingApInputFields(ops, input, LEGACY_AP_SINGLE_ENDPOINT_FIELDS);
   await patchAp(kubeconfig, claim, ops);
 }
 
