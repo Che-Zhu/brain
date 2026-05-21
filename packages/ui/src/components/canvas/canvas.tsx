@@ -169,7 +169,10 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   const openingFitKey = meta.openingFitView?.key ?? DEFAULT_OPENING_FIT_KEY;
   const nodeCount = nodes.length;
   const viewportFollow = meta.viewportFollow;
+  const viewportFollowTarget = viewportFollow?.isFollowTarget;
   const viewportFollowKey = viewportFollow?.key ?? openingFitKey;
+  const canvasReadyForViewportActions =
+    viewportInitialized && nodesInitialized && flowHeight > 0 && flowWidth > 0;
 
   useEffect(() => {
     if (
@@ -216,60 +219,57 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   ]);
 
   useEffect(() => {
-    const isFollowTarget = viewportFollow?.isFollowTarget;
-    if (isFollowTarget === undefined) {
+    if (viewportFollowTarget === undefined) {
       viewportFollowStateRef.current = initialCanvasViewportFollowState;
       return;
     }
 
+    if (!canvasReadyForViewportActions) {
+      return;
+    }
+
     const result = resolveCanvasViewportFollow({
-      isFollowTarget,
+      isFollowTarget: viewportFollowTarget,
       key: viewportFollowKey,
       nodes,
       state: viewportFollowStateRef.current,
     });
     viewportFollowStateRef.current = result.state;
 
-    if (
-      !(viewportInitialized && nodesInitialized) ||
-      flowHeight <= 0 ||
-      flowWidth <= 0
-    ) {
-      return;
-    }
-
-    if (result.action.kind === "setCenter") {
-      const { nodeId } = result.action;
-      const node = nodes.find((candidate) => candidate.id === nodeId);
-      if (node === undefined) {
+    switch (result.action.kind) {
+      case "fitView":
+        fitView({
+          duration: VIEWPORT_FOLLOW_ANIMATION_MS,
+          nodes: result.action.nodeIds.map((id) => ({ id })),
+        });
+        return;
+      case "none":
+        return;
+      case "setCenter": {
+        const { nodeId } = result.action;
+        const node = nodes.find((candidate) => candidate.id === nodeId);
+        if (node === undefined) {
+          return;
+        }
+        const width = node.measured?.width ?? node.width ?? 0;
+        const height = node.measured?.height ?? node.height ?? 0;
+        setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+          duration: VIEWPORT_FOLLOW_ANIMATION_MS,
+          zoom: getZoom(),
+        });
         return;
       }
-      const width = node.measured?.width ?? node.width ?? 0;
-      const height = node.measured?.height ?? node.height ?? 0;
-      setCenter(node.position.x + width / 2, node.position.y + height / 2, {
-        duration: VIEWPORT_FOLLOW_ANIMATION_MS,
-        zoom: getZoom(),
-      });
-      return;
-    }
-
-    if (result.action.kind === "fitView") {
-      fitView({
-        duration: VIEWPORT_FOLLOW_ANIMATION_MS,
-        nodes: result.action.nodeIds.map((id) => ({ id })),
-      });
+      default:
+        return;
     }
   }, [
+    canvasReadyForViewportActions,
     fitView,
-    flowHeight,
-    flowWidth,
     getZoom,
     nodes,
-    nodesInitialized,
     setCenter,
-    viewportFollow?.isFollowTarget,
     viewportFollowKey,
-    viewportInitialized,
+    viewportFollowTarget,
   ]);
 
   return (

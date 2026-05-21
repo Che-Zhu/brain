@@ -40,7 +40,7 @@ interface PlacementCandidate {
   sortKey: string;
 }
 
-function fallbackCanvasPosition(index: number): { x: number; y: number } {
+function fallbackCanvasPosition(index: number): CanvasLayoutPosition {
   return {
     x: (index % FALLBACK_COLUMNS) * FALLBACK_COL_GAP,
     y: Math.floor(index / FALLBACK_COLUMNS) * FALLBACK_ROW_GAP,
@@ -131,22 +131,28 @@ export function isCanvasNodeGeneratedPosition(node: Node | undefined): boolean {
   return layout?.positionSource === GENERATED_POSITION_SOURCE;
 }
 
-function nodeWithPosition(
-  node: Node,
-  position: CanvasLayoutPosition,
-  generated: boolean
-): Node {
-  if (!generated) {
-    return {
-      ...node,
-      position: { x: position.x, y: position.y },
-    };
-  }
+function comparePlacementCandidates(
+  a: PlacementCandidate,
+  b: PlacementCandidate
+): number {
+  return a.sortKey.localeCompare(b.sortKey);
+}
 
+function nodeWithPosition(node: Node, position: CanvasLayoutPosition): Node {
+  return {
+    ...node,
+    position: { x: position.x, y: position.y },
+  };
+}
+
+function nodeWithGeneratedPosition(
+  node: Node,
+  position: CanvasLayoutPosition
+): Node {
   const data = asRecord(node.data) ?? {};
   const layout = asRecord(data.layout) ?? {};
   return {
-    ...node,
+    ...nodeWithPosition(node, position),
     data: {
       ...data,
       layout: {
@@ -155,11 +161,12 @@ function nodeWithPosition(
         positionSource: GENERATED_POSITION_SOURCE,
       },
     },
-    position: { x: position.x, y: position.y },
   };
 }
 
-function firstOpenFallbackPosition(allocated: readonly CanvasNodeRect[]) {
+function firstOpenFallbackPosition(
+  allocated: readonly CanvasNodeRect[]
+): CanvasLayoutPosition {
   let index = 0;
   while (true) {
     const position = fallbackCanvasPosition(index);
@@ -192,7 +199,7 @@ export function placeCanvasNodes({
     const key = ref === undefined ? undefined : canvasLayoutResourceKey(ref);
     const savedPosition = key === undefined ? undefined : savedByRef.get(key);
     if (savedPosition !== undefined) {
-      placedNodes[index] = nodeWithPosition(node, savedPosition, false);
+      placedNodes[index] = nodeWithPosition(node, savedPosition);
       return;
     }
 
@@ -209,23 +216,22 @@ export function placeCanvasNodes({
     }
   });
 
-  for (const candidate of [...rasterCandidates].sort((a, b) =>
-    a.sortKey.localeCompare(b.sortKey)
+  for (const candidate of [...rasterCandidates].sort(
+    comparePlacementCandidates
   )) {
     const position = firstOpenFallbackPosition(allocated);
     allocated.push(rectFromPosition(position));
-    placedNodes[candidate.index] = nodeWithPosition(
+    placedNodes[candidate.index] = nodeWithGeneratedPosition(
       candidate.node,
-      position,
-      true
+      position
     );
     if (candidate.ref !== undefined) {
       positionByRef.set(canvasLayoutResourceKey(candidate.ref), position);
     }
   }
 
-  for (const candidate of [...entryPointCandidates].sort((a, b) =>
-    a.sortKey.localeCompare(b.sortKey)
+  for (const candidate of [...entryPointCandidates].sort(
+    comparePlacementCandidates
   )) {
     const apRef = entryPointApRefFromNode(candidate.node);
     const apPosition =
@@ -237,10 +243,9 @@ export function placeCanvasNodes({
         ? firstOpenFallbackPosition(allocated)
         : { x: apPosition.x - ENTRY_POINT_AP_LEFT_OFFSET, y: apPosition.y };
 
-    placedNodes[candidate.index] = nodeWithPosition(
+    placedNodes[candidate.index] = nodeWithGeneratedPosition(
       candidate.node,
-      position,
-      true
+      position
     );
   }
 
