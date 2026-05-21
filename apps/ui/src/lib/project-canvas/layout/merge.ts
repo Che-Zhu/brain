@@ -10,12 +10,15 @@ import {
   cloneCanvasLayoutDocument,
   cloneCanvasLayoutNode,
 } from "./cleanup";
+import {
+  canvasLayoutResourceKey as layoutResourceKey,
+  canvasLayoutResourceRefFromNode as layoutResourceRefFromNode,
+  placeCanvasNodes,
+} from "./placement";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
   CanvasLayoutPosition,
-  CanvasLayoutResourceKind,
-  CanvasLayoutResourceRef,
 } from "./types";
 
 export interface CanvasLayoutMergeResult {
@@ -40,24 +43,6 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== ""
     ? value.trim()
     : undefined;
-}
-
-export function canvasLayoutResourceKey(ref: CanvasLayoutResourceRef): string {
-  return `${ref.kind}:${ref.namespace}:${ref.name}`;
-}
-
-function resourceRefFromRecord(
-  kind: CanvasLayoutResourceKind,
-  source: Record<string, unknown> | undefined
-): CanvasLayoutResourceRef | undefined {
-  const name = nonEmptyString(source?.name);
-  const namespace = nonEmptyString(source?.namespace);
-
-  if (name === undefined || namespace === undefined) {
-    return undefined;
-  }
-
-  return { kind, name, namespace };
 }
 
 function finitePosition(
@@ -101,23 +86,6 @@ function withCanvasLayoutExpansion(
   };
 }
 
-export function canvasLayoutResourceRefFromNode(
-  node: Node
-): CanvasLayoutResourceRef | undefined {
-  const data = asRecord(node.data);
-
-  switch (node.type) {
-    case CANVAS_CONTAINER_NODE_TYPE:
-      return resourceRefFromRecord("AP", asRecord(data?.states));
-    case CANVAS_DATABASE_NODE_TYPE:
-      return resourceRefFromRecord("DB", asRecord(data?.workload));
-    case CANVAS_ENTRY_NODE_TYPE:
-      return resourceRefFromRecord("EntryPoint", asRecord(data?.resource));
-    default:
-      return undefined;
-  }
-}
-
 function lastSeenUidFromNode(node: Node): string | undefined {
   const data = asRecord(node.data);
 
@@ -136,7 +104,7 @@ function lastSeenUidFromNode(node: Node): string | undefined {
 export function canvasLayoutNodeFromNode(
   node: Node
 ): CanvasLayoutNode | undefined {
-  const ref = canvasLayoutResourceRefFromNode(node);
+  const ref = layoutResourceRefFromNode(node);
   const position = finitePosition(node.position);
   if (ref === undefined || position === undefined) {
     return undefined;
@@ -222,7 +190,7 @@ export function mergeCanvasLayoutWithDetectedNodes({
     return {
       changed: false,
       layout: undefined,
-      nodes: nodes.map((node) => ({ ...node })),
+      nodes: placeCanvasNodes({ layout, nodes }),
     };
   }
 
@@ -230,17 +198,17 @@ export function mergeCanvasLayoutWithDetectedNodes({
   const cleanedLayout = cleanupCanvasLayoutDocument(layout, { now });
   const layoutByRef = new Map<string, CanvasLayoutNode>();
   for (const item of cleanedLayout.nodes) {
-    layoutByRef.set(canvasLayoutResourceKey(item.ref), item);
+    layoutByRef.set(layoutResourceKey(item.ref), item);
   }
 
   const nextLayoutByRef = new Map<string, CanvasLayoutNode>();
   const renderedNodes = nodes.map((node) => {
-    const ref = canvasLayoutResourceRefFromNode(node);
+    const ref = layoutResourceRefFromNode(node);
     if (ref === undefined) {
       return { ...node };
     }
 
-    const key = canvasLayoutResourceKey(ref);
+    const key = layoutResourceKey(ref);
     const saved = layoutByRef.get(key);
     if (saved === undefined) {
       return { ...node };
@@ -258,7 +226,7 @@ export function mergeCanvasLayoutWithDetectedNodes({
 
   const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);
   nextLayout.nodes = cleanedLayout.nodes.map((item) => {
-    const key = canvasLayoutResourceKey(item.ref);
+    const key = layoutResourceKey(item.ref);
     const live = nextLayoutByRef.get(key);
     if (live !== undefined) {
       return live;
@@ -269,7 +237,7 @@ export function mergeCanvasLayoutWithDetectedNodes({
   return {
     changed: !layoutDocumentsEqual(layout, nextLayout),
     layout: nextLayout,
-    nodes: renderedNodes,
+    nodes: placeCanvasNodes({ layout: cleanedLayout, nodes: renderedNodes }),
   };
 }
 

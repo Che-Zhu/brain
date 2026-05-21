@@ -274,6 +274,10 @@ function databaseCompositionNameFromSpec(
   return nonEmptyString(compositionRef?.name);
 }
 
+function entryPointApRefFromResource(input: unknown): string | undefined {
+  return nonEmptyString(asRecord(asRecord(input)?.spec)?.apRef);
+}
+
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
  * Sets **kind**, **image**, **name**, **replicas** (from `spec.resource`), **uid**
@@ -483,11 +487,13 @@ export function entryPointsToCanvasState(
     const targets = entryNodeTargetsFromResource(item);
     const accessDomain = entryNodeAccessDomainFromTargets(targets);
     const g = grid0 + i;
+    const apRef = entryPointApRefFromResource(item);
 
     return {
       data: {
         ...(accessDomain === undefined ? {} : { accessDomain }),
         resource: {
+          ...(apRef === undefined ? {} : { apRef }),
           name,
           namespace,
           ...(uid === undefined || uid === "" ? {} : { uid }),

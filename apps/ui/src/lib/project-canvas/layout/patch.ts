@@ -1,5 +1,5 @@
 import { cleanupCanvasLayoutDocument } from "./cleanup";
-import { canvasLayoutResourceKey } from "./merge";
+import { canvasLayoutResourceKey } from "./placement";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,

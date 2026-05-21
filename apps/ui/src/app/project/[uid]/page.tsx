@@ -16,6 +16,7 @@ import {
   pendingApDbCanvasConnectionEdges,
   removePendingApDbCanvasReferences,
 } from "@/lib/project-canvas/flow/pending-connections";
+import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
@@ -107,6 +108,10 @@ export default function ProjectUidPage() {
     () => ({
       ...canvasMeta,
       openingFitView: {
+        key: `${namespace}:${uid}`,
+      },
+      viewportFollow: {
+        isFollowTarget: isCanvasNodeGeneratedPosition,
         key: `${namespace}:${uid}`,
       },
     }),

@@ -24,6 +24,7 @@ import {
   type CanvasEdgeAnchorPair,
   resolveCanvasEdgeAnchors,
 } from "./canvas.edge-anchors";
+import { mergeNodes } from "./canvas.node-merge";
 import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
 import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
@@ -33,6 +34,10 @@ import {
   CanvasUpperRightProvider,
 } from "./canvas.upper-right";
 import { useCanvas } from "./canvas.use";
+import {
+  initialCanvasViewportFollowState,
+  resolveCanvasViewportFollow,
+} from "./canvas.viewport-follow";
 
 export interface CanvasFlowProps {
   children?: ReactNode;
@@ -52,62 +57,22 @@ const CANVAS_DEFAULT_EDGE_STYLE = {
 const DEFAULT_OPENING_FIT_KEY = "__default__";
 const OPENING_FIT_ANIMATION_MS = 300;
 const OPENING_FIT_SETTLE_MS = 150;
-
-function mergeNodes(prev: Node[], next: Node[]): Node[] {
-  const prevById = new Map(prev.map((n) => [n.id, n]));
-  const merged = next.map((incoming) => {
-    const existing = prevById.get(incoming.id);
-    if (existing) {
-      return {
-        ...incoming,
-        data: mergeNodeData(existing, incoming),
-        position: existing.position,
-      };
-    }
-    return incoming;
-  });
-  return merged;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value != null && typeof value === "object"
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function nodeLayoutExpanded(node: Node): boolean | undefined {
-  const data = asRecord(node.data);
-  const layout = asRecord(data?.layout);
-  return typeof layout?.expanded === "boolean" ? layout.expanded : undefined;
-}
-
-function mergeNodeData(existing: Node, incoming: Node): Node["data"] {
-  const existingExpanded = nodeLayoutExpanded(existing);
-  if (existingExpanded === undefined) {
-    return incoming.data;
-  }
-
-  const incomingData = asRecord(incoming.data) ?? {};
-  const incomingLayout = asRecord(incomingData.layout) ?? {};
-  return {
-    ...incomingData,
-    layout: {
-      ...incomingLayout,
-      expanded: existingExpanded,
-    },
-  };
-}
+const VIEWPORT_FOLLOW_ANIMATION_MS = 300;
 
 function CanvasFlow({ children }: CanvasFlowProps) {
   const { meta, state } = useCanvas();
   const [nodes, setNodes, onNodesChange] = useNodesState(state.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(state.edges);
-  const { fitView, viewportInitialized } = useReactFlow<Node, Edge>();
+  const { fitView, getZoom, setCenter, viewportInitialized } = useReactFlow<
+    Node,
+    Edge
+  >();
   const nodesInitialized = useNodesInitialized();
   const flowHeight = useStore((store) => store.height);
   const flowWidth = useStore((store) => store.width);
   const initializedRef = useRef(false);
   const openingFitAppliedKeyRef = useRef<number | string | null>(null);
+  const viewportFollowStateRef = useRef(initialCanvasViewportFollowState);
   const edgeAnchorPairsRef = useRef(new Map<string, CanvasEdgeAnchorPair>());
 
   useLayoutEffect(() => {
@@ -203,6 +168,8 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   };
   const openingFitKey = meta.openingFitView?.key ?? DEFAULT_OPENING_FIT_KEY;
   const nodeCount = nodes.length;
+  const viewportFollow = meta.viewportFollow;
+  const viewportFollowKey = viewportFollow?.key ?? openingFitKey;
 
   useEffect(() => {
     if (
@@ -245,6 +212,63 @@ function CanvasFlow({ children }: CanvasFlowProps) {
     openingFitKey,
     openingFitViewOptions,
     shouldFitOpeningView,
+    viewportInitialized,
+  ]);
+
+  useEffect(() => {
+    const isFollowTarget = viewportFollow?.isFollowTarget;
+    if (isFollowTarget === undefined) {
+      viewportFollowStateRef.current = initialCanvasViewportFollowState;
+      return;
+    }
+
+    const result = resolveCanvasViewportFollow({
+      isFollowTarget,
+      key: viewportFollowKey,
+      nodes,
+      state: viewportFollowStateRef.current,
+    });
+    viewportFollowStateRef.current = result.state;
+
+    if (
+      !(viewportInitialized && nodesInitialized) ||
+      flowHeight <= 0 ||
+      flowWidth <= 0
+    ) {
+      return;
+    }
+
+    if (result.action.kind === "setCenter") {
+      const { nodeId } = result.action;
+      const node = nodes.find((candidate) => candidate.id === nodeId);
+      if (node === undefined) {
+        return;
+      }
+      const width = node.measured?.width ?? node.width ?? 0;
+      const height = node.measured?.height ?? node.height ?? 0;
+      setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+        duration: VIEWPORT_FOLLOW_ANIMATION_MS,
+        zoom: getZoom(),
+      });
+      return;
+    }
+
+    if (result.action.kind === "fitView") {
+      fitView({
+        duration: VIEWPORT_FOLLOW_ANIMATION_MS,
+        nodes: result.action.nodeIds.map((id) => ({ id })),
+      });
+    }
+  }, [
+    fitView,
+    flowHeight,
+    flowWidth,
+    getZoom,
+    nodes,
+    nodesInitialized,
+    setCenter,
+    viewportFollow?.isFollowTarget,
+    viewportFollowKey,
     viewportInitialized,
   ]);
 

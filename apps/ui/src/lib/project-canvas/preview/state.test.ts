@@ -74,3 +74,38 @@ test("preview canvas state does not render AP to DB connections without exact re
 
   assert.deepEqual(state.edges, []);
 });
+
+test("preview canvas state places unplaced EntryPoints to the left of their AP", () => {
+  const state = buildPreviewProjectCanvasState({
+    apsData: {
+      items: [
+        {
+          metadata: { name: "api", namespace: "default", uid: "ap-uid" },
+          spec: { input: { image: "ghcr.io/acme/api:latest" } },
+        },
+      ],
+    },
+    canvasLayout: undefined,
+    dbsData: undefined,
+    entryPointsData: {
+      items: [
+        {
+          metadata: {
+            name: "api-entry",
+            namespace: "default",
+            uid: "entry-uid",
+          },
+          spec: { apRef: "api" },
+        },
+      ],
+    },
+    namespace: "default",
+  });
+
+  const positions = new Map(
+    state.nodes.map((node) => [node.id, node.position])
+  );
+
+  assert.deepEqual(positions.get("ap-api"), { x: 0, y: 0 });
+  assert.deepEqual(positions.get("entry-api-entry"), { x: -340, y: 0 });
+});

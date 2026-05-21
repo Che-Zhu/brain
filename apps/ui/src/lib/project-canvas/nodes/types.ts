@@ -30,7 +30,9 @@ import {
 
 export interface CanvasNodeLayoutState {
   expanded?: boolean;
+  generatedPosition?: { x: number; y: number };
   onExpandedChange?: (node: Node, expanded: boolean) => void;
+  positionSource?: "generated";
 }
 
 export interface CanvasContainerNodeData extends Record<string, unknown> {
@@ -75,6 +77,7 @@ export interface CanvasEntryNodeData extends Record<string, unknown> {
   actions?: EntryNodeActions;
   layout?: CanvasNodeLayoutState;
   resource: {
+    apRef?: string;
     name: string;
     namespace: string;
     uid?: string;

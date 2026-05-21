@@ -105,6 +105,14 @@ export interface CanvasMeta {
   panelTabs?: Partial<Record<string, CanvasPanelTab[]>>;
   panelTypes?: CanvasPanelTypes;
   reactFlowProps?: CanvasReactFlowProps;
+  /**
+   * Optional follow behavior for newly seen nodes selected by the host app.
+   * The first node-set observed for each key is treated as opening state.
+   */
+  viewportFollow?: {
+    isFollowTarget: (node: Node) => boolean;
+    key?: number | string;
+  };
 }
 
 export interface CanvasContextValue {
