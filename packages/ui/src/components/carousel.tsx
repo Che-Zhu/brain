@@ -131,6 +131,7 @@ function Carousel({
         canScrollNext,
       }}
     >
+      {/* biome-ignore lint/a11y/useSemanticElements: carousel keeps a div API while exposing region semantics. */}
       <div
         aria-roledescription="carousel"
         className={cn("relative", className)}
@@ -170,6 +171,7 @@ function CarouselItem({ className, ...props }: ComponentProps<"div">) {
   const { orientation } = useCarousel();
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: slides use group semantics without fieldset form behavior.
     <div
       aria-roledescription="slide"
       className={cn(

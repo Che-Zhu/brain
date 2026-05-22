@@ -95,6 +95,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
   return (
     <style
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: chart config is trusted component configuration used to emit scoped CSS variables.
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
