@@ -17,6 +17,7 @@
     "cd": "./cd.sh"
   },
   "devDependencies": {
+    "@ai-hero/sandcastle": "^0.5.11",
     "@biomejs/biome": "2.4.11",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
