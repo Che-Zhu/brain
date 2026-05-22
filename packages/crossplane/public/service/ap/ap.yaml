@@ -114,6 +114,26 @@ spec:
                         minimum: 1
                         maximum: 65535
                         description: App Listening Port for the Private Address target.
+                      publicAddresses:
+                        type: array
+                        description: >
+                          Public Addresses desired for this AP. Each entry is a platform host
+                          routed to an App Listening Port; EntryPoint infrastructure is derived
+                          by the composition.
+                        items:
+                          type: object
+                          required:
+                            - host
+                            - port
+                          properties:
+                            host:
+                              type: string
+                              description: Platform Address host to expose publicly.
+                            port:
+                              type: integer
+                              minimum: 1
+                              maximum: 65535
+                              description: Target App Listening Port for this Public Address.
                   port:
                     type: integer
                     description: >
@@ -316,6 +336,27 @@ spec:
                     minimum: 1
                     maximum: 65535
                     description: App Listening Port targeted by the Private Address.
+                  publicAddresses:
+                    type: array
+                    description: Render-ready public URLs derived from AP Public Addresses and observed ingress state.
+                    items:
+                      type: object
+                      properties:
+                        host:
+                          type: string
+                          description: Public Address host.
+                        url:
+                          type: string
+                          description: Render-ready public URL including scheme.
+                        port:
+                          type: integer
+                          description: Target App Listening Port.
+                        type:
+                          type: string
+                          description: Public address type.
+                        status:
+                          type: string
+                          description: Public access status.
               conditions:
                 type: array
                 items:

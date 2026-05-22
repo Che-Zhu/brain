@@ -9,6 +9,10 @@ import {
 const DUPLICATE_ENV_NAME_RE = /Environment variable names must be unique/;
 const PRIVATE_PORT_RANGE_RE =
   /Private Address target port must be an integer from 1 through 65535/;
+const PUBLIC_HOST_REQUIRED_RE = /Public Address host is required/;
+const PUBLIC_HOST_UNIQUE_RE = /Public Address hosts must be unique/;
+const PUBLIC_PORT_RANGE_RE =
+  /Public Address target port must be an integer from 1 through 65535/;
 
 test("AP env settings patch direct rows as standard Kubernetes value entries", () => {
   const ops = patchOpsForApEnvSettings(
@@ -62,6 +66,52 @@ test("AP network settings patch privatePort without writing legacy endpoints", (
   ]);
 });
 
+test("AP network settings patch public addresses as one coherent network object", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        endpoints: [{ host: "old.example.com", port: 80 }],
+        host: "old.example.com",
+        network: {
+          privatePort: 80,
+          publicAddresses: [{ host: "old.example.com", port: 80 }],
+        },
+        port: 80,
+      },
+    },
+    {
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api.example.com",
+          port: 8080,
+          status: "Accessible",
+          type: "platform",
+          url: "https://api.example.com/",
+        },
+        { host: "admin.example.com", port: 9000 },
+      ],
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        privatePort: 8080,
+        publicAddresses: [
+          { host: "api.example.com", port: 8080 },
+          { host: "admin.example.com", port: 9000 },
+        ],
+      },
+    },
+    { op: "remove", path: "/spec/input/endpoints" },
+    { op: "remove", path: "/spec/input/port" },
+    { op: "remove", path: "/spec/input/host" },
+  ]);
+});
+
 test("AP network settings validate App Listening Ports", () => {
   for (const privatePort of [1, 65_535]) {
     assert.deepEqual(
@@ -76,6 +126,42 @@ test("AP network settings validate App Listening Ports", () => {
       PRIVATE_PORT_RANGE_RE
     );
   }
+});
+
+test("AP network settings validate Public Address hosts and ports", () => {
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        { privatePort: 8080, publicAddresses: [{ host: "  ", port: 8080 }] }
+      ),
+    PUBLIC_HOST_REQUIRED_RE
+  );
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        {
+          privatePort: 8080,
+          publicAddresses: [
+            { host: "api.example.com", port: 8080 },
+            { host: "API.example.com", port: 9000 },
+          ],
+        }
+      ),
+    PUBLIC_HOST_UNIQUE_RE
+  );
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        {
+          privatePort: 8080,
+          publicAddresses: [{ host: "api.example.com", port: 65_536 }],
+        }
+      ),
+    PUBLIC_PORT_RANGE_RE
+  );
 });
 
 test("AP env settings reject duplicate row names before patching", () => {

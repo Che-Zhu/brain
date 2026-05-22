@@ -288,12 +288,94 @@ func TestAPCompositionRendersPrivateOnlyNetworkPath(t *testing.T) {
 
 	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
 	network := asMap(t, status["network"], "ap.status.network")
-	if got := network["privateAddress"]; got != "http://web-service-port-8080.project-a.svc:8080" {
+	if got := network["privateAddress"]; got != "http://web-service.project-a.svc:8080" {
 		t.Fatalf("status.network.privateAddress = %v, want private service address", got)
 	}
 	if got := numberAsInt(t, network["privatePort"], "ap.status.network.privatePort"); got != 8080 {
 		t.Fatalf("status.network.privatePort = %d, want 8080", got)
 	}
+}
+
+func TestAPCompositionRendersPublicAddressesFromNetworkContract(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"input": map[string]interface{}{
+						"network": map[string]interface{}{
+							"privatePort": 8080,
+							"publicAddresses": []interface{}{
+								map[string]interface{}{"host": "api.example.com", "port": 8080},
+								map[string]interface{}{"host": "api-alt.example.com", "port": 8080},
+								map[string]interface{}{"host": "admin.example.com", "port": 9000},
+							},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+		"app-ingress": {
+			"spec": map[string]interface{}{
+				"tls": []interface{}{
+					map[string]interface{}{"hosts": []interface{}{"api.example.com", "api-alt.example.com", "admin.example.com"}},
+				},
+				"rules": []interface{}{
+					ingressRule("api.example.com", "web-service", 8080),
+					ingressRule("api-alt.example.com", "web-service", 8080),
+					ingressRule("admin.example.com", "web-service", 9000),
+				},
+			},
+		},
+	})
+
+	services := serviceObjects(t, out)
+	if got := len(services); got != 1 {
+		t.Fatalf("Service manifest count = %d, want 1", got)
+	}
+	serviceMetadata := asMap(t, services[0]["metadata"], "service.metadata")
+	if got := serviceMetadata["name"]; got != "web-service" {
+		t.Fatalf("Service metadata.name = %v, want web-service", got)
+	}
+	serviceSpec := asMap(t, services[0]["spec"], "service.spec")
+	assertPortNumbers(t, asSlice(t, serviceSpec["ports"], "service.spec.ports"), []int{8080, 9000}, "service.spec.ports")
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	templateSpec := asMap(t, asMap(t, deploymentSpec["template"], "deployment.spec.template")["spec"], "deployment.spec.template.spec")
+	containers := asSlice(t, templateSpec["containers"], "deployment.spec.template.spec.containers")
+	container := asMap(t, containers[0], "deployment.spec.template.spec.containers[0]")
+	assertPortNumbers(t, asSlice(t, container["ports"], "deployment container ports"), []int{8080, 9000}, "deployment container ports")
+
+	ingresses := ingressObjects(t, out)
+	if got := len(ingresses); got != 1 {
+		t.Fatalf("Ingress manifest count = %d, want 1", got)
+	}
+	ingressSpec := asMap(t, ingresses[0]["spec"], "ingress.spec")
+	rules := asSlice(t, ingressSpec["rules"], "ingress.spec.rules")
+	assertIngressBackend(t, rules, "api.example.com", "web-service", 8080)
+	assertIngressBackend(t, rules, "api-alt.example.com", "web-service", 8080)
+	assertIngressBackend(t, rules, "admin.example.com", "web-service", 9000)
+
+	entryPoint := manifestFromObject(t, singleEntryPointObject(t, out), "entrypoint object")
+	entryPointSpec := asMap(t, entryPoint["spec"], "entrypoint.spec")
+	entryPointTargets := asSlice(t, entryPointSpec["targets"], "entrypoint.spec.targets")
+	assertEntryPointTarget(t, entryPointTargets, "api.example.com", 8080)
+	assertEntryPointTarget(t, entryPointTargets, "api-alt.example.com", 8080)
+	assertEntryPointTarget(t, entryPointTargets, "admin.example.com", 9000)
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	network := asMap(t, status["network"], "ap.status.network")
+	if got := network["privateAddress"]; got != "http://web-service.project-a.svc:8080" {
+		t.Fatalf("status.network.privateAddress = %v, want private service address", got)
+	}
+	publicAddresses := asSlice(t, network["publicAddresses"], "ap.status.network.publicAddresses")
+	assertStatusPublicAddress(t, publicAddresses, "api.example.com", "https://api.example.com/", 8080)
+	assertStatusPublicAddress(t, publicAddresses, "api-alt.example.com", "https://api-alt.example.com/", 8080)
+	assertStatusPublicAddress(t, publicAddresses, "admin.example.com", "https://admin.example.com/", 9000)
 }
 
 func TestProviderKubernetesRBACAllowsEntryPointWrites(t *testing.T) {
@@ -415,6 +497,26 @@ func runningDeployment() map[string]interface{} {
 	}
 }
 
+func ingressRule(host string, serviceName string, port int) map[string]interface{} {
+	return map[string]interface{}{
+		"host": host,
+		"http": map[string]interface{}{
+			"paths": []interface{}{
+				map[string]interface{}{
+					"backend": map[string]interface{}{
+						"service": map[string]interface{}{
+							"name": serviceName,
+							"port": map[string]interface{}{"number": port},
+						},
+					},
+					"path":     "/",
+					"pathType": "Prefix",
+				},
+			},
+		},
+	}
+}
+
 func singleEntryPointObject(t *testing.T, output string) map[string]interface{} {
 	t.Helper()
 	objects := entryPointObjects(t, output)
@@ -503,6 +605,90 @@ func assertManagementPolicies(t *testing.T, obj map[string]interface{}, want ...
 			t.Fatalf("missing EntryPoint Object management policy %q in %v", policy, policies)
 		}
 	}
+}
+
+func assertPortNumbers(t *testing.T, ports []interface{}, want []int, path string) {
+	t.Helper()
+	if len(ports) != len(want) {
+		t.Fatalf("%s count = %d, want %d", path, len(ports), len(want))
+	}
+	for i, port := range ports {
+		portMap := asMap(t, port, fmt.Sprintf("%s[%d]", path, i))
+		rawPort := portMap["port"]
+		if rawPort == nil {
+			rawPort = portMap["containerPort"]
+		}
+		got := numberAsInt(t, rawPort, fmt.Sprintf("%s[%d].port", path, i))
+		if got != want[i] {
+			t.Fatalf("%s[%d].port = %d, want %d", path, i, got, want[i])
+		}
+	}
+}
+
+func assertIngressBackend(t *testing.T, rules []interface{}, host string, serviceName string, port int) {
+	t.Helper()
+	for i, rule := range rules {
+		ruleMap := asMap(t, rule, fmt.Sprintf("ingress.spec.rules[%d]", i))
+		if ruleMap["host"] != host {
+			continue
+		}
+		httpRule := asMap(t, ruleMap["http"], fmt.Sprintf("ingress.spec.rules[%d].http", i))
+		paths := asSlice(t, httpRule["paths"], fmt.Sprintf("ingress.spec.rules[%d].http.paths", i))
+		path := asMap(t, paths[0], fmt.Sprintf("ingress.spec.rules[%d].http.paths[0]", i))
+		backend := asMap(t, path["backend"], fmt.Sprintf("ingress.spec.rules[%d].http.paths[0].backend", i))
+		service := asMap(t, backend["service"], fmt.Sprintf("ingress.spec.rules[%d].http.paths[0].backend.service", i))
+		if got := service["name"]; got != serviceName {
+			t.Fatalf("Ingress backend for host %s service name = %v, want %s", host, got, serviceName)
+		}
+		servicePort := asMap(t, service["port"], fmt.Sprintf("ingress.spec.rules[%d].http.paths[0].backend.service.port", i))
+		if got := numberAsInt(t, servicePort["number"], "ingress backend service port"); got != port {
+			t.Fatalf("Ingress backend for host %s port = %d, want %d", host, got, port)
+		}
+		return
+	}
+	t.Fatalf("missing Ingress rule for host %s", host)
+}
+
+func assertEntryPointTarget(t *testing.T, targets []interface{}, host string, port int) {
+	t.Helper()
+	for i, target := range targets {
+		targetMap := asMap(t, target, fmt.Sprintf("entrypoint.spec.targets[%d]", i))
+		if targetMap["platformDomain"] != host {
+			continue
+		}
+		if got := numberAsInt(t, targetMap["port"], "entrypoint target port"); got != port {
+			t.Fatalf("EntryPoint target %s port = %d, want %d", host, got, port)
+		}
+		if got := targetMap["status"]; got != "accessible" {
+			t.Fatalf("EntryPoint target %s status = %v, want accessible", host, got)
+		}
+		return
+	}
+	t.Fatalf("missing EntryPoint target for host %s", host)
+}
+
+func assertStatusPublicAddress(t *testing.T, addresses []interface{}, host string, url string, port int) {
+	t.Helper()
+	for i, address := range addresses {
+		addressMap := asMap(t, address, fmt.Sprintf("ap.status.network.publicAddresses[%d]", i))
+		if addressMap["host"] != host {
+			continue
+		}
+		if got := addressMap["url"]; got != url {
+			t.Fatalf("status public address %s url = %v, want %s", host, got, url)
+		}
+		if got := numberAsInt(t, addressMap["port"], "status public address port"); got != port {
+			t.Fatalf("status public address %s port = %d, want %d", host, got, port)
+		}
+		if got := addressMap["type"]; got != "platform" {
+			t.Fatalf("status public address %s type = %v, want platform", host, got)
+		}
+		if got := addressMap["status"]; got != "accessible" {
+			t.Fatalf("status public address %s status = %v, want accessible", host, got)
+		}
+		return
+	}
+	t.Fatalf("missing status public address for host %s", host)
 }
 
 func numberAsInt(t *testing.T, value interface{}, path string) int {

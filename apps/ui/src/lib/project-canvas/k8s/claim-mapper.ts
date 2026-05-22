@@ -312,8 +312,54 @@ function apNetworkFromSpecAndStatus(
   return {
     ...(privateAddress === "" ? {} : { privateAddress }),
     privatePort,
-    publicAddresses: [],
+    publicAddresses: apNetworkPublicAddresses(inputNetwork, statusNetwork),
   };
+}
+
+function apNetworkPublicAddresses(
+  inputNetwork: Record<string, unknown> | undefined,
+  statusNetwork: Record<string, unknown> | undefined
+): ContainerNetwork["publicAddresses"] {
+  const observed = normalizeNetworkPublicAddresses(
+    statusNetwork?.publicAddresses,
+    true
+  );
+  if (observed.length > 0) {
+    return observed;
+  }
+  return normalizeNetworkPublicAddresses(inputNetwork?.publicAddresses, false);
+}
+
+function normalizeNetworkPublicAddresses(
+  raw: unknown,
+  includeObservedFields: boolean
+): ContainerNetwork["publicAddresses"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: ContainerNetwork["publicAddresses"] = [];
+  for (const item of raw) {
+    const address = asRecord(item);
+    if (address == null) {
+      continue;
+    }
+    const host = trimStr(address.host);
+    const port = privatePortNum(address.port);
+    if (host === "" || port == null) {
+      continue;
+    }
+    const url = trimStr(address.url);
+    const type = trimStr(address.type);
+    const status = trimStr(address.status);
+    out.push({
+      host,
+      port,
+      ...(includeObservedFields && status !== "" ? { status } : {}),
+      ...(includeObservedFields && type !== "" ? { type } : {}),
+      ...(includeObservedFields && url !== "" ? { url } : {}),
+    });
+  }
+  return out;
 }
 
 /** Prefer observed `status.endpoints` URLs; fall back to spec shape for the same port. */

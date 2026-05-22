@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestAPXRDIncludesPrivateNetworkContract(t *testing.T) {
+func TestAPXRDIncludesNetworkContract(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/ap.yaml"))
 	if err != nil {
 		t.Fatalf("read AP XRD: %v", err)
@@ -35,6 +35,29 @@ func TestAPXRDIncludesPrivateNetworkContract(t *testing.T) {
 	if got := privatePort["maximum"]; got != float64(65535) {
 		t.Fatalf("privatePort maximum = %v, want 65535", got)
 	}
+	publicAddresses := asMap(t, networkProps["publicAddresses"], "spec.input.network.publicAddresses")
+	if got := publicAddresses["type"]; got != "array" {
+		t.Fatalf("publicAddresses type = %v, want array", got)
+	}
+	publicAddressItem := asMap(t, publicAddresses["items"], "spec.input.network.publicAddresses.items")
+	publicAddressRequired := asSlice(t, publicAddressItem["required"], "spec.input.network.publicAddresses.items.required")
+	assertStringSliceContains(t, publicAddressRequired, "host")
+	assertStringSliceContains(t, publicAddressRequired, "port")
+	publicAddressProps := asMap(t, publicAddressItem["properties"], "spec.input.network.publicAddresses.items.properties")
+	host := asMap(t, publicAddressProps["host"], "spec.input.network.publicAddresses.items.host")
+	if got := host["type"]; got != "string" {
+		t.Fatalf("publicAddresses host type = %v, want string", got)
+	}
+	publicPort := asMap(t, publicAddressProps["port"], "spec.input.network.publicAddresses.items.port")
+	if got := publicPort["type"]; got != "integer" {
+		t.Fatalf("publicAddresses port type = %v, want integer", got)
+	}
+	if got := publicPort["minimum"]; got != float64(1) {
+		t.Fatalf("publicAddresses port minimum = %v, want 1", got)
+	}
+	if got := publicPort["maximum"]; got != float64(65535) {
+		t.Fatalf("publicAddresses port maximum = %v, want 65535", got)
+	}
 
 	statusProps := xrdStatusProperties(t, doc)
 	statusNetwork := asMap(t, statusProps["network"], "status.network")
@@ -42,6 +65,17 @@ func TestAPXRDIncludesPrivateNetworkContract(t *testing.T) {
 	for _, field := range []string{"privateAddress", "privatePort"} {
 		if _, ok := statusNetworkProps[field]; !ok {
 			t.Fatalf("status.network.%s is missing", field)
+		}
+	}
+	statusPublicAddresses := asMap(t, statusNetworkProps["publicAddresses"], "status.network.publicAddresses")
+	if got := statusPublicAddresses["type"]; got != "array" {
+		t.Fatalf("status.network.publicAddresses type = %v, want array", got)
+	}
+	statusPublicAddressItem := asMap(t, statusPublicAddresses["items"], "status.network.publicAddresses.items")
+	statusPublicAddressProps := asMap(t, statusPublicAddressItem["properties"], "status.network.publicAddresses.items.properties")
+	for _, field := range []string{"host", "url", "port", "type", "status"} {
+		if _, ok := statusPublicAddressProps[field]; !ok {
+			t.Fatalf("status.network.publicAddresses[].%s is missing", field)
 		}
 	}
 }
@@ -98,4 +132,14 @@ func asSlice(t *testing.T, value interface{}, path string) []interface{} {
 		t.Fatalf("%s is %T, want []interface{}", path, value)
 	}
 	return s
+}
+
+func assertStringSliceContains(t *testing.T, values []interface{}, want string) {
+	t.Helper()
+	for _, value := range values {
+		if got, ok := value.(string); ok && got == want {
+			return
+		}
+	}
+	t.Fatalf("%q missing from %v", want, values)
 }

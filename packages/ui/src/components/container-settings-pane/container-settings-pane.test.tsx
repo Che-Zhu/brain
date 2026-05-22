@@ -37,6 +37,11 @@ const PRIVATE_ADDRESS_VALUE_RE =
 const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
 const PUBLIC_ADDRESSES_RE = /Public Addresses/;
 const NO_PUBLIC_ADDRESSES_RE = /No public addresses/;
+const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
+const PUBLIC_ADDRESS_TARGET_RE = /Public Address target port/;
+const COPY_PUBLIC_ADDRESS_RE = /aria-label="Copy Public Address"/;
+const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
+const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
 const PORTS_TABLE_RE = /data-slot="ports-table"/;
 const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 
@@ -116,6 +121,43 @@ test("container settings pane renders Network instead of Ports for private-only 
   assert.match(html, PUBLIC_ADDRESSES_RE);
   assert.match(html, NO_PUBLIC_ADDRESSES_RE);
   assert.doesNotMatch(html, PORTS_TABLE_RE);
+});
+
+test("container settings pane renders editable public address rows", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api.example.com",
+            port: 8080,
+            status: "accessible",
+            type: "platform",
+            url: "https://api.example.com/",
+          },
+        ],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
+  assert.match(html, PUBLIC_ADDRESS_TARGET_RE);
+  assert.match(html, COPY_PUBLIC_ADDRESS_RE);
+  assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
+  assert.match(html, ADD_PUBLIC_ADDRESS_RE);
+  assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
 });
 
 test("read-only container settings view cannot mutate environment rows", () => {

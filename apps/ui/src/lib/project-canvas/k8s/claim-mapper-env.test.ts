@@ -69,6 +69,96 @@ test("AP claim settings maps private-only network from desired and observed AP s
   assert.deepEqual(settings.ports, []);
 });
 
+test("AP claim settings maps public addresses from observed AP network state", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080,
+            publicAddresses: [
+              { host: "api.example.com", port: 8080 },
+              { host: "admin.example.com", port: 9000 },
+            ],
+          },
+        },
+      },
+      status: {
+        network: {
+          privateAddress: "http://api-service-port-8080.default.svc:8080",
+          privatePort: 8080,
+          publicAddresses: [
+            {
+              host: "api.example.com",
+              port: 8080,
+              status: "accessible",
+              type: "platform",
+              url: "https://api.example.com/",
+            },
+            {
+              host: "admin.example.com",
+              port: 9000,
+              status: "progressing",
+              type: "platform",
+              url: "http://admin.example.com/",
+            },
+          ],
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.publicAddresses, [
+    {
+      host: "api.example.com",
+      port: 8080,
+      status: "accessible",
+      type: "platform",
+      url: "https://api.example.com/",
+    },
+    {
+      host: "admin.example.com",
+      port: 9000,
+      status: "progressing",
+      type: "platform",
+      url: "http://admin.example.com/",
+    },
+  ]);
+});
+
+test("AP claim settings falls back to desired public addresses while observed URLs are pending", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080,
+            publicAddresses: [{ host: "api.example.com", port: 8080 }],
+          },
+        },
+      },
+      status: {
+        network: {
+          privateAddress: "http://api-service-port-8080.default.svc:8080",
+          privatePort: 8080,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.publicAddresses, [
+    { host: "api.example.com", port: 8080 },
+  ]);
+});
+
 test("AP claim settings ignores invalid private-only network ports", () => {
   const settings = claimToContainerSettings(
     {

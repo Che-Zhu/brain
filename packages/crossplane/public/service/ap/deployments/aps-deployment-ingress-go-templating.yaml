@@ -100,9 +100,24 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
+            {{- $networkPublicAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
+            {{- range $network.publicAddresses }}
+            {{- $pubHost := "" }}
+            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
+            {{- $pubPort := 0 }}
+            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
+            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
+            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $endpointsRaw := list }}
             {{- if gt $privatePort 0 }}
             {{- $endpointsRaw = list (dict "port" $privatePort "public" false) }}
+            {{- range $networkPublicAddresses }}
+            {{- $endpointsRaw = concat $endpointsRaw (list (dict "port" .port "host" .host "public" true "fixedHost" true)) }}
+            {{- end }}
             {{- else if hasKey $input "endpoints" }}
             {{- $endpointsRaw = default (list) $input.endpoints }}
             {{- else if and $input.port $input.host }}
@@ -122,15 +137,28 @@ spec:
             {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
             {{- $isPublic := true }}
             {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $fixedHost := false }}
+            {{- if hasKey . "fixedHost" }}{{ $fixedHost = .fixedHost }}{{ end }}
             {{- $effHost := "" }}
             {{- if $isPublic }}
-            {{-   if ne $region "" }}
+            {{-   if $fixedHost }}
+            {{-     $effHost = $hostIn }}
+            {{-   else if ne $region "" }}
             {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
             {{-   else }}
             {{-     $effHost = $hostIn }}
             {{-   end }}
             {{- end }}
             {{- $endpoints = concat $endpoints (list (dict "port" $p "host" $effHost "public" $isPublic)) }}
+            {{- end }}
+            {{- $ports := list }}
+            {{- $portsSeen := dict }}
+            {{- range $endpoints }}
+            {{- $portKey := printf "p%d" .port }}
+            {{- if not (index $portsSeen $portKey) }}
+            {{- $_ := set $portsSeen $portKey 1 }}
+            {{- $ports = concat $ports (list (dict "port" .port)) }}
+            {{- end }}
             {{- end }}
             {{- $needIngress := false }}
             {{- range $endpoints }}
@@ -151,7 +179,11 @@ spec:
                   "probes" ($input.probes | default (dict))
             }}
             {{- if gt $privatePort 0 }}
-            {{- $_ := set $effectiveInput "network" (dict "privatePort" $privatePort) }}
+            {{- $effectiveNetwork := dict "privatePort" $privatePort }}
+            {{- if gt (len $networkPublicAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- end }}
+            {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- else }}
             {{- $_ := set $effectiveInput "endpoints" $endpoints }}
             {{- end }}
@@ -277,16 +309,11 @@ spec:
                   containers:
                   - name: {{ $name }}
                     image: {{ $input.image }}
-                    {{- if $endpoints }}
+                    {{- if $ports }}
                     ports:
-                    {{- $containerPortsSeen := dict }}
-                    {{- range $endpoints }}
-                    {{- $portKey := printf "p%d" .port }}
-                    {{- if not (index $containerPortsSeen $portKey) }}
-                    {{- $_ := set $containerPortsSeen $portKey 1 }}
+                    {{- range $ports }}
                     - containerPort: {{ .port }}
                       name: http-{{ .port }}
-                    {{- end }}
                     {{- end }}
                     {{- end }}
                     {{- if $input.env }}
@@ -324,20 +351,16 @@ spec:
                     {{- end }}
                     {{- end }}
 
-            {{- $portsSeen := dict }}
-            {{- range $endpoints }}
-            {{- $portKey := printf "p%d" .port }}
-            {{- if not (index $portsSeen $portKey) }}
-            {{- $_ := set $portsSeen $portKey 1 }}
+            {{- if $ports }}
             ---
 
             apiVersion: v1
             kind: Service
             metadata:
-              name: {{ printf "%s-service-port-%d" $name .port }}
+              name: {{ printf "%s-service" $name }}
               namespace: {{ $ns }}
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: app-service-port-{{ .port }}
+                gotemplating.fn.crossplane.io/composition-resource-name: app-service
               labels:
                 crossplane.io/composite: {{ $name }}
                 {{ if ne $projectName "" }}
@@ -355,11 +378,12 @@ spec:
               selector:
                 app: {{ $name }}
               ports:
+              {{- range $ports }}
               - name: http-{{ .port }}
                 port: {{ .port }}
                 targetPort: {{ .port }}
                 protocol: TCP
-            {{- end }}
+              {{- end }}
             {{- end }}
             {{- if $needIngress }}
 
@@ -412,7 +436,7 @@ spec:
                     pathType: Prefix
                     backend:
                       service:
-                        name: {{ printf "%s-service-port-%d" $name .port }}
+                        name: {{ printf "%s-service" $name }}
                         port:
                           number: {{ .port }}
               {{- end }}
@@ -572,14 +596,13 @@ spec:
               {{ if ne $projectUid "" }}
               projectUid: {{ $projectUid | quote }}
               {{ end }}
-              {{ if gt (len $endpoints) 0 }}
+              {{ if gt (len $ports) 0 }}
               endpoints:
-              {{ range $endpoints }}
+              {{ range $ports }}
               {{- $p := .port }}
-              {{- $isPublic := .public }}
-              {{- $svcKey := printf "app-service-port-%d" $p }}
+              {{- $svcKey := "app-service" }}
               {{- $svcObs := getComposedResource $ $svcKey }}
-              {{- $svcDns := printf "%s-service-port-%d" $name $p }}
+              {{- $svcDns := printf "%s-service" $name }}
               {{- $priv := printf "http://%s.%s.svc:%v" $svcDns $ns $p }}
               {{- if and $svcObs $svcObs.spec $svcObs.spec.clusterIP }}
               {{- $cip := $svcObs.spec.clusterIP | toString }}
@@ -588,8 +611,13 @@ spec:
               {{- end }}
               {{- end }}
               {{- $pub := "" }}
-              {{- if and $isPublic (ne (trim (toString (default "" .host))) "") }}
-              {{- $pubHost := trim (toString (default "" .host)) }}
+              {{- $pubHost := "" }}
+              {{- range $ep := $endpoints }}
+              {{- if and $ep.public (eq (int $ep.port) (int $p)) (eq $pubHost "") (ne (trim (toString (default "" $ep.host))) "") }}
+              {{- $pubHost = trim (toString $ep.host) }}
+              {{- end }}
+              {{- end }}
+              {{- if ne $pubHost "" }}
               {{- if and $ingObs $ingObs.spec $ingObs.spec.rules }}
               {{- $wantSvc := $svcDns }}
               {{- range $rule := $ingObs.spec.rules }}
@@ -615,7 +643,7 @@ spec:
               {{ end }}
               {{ end }}
               {{ if gt $privatePort 0 }}
-              {{- $networkSvcDns := printf "%s-service-port-%d" $name $privatePort }}
+              {{- $networkSvcDns := printf "%s-service" $name }}
               {{- $networkPrivateAddress := printf "http://%s.%s.svc" $networkSvcDns $ns }}
               {{- if ne $privatePort 80 }}
               {{- $networkPrivateAddress = printf "%s:%d" $networkPrivateAddress $privatePort }}
@@ -623,6 +651,18 @@ spec:
               network:
                 privateAddress: {{ $networkPrivateAddress | quote }}
                 privatePort: {{ $privatePort }}
+                {{- if $needIngress }}
+                publicAddresses:
+                  {{ range $endpoints }}
+                  {{- if and .public (ne (trim (toString (default "" .host))) "") }}
+                  - host: {{ trim (toString .host) | quote }}
+                    url: {{ printf "%s://%s/" $pubScheme (trim (toString .host)) | quote }}
+                    port: {{ .port }}
+                    type: "platform"
+                    status: {{ $entryTargetStatus | quote }}
+                  {{ end }}
+                  {{ end }}
+                {{- end }}
               {{ end }}
     - step: create-orphaned-config-snapshot-rbac
       functionRef:
@@ -675,9 +715,24 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
+            {{- $networkPublicAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
+            {{- range $network.publicAddresses }}
+            {{- $pubHost := "" }}
+            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
+            {{- $pubPort := 0 }}
+            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
+            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
+            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $endpointsRaw := list }}
             {{- if gt $privatePort 0 }}
             {{- $endpointsRaw = list (dict "port" $privatePort "public" false) }}
+            {{- range $networkPublicAddresses }}
+            {{- $endpointsRaw = concat $endpointsRaw (list (dict "port" .port "host" .host "public" true "fixedHost" true)) }}
+            {{- end }}
             {{- else if hasKey $input "endpoints" }}
             {{- $endpointsRaw = default (list) $input.endpoints }}
             {{- else if and $input.port $input.host }}
@@ -697,9 +752,13 @@ spec:
             {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
             {{- $isPublic := true }}
             {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $fixedHost := false }}
+            {{- if hasKey . "fixedHost" }}{{ $fixedHost = .fixedHost }}{{ end }}
             {{- $effHost := "" }}
             {{- if $isPublic }}
-            {{-   if ne $region "" }}
+            {{-   if $fixedHost }}
+            {{-     $effHost = $hostIn }}
+            {{-   else if ne $region "" }}
             {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
             {{-   else }}
             {{-     $effHost = $hostIn }}
@@ -724,7 +783,11 @@ spec:
                   "probes" ($input.probes | default (dict))
             }}
             {{- if gt $privatePort 0 }}
-            {{- $_ := set $effectiveInput "network" (dict "privatePort" $privatePort) }}
+            {{- $effectiveNetwork := dict "privatePort" $privatePort }}
+            {{- if gt (len $networkPublicAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- end }}
+            {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- else }}
             {{- $_ := set $effectiveInput "endpoints" $endpoints }}
             {{- end }}
@@ -858,9 +921,24 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
+            {{- $networkPublicAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
+            {{- range $network.publicAddresses }}
+            {{- $pubHost := "" }}
+            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
+            {{- $pubPort := 0 }}
+            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
+            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
+            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $endpointsRaw := list }}
             {{- if gt $privatePort 0 }}
             {{- $endpointsRaw = list (dict "port" $privatePort "public" false) }}
+            {{- range $networkPublicAddresses }}
+            {{- $endpointsRaw = concat $endpointsRaw (list (dict "port" .port "host" .host "public" true "fixedHost" true)) }}
+            {{- end }}
             {{- else if hasKey $input "endpoints" }}
             {{- $endpointsRaw = default (list) $input.endpoints }}
             {{- else if and $input.port $input.host }}
@@ -880,9 +958,13 @@ spec:
             {{- if hasKey . "host" }}{{ $hostIn = trim (toString .host) }}{{ end }}
             {{- $isPublic := true }}
             {{- if hasKey . "public" }}{{ $isPublic = .public }}{{ end }}
+            {{- $fixedHost := false }}
+            {{- if hasKey . "fixedHost" }}{{ $fixedHost = .fixedHost }}{{ end }}
             {{- $effHost := "" }}
             {{- if $isPublic }}
-            {{-   if ne $region "" }}
+            {{-   if $fixedHost }}
+            {{-     $effHost = $hostIn }}
+            {{-   else if ne $region "" }}
             {{-     if $multiPublic }}{{ $effHost = printf "%s-p%d-%s.%s" $name $p $slug $region }}{{ else }}{{ $effHost = $computedHost }}{{ end }}
             {{-   else }}
             {{-     $effHost = $hostIn }}
@@ -907,7 +989,11 @@ spec:
                   "probes" ($input.probes | default (dict))
             }}
             {{- if gt $privatePort 0 }}
-            {{- $_ := set $effectiveInput "network" (dict "privatePort" $privatePort) }}
+            {{- $effectiveNetwork := dict "privatePort" $privatePort }}
+            {{- if gt (len $networkPublicAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- end }}
+            {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- else }}
             {{- $_ := set $effectiveInput "endpoints" $endpoints }}
             {{- end }}

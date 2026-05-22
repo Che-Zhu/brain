@@ -76,6 +76,7 @@ func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, se
 	}
 	statusCopy["variables"] = buildVariablesFromEndpoints(endpoints)
 	mergePrivateNetworkStatus(ap, statusCopy, services)
+	mergePublicNetworkStatus(ap, statusCopy, ingresses)
 	out["status"] = statusCopy
 
 	return out
@@ -144,6 +145,123 @@ func privateNetworkAddressForPort(services []map[string]interface{}, namespace s
 		}
 	}
 	return ""
+}
+
+type networkPublicAddress struct {
+	host string
+	port int
+}
+
+func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}, ingresses []map[string]interface{}) {
+	addresses := apPublicAddresses(ap)
+	if len(addresses) == 0 {
+		return
+	}
+	network, _ := status["network"].(map[string]interface{})
+	networkCopy := make(map[string]interface{})
+	for k, v := range network {
+		networkCopy[k] = v
+	}
+	if _, exists := networkCopy["publicAddresses"]; exists {
+		status["network"] = networkCopy
+		return
+	}
+
+	schemeByHost := ingressSchemeByHost(ingresses)
+	accessStatus := publicAccessStatusFromPhase(status["phase"])
+	publicAddresses := make([]map[string]interface{}, 0, len(addresses))
+	for _, address := range addresses {
+		scheme := schemeByHost[address.host]
+		if scheme == "" {
+			scheme = "http"
+		}
+		publicAddresses = append(publicAddresses, map[string]interface{}{
+			"host":   address.host,
+			"port":   address.port,
+			"status": accessStatus,
+			"type":   "platform",
+			"url":    fmt.Sprintf("%s://%s/", scheme, address.host),
+		})
+	}
+	networkCopy["publicAddresses"] = publicAddresses
+	status["network"] = networkCopy
+}
+
+func apPublicAddresses(ap map[string]interface{}) []networkPublicAddress {
+	spec, _ := ap["spec"].(map[string]interface{})
+	if spec == nil {
+		return nil
+	}
+	input, _ := spec["input"].(map[string]interface{})
+	if input == nil {
+		return nil
+	}
+	network, _ := input["network"].(map[string]interface{})
+	if network == nil {
+		return nil
+	}
+	raw, _ := network["publicAddresses"].([]interface{})
+	if len(raw) == 0 {
+		return nil
+	}
+	addresses := make([]networkPublicAddress, 0, len(raw))
+	for _, item := range raw {
+		address, _ := item.(map[string]interface{})
+		if address == nil {
+			continue
+		}
+		host, _ := address["host"].(string)
+		host = strings.TrimSpace(host)
+		port, ok := privatePortFromValue(address["port"])
+		if host == "" || !ok {
+			continue
+		}
+		addresses = append(addresses, networkPublicAddress{host: host, port: port})
+	}
+	return addresses
+}
+
+func ingressSchemeByHost(ingresses []map[string]interface{}) map[string]string {
+	result := make(map[string]string)
+	for _, ing := range ingresses {
+		spec, _ := ing["spec"].(map[string]interface{})
+		if spec == nil {
+			continue
+		}
+		tlsHosts := getTLSHosts(spec)
+		rules, _ := spec["rules"].([]interface{})
+		for _, item := range rules {
+			rule, _ := item.(map[string]interface{})
+			if rule == nil {
+				continue
+			}
+			host, _ := rule["host"].(string)
+			host = strings.TrimSpace(host)
+			if host == "" || isPlaceholderIngressHost(host) {
+				continue
+			}
+			scheme := "http"
+			if tlsHosts[host] {
+				scheme = "https"
+			}
+			result[host] = scheme
+		}
+	}
+	return result
+}
+
+func publicAccessStatusFromPhase(phaseValue interface{}) string {
+	phase, _ := phaseValue.(string)
+	switch phase {
+	case "Running":
+		return "accessible"
+	case "Progressing":
+		return "progressing"
+	case "Failed", "Degraded", "Paused":
+		return "inaccessible"
+	default:
+		return "unknown"
+	}
 }
 
 func privatePortFromValue(value interface{}) (int, bool) {

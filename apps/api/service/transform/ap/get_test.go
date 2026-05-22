@@ -112,6 +112,73 @@ func TestAPTransformPreservesExistingPrivateNetworkAddress(t *testing.T) {
 	}
 }
 
+func TestAPTransformEnrichesPublicNetworkAddressesFromIngress(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name":      "api",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 8080,
+						"publicAddresses": []interface{}{
+							map[string]interface{}{"host": "api.example.com", "port": 8080},
+							map[string]interface{}{"host": "api-alt.example.com", "port": 8080},
+							map[string]interface{}{"host": "admin.example.com", "port": 9000},
+						},
+					},
+				},
+			},
+			"status": map[string]interface{}{
+				"phase": "Running",
+			},
+		},
+		[]map[string]interface{}{
+			{
+				"metadata": map[string]interface{}{
+					"name":      "api-ingress",
+					"namespace": "default",
+				},
+				"spec": map[string]interface{}{
+					"rules": []interface{}{
+						ingressRule("api.example.com", "api-service", 8080),
+						ingressRule("api-alt.example.com", "api-service", 8080),
+						ingressRule("admin.example.com", "api-service", 9000),
+					},
+					"tls": []interface{}{
+						map[string]interface{}{
+							"hosts": []interface{}{"api.example.com", "api-alt.example.com", "admin.example.com"},
+						},
+					},
+				},
+			},
+		},
+		[]map[string]interface{}{
+			{
+				"metadata": map[string]interface{}{
+					"name":      "api-service",
+					"namespace": "default",
+				},
+				"spec": map[string]interface{}{
+					"ports": []interface{}{
+						map[string]interface{}{"port": 8080},
+						map[string]interface{}{"port": 9000},
+					},
+				},
+			},
+		},
+	)
+
+	status := out["status"].(map[string]interface{})
+	network := status["network"].(map[string]interface{})
+	addresses := network["publicAddresses"].([]map[string]interface{})
+	assertPublicNetworkAddress(t, addresses, "api.example.com", "https://api.example.com/", 8080)
+	assertPublicNetworkAddress(t, addresses, "api-alt.example.com", "https://api-alt.example.com/", 8080)
+	assertPublicNetworkAddress(t, addresses, "admin.example.com", "https://admin.example.com/", 9000)
+}
+
 func TestAPTransformIgnoresInvalidPrivateNetworkPort(t *testing.T) {
 	for _, privatePort := range []interface{}{0, 65536, 8080.5} {
 		t.Run(fmt.Sprint(privatePort), func(t *testing.T) {
@@ -155,4 +222,46 @@ func TestAPTransformIgnoresInvalidPrivateNetworkPort(t *testing.T) {
 
 func intString(n int) string {
 	return strconv.Itoa(n)
+}
+
+func ingressRule(host string, serviceName string, port int) map[string]interface{} {
+	return map[string]interface{}{
+		"host": host,
+		"http": map[string]interface{}{
+			"paths": []interface{}{
+				map[string]interface{}{
+					"backend": map[string]interface{}{
+						"service": map[string]interface{}{
+							"name": serviceName,
+							"port": map[string]interface{}{"number": port},
+						},
+					},
+					"path": "/",
+				},
+			},
+		},
+	}
+}
+
+func assertPublicNetworkAddress(t *testing.T, addresses []map[string]interface{}, host string, url string, port int) {
+	t.Helper()
+	for _, address := range addresses {
+		if address["host"] != host {
+			continue
+		}
+		if got := address["url"]; got != url {
+			t.Fatalf("public address %s url = %v, want %s", host, got, url)
+		}
+		if got := address["port"]; got != port {
+			t.Fatalf("public address %s port = %v, want %d", host, got, port)
+		}
+		if got := address["type"]; got != "platform" {
+			t.Fatalf("public address %s type = %v, want platform", host, got)
+		}
+		if got := address["status"]; got != "accessible" {
+			t.Fatalf("public address %s status = %v, want accessible", host, got)
+		}
+		return
+	}
+	t.Fatalf("missing public address for host %s", host)
 }

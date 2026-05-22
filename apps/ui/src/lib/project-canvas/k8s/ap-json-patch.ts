@@ -291,15 +291,55 @@ function validatedPrivatePort(privatePort: number): number {
   return n;
 }
 
+function validatedPublicAddressPort(port: number): number {
+  const n = Number(port);
+  if (!Number.isInteger(n) || n < 1 || n > 65_535) {
+    throw new Error(
+      "Public Address target port must be an integer from 1 through 65535."
+    );
+  }
+  return n;
+}
+
+function validatedPublicAddresses(
+  publicAddresses:
+    | readonly ContainerNetwork["publicAddresses"][number][]
+    | undefined
+): Record<string, unknown>[] | undefined {
+  if (publicAddresses == null) {
+    return undefined;
+  }
+  const seenHosts = new Set<string>();
+  return publicAddresses.map((address) => {
+    const host = address.host.trim();
+    if (host === "") {
+      throw new Error("Public Address host is required.");
+    }
+    const hostKey = host.toLowerCase();
+    if (seenHosts.has(hostKey)) {
+      throw new Error("Public Address hosts must be unique.");
+    }
+    seenHosts.add(hostKey);
+    return {
+      host,
+      port: validatedPublicAddressPort(address.port),
+    };
+  });
+}
+
 export function patchOpsForApNetworkSettings(
   spec: Record<string, unknown> | undefined,
-  network: Pick<ContainerNetwork, "privatePort">
+  network: Pick<ContainerNetwork, "privatePort"> &
+    Partial<Pick<ContainerNetwork, "publicAddresses">>
 ): K8sJsonPatchOp[] {
   const privatePort = validatedPrivatePort(network.privatePort);
+  const publicAddresses = validatedPublicAddresses(network.publicAddresses);
   const input = asRecord(spec?.input);
-  const ops = patchOpsForApInput(spec, {
-    network: { privatePort },
-  });
+  const networkInput: Record<string, unknown> = { privatePort };
+  if (publicAddresses != null) {
+    networkInput.publicAddresses = publicAddresses;
+  }
+  const ops = patchOpsForApInput(spec, { network: networkInput });
   removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
   return ops;
 }
