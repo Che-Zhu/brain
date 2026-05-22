@@ -92,6 +92,31 @@ func TestDBXRDIncludesLifecycleFields(t *testing.T) {
 	}
 }
 
+func TestDBXRDConstrainsReplicas(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "packages/crossplane/public/service/db/db.yaml"))
+	if err != nil {
+		t.Fatalf("read DB XRD: %v", err)
+	}
+
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse DB XRD: %v", err)
+	}
+
+	specProps := xrdSpecProperties(t, doc)
+	replicas := asMap(t, specProps["replicas"], "spec.replicas")
+	if got := replicas["type"]; got != "integer" {
+		t.Fatalf("spec.replicas type = %v, want integer", got)
+	}
+	if got := replicas["minimum"]; !isNumber(got, 1) {
+		t.Fatalf("spec.replicas minimum = %v, want 1", got)
+	}
+	if got := replicas["maximum"]; !isNumber(got, 10) {
+		t.Fatalf("spec.replicas maximum = %v, want 10", got)
+	}
+}
+
 func TestDBCompositionsRenderPauseAndRestartLifecycle(t *testing.T) {
 	root := repoRoot(t)
 	cases := map[string][]string{
@@ -376,13 +401,17 @@ func assertStringSliceEqual(t *testing.T, got []string, want []string) {
 }
 
 func isZeroNumber(value interface{}) bool {
+	return isNumber(value, 0)
+}
+
+func isNumber(value interface{}, want int) bool {
 	switch v := value.(type) {
 	case int:
-		return v == 0
+		return v == want
 	case int64:
-		return v == 0
+		return v == int64(want)
 	case float64:
-		return v == 0
+		return v == float64(want)
 	default:
 		return false
 	}

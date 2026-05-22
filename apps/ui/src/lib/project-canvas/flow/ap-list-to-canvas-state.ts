@@ -262,6 +262,18 @@ function databaseConnectionsFromResource(
   ];
 }
 
+function databaseDesiredFromSpec(
+  spec: Record<string, unknown>
+): CanvasDatabaseNodeData["desired"] {
+  const replicas =
+    typeof spec.replicas === "number" && Number.isFinite(spec.replicas)
+      ? spec.replicas
+      : undefined;
+  return {
+    ...(replicas === undefined ? {} : { replicas }),
+  };
+}
+
 function databaseCompositionNameFromSpec(
   spec: Record<string, unknown>
 ): string | undefined {
@@ -447,6 +459,7 @@ export function dbToDatabaseNodeData(
 
   return {
     connections: databaseConnectionsFromResource(spec, status),
+    desired: databaseDesiredFromSpec(spec),
     states,
     ...(uid === undefined || uid === "" ? {} : { uid }),
     workload: { name, namespace },

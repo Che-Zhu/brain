@@ -28,7 +28,7 @@ import {
 
 const METRICS_REFRESH_MS = 5000;
 
-interface DatabaseMetricsPaneProps {
+export interface DatabaseMetricsPaneProps {
   kubeconfig?: string;
   node: Node | null;
   onClose: () => void;

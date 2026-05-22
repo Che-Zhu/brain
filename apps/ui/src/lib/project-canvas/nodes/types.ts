@@ -65,7 +65,14 @@ export interface CanvasDatabaseWorkloadRef {
 export interface CanvasDatabaseNodeData extends Record<string, unknown> {
   actions?: DatabaseNodeActions;
   connections: DatabaseNodeConnection[];
+  desired?: {
+    replicas?: number;
+  };
   layout?: CanvasNodeLayoutState;
+  settingsAccess?: {
+    readOnly?: boolean;
+    shareToken?: string;
+  };
   states: DatabaseNodeStates;
   uid?: string;
   workload: CanvasDatabaseWorkloadRef;

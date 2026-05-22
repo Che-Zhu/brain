@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { CANVAS_ENTRY_NODE_TYPE } from "../nodes/constants";
-import { entryPointsToCanvasState } from "./ap-list-to-canvas-state";
+import {
+  CANVAS_DATABASE_NODE_TYPE,
+  CANVAS_ENTRY_NODE_TYPE,
+} from "../nodes/constants";
+import {
+  dbsToCanvasState,
+  entryPointsToCanvasState,
+} from "./ap-list-to-canvas-state";
 
 test("EntryPoint canvas nodes are derived from AP Network public addresses", () => {
   const state = entryPointsToCanvasState(undefined, {
@@ -174,4 +180,33 @@ test("EntryPoint canvas nodes keep uid fallback when resource name is unavailabl
       },
     ],
   });
+});
+
+test("DB canvas nodes preserve desired replicas for settings drafts", () => {
+  const state = dbsToCanvasState(
+    {
+      items: [
+        {
+          metadata: { name: "postgres", namespace: "default", uid: "db-uid" },
+          spec: {
+            engine: "postgresql",
+            replicas: 3,
+          },
+          status: { phase: "Running" },
+        },
+      ],
+    },
+    { namespaceFallback: "default" }
+  );
+
+  assert.equal(state.nodes[0]?.id, "db-postgres");
+  assert.equal(state.nodes[0]?.type, CANVAS_DATABASE_NODE_TYPE);
+  assert.equal(
+    (
+      state.nodes[0]?.data as {
+        desired?: { replicas?: number };
+      }
+    ).desired?.replicas,
+    3
+  );
 });
