@@ -7,6 +7,10 @@ export interface DatabaseSettingsNumberConstraint {
 }
 
 export const DB_SETTINGS_REPLICAS = { max: 10, min: 1 } as const;
+export const DB_SETTINGS_REPLICA_COUNT = {
+  ...DB_SETTINGS_REPLICAS,
+  step: 1,
+} as const satisfies DatabaseSettingsNumberConstraint;
 export const DB_SETTINGS_CPU_LIMIT_CORES = {
   max: 4,
   min: 0.25,
@@ -50,13 +54,8 @@ export interface DatabaseSettingsPatch {
 }
 
 function integerInRange(raw: unknown, fallback: number): number {
-  let numeric = Number.NaN;
-  if (typeof raw === "number") {
-    numeric = raw;
-  } else if (typeof raw === "string" && raw.trim() !== "") {
-    numeric = Number(raw);
-  }
-  if (!Number.isFinite(numeric)) {
+  const numeric = finiteNumberFromRaw(raw);
+  if (numeric === undefined) {
     return fallback;
   }
   const rounded = Math.round(numeric);
@@ -66,9 +65,9 @@ function integerInRange(raw: unknown, fallback: number): number {
   );
 }
 
-function numberFromRaw(raw: unknown): number | undefined {
+function finiteNumberFromRaw(raw: unknown): number | undefined {
   if (typeof raw === "number") {
-    return raw;
+    return Number.isFinite(raw) ? raw : undefined;
   }
   if (typeof raw === "string" && raw.trim() !== "") {
     const numeric = Number(raw);
@@ -82,8 +81,8 @@ function steppedNumberInRange(
   constraint: DatabaseSettingsNumberConstraint,
   fallback: number
 ): number {
-  const numeric = numberFromRaw(raw);
-  if (!Number.isFinite(numeric)) {
+  const numeric = finiteNumberFromRaw(raw);
+  if (numeric === undefined) {
     return fallback;
   }
   const clamped = Math.min(constraint.max, Math.max(constraint.min, numeric));

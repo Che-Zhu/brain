@@ -7,7 +7,15 @@ import type { DatabaseNodeStatus } from "@workspace/ui/components/database-node/
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { Separator } from "@workspace/ui/components/separator";
 import { cn } from "@workspace/ui/lib/utils";
-import { Cpu, HardDrive, Layers, MemoryStick, Settings, X } from "lucide-react";
+import {
+  Cpu,
+  HardDrive,
+  Layers,
+  type LucideIcon,
+  MemoryStick,
+  Settings,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,7 +26,7 @@ import {
   type DatabaseSettingsNumberConstraint,
   DB_SETTINGS_CPU_LIMIT_CORES,
   DB_SETTINGS_MEMORY_LIMIT_GIB,
-  DB_SETTINGS_REPLICAS,
+  DB_SETTINGS_REPLICA_COUNT,
   DB_SETTINGS_STORAGE_GIB,
   dbSettingsDraftFromNodeData,
   dbSettingsDraftIsDirty,
@@ -71,7 +79,7 @@ function DatabaseSettingsSlider({
   ariaLabel: string;
   constraint: DatabaseSettingsNumberConstraint;
   disabled: boolean;
-  icon: typeof Layers;
+  icon: LucideIcon;
   label: string;
   maxDecimals: number;
   onValueChange: (value: number) => void;
@@ -232,7 +240,7 @@ export function DatabaseSettingsPane({
             <div className="flex flex-col gap-5">
               <DatabaseSettingsSlider
                 ariaLabel="Database replica count"
-                constraint={{ ...DB_SETTINGS_REPLICAS, step: 1 }}
+                constraint={DB_SETTINGS_REPLICA_COUNT}
                 disabled={controlsDisabled}
                 icon={Layers}
                 label="Replicas"
