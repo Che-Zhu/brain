@@ -99,7 +99,8 @@ export interface ContainerPort {
 }
 
 export interface ContainerNetworkPublicAddress {
-  host: string;
+  host?: string;
+  id?: string;
   port: number;
   status?: string;
   type?: string;
@@ -610,62 +611,33 @@ interface NetworkSettingsSectionProps {
 }
 
 function publicAddressValue(address: ContainerNetworkPublicAddress): string {
-  return address.url?.trim() || address.host;
+  return address.url?.trim() || address.host?.trim() || "";
 }
 
-function publicAddressHostKey(host: string): string {
-  return host.trim().toLowerCase();
+function publicAddressKey(
+  address: ContainerNetworkPublicAddress,
+  index: number
+): string {
+  return (
+    address.id?.trim() ||
+    address.host?.trim().toLowerCase() ||
+    `pending-${index}`
+  );
 }
 
 interface PublicAddressRowProps {
   address: ContainerNetworkPublicAddress;
   onDelete?: () => void | Promise<void>;
-  onPortChange?: (port: number) => void | Promise<void>;
   readOnly: boolean;
 }
 
 function PublicAddressRow({
   address,
   onDelete,
-  onPortChange,
   readOnly,
 }: PublicAddressRowProps) {
-  const portInputId = useId();
-  const [draftPort, setDraftPort] = useState(() => String(address.port));
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const value = publicAddressValue(address);
-
-  useEffect(() => {
-    setDraftPort(String(address.port));
-    setError(null);
-  }, [address.port]);
-
-  const parsedPort = parsePortNumberDigits(draftPort.trim());
-  const dirty = draftPort.trim() !== String(address.port);
-  const canSave = onPortChange != null && dirty && parsedPort.ok && !pending;
-
-  const handleSave = async () => {
-    if (onPortChange == null) {
-      return;
-    }
-    const parsed = parsePortNumberDigits(draftPort.trim());
-    if (!parsed.ok) {
-      setError(parsed.message);
-      return;
-    }
-    setPending(true);
-    try {
-      await onPortChange(parsed.n);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setDraftPort(String(address.port));
-    setError(null);
-  };
 
   const handleCopy = async () => {
     if (value === "") {
@@ -721,64 +693,18 @@ function PublicAddressRow({
         )}
       </div>
       <div className="grid min-w-0 gap-1.5">
-        <Label htmlFor={portInputId}>Public Address target port</Label>
+        <Label>Public Address target port</Label>
         <div className="flex min-w-0 items-center gap-2">
-          <Input
-            aria-describedby={
-              error == null ? undefined : `${portInputId}-error`
-            }
-            aria-invalid={error != null}
-            className="h-8 max-w-32 font-mono text-xs"
-            disabled={readOnly || onPortChange == null}
-            id={portInputId}
-            inputMode="numeric"
-            onChange={(event) => {
-              setDraftPort(event.target.value);
-              setError(null);
-            }}
-            value={draftPort}
-          />
-          {readOnly || !dirty ? null : (
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                aria-label="Cancel Public Address port edit"
-                className="h-7 px-2 text-xs"
-                disabled={pending}
-                onClick={handleCancel}
-                type="button"
-                variant="ghost"
-              >
-                <X aria-hidden />
-              </Button>
-              <Button
-                aria-label="Save Public Address target port"
-                className="h-7 px-2 text-xs"
-                disabled={!canSave}
-                onClick={handleSave}
-                type="button"
-                variant="secondary"
-              >
-                <Save aria-hidden />
-              </Button>
-            </div>
-          )}
+          <div className="h-8 max-w-32 rounded-md border border-border bg-muted/30 px-2.5 py-2 font-mono text-foreground text-xs">
+            {address.port}
+          </div>
         </div>
-        {error == null ? null : (
-          <p
-            className="text-destructive text-xs"
-            id={`${portInputId}-error`}
-            role="alert"
-          >
-            {error}
-          </p>
-        )}
       </div>
     </div>
   );
 }
 
 interface PublicAddressDraft {
-  host: string;
   port: number;
 }
 
@@ -787,49 +713,29 @@ type PublicAddressDraftValidation =
   | { message: string; ok: false };
 
 function validatePublicAddressDraft(
-  hostDraft: string,
-  portDraft: string,
-  existingAddresses: readonly ContainerNetworkPublicAddress[]
+  portDraft: string
 ): PublicAddressDraftValidation {
-  const host = hostDraft.trim();
-  if (host === "") {
-    return { message: "Public Address host is required.", ok: false };
-  }
-
-  const hostKey = publicAddressHostKey(host);
-  if (
-    existingAddresses.some(
-      (address) => publicAddressHostKey(address.host) === hostKey
-    )
-  ) {
-    return { message: "Public Address hosts must be unique.", ok: false };
-  }
-
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   if (!parsedPort.ok) {
     return { message: parsedPort.message, ok: false };
   }
 
-  return { address: { host, port: parsedPort.n }, ok: true };
+  return { address: { port: parsedPort.n }, ok: true };
 }
 
 interface AddPublicAddressFormProps {
   defaultPort: number;
-  existingAddresses: readonly ContainerNetworkPublicAddress[];
   onCancel: () => void;
   onSubmit?: (address: PublicAddressDraft) => void | Promise<void>;
 }
 
 function AddPublicAddressForm({
   defaultPort,
-  existingAddresses,
   onCancel,
   onSubmit,
 }: AddPublicAddressFormProps) {
-  const hostInputId = useId();
   const portInputId = useId();
-  const errorId = `${hostInputId}-error`;
-  const [draftHost, setDraftHost] = useState("");
+  const errorId = `${portInputId}-error`;
   const [draftPort, setDraftPort] = useState(() => String(defaultPort));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -838,11 +744,7 @@ function AddPublicAddressForm({
     if (onSubmit == null) {
       return;
     }
-    const validation = validatePublicAddressDraft(
-      draftHost,
-      draftPort,
-      existingAddresses
-    );
+    const validation = validatePublicAddressDraft(draftPort);
     if (!validation.ok) {
       setError(validation.message);
       return;
@@ -859,21 +761,6 @@ function AddPublicAddressForm({
 
   return (
     <div className="grid min-w-0 gap-2 rounded-md border border-border border-dashed bg-background/60 p-2">
-      <div className="grid min-w-0 gap-1.5">
-        <Label htmlFor={hostInputId}>Public Address host</Label>
-        <Input
-          aria-describedby={error == null ? undefined : errorId}
-          aria-invalid={error != null}
-          className="h-8 font-mono text-xs"
-          disabled={pending}
-          id={hostInputId}
-          onChange={(event) => {
-            setDraftHost(event.target.value);
-            setError(null);
-          }}
-          value={draftHost}
-        />
-      </div>
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
         <Input
@@ -986,22 +873,17 @@ function NetworkSettingsSection({
     });
   };
 
-  const handlePublicAddressPortChange = async (index: number, port: number) => {
-    if (onNetworkChange == null) {
-      return;
-    }
-    const publicAddresses = network.publicAddresses.map((address, itemIndex) =>
-      itemIndex === index ? { ...address, port } : address
-    );
-    await onNetworkChange({ ...network, publicAddresses });
-  };
-
   const handleDeletePublicAddress = async (index: number) => {
     if (onNetworkChange == null) {
       return;
     }
+    const target = network.publicAddresses[index];
+    const targetId = target?.id?.trim();
     const publicAddresses = network.publicAddresses.filter(
-      (_, itemIndex) => itemIndex !== index
+      (address, itemIndex) =>
+        targetId != null && targetId !== ""
+          ? address.id?.trim() !== targetId
+          : itemIndex !== index
     );
     await onNetworkChange({ ...network, publicAddresses });
   };
@@ -1108,7 +990,6 @@ function NetworkSettingsSection({
           {addOpen ? (
             <AddPublicAddressForm
               defaultPort={network.privatePort}
-              existingAddresses={network.publicAddresses}
               onCancel={handleCancelAddPublicAddress}
               onSubmit={
                 onNetworkChange == null ? undefined : handleAddPublicAddress
@@ -1124,15 +1005,10 @@ function NetworkSettingsSection({
               {network.publicAddresses.map((address, index) => (
                 <PublicAddressRow
                   address={address}
-                  key={publicAddressHostKey(address.host)}
+                  key={publicAddressKey(address, index)}
                   onDelete={
                     canMutateNetwork
                       ? () => handleDeletePublicAddress(index)
-                      : undefined
-                  }
-                  onPortChange={
-                    canMutateNetwork
-                      ? (port) => handlePublicAddressPortChange(index, port)
                       : undefined
                   }
                   readOnly={readOnly}

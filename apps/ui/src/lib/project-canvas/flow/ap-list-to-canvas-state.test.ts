@@ -14,7 +14,7 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
             input: {
               network: {
                 privatePort: 8080,
-                publicAddresses: [{ host: "api.example.com", port: 8080 }],
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
               },
             },
           },
@@ -25,6 +25,7 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
               publicAddresses: [
                 {
                   host: "api.example.com",
+                  id: "pa_abc123",
                   port: 8080,
                   status: "accessible",
                   type: "platform",
@@ -71,7 +72,7 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
     states: { name: "api" },
     targets: [
       {
-        id: "8080-api.example.com",
+        id: "pa_abc123",
         label: "Platform Address",
         status: { label: "Accessible", tone: "accessible" },
         value: "https://api.example.com/",
@@ -80,7 +81,7 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
   });
 });
 
-test("EntryPoint canvas nodes fall back to desired Public Addresses while observed URLs are pending", () => {
+test("EntryPoint canvas nodes fall back to desired Platform Addresses while observed URLs are pending", () => {
   const state = entryPointsToCanvasState(undefined, {
     apsData: {
       items: [
@@ -90,7 +91,7 @@ test("EntryPoint canvas nodes fall back to desired Public Addresses while observ
             input: {
               network: {
                 privatePort: 8080,
-                publicAddresses: [{ host: "api.example.com", port: 8080 }],
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
               },
             },
           },
@@ -109,7 +110,7 @@ test("EntryPoint canvas nodes fall back to desired Public Addresses while observ
   assert.deepEqual(state.nodes[0]?.data, {
     accessDomain: {
       label: "Access domain",
-      value: "api.example.com",
+      value: "Pending",
     },
     resource: {
       apRef: "api",
@@ -119,10 +120,10 @@ test("EntryPoint canvas nodes fall back to desired Public Addresses while observ
     states: { name: "api" },
     targets: [
       {
-        id: "8080-api.example.com",
-        label: "Public Address",
-        status: { label: "Unknown", tone: "unknown" },
-        value: "https://api.example.com/",
+        id: "pa_abc123",
+        label: "Platform Address",
+        status: { label: "Progressing", tone: "progressing" },
+        value: "Pending",
       },
     ],
   });
@@ -138,6 +139,7 @@ test("EntryPoint canvas nodes keep uid fallback when resource name is unavailabl
             apRef: "api",
             targets: [
               {
+                id: "pa_abc123",
                 platformDomain: "https://api.example.com",
                 port: 8080,
                 status: "accessible",
@@ -165,7 +167,7 @@ test("EntryPoint canvas nodes keep uid fallback when resource name is unavailabl
     states: { name: "unknown" },
     targets: [
       {
-        id: "8080-api.example.com",
+        id: "pa_abc123",
         label: "Public Domain",
         status: { label: "Accessible", tone: "accessible" },
         value: "https://api.example.com/",

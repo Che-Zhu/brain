@@ -3,6 +3,7 @@ package ap
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,8 @@ const APCompositeLabel = "crossplane.io/composite"
 // defaultIngressHostFromComposition is a placeholder from older generated templates.
 // It must not surface as a real connection URL.
 const defaultIngressHostFromComposition = "placeholder.example.com"
+
+var platformAddressIDPattern = regexp.MustCompile(`^pa_[a-z0-9]{6,32}$`)
 
 func isPlaceholderIngressHost(host string) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
@@ -141,47 +144,91 @@ func privateNetworkAddressForPort(services []map[string]interface{}, namespace s
 }
 
 type networkPublicAddress struct {
+	id   string
 	host string
 	port int
 }
 
 func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}, ingresses []map[string]interface{}) {
-	addresses := apPublicAddresses(ap)
+	addresses := apPlatformAddressRequests(ap)
 	if len(addresses) == 0 {
 		return
 	}
 	networkCopy := networkStatusCopy(status)
 	if _, exists := networkCopy["publicAddresses"]; exists {
+		publicAddresses := publicAddressRowsFromValue(networkCopy["publicAddresses"])
+		seenIDs := make(map[string]bool, len(publicAddresses))
+		for _, address := range publicAddresses {
+			id, _ := address["id"].(string)
+			if id != "" {
+				seenIDs[id] = true
+			}
+		}
+		for _, address := range addresses {
+			if seenIDs[address.id] {
+				continue
+			}
+			publicAddresses = append(publicAddresses, pendingPublicAddressRow(address))
+		}
+		networkCopy["publicAddresses"] = publicAddresses
 		status["network"] = networkCopy
 		return
 	}
 
-	schemeByHost := ingressSchemeByHost(ingresses)
-	accessStatus := publicAccessStatusFromPhase(status["phase"])
 	publicAddresses := make([]map[string]interface{}, 0, len(addresses))
 	for _, address := range addresses {
-		scheme := schemeByHost[address.host]
-		if scheme == "" {
-			scheme = "http"
-		}
-		publicAddresses = append(publicAddresses, map[string]interface{}{
-			"host":   address.host,
-			"port":   address.port,
-			"status": accessStatus,
-			"type":   "platform",
-			"url":    fmt.Sprintf("%s://%s/", scheme, address.host),
-		})
+		publicAddresses = append(publicAddresses, pendingPublicAddressRow(address))
 	}
 	networkCopy["publicAddresses"] = publicAddresses
 	status["network"] = networkCopy
 }
 
-func apPublicAddresses(ap map[string]interface{}) []networkPublicAddress {
+func publicAddressRowsFromValue(value interface{}) []map[string]interface{} {
+	switch rows := value.(type) {
+	case []map[string]interface{}:
+		out := make([]map[string]interface{}, 0, len(rows))
+		for _, row := range rows {
+			rowCopy := make(map[string]interface{}, len(row))
+			for k, v := range row {
+				rowCopy[k] = v
+			}
+			out = append(out, rowCopy)
+		}
+		return out
+	case []interface{}:
+		out := make([]map[string]interface{}, 0, len(rows))
+		for _, item := range rows {
+			row, _ := item.(map[string]interface{})
+			if row == nil {
+				continue
+			}
+			rowCopy := make(map[string]interface{}, len(row))
+			for k, v := range row {
+				rowCopy[k] = v
+			}
+			out = append(out, rowCopy)
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func pendingPublicAddressRow(address networkPublicAddress) map[string]interface{} {
+	return map[string]interface{}{
+		"id":     address.id,
+		"port":   address.port,
+		"status": "progressing",
+		"type":   "platform",
+	}
+}
+
+func apPlatformAddressRequests(ap map[string]interface{}) []networkPublicAddress {
 	network := apInputNetwork(ap)
 	if network == nil {
 		return nil
 	}
-	raw, _ := network["publicAddresses"].([]interface{})
+	raw, _ := network["platformAddresses"].([]interface{})
 	if len(raw) == 0 {
 		return nil
 	}
@@ -191,13 +238,13 @@ func apPublicAddresses(ap map[string]interface{}) []networkPublicAddress {
 		if address == nil {
 			continue
 		}
-		host, _ := address["host"].(string)
-		host = strings.TrimSpace(host)
+		id, _ := address["id"].(string)
+		id = strings.TrimSpace(id)
 		port, ok := privatePortFromValue(address["port"])
-		if host == "" || !ok {
+		if !platformAddressIDPattern.MatchString(id) || !ok {
 			continue
 		}
-		addresses = append(addresses, networkPublicAddress{host: host, port: port})
+		addresses = append(addresses, networkPublicAddress{id: id, port: port})
 	}
 	return addresses
 }

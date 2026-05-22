@@ -9,10 +9,12 @@ import {
 const DUPLICATE_ENV_NAME_RE = /Environment variable names must be unique/;
 const PRIVATE_PORT_RANGE_RE =
   /Private Address target port must be an integer from 1 through 65535/;
-const PUBLIC_HOST_REQUIRED_RE = /Public Address host is required/;
-const PUBLIC_HOST_UNIQUE_RE = /Public Address hosts must be unique/;
 const PUBLIC_PORT_RANGE_RE =
   /Public Address target port must be an integer from 1 through 65535/;
+const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
+const PLATFORM_ADDRESS_ID_INVALID_RE =
+  /Platform Address ID must match \^pa_\[a-z0-9\]\{6,32\}\$/;
+const PLATFORM_ADDRESS_ID_UNIQUE_RE = /Platform Address IDs must be unique/;
 
 test("AP env settings patch direct rows as standard Kubernetes value entries", () => {
   const ops = patchOpsForApEnvSettings(
@@ -66,7 +68,7 @@ test("AP network settings patch privatePort without writing retired endpoint fie
   ]);
 });
 
-test("AP network settings patch public addresses as one coherent network object", () => {
+test("AP network settings patch generated Platform Address IDs as one coherent network object", () => {
   const ops = patchOpsForApNetworkSettings(
     {
       input: {
@@ -94,21 +96,64 @@ test("AP network settings patch public addresses as one coherent network object"
     }
   );
 
+  assert.equal(ops.length, 4);
+  assert.deepEqual(ops.slice(1), [
+    { op: "remove", path: "/spec/input/endpoints" },
+    { op: "remove", path: "/spec/input/port" },
+    { op: "remove", path: "/spec/input/host" },
+  ]);
+  assert.equal(ops[0]?.op, "replace");
+  assert.equal(ops[0]?.path, "/spec/input/network");
+  const network = ops[0]?.value as {
+    platformAddresses: { id: string; port: number }[];
+    privatePort: number;
+  };
+  assert.equal(network.privatePort, 8080);
+  assert.equal(network.platformAddresses.length, 2);
+  assert.match(network.platformAddresses[0]?.id ?? "", PLATFORM_ADDRESS_ID_RE);
+  assert.equal(network.platformAddresses[0]?.port, 8080);
+  assert.match(network.platformAddresses[1]?.id ?? "", PLATFORM_ADDRESS_ID_RE);
+  assert.equal(network.platformAddresses[1]?.port, 9000);
+});
+
+test("AP network settings writes v1 Platform Addresses with stable IDs and no host or URL", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        network: {
+          privatePort: 80,
+          publicAddresses: [{ host: "old.example.com", port: 80 }],
+        },
+      },
+    },
+    {
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api.example.com",
+          id: "pa_abc123",
+          port: 8080,
+          status: "accessible",
+          type: "platform",
+          url: "https://api.example.com/",
+        },
+        { id: "pa_def456", port: 8080 },
+      ],
+    }
+  );
+
   assert.deepEqual(ops, [
     {
       op: "replace",
       path: "/spec/input/network",
       value: {
         privatePort: 8080,
-        publicAddresses: [
-          { host: "api.example.com", port: 8080 },
-          { host: "admin.example.com", port: 9000 },
+        platformAddresses: [
+          { id: "pa_abc123", port: 8080 },
+          { id: "pa_def456", port: 8080 },
         ],
       },
     },
-    { op: "remove", path: "/spec/input/endpoints" },
-    { op: "remove", path: "/spec/input/port" },
-    { op: "remove", path: "/spec/input/host" },
   ]);
 });
 
@@ -128,14 +173,14 @@ test("AP network settings validate App Listening Ports", () => {
   }
 });
 
-test("AP network settings validate Public Address hosts and ports", () => {
+test("AP network settings validate Platform Address IDs and Public Address ports", () => {
   assert.throws(
     () =>
       patchOpsForApNetworkSettings(
         { input: {} },
-        { privatePort: 8080, publicAddresses: [{ host: "  ", port: 8080 }] }
+        { privatePort: 8080, publicAddresses: [{ id: "pa_BAD", port: 8080 }] }
       ),
-    PUBLIC_HOST_REQUIRED_RE
+    PLATFORM_ADDRESS_ID_INVALID_RE
   );
   assert.throws(
     () =>
@@ -144,12 +189,12 @@ test("AP network settings validate Public Address hosts and ports", () => {
         {
           privatePort: 8080,
           publicAddresses: [
-            { host: "api.example.com", port: 8080 },
-            { host: "API.example.com", port: 9000 },
+            { id: "pa_abc123", port: 8080 },
+            { id: "pa_abc123", port: 9000 },
           ],
         }
       ),
-    PUBLIC_HOST_UNIQUE_RE
+    PLATFORM_ADDRESS_ID_UNIQUE_RE
   );
   assert.throws(
     () =>
@@ -157,7 +202,7 @@ test("AP network settings validate Public Address hosts and ports", () => {
         { input: {} },
         {
           privatePort: 8080,
-          publicAddresses: [{ host: "api.example.com", port: 65_536 }],
+          publicAddresses: [{ id: "pa_abc123", port: 65_536 }],
         }
       ),
     PUBLIC_PORT_RANGE_RE

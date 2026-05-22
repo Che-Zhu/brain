@@ -91,8 +91,8 @@ For the active default AP composition, public access is represented under `input
 ```yaml
     network:
       privatePort: 3000
-      publicAddresses:
-        - host: chatgpt.mydomain.com
+      platformAddresses:
+        - id: pa_chatgpt
           port: 3000
 ```
 
@@ -323,22 +323,19 @@ spec:
   storageSize: "50Gi"
 ```
 
-### Pattern 2: Using Different Domains
+### Pattern 2: Multiple Platform Addresses
 
 ```yaml
 input:
   network:
     privatePort: 3000
-    publicAddresses:
-      # Platform Address
-      - host: app.mydomain.com
+    platformAddresses:
+      - id: pa_app001
         port: 3000
-      # Custom Domain (ensure DNS is configured)
-      - host: myapp.example.org
+      - id: pa_app002
         port: 3000
-      # Development with nip.io
-      - host: myapp.192.168.1.100.nip.io
-        port: 3000
+      - id: pa_admin1
+        port: 9000
 ```
 
 ### Pattern 3: Namespace Isolation

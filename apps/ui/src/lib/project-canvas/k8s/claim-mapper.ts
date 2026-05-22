@@ -27,6 +27,7 @@ const MEM_SUFFIX_GI = /^([0-9]+(?:\.[0-9]+)?)gi$/i;
 const MEM_SUFFIX_MI = /^([0-9]+(?:\.[0-9]+)?)mi$/i;
 const MEM_SUFFIX_G = /^([0-9]+(?:\.[0-9]+)?)g$/i;
 const MEM_SUFFIX_M = /^([0-9]+(?:\.[0-9]+)?)m$/i;
+const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
@@ -209,10 +210,43 @@ function apNetworkPublicAddresses(
     statusNetwork?.publicAddresses,
     true
   );
+  const desiredPending = normalizeDesiredPlatformAddresses(
+    inputNetwork?.platformAddresses
+  );
   if (observed.length > 0) {
-    return observed;
+    const observedIds = new Set(
+      observed.map((address) => address.id).filter((id) => id != null)
+    );
+    return [
+      ...observed,
+      ...desiredPending.filter(
+        (address) => address.id == null || !observedIds.has(address.id)
+      ),
+    ];
   }
-  return normalizeNetworkPublicAddresses(inputNetwork?.publicAddresses, false);
+  return desiredPending;
+}
+
+function normalizeDesiredPlatformAddresses(
+  raw: unknown
+): ContainerNetwork["publicAddresses"] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: ContainerNetwork["publicAddresses"] = [];
+  for (const item of raw) {
+    const address = asRecord(item);
+    if (address == null) {
+      continue;
+    }
+    const id = trimStr(address.id);
+    const port = privatePortNum(address.port);
+    if (!PLATFORM_ADDRESS_ID_RE.test(id) || port == null) {
+      continue;
+    }
+    out.push({ id, port, status: "progressing", type: "platform" });
+  }
+  return out;
 }
 
 function normalizeNetworkPublicAddresses(
@@ -240,13 +274,15 @@ function normalizeNetworkPublicAddress(
   if (address == null) {
     return undefined;
   }
+  const id = trimStr(address.id);
   const host = trimStr(address.host);
   const port = privatePortNum(address.port);
-  if (host === "" || port == null) {
+  if ((host === "" && id === "") || port == null) {
     return undefined;
   }
   const normalized: ContainerNetwork["publicAddresses"][number] = {
-    host,
+    ...(host === "" ? {} : { host }),
+    ...(id === "" ? {} : { id }),
     port,
   };
   if (!includeObservedFields) {

@@ -8,7 +8,7 @@ metadata:
     meta.crossplane.io/description: >
       Generic app with Deployment, Service, and optional Ingress from spec.input.network.
       Container image is spec.input.image; replicas and CPU/memory are spec.resource (Kubernetes-shaped).
-      Public Addresses in spec.input.network.publicAddresses route platform hosts to App Listening Ports.
+      Public Addresses in spec.input.network.platformAddresses route platform hosts to App Listening Ports.
       Optional spec.projectName observes a Project claim in the same namespace (kubernetes.m
       Object Observe), adds labels crossplane.io/project-name and crossplane.io/project-uid. Composed workloads
       (Deployment, Services, Ingress, ConfigMap, etc.) ownerReference the AP claim only; only the AP composite
@@ -90,16 +90,33 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
-            {{- $networkPublicAddresses := list }}
-            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
-            {{- range $network.publicAddresses }}
-            {{- $pubHost := "" }}
-            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
-            {{- $pubPort := 0 }}
-            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
-            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
-            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- $routingDomain := "" }}
+            {{- $metadataLabels := .observed.composite.resource.metadata.labels | default dict }}
+            {{- if hasKey $metadataLabels "region" }}{{ $routingDomain = trim (toString $metadataLabels.region) }}{{ end }}
+            {{- $safeAPName := lower $name }}
+            {{- $safeAPName = regexReplaceAll "[^a-z0-9-]+" $safeAPName "-" }}
+            {{- $safeAPName = trimAll "-" $safeAPName }}
+            {{- if eq $safeAPName "" }}{{ $safeAPName = "ap" }}{{ end }}
+            {{- $platformAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "platformAddresses") }}
+            {{- range $network.platformAddresses }}
+            {{- $paID := "" }}
+            {{- if hasKey . "id" }}{{ $paID = trim (toString .id) }}{{ end }}
+            {{- $paPort := 0 }}
+            {{- if hasKey . "port" }}{{ $paPort = int .port }}{{ end }}
+            {{- if and (regexMatch "^pa_[a-z0-9]{6,32}$" $paID) (gt $paPort 0) }}
+            {{- $platformAddresses = concat $platformAddresses (list (dict "id" $paID "port" $paPort)) }}
             {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $networkPublicAddresses := list }}
+            {{- if ne $routingDomain "" }}
+            {{- range $platformAddresses }}
+            {{- $slug := sha256sum (printf "%s/%s/%s/%s" $ns $name $apUid .id) | trunc 10 }}
+            {{- $hostPrefix := $safeAPName | trunc 52 | trimSuffix "-" }}
+            {{- if eq $hostPrefix "" }}{{ $hostPrefix = "ap" }}{{ end }}
+            {{- $host := printf "%s-%s.%s" $hostPrefix $slug $routingDomain }}
+            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "id" .id "host" $host "port" .port)) }}
             {{- end }}
             {{- end }}
             {{- $ports := list }}
@@ -108,7 +125,7 @@ spec:
             {{- $_ := set $portsSeen (printf "p%d" $privatePort) 1 }}
             {{- $ports = concat $ports (list (dict "port" $privatePort)) }}
             {{- end }}
-            {{- range $networkPublicAddresses }}
+            {{- range $platformAddresses }}
             {{- $portKey := printf "p%d" .port }}
             {{- if not (index $portsSeen $portKey) }}
             {{- $_ := set $portsSeen $portKey 1 }}
@@ -132,8 +149,8 @@ spec:
             }}
             {{- if gt $privatePort 0 }}
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
-            {{- if gt (len $networkPublicAddresses) 0 }}
-            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- if gt (len $platformAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
@@ -520,7 +537,8 @@ spec:
                     apRef: {{ $name | quote }}
                     targets:
                       {{ range $networkPublicAddresses }}
-                      - port: {{ .port }}
+                      - id: {{ .id | quote }}
+                        port: {{ .port }}
                         platformDomain: {{ .host | quote }}
                         status: {{ $entryTargetStatus | quote }}
                       {{ end }}
@@ -554,7 +572,8 @@ spec:
                 {{- if $needIngress }}
                 publicAddresses:
                   {{ range $networkPublicAddresses }}
-                  - host: {{ .host | quote }}
+                  - id: {{ .id | quote }}
+                    host: {{ .host | quote }}
                     url: {{ printf "%s://%s/" $pubScheme .host | quote }}
                     port: {{ .port }}
                     type: "platform"
@@ -604,15 +623,15 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
-            {{- $networkPublicAddresses := list }}
-            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
-            {{- range $network.publicAddresses }}
-            {{- $pubHost := "" }}
-            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
-            {{- $pubPort := 0 }}
-            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
-            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
-            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- $platformAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "platformAddresses") }}
+            {{- range $network.platformAddresses }}
+            {{- $paID := "" }}
+            {{- if hasKey . "id" }}{{ $paID = trim (toString .id) }}{{ end }}
+            {{- $paPort := 0 }}
+            {{- if hasKey . "port" }}{{ $paPort = int .port }}{{ end }}
+            {{- if and (regexMatch "^pa_[a-z0-9]{6,32}$" $paID) (gt $paPort 0) }}
+            {{- $platformAddresses = concat $platformAddresses (list (dict "id" $paID "port" $paPort)) }}
             {{- end }}
             {{- end }}
             {{- end }}
@@ -630,8 +649,8 @@ spec:
             }}
             {{- if gt $privatePort 0 }}
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
-            {{- if gt (len $networkPublicAddresses) 0 }}
-            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- if gt (len $platformAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
@@ -756,15 +775,15 @@ spec:
             {{- $network := $input.network | default dict }}
             {{- $privatePort := 0 }}
             {{- if hasKey $network "privatePort" }}{{ $privatePort = int $network.privatePort }}{{ end }}
-            {{- $networkPublicAddresses := list }}
-            {{- if and (gt $privatePort 0) (hasKey $network "publicAddresses") }}
-            {{- range $network.publicAddresses }}
-            {{- $pubHost := "" }}
-            {{- if hasKey . "host" }}{{ $pubHost = trim (toString .host) }}{{ end }}
-            {{- $pubPort := 0 }}
-            {{- if hasKey . "port" }}{{ $pubPort = int .port }}{{ end }}
-            {{- if and (ne $pubHost "") (gt $pubPort 0) }}
-            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "host" $pubHost "port" $pubPort)) }}
+            {{- $platformAddresses := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "platformAddresses") }}
+            {{- range $network.platformAddresses }}
+            {{- $paID := "" }}
+            {{- if hasKey . "id" }}{{ $paID = trim (toString .id) }}{{ end }}
+            {{- $paPort := 0 }}
+            {{- if hasKey . "port" }}{{ $paPort = int .port }}{{ end }}
+            {{- if and (regexMatch "^pa_[a-z0-9]{6,32}$" $paID) (gt $paPort 0) }}
+            {{- $platformAddresses = concat $platformAddresses (list (dict "id" $paID "port" $paPort)) }}
             {{- end }}
             {{- end }}
             {{- end }}
@@ -782,8 +801,8 @@ spec:
             }}
             {{- if gt $privatePort 0 }}
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
-            {{- if gt (len $networkPublicAddresses) 0 }}
-            {{- $_ := set $effectiveNetwork "publicAddresses" $networkPublicAddresses }}
+            {{- if gt (len $platformAddresses) 0 }}
+            {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}

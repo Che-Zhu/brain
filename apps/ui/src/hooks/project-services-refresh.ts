@@ -16,6 +16,7 @@ const WORKLOAD_TRANSIENT_PHASES = new Set([
   "stopping",
   "updating",
 ]);
+const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 function normalizeWorkloadPhase(input: unknown) {
   return typeof input === "string"
@@ -26,12 +27,28 @@ function normalizeWorkloadPhase(input: unknown) {
     : "";
 }
 
+function hasPlatformAddressRequest(item: unknown) {
+  if (item == null || typeof item !== "object") {
+    return false;
+  }
+  const id = (item as Record<string, unknown>).id;
+  return typeof id === "string" && PLATFORM_ADDRESS_ID_RE.test(id.trim());
+}
+
 function hasNetworkPublicAddresses(network: unknown) {
   if (network == null || typeof network !== "object") {
     return false;
   }
   const publicAddresses = (network as Record<string, unknown>).publicAddresses;
-  return Array.isArray(publicAddresses) && publicAddresses.length > 0;
+  if (Array.isArray(publicAddresses) && publicAddresses.length > 0) {
+    return true;
+  }
+  const platformAddresses = (network as Record<string, unknown>)
+    .platformAddresses;
+  return (
+    Array.isArray(platformAddresses) &&
+    platformAddresses.some(hasPlatformAddressRequest)
+  );
 }
 
 export function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {

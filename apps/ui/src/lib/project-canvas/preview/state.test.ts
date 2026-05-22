@@ -86,7 +86,7 @@ test("preview canvas state places unplaced EntryPoints to the left of their AP",
               image: "ghcr.io/acme/api:latest",
               network: {
                 privatePort: 8080,
-                publicAddresses: [{ host: "api.example.com", port: 8080 }],
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
               },
             },
           },
@@ -97,6 +97,7 @@ test("preview canvas state places unplaced EntryPoints to the left of their AP",
               publicAddresses: [
                 {
                   host: "api.example.com",
+                  id: "pa_abc123",
                   port: 8080,
                   status: "accessible",
                   type: "platform",
@@ -189,7 +190,7 @@ test("preview canvas state connects AP Network EntryPoint nodes to their AP", ()
               image: "ghcr.io/acme/api:latest",
               network: {
                 privatePort: 8080,
-                publicAddresses: [{ host: "api.example.com", port: 8080 }],
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
               },
             },
           },
@@ -200,6 +201,7 @@ test("preview canvas state connects AP Network EntryPoint nodes to their AP", ()
               publicAddresses: [
                 {
                   host: "api.example.com",
+                  id: "pa_abc123",
                   port: 8080,
                   status: "accessible",
                   type: "platform",

@@ -28,6 +28,9 @@ import {
 
 export type ContainerSettingsOnPortsChange = (ports: ContainerPort[]) => void;
 
+const WORKLOAD_RECONCILE_POLL_MS = 1000;
+const WORKLOAD_RECONCILE_POLL_WINDOW_MS = 30_000;
+
 export interface UseWorkloadClaimSettingsOptions {
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
   kubeconfig?: string;
@@ -61,6 +64,7 @@ export function useWorkloadClaimSettings(
   const shareToken = options.shareToken?.trim() ?? "";
   const dbDsnReferenceSources = options.dbDsnReferenceSources ?? [];
   const isApWorkload = workloadKind === "AP";
+  const [claimReconcilePollUntil, setClaimReconcilePollUntil] = useState(0);
 
   const {
     data: claimPayload,
@@ -72,6 +76,8 @@ export function useWorkloadClaimSettings(
     kubeconfig,
     name,
     namespace,
+    refreshInterval:
+      claimReconcilePollUntil > Date.now() ? WORKLOAD_RECONCILE_POLL_MS : 0,
     shareToken: shareToken === "" ? undefined : shareToken,
   });
 
@@ -110,6 +116,7 @@ export function useWorkloadClaimSettings(
     [localOverride, mapped]
   );
   const revalidateAfterApMutation = useCallback(async () => {
+    setClaimReconcilePollUntil(Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS);
     await Promise.all([
       revalidateClaim(),
       onWorkloadMutation?.().catch(() => undefined),

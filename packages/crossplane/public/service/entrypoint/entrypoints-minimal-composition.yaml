@@ -50,7 +50,8 @@ spec:
               {{- if gt (len $targets) 0 }}
               targets:
                 {{ range $targets }}
-                - port: {{ .port }}
+                - id: {{ .id | quote }}
+                  port: {{ .port }}
                   platformDomain: {{ .platformDomain | quote }}
                   status: {{ default "unknown" .status | quote }}
                 {{ end }}

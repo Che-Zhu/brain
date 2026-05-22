@@ -17,6 +17,8 @@ import {
 export type CanvasDetectedConnectionKind = "EntryPointToAP" | "APToDB";
 export type CanvasConnectionResourceKind = "AP" | "DB" | "EntryPoint";
 
+const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
+
 export interface CanvasConnectionResourceRef {
   kind: CanvasConnectionResourceKind;
   name: string;
@@ -170,8 +172,19 @@ function entryPointRefByApKey(
 }
 
 function hasPublicAddressesFromNetwork(network: unknown): boolean {
-  const publicAddresses = asRecord(network)?.publicAddresses;
-  return Array.isArray(publicAddresses) && publicAddresses.length > 0;
+  const record = asRecord(network);
+  const publicAddresses = record?.publicAddresses;
+  if (Array.isArray(publicAddresses) && publicAddresses.length > 0) {
+    return true;
+  }
+  const platformAddresses = record?.platformAddresses;
+  return (
+    Array.isArray(platformAddresses) &&
+    platformAddresses.some((address) => {
+      const id = asRecord(address)?.id;
+      return typeof id === "string" && PLATFORM_ADDRESS_ID_RE.test(id.trim());
+    })
+  );
 }
 
 function apHasNetworkPublicAddresses(ap: unknown): boolean {

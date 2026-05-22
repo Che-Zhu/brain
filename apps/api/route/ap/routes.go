@@ -10,7 +10,7 @@ import (
 // The AP spec is the API contract for the generated Deployment, Service(s), Ingress, and EntryPoint:
 // - name: logical instance name used for composed resource naming; defaults to metadata.name if omitted.
 // - projectName: optional Project claim name in the same namespace (labels + ownerReference).
-// - input: image, network.privatePort, network.publicAddresses, env, probes, imagePullPolicy.
+// - input: image, network.privatePort, network.platformAddresses, env, probes, imagePullPolicy.
 // - resource: replicas, requests, limits (Kubernetes-shaped).
 // - paused, restartRequest, ingressAnnotations: lifecycle and Ingress metadata.
 func Register(api huma.API) {

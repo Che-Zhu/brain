@@ -24,7 +24,8 @@ spec:
             description: >
               Claim metadata. The default AP composition reads desired networking from
               spec.input.network: a Private Address target App Listening Port plus optional
-              Public Addresses. metadata.labels.region is not used by the AP Network contract.
+              Platform Address requests. metadata.labels.region carries the routing domain
+              used to allocate platform hosts.
             properties:
               labels:
                 type: object
@@ -90,21 +91,25 @@ spec:
                         minimum: 1
                         maximum: 65535
                         description: App Listening Port for the Private Address target.
-                      publicAddresses:
+                      platformAddresses:
                         type: array
+                        x-kubernetes-list-type: map
+                        x-kubernetes-list-map-keys:
+                          - id
                         description: >
-                          Public Addresses desired for this AP. Each entry is a platform host
-                          routed to an App Listening Port; EntryPoint infrastructure is derived
-                          by the composition.
+                          Platform Address requests desired for this AP. Each entry has a stable
+                          opaque ID and the App Listening Port it targets; host and URL allocation
+                          are derived by the platform.
                         items:
                           type: object
                           required:
-                            - host
+                            - id
                             - port
                           properties:
-                            host:
+                            id:
                               type: string
-                              description: Platform Address host to expose publicly.
+                              pattern: ^pa_[a-z0-9]{6,32}$
+                              description: Stable opaque Platform Address ID.
                             port:
                               type: integer
                               minimum: 1
@@ -289,6 +294,9 @@ spec:
                         host:
                           type: string
                           description: Public Address host.
+                        id:
+                          type: string
+                          description: Stable opaque Platform Address ID.
                         url:
                           type: string
                           description: Render-ready public URL including scheme.

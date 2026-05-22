@@ -30,9 +30,13 @@ spec:
                   items:
                     type: object
                     required:
+                      - id
                       - port
                       - platformDomain
                     properties:
+                      id:
+                        type: string
+                        description: Stable Platform Address ID.
                       port:
                         type: integer
                         description: Service/container port number.
@@ -77,6 +81,8 @@ spec:
                   items:
                     type: object
                     properties:
+                      id:
+                        type: string
                       port:
                         type: integer
                       platformDomain:

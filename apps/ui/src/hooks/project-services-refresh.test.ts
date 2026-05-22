@@ -13,7 +13,7 @@ test("public AP endpoint detection includes Network public addresses", () => {
             input: {
               network: {
                 privatePort: 8080,
-                publicAddresses: [{ host: "api.example.com", port: 8080 }],
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
               },
             },
           },
@@ -22,10 +22,37 @@ test("public AP endpoint detection includes Network public addresses", () => {
               publicAddresses: [
                 {
                   host: "api.example.com",
+                  id: "pa_abc123",
                   port: 8080,
                   url: "https://api.example.com/",
                 },
               ],
+            },
+          },
+        },
+      ],
+    }),
+    true
+  );
+});
+
+test("public AP endpoint detection includes desired Platform Address requests", () => {
+  assert.equal(
+    hasPublicApEndpoint({
+      items: [
+        {
+          metadata: { name: "api", namespace: "default" },
+          spec: {
+            input: {
+              network: {
+                privatePort: 8080,
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+              },
+            },
+          },
+          status: {
+            network: {
+              privatePort: 8080,
             },
           },
         },

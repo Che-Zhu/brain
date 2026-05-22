@@ -59,11 +59,10 @@ Composition behavior to know before you write a claim:
   (`replicas`, `requests`, `limits`). Top-level **`spec.projectName`**, **`spec.paused`**,
   **`spec.restartRequest`**, and **`spec.ingressAnnotations`** are not nested under `input`.
 - **Network contract:** `spec.input.network.privatePort` is the App Listening Port targeted by
-  the Private Address. Optional `spec.input.network.publicAddresses[]` entries expose Platform
-  Addresses; each entry has `host` and target App Listening Port `port`.
-- The composition does not invent AP public hosts. Use the real `BASE_HOST` from the active
-  kubeconfig cluster server ([§6.3](#63-derive-the-ingress-base-host)) and set each Public Address
-  host explicitly, for example `<slug>.<BASE_HOST>`.
+  the Private Address. Optional `spec.input.network.platformAddresses[]` entries request Platform
+  Addresses; each entry has stable opaque `id` and target App Listening Port `port`.
+- The composition derives platform hosts from the AP name, Platform Address ID, and routing domain
+  carried by `metadata.labels.region`; do not set desired host or URL fields.
 - APs without Public Addresses stay private-only: one Service and no Ingress or EntryPoint.
 - The composed `Deployment`/`Service`/`Ingress`/`ConfigMap` ownerReference the `AP`. Composed
   child names: `Deployment={name}`, `Service={name}-service`,
@@ -79,7 +78,7 @@ Composition behavior to know before you write a claim:
 | `projectName`                    | string                                      | —           | `Project` claim name in the same namespace (labels + `ownerReference`). |
 | `input.image`                    | string                                      | —           | Container image. |
 | `input.network.privatePort`      | integer                                     | —           | App Listening Port targeted by the Private Address. |
-| `input.network.publicAddresses[]` | `[{ host, port }]`                         | `[]`        | Platform hosts routed to App Listening Ports through Ingress + EntryPoint. |
+| `input.network.platformAddresses[]` | `[{ id, port }]`                         | `[]`        | Platform Address IDs routed to App Listening Ports through Ingress + EntryPoint. |
 | `input.env[]`                    | `[{ name, value?, valueFrom? }]`            | `[]`        | Standard Kubernetes env shape. |
 | `input.probes`                   | Kubernetes Probe map                        | none        | `startup` / `liveness` / `readiness`; no defaults. |
 | `input.imagePullPolicy`          | `Always` \| `IfNotPresent` \| `Never`        | `Always`    | |
@@ -207,7 +206,7 @@ spec:
 
 **JSON merge patch** (API `PATCH /api/ap/v1alpha1/`): patch nested subtrees, e.g.
 `{"spec":{"input":{"image":"nginx:1.27"}}}`, `{"spec":{"resource":{"replicas":2}}}`,
-`{"spec":{"paused":true}}`. Replacing `spec.input.network.publicAddresses` or `spec.input.env`
+`{"spec":{"paused":true}}`. Replacing `spec.input.network.platformAddresses` or `spec.input.env`
 requires sending the **full** desired array.
 
 ---
@@ -405,8 +404,8 @@ user's cluster. Read it to make decisions; never assume a value.
 3. For an `AP`:
    - Nest image/network/env/probes under **`spec.input`** and replicas/requests/limits under
      **`spec.resource`** ([§1](#1-ap--deploy-one-docker-image)).
-   - For public APs, set `spec.input.network.publicAddresses[].host` to a real
-     `<slug>.<base-host>` host from [§6.3](#63-derive-the-ingress-base-host).
+   - For public APs, set `spec.input.network.platformAddresses[]` with stable IDs like
+     `pa_abc123`; the platform derives host and URL values.
    - **Template / app store:** discover templates via metadata-only listing in
      `crossplane-system` ([§1.1](#11-template-ap-app-store)); fetch **one** `template/instance`
      annotation; draft the claim; tabulate missing required `spec.input` fields and ask the user
@@ -477,9 +476,9 @@ BASE_HOST=$(printf '%s' "$SERVER" | sed -E 's#^https?://##; s#/.*$##; s#:[0-9]+$
 echo "$BASE_HOST"
 ```
 
-For AP Public Addresses, set `spec.input.network.publicAddresses[].host` to a concrete host under
-this `BASE_HOST`, for example `<your-app>.<BASE_HOST>`. Use distinct left-hand labels for multiple
-Public Addresses in the same namespace.
+For AP Public Addresses, set `metadata.labels.region` to this `BASE_HOST` and add
+`spec.input.network.platformAddresses[]` entries with stable `pa_...` IDs. The platform derives
+the concrete host and URL values.
 
 For `DB`, `BASE_HOST` doubles as the value of `metadata.labels.region` **only when** you want a
 public NodePort URI (`status.connectionStringPublic`). It is not used for host rewriting; for
@@ -536,11 +535,11 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 
 ### 6.5 Common gotchas
 
-- **Public Address host clashes** when two APs pick the same host. Keep
-  `spec.input.network.publicAddresses[].host` values unique within the namespace.
+- **Duplicate Platform Address IDs** are invalid. Keep
+  `spec.input.network.platformAddresses[].id` values unique within the AP.
 - **No `spec.input.network.privatePort`** means the default AP composition has no App Listening Port
   to render, so it does not create the Network Service.
-- **No `spec.input.network.publicAddresses[]`** keeps the AP private-only: Service only, no Ingress
+- **No `spec.input.network.platformAddresses[]`** keeps the AP private-only: Service only, no Ingress
   or EntryPoint.
 - **Changing `spec.input.image`** rolls the Deployment and stamps a new immutable
   `{name}-config-snapshot-{hash}` ConfigMap for rollback (effective snapshot uses nested `input` /
@@ -568,21 +567,22 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 1. **Compare claim vs composed Ingress** (traffic follows the Ingress, not your YAML file on disk):
 
    ```bash
-   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.input.network.publicAddresses}' ; echo
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.input.network.platformAddresses}' ; echo
    kubectl get ingress "${NAME}-ingress" -n "$NS" -o jsonpath='{.spec.rules[*].host}' ; echo
    kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.status.network.publicAddresses}' ; echo
    ```
 
-2. **AP public hosts are explicit:** the default composition uses
-   `spec.input.network.publicAddresses[].host` directly. If the Ingress shows a different host,
-   inspect the live AP object and Crossplane reconcile status.
+2. **AP public hosts are derived:** the default composition uses the AP identity, Platform Address
+   ID, and `metadata.labels.region`. If the Ingress shows a surprising host, inspect the live AP
+   object and Crossplane reconcile status.
 
 3. **`kubectl apply ... unchanged`**: the live **AP** object already matched your manifest. If
-   you thought you changed the host, re-check namespace/name, `kubectl get ap ... -o yaml`, and
-   whether another controller (SSA field manager / webhook) resets `spec.input.network`.
+   you thought you changed the Platform Address request, re-check namespace/name,
+   `kubectl get ap ... -o yaml`, and whether another controller (SSA field manager / webhook)
+   resets `spec.input.network`.
 
-4. **Stale Ingress after fixing `spec.input.network.publicAddresses`**: if the AP spec shows the new host but
-   `kubectl get ingress` still shows an old one, inspect `kubectl describe ap` (sync/ready).
+4. **Stale Ingress after fixing `spec.input.network.platformAddresses`**: if the AP spec shows the
+   new request but `kubectl get ingress` still shows an old one, inspect `kubectl describe ap` (sync/ready).
    Wait for reconcile, or apply a harmless metadata annotation bump to force a new pipeline
    pass; if still wedged, recreate the AP with a **new** `metadata.name` and a fresh host.
 
@@ -617,8 +617,8 @@ spec:
     image: nginx:latest
     network:
       privatePort: 80
-      publicAddresses:
-        - host: <your-app>.<base-host>
+      platformAddresses:
+        - id: pa_app001
           port: 80
   resource:
     replicas: 1
@@ -642,8 +642,8 @@ spec:
     image: nginx:latest
     network:
       privatePort: 80
-      publicAddresses:
-        - host: <your-app>.<base-host>
+      platformAddresses:
+        - id: pa_app001
           port: 80
   resource:
     replicas: 1
@@ -672,10 +672,10 @@ spec:
     image: ghcr.io/<owner>/<repo>:<tag>
     network:
       privatePort: 8080
-      publicAddresses:
-        - host: <your-app>.<base-host>
+      platformAddresses:
+        - id: pa_app001
           port: 8080
-        - host: <your-app>-metrics.<base-host>
+        - id: pa_metrics
           port: 9090
     env:
       - name: LOG_LEVEL

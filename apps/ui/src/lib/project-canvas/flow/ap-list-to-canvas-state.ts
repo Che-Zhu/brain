@@ -520,12 +520,15 @@ interface EntryPointCanvasResource {
 }
 
 interface NetworkPublicAddress {
-  host: string;
+  host?: string;
+  id?: string;
   port: number;
   status?: string;
   type?: string;
   url?: string;
 }
+
+const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 function entryPointCanvasResources(
   data: K8sGetResponse | undefined,
@@ -614,10 +617,47 @@ function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
     statusNetwork?.publicAddresses,
     true
   );
+  const desiredPending = normalizeDesiredPlatformAddresses(
+    inputNetwork?.platformAddresses
+  );
   if (statusAddresses.length > 0) {
-    return statusAddresses;
+    const observedIds = new Set(
+      statusAddresses.map((address) => address.id).filter((id) => id != null)
+    );
+    return [
+      ...statusAddresses,
+      ...desiredPending.filter(
+        (address) => address.id == null || !observedIds.has(address.id)
+      ),
+    ];
   }
-  return normalizeNetworkPublicAddresses(inputNetwork?.publicAddresses, false);
+  return desiredPending;
+}
+
+function normalizeDesiredPlatformAddresses(
+  raw: unknown
+): NetworkPublicAddress[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: NetworkPublicAddress[] = [];
+  for (const item of raw) {
+    const record = asRecord(item);
+    if (record === undefined) {
+      continue;
+    }
+    const id = nonEmptyString(record.id);
+    const port = entryPointTargetPort(record.port);
+    if (
+      id === undefined ||
+      !PLATFORM_ADDRESS_ID_RE.test(id) ||
+      port === undefined
+    ) {
+      continue;
+    }
+    out.push({ id, port, status: "progressing", type: "platform" });
+  }
+  return out;
 }
 
 function normalizeNetworkPublicAddresses(
@@ -646,12 +686,17 @@ function networkPublicAddressFromRecord(
     return undefined;
   }
   const host = nonEmptyString(record.host);
+  const id = nonEmptyString(record.id);
   const port = entryPointTargetPort(record.port);
-  if (host === undefined || port === undefined) {
+  if ((host === undefined && id === undefined) || port === undefined) {
     return undefined;
   }
 
-  const address: NetworkPublicAddress = { host, port };
+  const address: NetworkPublicAddress = {
+    ...(host === undefined ? {} : { host }),
+    ...(id === undefined ? {} : { id }),
+    port,
+  };
   if (!includeObservedFields) {
     return address;
   }
@@ -674,12 +719,16 @@ function networkPublicAddressFromRecord(
 function entryNodeTargetsFromPublicAddresses(
   addresses: readonly NetworkPublicAddress[]
 ): EntryNodeTarget[] {
-  return addresses.map((address) => ({
-    id: `${address.port}-${address.host}`,
-    label: publicAddressTargetLabel(address.type),
-    status: entryPointTargetStatus(address.status),
-    value: address.url ?? `https://${address.host}/`,
-  }));
+  return addresses.map((address, index) => {
+    const host = address.host;
+    return {
+      id: address.id ?? `${address.port}-${host ?? `pending-${index}`}`,
+      label: publicAddressTargetLabel(address.type),
+      status: entryPointTargetStatus(address.status),
+      value:
+        address.url ?? (host === undefined ? "Pending" : `https://${host}/`),
+    };
+  });
 }
 
 function publicAddressTargetLabel(type: string | undefined): string {
@@ -714,9 +763,10 @@ function entryNodeTargetsFromResource(input: unknown): EntryNodeTarget[] {
       }
       const port = entryPointTargetPort(record.port);
       const idPort = port === undefined ? `target-${index}` : String(port);
+      const targetID = nonEmptyString(record.id);
 
       return {
-        id: `${idPort}-${platformDomain}`,
+        id: targetID ?? `${idPort}-${platformDomain}`,
         label: "Public Domain",
         status: entryPointTargetStatus(record.status),
         value: `https://${platformDomain}/`,

@@ -35,28 +35,40 @@ func TestAPXRDIncludesNetworkContract(t *testing.T) {
 	if got := privatePort["maximum"]; got != float64(65535) {
 		t.Fatalf("privatePort maximum = %v, want 65535", got)
 	}
-	publicAddresses := asMap(t, networkProps["publicAddresses"], "spec.input.network.publicAddresses")
-	if got := publicAddresses["type"]; got != "array" {
-		t.Fatalf("publicAddresses type = %v, want array", got)
+	if _, ok := networkProps["publicAddresses"]; ok {
+		t.Fatal("spec.input.network.publicAddresses should not be accepted in the v1 contract")
 	}
-	publicAddressItem := asMap(t, publicAddresses["items"], "spec.input.network.publicAddresses.items")
-	publicAddressRequired := asSlice(t, publicAddressItem["required"], "spec.input.network.publicAddresses.items.required")
-	assertStringSliceContains(t, publicAddressRequired, "host")
-	assertStringSliceContains(t, publicAddressRequired, "port")
-	publicAddressProps := asMap(t, publicAddressItem["properties"], "spec.input.network.publicAddresses.items.properties")
-	host := asMap(t, publicAddressProps["host"], "spec.input.network.publicAddresses.items.host")
-	if got := host["type"]; got != "string" {
-		t.Fatalf("publicAddresses host type = %v, want string", got)
+	platformAddresses := asMap(t, networkProps["platformAddresses"], "spec.input.network.platformAddresses")
+	if got := platformAddresses["type"]; got != "array" {
+		t.Fatalf("platformAddresses type = %v, want array", got)
 	}
-	publicPort := asMap(t, publicAddressProps["port"], "spec.input.network.publicAddresses.items.port")
+	listType, _ := platformAddresses["x-kubernetes-list-type"].(string)
+	if listType != "map" {
+		t.Fatalf("platformAddresses x-kubernetes-list-type = %v, want map", listType)
+	}
+	mapKeys := asSlice(t, platformAddresses["x-kubernetes-list-map-keys"], "spec.input.network.platformAddresses.x-kubernetes-list-map-keys")
+	assertStringSliceContains(t, mapKeys, "id")
+	platformAddressItem := asMap(t, platformAddresses["items"], "spec.input.network.platformAddresses.items")
+	platformAddressRequired := asSlice(t, platformAddressItem["required"], "spec.input.network.platformAddresses.items.required")
+	assertStringSliceContains(t, platformAddressRequired, "id")
+	assertStringSliceContains(t, platformAddressRequired, "port")
+	platformAddressProps := asMap(t, platformAddressItem["properties"], "spec.input.network.platformAddresses.items.properties")
+	id := asMap(t, platformAddressProps["id"], "spec.input.network.platformAddresses.items.id")
+	if got := id["type"]; got != "string" {
+		t.Fatalf("platformAddresses id type = %v, want string", got)
+	}
+	if got := id["pattern"]; got != "^pa_[a-z0-9]{6,32}$" {
+		t.Fatalf("platformAddresses id pattern = %v, want v1 opaque ID pattern", got)
+	}
+	publicPort := asMap(t, platformAddressProps["port"], "spec.input.network.platformAddresses.items.port")
 	if got := publicPort["type"]; got != "integer" {
-		t.Fatalf("publicAddresses port type = %v, want integer", got)
+		t.Fatalf("platformAddresses port type = %v, want integer", got)
 	}
 	if got := publicPort["minimum"]; got != float64(1) {
-		t.Fatalf("publicAddresses port minimum = %v, want 1", got)
+		t.Fatalf("platformAddresses port minimum = %v, want 1", got)
 	}
 	if got := publicPort["maximum"]; got != float64(65535) {
-		t.Fatalf("publicAddresses port maximum = %v, want 65535", got)
+		t.Fatalf("platformAddresses port maximum = %v, want 65535", got)
 	}
 
 	statusProps := xrdStatusProperties(t, doc)
@@ -73,7 +85,7 @@ func TestAPXRDIncludesNetworkContract(t *testing.T) {
 	}
 	statusPublicAddressItem := asMap(t, statusPublicAddresses["items"], "status.network.publicAddresses.items")
 	statusPublicAddressProps := asMap(t, statusPublicAddressItem["properties"], "status.network.publicAddresses.items.properties")
-	for _, field := range []string{"host", "url", "port", "type", "status"} {
+	for _, field := range []string{"id", "host", "url", "port", "type", "status"} {
 		if _, ok := statusPublicAddressProps[field]; !ok {
 			t.Fatalf("status.network.publicAddresses[].%s is missing", field)
 		}

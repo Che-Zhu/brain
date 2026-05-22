@@ -79,9 +79,9 @@ test("AP claim settings maps public addresses from observed AP network state", (
           image: "ghcr.io/acme/api:latest",
           network: {
             privatePort: 8080,
-            publicAddresses: [
-              { host: "api.example.com", port: 8080 },
-              { host: "admin.example.com", port: 9000 },
+            platformAddresses: [
+              { id: "pa_abc123", port: 8080 },
+              { id: "pa_admin9", port: 9000 },
             ],
           },
         },
@@ -93,6 +93,7 @@ test("AP claim settings maps public addresses from observed AP network state", (
           publicAddresses: [
             {
               host: "api.example.com",
+              id: "pa_abc123",
               port: 8080,
               status: "accessible",
               type: "platform",
@@ -100,6 +101,7 @@ test("AP claim settings maps public addresses from observed AP network state", (
             },
             {
               host: "admin.example.com",
+              id: "pa_admin9",
               port: 9000,
               status: "progressing",
               type: "platform",
@@ -115,6 +117,7 @@ test("AP claim settings maps public addresses from observed AP network state", (
   assert.deepEqual(settings.network?.publicAddresses, [
     {
       host: "api.example.com",
+      id: "pa_abc123",
       port: 8080,
       status: "accessible",
       type: "platform",
@@ -122,6 +125,7 @@ test("AP claim settings maps public addresses from observed AP network state", (
     },
     {
       host: "admin.example.com",
+      id: "pa_admin9",
       port: 9000,
       status: "progressing",
       type: "platform",
@@ -130,7 +134,7 @@ test("AP claim settings maps public addresses from observed AP network state", (
   ]);
 });
 
-test("AP claim settings falls back to desired public addresses while observed URLs are pending", () => {
+test("AP claim settings falls back to desired Platform Addresses while observed URLs are pending", () => {
   const settings = claimToContainerSettings(
     {
       kind: "AP",
@@ -140,7 +144,7 @@ test("AP claim settings falls back to desired public addresses while observed UR
           image: "ghcr.io/acme/api:latest",
           network: {
             privatePort: 8080,
-            publicAddresses: [{ host: "api.example.com", port: 8080 }],
+            platformAddresses: [{ id: "pa_abc123", port: 8080 }],
           },
         },
       },
@@ -155,7 +159,7 @@ test("AP claim settings falls back to desired public addresses while observed UR
   );
 
   assert.deepEqual(settings.network?.publicAddresses, [
-    { host: "api.example.com", port: 8080 },
+    { id: "pa_abc123", port: 8080, status: "progressing", type: "platform" },
   ]);
 });
 
