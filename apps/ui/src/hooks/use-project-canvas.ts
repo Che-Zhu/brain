@@ -174,6 +174,23 @@ function createPendingApDbReferenceMutationStartHandler({
     );
 }
 
+function containerNodeSettingsAccess({
+  readOnly,
+  shareToken,
+}: {
+  readOnly: boolean;
+  shareToken: string | undefined;
+}): CanvasContainerNodeData["settingsAccess"] | undefined {
+  const st = shareToken?.trim();
+  if (!(readOnly || st)) {
+    return undefined;
+  }
+  return {
+    ...(readOnly ? { readOnly: true } : {}),
+    ...(st ? { shareToken: st } : {}),
+  };
+}
+
 /**
  * Wires URL-driven workload selection (`?service=`), panel tab (`?tab=`),
  * edge selection (Jotai), node toolbar actions, **AP** lifecycle menu actions, and canvas `meta` for `<Canvas.Root />`.
@@ -440,6 +457,10 @@ export function useProjectCanvas(
         nodeId: node.id,
         onConsumed: handleAddDbDsnReferenceIntentConsumed,
       });
+      const settingsAccess = containerNodeSettingsAccess({
+        readOnly,
+        shareToken: options?.shareToken,
+      });
       const onAddDbDsnReferenceMutationStart =
         createPendingApDbReferenceMutationStartHandler({
           apName: name,
@@ -455,6 +476,7 @@ export function useProjectCanvas(
             dbDsnReferenceSources,
             ...dbReferenceIntentData,
             onAddDbDsnReferenceMutationStart,
+            settingsAccess,
           },
         };
       }
@@ -532,6 +554,7 @@ export function useProjectCanvas(
           dbDsnReferenceSources,
           onAddDbDsnReferenceMutationStart,
           onWorkloadMutation: afterLifecycle,
+          settingsAccess,
           actions: {
             ...(data.actions ?? {}),
             ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
@@ -547,8 +570,10 @@ export function useProjectCanvas(
       deleteWorkload,
       handleAddDbDsnReferenceIntentConsumed,
       onPendingApDbReferencesStart,
+      options?.shareToken,
       pendingAddDbDsnReferenceIntent,
       pauseWorkload,
+      readOnly,
       restartWorkload,
       runMutationThenRefresh,
       setPanelTab,

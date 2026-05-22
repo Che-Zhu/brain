@@ -182,6 +182,7 @@ export function useProjectServices(options: {
       namespaceFallback: namespace,
     });
     const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
+      apsData,
       gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
       namespaceFallback: namespace,
     });

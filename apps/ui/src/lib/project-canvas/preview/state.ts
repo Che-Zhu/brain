@@ -39,6 +39,7 @@ export function buildPreviewProjectCanvasState({
     namespaceFallback: namespace,
   });
   const entryPointBlock = entryPointsToCanvasState(entryPointsData, {
+    apsData,
     gridIndexOffset: apBlock.nodes.length + dbBlock.nodes.length,
     namespaceFallback: namespace,
   });

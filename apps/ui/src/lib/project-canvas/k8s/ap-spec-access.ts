@@ -77,6 +77,12 @@ export function readApEnv(
 
 /** True when any `input.endpoints[]` is public, or single `input.port` + `input.host`. */
 export function hasApPublicExposure(spec: Record<string, unknown>): boolean {
+  const input = readApInput(spec);
+  const publicAddresses = asRecord(input.network)?.publicAddresses;
+  if (Array.isArray(publicAddresses) && publicAddresses.length > 0) {
+    return true;
+  }
+
   const endpoints = readApEndpoints(spec);
   if (endpoints != null) {
     return endpoints.some((endpoint) => {
@@ -84,7 +90,6 @@ export function hasApPublicExposure(spec: Record<string, unknown>): boolean {
       return ep != null && ep.public !== false;
     });
   }
-  const input = readApInput(spec);
   const host = typeof input.host === "string" ? input.host : "";
   const port = input.port;
   return host !== "" && typeof port === "number" && Number.isFinite(port);

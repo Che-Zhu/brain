@@ -40,13 +40,15 @@ export type ContainerSettingsOnPortsChange = NonNullable<
 
 export interface UseWorkloadClaimSettingsOptions {
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
-  kubeconfig: string;
+  kubeconfig?: string;
   name: string;
   namespace: string;
   onAddDbDsnReferenceMutationStart?: (
     references: readonly ContainerSettingsPaneConfirmedAddDbDsnReference[]
   ) => (() => void) | undefined;
   onWorkloadMutation?: () => Promise<unknown>;
+  readOnly?: boolean;
+  shareToken?: string;
   workloadKind: WorkloadClaimKind;
 }
 
@@ -58,13 +60,15 @@ export function useWorkloadClaimSettings(
   options: UseWorkloadClaimSettingsOptions
 ) {
   const {
-    kubeconfig,
     name,
     namespace,
     onAddDbDsnReferenceMutationStart,
     onWorkloadMutation,
     workloadKind,
   } = options;
+  const kubeconfig = options.kubeconfig ?? "";
+  const readOnly = options.readOnly === true;
+  const shareToken = options.shareToken?.trim() ?? "";
   const dbDsnReferenceSources = options.dbDsnReferenceSources ?? [];
   const isApWorkload = workloadKind === "AP";
 
@@ -78,6 +82,7 @@ export function useWorkloadClaimSettings(
     kubeconfig,
     name,
     namespace,
+    shareToken: shareToken === "" ? undefined : shareToken,
   });
 
   const claimBodyRef = useRef<Record<string, unknown> | undefined>(undefined);
@@ -142,7 +147,7 @@ export function useWorkloadClaimSettings(
 
   const onImageChange = useCallback(
     async (image: string) => {
-      if (!isApWorkload) {
+      if (!isApWorkload || readOnly) {
         return;
       }
       const body = claimBodyRef.current;
@@ -161,7 +166,7 @@ export function useWorkloadClaimSettings(
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateAfterApMutation]
+    [isApWorkload, kubeconfig, readOnly, revalidateAfterApMutation]
   );
 
   const onEnvChange = useCallback(
@@ -169,7 +174,7 @@ export function useWorkloadClaimSettings(
       env: ContainerEnvVar[],
       meta?: ContainerSettingsPaneEnvChangeMeta
     ) => {
-      if (!isApWorkload) {
+      if (!isApWorkload || readOnly) {
         return;
       }
       const body = claimBodyRef.current;
@@ -199,13 +204,14 @@ export function useWorkloadClaimSettings(
       isApWorkload,
       kubeconfig,
       onAddDbDsnReferenceMutationStart,
+      readOnly,
       revalidateAfterApMutation,
     ]
   );
 
   const onPortsChange = useCallback<ContainerSettingsOnPortsChange>(
     async (ports) => {
-      if (!isApWorkload) {
+      if (!isApWorkload || readOnly) {
         return;
       }
       const body = claimBodyRef.current;
@@ -224,12 +230,12 @@ export function useWorkloadClaimSettings(
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateAfterApMutation]
+    [isApWorkload, kubeconfig, readOnly, revalidateAfterApMutation]
   );
 
   const onNetworkChange = useCallback(
     async (network: NonNullable<ClaimContainerSettings["network"]>) => {
-      if (!isApWorkload) {
+      if (!isApWorkload || readOnly) {
         return;
       }
       const body = claimBodyRef.current;
@@ -248,12 +254,12 @@ export function useWorkloadClaimSettings(
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, revalidateAfterApMutation]
+    [isApWorkload, kubeconfig, readOnly, revalidateAfterApMutation]
   );
 
   const onResourceQuotasCommit = useCallback(
     async (next: { cpu: number; memory: number; replicas?: number }) => {
-      if (!isApWorkload) {
+      if (!isApWorkload || readOnly) {
         return;
       }
       const body = claimBodyRef.current;
@@ -302,6 +308,7 @@ export function useWorkloadClaimSettings(
       display.replicas,
       isApWorkload,
       kubeconfig,
+      readOnly,
       revalidateAfterApMutation,
     ]
   );

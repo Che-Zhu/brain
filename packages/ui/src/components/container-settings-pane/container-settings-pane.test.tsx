@@ -32,6 +32,8 @@ const MYSQL_OPTION_SELECTED_RE =
 const NETWORK_SECTION_RE = /Network/;
 const PRIVATE_ADDRESS_RE = /Private Address/;
 const PRIVATE_ADDRESS_TARGET_RE = /Private Address target port/;
+const PRIVATE_ADDRESS_DEFAULT_VALUE_RE =
+  /http:\/\/api-service.default.svc:8080/;
 const PRIVATE_ADDRESS_VALUE_RE =
   /http:\/\/api-service-port-8080.default.svc:8080/;
 const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
@@ -158,6 +160,47 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
   assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
+});
+
+test("read-only network view renders addresses without mutation controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api.example.com",
+            port: 8080,
+            status: "accessible",
+            type: "platform",
+            url: "https://api.example.com/",
+          },
+        ],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[{ port: 80, protocol: "tcp" }]}
+      readOnly
+    />
+  );
+
+  assert.match(html, NETWORK_SECTION_RE);
+  assert.match(html, PRIVATE_ADDRESS_RE);
+  assert.match(html, PRIVATE_ADDRESS_DEFAULT_VALUE_RE);
+  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
+  assert.match(html, COPY_PRIVATE_ADDRESS_RE);
+  assert.match(html, COPY_PUBLIC_ADDRESS_RE);
+  assert.doesNotMatch(html, ADD_PUBLIC_ADDRESS_RE);
+  assert.doesNotMatch(html, DELETE_PUBLIC_ADDRESS_RE);
+  assert.doesNotMatch(html, PORTS_TABLE_RE);
 });
 
 test("read-only container settings view cannot mutate environment rows", () => {

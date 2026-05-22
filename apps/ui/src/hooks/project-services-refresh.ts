@@ -28,6 +28,14 @@ function normalizeWorkloadPhase(input: unknown) {
     : "";
 }
 
+function hasNetworkPublicAddresses(network: unknown) {
+  if (network == null || typeof network !== "object") {
+    return false;
+  }
+  const publicAddresses = (network as Record<string, unknown>).publicAddresses;
+  return Array.isArray(publicAddresses) && publicAddresses.length > 0;
+}
+
 export function hasTransientWorkloadPhase(data: K8sGetResponse | undefined) {
   return apItemsFromList(data).some((item) => {
     const status =
@@ -55,6 +63,9 @@ export function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
     const statusEndpoints = Array.isArray(status?.endpoints)
       ? status.endpoints
       : [];
+    if (hasNetworkPublicAddresses(status?.network)) {
+      return true;
+    }
     if (
       statusEndpoints.some(
         (endpoint) =>

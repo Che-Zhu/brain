@@ -338,6 +338,8 @@ export interface DbsToCanvasStateOptions {
 }
 
 export interface EntryPointsToCanvasStateOptions {
+  /** AP list used to derive public EntryPoint nodes from `status.network.publicAddresses`. */
+  apsData?: K8sGetResponse;
   /** Index offset for deterministic fallback placement when combining node lists. @default 0 */
   gridIndexOffset?: number;
   /** Used when a list item has no `metadata.namespace` (same as k8s list query). */
@@ -476,18 +478,18 @@ export function entryPointsToCanvasState(
   data: K8sGetResponse | undefined,
   options?: EntryPointsToCanvasStateOptions
 ): { edges: Edge[]; nodes: Node[] } {
-  const items = apItemsFromList(data);
+  const items = entryPointCanvasResources(data, options);
   const grid0 = options?.gridIndexOffset ?? 0;
   const nodes: Node[] = items.map((item, i) => {
-    const stable = metadataName(item) ?? metadataUid(item) ?? `i-${i}`;
-    const name = metadataName(item) ?? "unknown";
-    const namespace =
-      metadataNamespace(item) ?? options?.namespaceFallback ?? "";
-    const uid = metadataUid(item);
-    const targets = entryNodeTargetsFromResource(item);
+    const stable =
+      item.stableName ?? item.name ?? item.uid ?? metadataName(item.resource);
+    const name = item.name ?? "unknown";
+    const namespace = item.namespace ?? options?.namespaceFallback ?? "";
+    const uid = item.uid;
+    const targets = item.targets;
     const accessDomain = entryNodeAccessDomainFromTargets(targets);
     const g = grid0 + i;
-    const apRef = entryPointApRefFromResource(item);
+    const apRef = item.apRef;
 
     return {
       data: {
@@ -507,6 +509,173 @@ export function entryPointsToCanvasState(
     };
   });
   return { nodes, edges: [] };
+}
+
+interface EntryPointCanvasResource {
+  apRef?: string;
+  name: string;
+  namespace: string;
+  resource?: unknown;
+  stableName?: string;
+  targets: EntryNodeTarget[];
+  uid?: string;
+}
+
+interface NetworkPublicAddress {
+  host: string;
+  port: number;
+  status?: string;
+  type?: string;
+  url?: string;
+}
+
+function entryPointCanvasResources(
+  data: K8sGetResponse | undefined,
+  options: EntryPointsToCanvasStateOptions | undefined
+): EntryPointCanvasResource[] {
+  const entryPointItems = apItemsFromList(data);
+  if (options?.apsData === undefined) {
+    return entryPointItems.map((item) =>
+      entryPointCanvasResourceFromEntryPoint(item, options?.namespaceFallback)
+    );
+  }
+
+  const entryPointByApRef = entryPointResourceByApRef(
+    entryPointItems,
+    options.namespaceFallback
+  );
+  const resources: EntryPointCanvasResource[] = [];
+  for (const ap of apItemsFromList(options.apsData)) {
+    const publicAddresses = apNetworkPublicAddresses(ap);
+    if (publicAddresses.length === 0) {
+      continue;
+    }
+    const apName = metadataName(ap);
+    const namespace = metadataNamespace(ap) ?? options.namespaceFallback ?? "";
+    if (apName === undefined || namespace === "") {
+      continue;
+    }
+    const entryPoint = entryPointByApRef.get(`${namespace}/${apName}`);
+    const entryPointName = metadataName(entryPoint);
+    const entryPointUid = metadataUid(entryPoint);
+    const name = entryPointName ?? apName;
+    resources.push({
+      apRef: apName,
+      name,
+      namespace,
+      resource: entryPoint,
+      stableName: entryPointName ?? apName,
+      targets: entryNodeTargetsFromPublicAddresses(publicAddresses),
+      ...(entryPointUid === undefined ? {} : { uid: entryPointUid }),
+    });
+  }
+  return resources;
+}
+
+function entryPointCanvasResourceFromEntryPoint(
+  item: unknown,
+  namespaceFallback: string | undefined
+): EntryPointCanvasResource {
+  return {
+    apRef: entryPointApRefFromResource(item),
+    name: metadataName(item) ?? "unknown",
+    namespace: metadataNamespace(item) ?? namespaceFallback ?? "",
+    resource: item,
+    targets: entryNodeTargetsFromResource(item),
+    ...(metadataUid(item) === undefined ? {} : { uid: metadataUid(item) }),
+  };
+}
+
+function entryPointResourceByApRef(
+  entryPoints: readonly unknown[],
+  namespaceFallback: string | undefined
+): Map<string, unknown> {
+  const map = new Map<string, unknown>();
+  for (const entryPoint of entryPoints) {
+    const apRef = entryPointApRefFromResource(entryPoint);
+    const namespace = metadataNamespace(entryPoint) ?? namespaceFallback ?? "";
+    if (apRef === undefined || namespace === "") {
+      continue;
+    }
+    map.set(`${namespace}/${apRef}`, entryPoint);
+  }
+  return map;
+}
+
+function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
+  const root = asRecord(ap) ?? {};
+  const statusNetwork = asRecord(asRecord(root.status)?.network);
+  const inputNetwork = asRecord(asRecord(asRecord(root.spec)?.input)?.network);
+  const statusAddresses = normalizeNetworkPublicAddresses(
+    statusNetwork?.publicAddresses,
+    true
+  );
+  if (statusAddresses.length > 0) {
+    return statusAddresses;
+  }
+  return normalizeNetworkPublicAddresses(inputNetwork?.publicAddresses, false);
+}
+
+function normalizeNetworkPublicAddresses(
+  raw: unknown,
+  includeObservedFields: boolean
+): NetworkPublicAddress[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: NetworkPublicAddress[] = [];
+  for (const item of raw) {
+    const record = asRecord(item);
+    if (record === undefined) {
+      continue;
+    }
+    const host = nonEmptyString(record.host);
+    const port = entryPointTargetPort(record.port);
+    if (host === undefined || port === undefined) {
+      continue;
+    }
+    out.push({
+      host,
+      port,
+      ...(includeObservedFields
+        ? {
+            ...(nonEmptyString(record.status) === undefined
+              ? {}
+              : { status: nonEmptyString(record.status) }),
+            ...(nonEmptyString(record.type) === undefined
+              ? {}
+              : { type: nonEmptyString(record.type) }),
+            ...(nonEmptyString(record.url) === undefined
+              ? {}
+              : { url: nonEmptyString(record.url) }),
+          }
+        : {}),
+    });
+  }
+  return out;
+}
+
+function entryNodeTargetsFromPublicAddresses(
+  addresses: readonly NetworkPublicAddress[]
+): EntryNodeTarget[] {
+  return addresses.map((address) => ({
+    id: `${address.port}-${address.host}`,
+    label: publicAddressTargetLabel(address.type),
+    status: entryPointTargetStatus(address.status),
+    value: address.url ?? `https://${address.host}/`,
+  }));
+}
+
+function publicAddressTargetLabel(type: string | undefined): string {
+  switch (type?.toLowerCase()) {
+    case "platform":
+      return "Platform Address";
+    case "custom":
+    case "custom-domain":
+      return "Custom Domain";
+    default:
+      return "Public Address";
+  }
 }
 
 function entryPointTargets(input: unknown): unknown[] {

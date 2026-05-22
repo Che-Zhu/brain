@@ -27,6 +27,9 @@ export const WorkloadSettingsCanvasPanel = memo(
         : undefined;
     const name = states?.name ?? "";
     const workloadKind = workloadClaimKindFromStates(states);
+    const settingsReadOnly = data?.settingsAccess?.readOnly === true;
+    const settingsShareToken = data?.settingsAccess?.shareToken?.trim() ?? "";
+    const canEditAp = workloadKind === "AP" && !settingsReadOnly;
 
     const {
       display,
@@ -47,11 +50,13 @@ export const WorkloadSettingsCanvasPanel = memo(
       claimPayload,
     } = useWorkloadClaimSettings({
       dbDsnReferenceSources: data?.dbDsnReferenceSources,
-      kubeconfig,
+      kubeconfig: settingsReadOnly ? "" : kubeconfig,
       name,
       namespace: ns,
       onAddDbDsnReferenceMutationStart: data?.onAddDbDsnReferenceMutationStart,
       onWorkloadMutation: data?.onWorkloadMutation,
+      readOnly: settingsReadOnly,
+      shareToken: settingsShareToken,
       workloadKind,
     });
 
@@ -109,17 +114,17 @@ export const WorkloadSettingsCanvasPanel = memo(
           onAddDbDsnReferenceIntentConsumed={
             data?.onAddDbDsnReferenceIntentConsumed
           }
-          onEnvChange={isApWorkload ? onEnvChange : ignoreEnv}
-          onImageChange={isApWorkload ? onImageChange : ignoreImage}
-          onNetworkChange={isApWorkload ? onNetworkChange : ignoreNetwork}
-          onPortsChange={isApWorkload ? onPortsChange : ignorePorts}
+          onEnvChange={canEditAp ? onEnvChange : ignoreEnv}
+          onImageChange={canEditAp ? onImageChange : ignoreImage}
+          onNetworkChange={canEditAp ? onNetworkChange : ignoreNetwork}
+          onPortsChange={canEditAp ? onPortsChange : ignorePorts}
           onResourceQuotasCommit={
-            isApWorkload ? onResourceQuotasCommit : undefined
+            canEditAp ? onResourceQuotasCommit : undefined
           }
           ports={display.ports}
-          readOnly={!isApWorkload}
+          readOnly={!isApWorkload || settingsReadOnly}
           replicasQuota={
-            isApWorkload
+            canEditAp
               ? {
                   ...WORKLOAD_PANEL_REPLICAS,
                   onValueChange: ignoreReplicas,
