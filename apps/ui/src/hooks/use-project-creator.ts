@@ -17,11 +17,13 @@ import { useProjectCompositions } from "@/hooks/compositions/use-project-composi
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useGithubRepos } from "@/hooks/use-github-repos";
 import {
+  mergeApMetadataRegion,
   mergeApSpecProjectName,
   mergeDbSpecProjectName,
 } from "@/lib/ap-yaml-merge-project";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
 import { fetchProjectUidByName } from "@/lib/fetch-project-uid";
+import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import { k8sApplyYaml } from "@/lib/project-canvas/k8s/http/apply-yaml";
 import {
   joinKubeYamlDocuments,
@@ -223,15 +225,18 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
 
         const projectClaimName = randomName();
         const apClaimName = childResourceName(projectClaimName);
+        const routingDomain = routingDomainFromKubeconfig(kubeconfig);
 
         const vars = {
           image: trimmed,
           name: apClaimName,
           namespace,
+          region: routingDomain,
         };
 
         let apYaml = renderCrossplaneCompositionTemplate(apTpl, vars);
         apYaml = mergeApSpecProjectName(apYaml, projectClaimName);
+        apYaml = mergeApMetadataRegion(apYaml, routingDomain);
 
         const projectYaml = renderCrossplaneCompositionTemplate(projectTpl, {
           name: projectClaimName,
@@ -277,6 +282,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
 
         const projectClaimName = randomName();
         const dbClaimName = childResourceName(projectClaimName);
+        const routingDomain = routingDomainFromKubeconfig(kubeconfig);
 
         const projectYaml = renderCrossplaneCompositionTemplate(projectTpl, {
           name: projectClaimName,
@@ -285,6 +291,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         let dbYaml = renderCrossplaneCompositionTemplate(choice.template, {
           name: dbClaimName,
           namespace,
+          region: routingDomain,
         });
         dbYaml = mergeDbSpecProjectName(dbYaml, projectClaimName);
 

@@ -38,6 +38,43 @@ export function mergeApSpecProjectName(
 }
 
 /**
+ * Sets the routing-domain label used by the AP composition to allocate Public
+ * Address hosts.
+ */
+export function mergeApMetadataRegion(
+  apYamlSingleDoc: string,
+  routingDomain: string
+): string {
+  const domain = routingDomain.trim();
+  const trimmed = apYamlSingleDoc.trim();
+  if (!(trimmed && domain)) {
+    return trimmed;
+  }
+  const parsed: unknown = YAML.parse(trimmed);
+  if (
+    parsed == null ||
+    typeof parsed !== "object" ||
+    !("kind" in parsed) ||
+    (parsed as { kind?: string }).kind !== "AP"
+  ) {
+    return trimmed;
+  }
+
+  const doc = parsed as Record<string, unknown>;
+  const metadata =
+    typeof doc.metadata === "object" && doc.metadata !== null
+      ? { ...(doc.metadata as Record<string, unknown>) }
+      : {};
+  const labels =
+    typeof metadata.labels === "object" && metadata.labels !== null
+      ? { ...(metadata.labels as Record<string, unknown>) }
+      : {};
+  labels.region = domain;
+  doc.metadata = { ...metadata, labels };
+  return YAML.stringify(doc).trimEnd();
+}
+
+/**
  * Sets `spec.projectName` so DB compositions can observe the Project claim and label composed resources.
  */
 export function mergeDbSpecProjectName(

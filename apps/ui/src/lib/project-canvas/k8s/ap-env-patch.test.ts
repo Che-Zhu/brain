@@ -157,6 +157,59 @@ test("AP network settings writes v1 Platform Addresses with stable IDs and no ho
   ]);
 });
 
+test("AP network settings backfills routing domain label when adding Public Addresses", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        network: {
+          privatePort: 80,
+        },
+      },
+    },
+    {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_abc123", port: 80 }],
+    },
+    {
+      metadata: { labels: { "crossplane.io/project-name": "demo" } },
+      routingDomain: "192.168.12.53.nip.io",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        privatePort: 80,
+        platformAddresses: [{ id: "pa_abc123", port: 80 }],
+      },
+    },
+    {
+      op: "add",
+      path: "/metadata/labels/region",
+      value: "192.168.12.53.nip.io",
+    },
+  ]);
+});
+
+test("AP network settings preserves existing routing domain label", () => {
+  const ops = patchOpsForApNetworkSettings(
+    { input: { network: { privatePort: 80 } } },
+    {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_abc123", port: 80 }],
+    },
+    {
+      metadata: { labels: { region: "custom.example.com" } },
+      routingDomain: "192.168.12.53.nip.io",
+    }
+  );
+
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0]?.path, "/spec/input/network");
+});
+
 test("AP network settings validate App Listening Ports", () => {
   for (const privatePort of [1, 65_535]) {
     assert.deepEqual(

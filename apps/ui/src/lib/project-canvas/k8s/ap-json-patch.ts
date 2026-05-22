@@ -10,6 +10,10 @@ import {
 import { parse as parseYaml } from "yaml";
 
 import {
+  isRoutingDomainLabelValue,
+  routingDomainFromKubeconfig,
+} from "@/lib/kubeconfig-routing-domain";
+import {
   generatePlatformAddressId,
   isPlatformAddressId,
   normalizePlatformAddressId,
@@ -28,6 +32,11 @@ const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
 
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
   Partial<Pick<ContainerNetwork, "publicAddresses">>;
+
+interface ApNetworkSettingsPatchOptions {
+  metadata?: Record<string, unknown>;
+  routingDomain?: string;
+}
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
@@ -85,6 +94,40 @@ function removeExistingApInputFields(
       ops.push({ op: "remove", path: `/spec/input/${field}` });
     }
   }
+}
+
+function apHasRoutingDomain(metadata: Record<string, unknown> | undefined) {
+  const labels = asRecord(metadata?.labels);
+  const region = typeof labels?.region === "string" ? labels.region.trim() : "";
+  return region !== "";
+}
+
+function appendRoutingDomainPatch(
+  ops: K8sJsonPatchOp[],
+  metadata: Record<string, unknown> | undefined,
+  routingDomain: string,
+  hasPublicAddresses: boolean
+): void {
+  const domain = routingDomain.trim();
+  if (
+    !hasPublicAddresses ||
+    domain === "" ||
+    !isRoutingDomainLabelValue(domain) ||
+    apHasRoutingDomain(metadata)
+  ) {
+    return;
+  }
+
+  if (asRecord(metadata?.labels) == null) {
+    ops.push({
+      op: "add",
+      path: "/metadata/labels",
+      value: { region: domain },
+    });
+    return;
+  }
+
+  ops.push({ op: "add", path: "/metadata/labels/region", value: domain });
 }
 
 /** Kubernetes container cpu limit string from UI cores (e.g. 0.25 → `250m`, 2 → `2`). */
@@ -276,7 +319,8 @@ function validatedPlatformAddresses(
 
 export function patchOpsForApNetworkSettings(
   spec: Record<string, unknown> | undefined,
-  network: ApNetworkSettingsPatch
+  network: ApNetworkSettingsPatch,
+  options: ApNetworkSettingsPatchOptions = {}
 ): K8sJsonPatchOp[] {
   const privatePort = validatedNetworkPort(
     network.privatePort,
@@ -290,6 +334,12 @@ export function patchOpsForApNetworkSettings(
   }
   const ops = patchOpsForApInput(spec, { network: networkInput });
   removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
+  appendRoutingDomainPatch(
+    ops,
+    options.metadata,
+    options.routingDomain ?? "",
+    (platformAddresses?.length ?? 0) > 0
+  );
   return ops;
 }
 
@@ -308,7 +358,14 @@ export async function applyApNetwork(
   network: ApNetworkSettingsPatch
 ): Promise<void> {
   const spec = asRecord(claim.spec);
-  await patchAp(kubeconfig, claim, patchOpsForApNetworkSettings(spec, network));
+  await patchAp(
+    kubeconfig,
+    claim,
+    patchOpsForApNetworkSettings(spec, network, {
+      metadata: asRecord(claim.metadata),
+      routingDomain: routingDomainFromKubeconfig(kubeconfig),
+    })
+  );
 }
 
 export async function applyApReplicas(
