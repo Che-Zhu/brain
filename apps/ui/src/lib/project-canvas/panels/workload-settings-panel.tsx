@@ -15,7 +15,10 @@ import type { CanvasContainerNodeData } from "@/lib/project-canvas/nodes/types";
 import { useWorkloadClaimSettings } from "@/lib/project-canvas/panels/use-workload-claim-settings";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { WORKLOAD_PANEL_REPLICAS } from "@/store/canvas-store";
-import { CanvasResourcePane } from "./canvas-resource-pane";
+import {
+  CanvasResourcePane,
+  type CanvasResourcePaneProps,
+} from "./canvas-resource-pane";
 
 function workloadSettingsSubtitle({
   image,
@@ -26,6 +29,37 @@ function workloadSettingsSubtitle({
 }) {
   const imageValue = image?.trim() ?? "";
   return imageValue === "" ? kind : `${kind} · ${imageValue}`;
+}
+
+type WorkloadSettingsShellProps = Pick<
+  CanvasResourcePaneProps,
+  "children" | "onClose" | "status" | "subtitle" | "title"
+>;
+
+function WorkloadSettingsShell({
+  children,
+  onClose,
+  status,
+  subtitle,
+  title,
+}: WorkloadSettingsShellProps) {
+  return (
+    <CanvasResourcePane
+      closeAriaLabel="Close workload settings"
+      icon={
+        <Settings2
+          aria-hidden
+          className="size-4 shrink-0 text-database-metrics-chart"
+        />
+      }
+      onClose={onClose}
+      status={status}
+      subtitle={subtitle}
+      title={title}
+    >
+      {children}
+    </CanvasResourcePane>
+  );
 }
 
 export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
@@ -82,17 +116,11 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     shareToken: settingsShareToken,
     workloadKind,
   });
+  const claim = k8sGetClaimBody(claimPayload);
 
   if (ns === "" || name === "") {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload settings"
-        icon={
-          <Settings2
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadSettingsShell
         onClose={onClose}
         status={states?.status}
         subtitle={subtitle}
@@ -101,20 +129,13 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         <p className="text-muted-foreground text-sm">
           Select a workload with a name and configure namespace in settings.
         </p>
-      </CanvasResourcePane>
+      </WorkloadSettingsShell>
     );
   }
 
   if (error != null) {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload settings"
-        icon={
-          <Settings2
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadSettingsShell
         onClose={onClose}
         status={states?.status}
         subtitle={subtitle}
@@ -123,39 +144,25 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         <p className="text-destructive text-sm" role="alert">
           Could not load claim: {error.message}
         </p>
-      </CanvasResourcePane>
+      </WorkloadSettingsShell>
     );
   }
 
-  if (isLoading && k8sGetClaimBody(claimPayload) == null) {
+  if (isLoading && claim == null) {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload settings"
-        icon={
-          <Settings2
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadSettingsShell
         onClose={onClose}
         status={states?.status}
         subtitle={subtitle}
         title={title}
       >
         <p className="text-muted-foreground text-sm">Loading workload…</p>
-      </CanvasResourcePane>
+      </WorkloadSettingsShell>
     );
   }
 
   return (
-    <CanvasResourcePane
-      closeAriaLabel="Close workload settings"
-      icon={
-        <Settings2
-          aria-hidden
-          className="size-4 shrink-0 text-database-metrics-chart"
-        />
-      }
+    <WorkloadSettingsShell
       onClose={onClose}
       status={states?.status}
       subtitle={subtitle}
@@ -203,7 +210,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
             : undefined
         }
       />
-    </CanvasResourcePane>
+    </WorkloadSettingsShell>
   );
 });
 

@@ -28,7 +28,41 @@ import { rollbackApFromEffectiveConfigYaml } from "@/lib/project-canvas/k8s/ap-j
 import { k8sGetClaimBody } from "@/lib/project-canvas/k8s/claim-mapper";
 import { fetchConfigMapConfigYaml } from "@/lib/project-canvas/k8s/fetch-configmap-config-yaml";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
-import { CanvasResourcePane } from "./canvas-resource-pane";
+import {
+  CanvasResourcePane,
+  type CanvasResourcePaneProps,
+} from "./canvas-resource-pane";
+
+type WorkloadHistoryShellProps = Pick<
+  CanvasResourcePaneProps,
+  "children" | "onClose" | "status" | "subtitle" | "title"
+>;
+
+function WorkloadHistoryShell({
+  children,
+  onClose,
+  status,
+  subtitle,
+  title,
+}: WorkloadHistoryShellProps) {
+  return (
+    <CanvasResourcePane
+      closeAriaLabel="Close workload history"
+      icon={
+        <History
+          aria-hidden
+          className="size-4 shrink-0 text-database-metrics-chart"
+        />
+      }
+      onClose={onClose}
+      status={status}
+      subtitle={subtitle}
+      title={title}
+    >
+      {children}
+    </CanvasResourcePane>
+  );
+}
 
 export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
   node,
@@ -58,13 +92,11 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     name,
     namespace: ns,
   });
+  const claim = k8sGetClaimBody(claimPayload);
 
   const rows = useMemo(
-    () =>
-      workloadKind === "AP"
-        ? apConfigSnapshotRowsFromClaim(k8sGetClaimBody(claimPayload))
-        : [],
-    [claimPayload, workloadKind]
+    () => (workloadKind === "AP" ? apConfigSnapshotRowsFromClaim(claim) : []),
+    [claim, workloadKind]
   );
 
   const onLoadConfigYaml = useCallback(
@@ -84,7 +116,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
 
   const runRollback = useCallback(
     async (configMapName: string) => {
-      const claim = k8sGetClaimBody(claimPayload);
       if (claim == null) {
         throw new Error("Workload claim is not loaded yet.");
       }
@@ -96,7 +127,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
       await rollbackApFromEffectiveConfigYaml(kubeconfig, claim, yaml);
       await revalidateClaim();
     },
-    [claimPayload, kubeconfig, ns, revalidateClaim]
+    [claim, kubeconfig, ns, revalidateClaim]
   );
 
   const confirmRollbackSnapshot = () => {
@@ -130,14 +161,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
 
   if (ns === "" || name === "") {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload history"
-        icon={
-          <History
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadHistoryShell
         onClose={onClose}
         status={states?.status}
         subtitle={workloadKind}
@@ -146,20 +170,13 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
         <p className="text-muted-foreground text-sm">
           Select a workload with a name and configure namespace in settings.
         </p>
-      </CanvasResourcePane>
+      </WorkloadHistoryShell>
     );
   }
 
   if (workloadKind !== "AP") {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload history"
-        icon={
-          <History
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadHistoryShell
         onClose={onClose}
         status={states?.status}
         subtitle={workloadKind}
@@ -169,20 +186,13 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
           Config snapshot history applies to AP workloads. Database claims use a
           different backup model.
         </p>
-      </CanvasResourcePane>
+      </WorkloadHistoryShell>
     );
   }
 
   if (error != null) {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload history"
-        icon={
-          <History
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadHistoryShell
         onClose={onClose}
         status={states?.status}
         subtitle={workloadKind}
@@ -191,40 +201,26 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
         <p className="text-destructive text-sm" role="alert">
           Could not load workload: {error.message}
         </p>
-      </CanvasResourcePane>
+      </WorkloadHistoryShell>
     );
   }
 
-  if (isLoading && k8sGetClaimBody(claimPayload) == null) {
+  if (isLoading && claim == null) {
     return (
-      <CanvasResourcePane
-        closeAriaLabel="Close workload history"
-        icon={
-          <History
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadHistoryShell
         onClose={onClose}
         status={states?.status}
         subtitle={workloadKind}
         title={title}
       >
         <p className="text-muted-foreground text-sm">Loading history…</p>
-      </CanvasResourcePane>
+      </WorkloadHistoryShell>
     );
   }
 
   return (
     <>
-      <CanvasResourcePane
-        closeAriaLabel="Close workload history"
-        icon={
-          <History
-            aria-hidden
-            className="size-4 shrink-0 text-database-metrics-chart"
-          />
-        }
+      <WorkloadHistoryShell
         onClose={onClose}
         status={states?.status}
         subtitle={workloadKind}
@@ -238,7 +234,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
           rows={rows}
           workloadName={name}
         />
-      </CanvasResourcePane>
+      </WorkloadHistoryShell>
       <AlertDialog
         onOpenChange={(next) => {
           if (!next) {

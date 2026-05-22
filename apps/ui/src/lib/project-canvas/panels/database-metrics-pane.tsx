@@ -12,10 +12,10 @@ import type { Node } from "@xyflow/react";
 import { Activity, Cpu, HardDrive, MemoryStick } from "lucide-react";
 import { type ComponentType, type SVGProps, useMemo } from "react";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
-import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
 import { telemetryRowsToMetricsData } from "@/lib/project-canvas/telemetry/rows-to-metrics";
 import { CanvasResourcePane } from "./canvas-resource-pane";
 import {
+  formatMetricTrend,
   formatPercent,
   latestPercent,
   metricReading,
@@ -33,11 +33,6 @@ export interface DatabaseMetricsPaneProps {
   node: Node | null;
   onClose: () => void;
   open: boolean;
-}
-
-function trendLabel(series: readonly MetricDataPoint[]) {
-  const trend = computeMetricTrend(series);
-  return trend.charAt(0).toUpperCase() + trend.slice(1);
 }
 
 function DatabaseMetricCard({
@@ -82,7 +77,9 @@ function DatabaseMetricCard({
           </p>
         </div>
         <div className="flex min-w-0 justify-between gap-3 text-sm leading-5">
-          <p className="truncate text-muted-foreground">{trendLabel(series)}</p>
+          <p className="truncate text-muted-foreground">
+            {formatMetricTrend(series)}
+          </p>
           <p className="shrink-0 text-primary">{formatPercent(percent)}</p>
         </div>
       </div>

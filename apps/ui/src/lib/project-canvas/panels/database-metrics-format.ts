@@ -4,6 +4,8 @@ import type {
 } from "@workspace/ui/components/database-node/database-node";
 import type { MetricDataPoint } from "@workspace/ui/components/metrics-chart/metrics-chart.types";
 
+import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
+
 const PERCENT_FORMATTER = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
@@ -58,6 +60,11 @@ export function latestPercent(
 
 export function formatPercent(value: number | undefined) {
   return value === undefined ? "--" : `${PERCENT_FORMATTER.format(value)}%`;
+}
+
+export function formatMetricTrend(series: readonly MetricDataPoint[]) {
+  const trend = computeMetricTrend(series);
+  return trend.charAt(0).toUpperCase() + trend.slice(1);
 }
 
 function parseCpuCores(capacity: string | undefined) {

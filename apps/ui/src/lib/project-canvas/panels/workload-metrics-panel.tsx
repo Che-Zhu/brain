@@ -6,24 +6,22 @@ import type { MetricDataPoint } from "@workspace/ui/components/metrics-chart/met
 import type { Node } from "@xyflow/react";
 import { useAtomValue } from "jotai";
 import { Activity, Cpu, MemoryStick } from "lucide-react";
-import { memo, useMemo } from "react";
+import { type ComponentType, memo, type SVGProps, useMemo } from "react";
 
 import { containerStatesFromNode } from "@/lib/project-canvas/flow/container-node-workload";
-import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
 import { telemetryRowsToMetricsData } from "@/lib/project-canvas/telemetry/rows-to-metrics";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CanvasResourcePane } from "./canvas-resource-pane";
-import { formatPercent, latestPercent } from "./database-metrics-format";
+import {
+  formatMetricTrend,
+  formatPercent,
+  latestPercent,
+} from "./database-metrics-format";
 import {
   METRICS_SERIES_STEP_SECONDS,
   workloadMetricsSeriesTarget,
   workloadMetricsSeriesWindow,
 } from "./metrics-series-request";
-
-function trendLabel(series: readonly MetricDataPoint[]) {
-  const trend = computeMetricTrend(series);
-  return trend.charAt(0).toUpperCase() + trend.slice(1);
-}
 
 function WorkloadMetricCard({
   fallback,
@@ -32,7 +30,7 @@ function WorkloadMetricCard({
   series,
 }: {
   fallback: number | string | undefined;
-  icon: typeof Cpu;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
   series: MetricDataPoint[];
 }) {
@@ -56,7 +54,7 @@ function WorkloadMetricCard({
           </p>
         </div>
         <p className="truncate text-muted-foreground text-sm leading-5">
-          {trendLabel(series)}
+          {formatMetricTrend(series)}
         </p>
       </div>
       <div className="min-h-0 flex-1">
