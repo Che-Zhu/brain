@@ -8,10 +8,9 @@ export interface CanvasStackOrderItem {
   stackOrder?: number;
 }
 
-export interface BringCanvasStackOrderItemToFrontResult {
-  changed: boolean;
-  stackOrder?: number;
-}
+export type BringCanvasStackOrderItemToFrontResult =
+  | { changed: false; stackOrder?: never }
+  | { changed: true; stackOrder: number };
 
 const DEFAULT_LAYER_BY_KIND: Record<CanvasLayoutResourceRef["kind"], number> = {
   AP: 0,

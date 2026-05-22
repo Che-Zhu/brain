@@ -77,14 +77,13 @@ export function bringCanvasNodeToFrontInStackOrder(
     canvasStackOrderItemsFromNodes(nodes),
     nodeId
   );
-  if (!result.changed || result.stackOrder === undefined) {
+  if (!result.changed) {
     return { changed: false, nodes: applyCanvasStackOrderToNodes(nodes) };
   }
 
+  const { stackOrder } = result;
   const nextNodes = nodes.map((node) =>
-    node.id === nodeId
-      ? nodeWithCanvasStackOrder(node, result.stackOrder)
-      : node
+    node.id === nodeId ? nodeWithCanvasStackOrder(node, stackOrder) : node
   );
   const rankedNodes = applyCanvasStackOrderToNodes(nextNodes);
   return {

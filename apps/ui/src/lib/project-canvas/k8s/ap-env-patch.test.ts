@@ -6,6 +6,7 @@ import {
   patchOpsForApEnvSettings,
   patchOpsForApNetworkSettings,
 } from "./ap-json-patch";
+import type { K8sJsonPatchOp } from "./http/json-patch";
 
 const DUPLICATE_ENV_NAME_RE = /Environment variable names must be unique/;
 const PRIVATE_PORT_RANGE_RE =
@@ -15,6 +16,13 @@ const PUBLIC_PORT_RANGE_RE =
 const PLATFORM_ADDRESS_ID_INVALID_RE =
   /Platform Address ID must match \^pa_\[a-z0-9\]\{6,32\}\$/;
 const PLATFORM_ADDRESS_ID_UNIQUE_RE = /Platform Address IDs must be unique/;
+
+function patchOpValue(op: K8sJsonPatchOp | undefined): unknown {
+  if (op === undefined || op.op === "remove") {
+    assert.fail("Expected patch operation with a value.");
+  }
+  return op.value;
+}
 
 test("AP env settings patch direct rows as standard Kubernetes value entries", () => {
   const ops = patchOpsForApEnvSettings(
@@ -213,7 +221,9 @@ test("AP network settings preserves existing routing domain label", () => {
 test("AP network settings validate App Listening Ports", () => {
   for (const privatePort of [1, 65_535]) {
     assert.deepEqual(
-      patchOpsForApNetworkSettings({ input: {} }, { privatePort })[0]?.value,
+      patchOpValue(
+        patchOpsForApNetworkSettings({ input: {} }, { privatePort })[0]
+      ),
       { privatePort }
     );
   }
@@ -358,15 +368,17 @@ test("AP env settings preserve non-direct rows unless they are deleted", () => {
   };
 
   assert.deepEqual(
-    patchOpsForApEnvSettings(spec, [
-      { name: "DATABASE_URL", value: "postgres://db:5432/app" },
-      {
-        name: "DATABASE_PASSWORD",
-        value: "(valueFrom)",
-        valueFrom: { secretKeyRef },
-        valueSource: "valueFrom",
-      },
-    ])[0]?.value,
+    patchOpValue(
+      patchOpsForApEnvSettings(spec, [
+        { name: "DATABASE_URL", value: "postgres://db:5432/app" },
+        {
+          name: "DATABASE_PASSWORD",
+          value: "(valueFrom)",
+          valueFrom: { secretKeyRef },
+          valueSource: "valueFrom",
+        },
+      ])[0]
+    ),
     [
       { name: "DATABASE_URL", value: "postgres://db:5432/app" },
       { name: "DATABASE_PASSWORD", valueFrom: { secretKeyRef } },
@@ -374,9 +386,11 @@ test("AP env settings preserve non-direct rows unless they are deleted", () => {
   );
 
   assert.deepEqual(
-    patchOpsForApEnvSettings(spec, [
-      { name: "DATABASE_URL", value: "postgres://db:5432/app" },
-    ])[0]?.value,
+    patchOpValue(
+      patchOpsForApEnvSettings(spec, [
+        { name: "DATABASE_URL", value: "postgres://db:5432/app" },
+      ])[0]
+    ),
     [{ name: "DATABASE_URL", value: "postgres://db:5432/app" }]
   );
 });
