@@ -29,6 +29,7 @@ export const DB_SETTINGS_STORAGE_GIB = {
 
 const DB_SETTINGS_DEFAULTS = {
   cpuLimitCores: 0.5,
+  exposeNodePort: false,
   memoryLimitGi: 1,
   replicas: DB_SETTINGS_REPLICAS.min,
   storageSizeGi: 3,
@@ -39,6 +40,7 @@ const BINARY_QUANTITY_PATTERN = /^([0-9]+(?:\.[0-9]+)?)(Ki|Mi|Gi|Ti)?$/i;
 
 export interface DatabaseSettingsDraft {
   cpuLimitCores: number;
+  exposeNodePort: boolean;
   memoryLimitGi: number;
   replicas: number;
   storageSizeGi: number;
@@ -47,6 +49,7 @@ export interface DatabaseSettingsDraft {
 export interface DatabaseSettingsPatch {
   spec: Partial<{
     cpuLimit: string;
+    exposeNodePort: boolean;
     memoryLimit: string;
     replicas: number;
     storageSize: string;
@@ -167,6 +170,10 @@ export function normalizeDbSettingsStorageGi(raw: unknown): number {
   );
 }
 
+function normalizeDbSettingsExposeNodePort(raw: unknown): boolean {
+  return typeof raw === "boolean" ? raw : DB_SETTINGS_DEFAULTS.exposeNodePort;
+}
+
 export function dbSettingsCpuLimitQuantity(cores: number): string {
   const normalized = normalizeDbSettingsCpuLimitCores(cores);
   const millicores = Math.round(normalized * 1000);
@@ -191,6 +198,7 @@ export function dbSettingsStorageQuantity(storageGi: number): string {
 function normalizeDraft(draft: DatabaseSettingsDraft): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(draft.cpuLimitCores),
+    exposeNodePort: normalizeDbSettingsExposeNodePort(draft.exposeNodePort),
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(draft.memoryLimitGi),
     replicas: normalizeDbSettingsReplicas(draft.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(draft.storageSizeGi),
@@ -202,6 +210,7 @@ export function dbSettingsDraftFromNodeData({
 }: Pick<CanvasDatabaseNodeData, "desired">): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(desired?.cpuLimit),
+    exposeNodePort: normalizeDbSettingsExposeNodePort(desired?.exposeNodePort),
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(desired?.memoryLimit),
     replicas: normalizeDbSettingsReplicas(desired?.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(desired?.storageSize),
@@ -216,6 +225,7 @@ export function dbSettingsDraftIsDirty(
   const normalizedDraft = normalizeDraft(draft);
   return (
     normalizedOriginal.cpuLimitCores !== normalizedDraft.cpuLimitCores ||
+    normalizedOriginal.exposeNodePort !== normalizedDraft.exposeNodePort ||
     normalizedOriginal.memoryLimitGi !== normalizedDraft.memoryLimitGi ||
     normalizedOriginal.replicas !== normalizedDraft.replicas ||
     normalizedOriginal.storageSizeGi !== normalizedDraft.storageSizeGi
@@ -232,6 +242,9 @@ export function buildDbSettingsPatch(
 
   if (normalizedOriginal.replicas !== normalizedDraft.replicas) {
     spec.replicas = normalizedDraft.replicas;
+  }
+  if (normalizedOriginal.exposeNodePort !== normalizedDraft.exposeNodePort) {
+    spec.exposeNodePort = normalizedDraft.exposeNodePort;
   }
   if (normalizedOriginal.cpuLimitCores !== normalizedDraft.cpuLimitCores) {
     spec.cpuLimit = dbSettingsCpuLimitQuantity(normalizedDraft.cpuLimitCores);

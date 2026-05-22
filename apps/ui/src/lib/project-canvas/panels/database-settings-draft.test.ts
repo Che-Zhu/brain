@@ -20,10 +20,10 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
   assert.deepEqual(
     dbSettingsDraftFromNodeData({
       desired: { replicas: 12 },
-      states: { displayEngine: "PostgreSQL", name: "postgres" },
     }),
     {
       cpuLimitCores: 0.5,
+      exposeNodePort: false,
       memoryLimitGi: 1,
       replicas: 10,
       storageSizeGi: 3,
@@ -33,10 +33,10 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
   assert.deepEqual(
     dbSettingsDraftFromNodeData({
       desired: {},
-      states: { displayEngine: "PostgreSQL", name: "postgres" },
     }),
     {
       cpuLimitCores: 0.5,
+      exposeNodePort: false,
       memoryLimitGi: 1,
       replicas: 1,
       storageSizeGi: 3,
@@ -46,8 +46,7 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
 
 test("DB settings draft detects replica changes and builds focused patches", () => {
   const data = {
-    desired: { replicas: 2 },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
+    desired: { exposeNodePort: false, replicas: 2 },
   };
   const original = dbSettingsDraftFromNodeData(data);
 
@@ -62,6 +61,39 @@ test("DB settings draft detects replica changes and builds focused patches", () 
     buildDbSettingsPatch(original, { ...original, replicas: 3 }),
     {
       spec: { replicas: 3 },
+    }
+  );
+});
+
+test("DB settings draft detects public connection changes and builds combined patches", () => {
+  const original = dbSettingsDraftFromNodeData({
+    desired: {
+      cpuLimit: "1",
+      exposeNodePort: false,
+      memoryLimit: "2Gi",
+      replicas: 2,
+      storageSize: "20Gi",
+    },
+  });
+
+  assert.equal(original.exposeNodePort, false);
+  assert.equal(
+    dbSettingsDraftIsDirty(original, { ...original, exposeNodePort: true }),
+    true
+  );
+  assert.deepEqual(
+    buildDbSettingsPatch(original, {
+      ...original,
+      exposeNodePort: true,
+      replicas: 3,
+      storageSizeGi: 25,
+    }),
+    {
+      spec: {
+        exposeNodePort: true,
+        replicas: 3,
+        storageSize: "25Gi",
+      },
     }
   );
 });
@@ -88,11 +120,11 @@ test("DB settings draft normalizes resource and storage values into focused patc
       replicas: 2,
       storageSize: "20Gi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.deepEqual(original, {
     cpuLimitCores: 1.5,
+    exposeNodePort: false,
     memoryLimitGi: 2,
     replicas: 2,
     storageSizeGi: 20,
@@ -100,6 +132,7 @@ test("DB settings draft normalizes resource and storage values into focused patc
 
   const draft = {
     cpuLimitCores: 2,
+    exposeNodePort: false,
     memoryLimitGi: 4,
     replicas: 3,
     storageSizeGi: 25,
@@ -124,7 +157,6 @@ test("DB settings draft builds focused single-field patches", () => {
       replicas: 2,
       storageSize: "20Gi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.deepEqual(
@@ -149,7 +181,6 @@ test("DB settings draft normalizes storage quantities to Gi draft values", () =>
       replicas: 1,
       storageSize: "20480Mi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.equal(original.memoryLimitGi, 1);

@@ -3,9 +3,17 @@
 import { useDbSettingsOperations } from "@workspace/api/hooks";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import type { DatabaseNodeStatus } from "@workspace/ui/components/database-node/database-node";
+import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
+import {
+  canCopyDatabaseNodeConnection,
+  type DatabaseNodeConnection,
+  type DatabaseNodeStatus,
+  getDatabaseNodeConnectionKey,
+  maskDatabaseConnectionString,
+} from "@workspace/ui/components/database-node/database-node";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { Separator } from "@workspace/ui/components/separator";
+import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Cpu,
@@ -24,6 +32,7 @@ import {
   buildDbSettingsPatch,
   type DatabaseSettingsDraft,
   type DatabaseSettingsNumberConstraint,
+  type DatabaseSettingsPatch,
   DB_SETTINGS_CPU_LIMIT_CORES,
   DB_SETTINGS_MEMORY_LIMIT_GIB,
   DB_SETTINGS_REPLICA_COUNT,
@@ -41,6 +50,15 @@ interface DatabaseSettingsPaneProps {
   kubeconfig?: string;
   onClose: () => void;
   onUpdated?: () => Promise<unknown>;
+}
+
+interface DatabaseSettingsPaneContentProps {
+  data: CanvasDatabaseNodeData;
+  editable?: boolean;
+  onClose: () => void;
+  onSubmitPatch?: (patch: DatabaseSettingsPatch) => Promise<unknown> | unknown;
+  onUpdated?: () => Promise<unknown>;
+  updating?: boolean;
 }
 
 function statusPillClassName(status: DatabaseNodeStatus | undefined) {
@@ -64,6 +82,127 @@ function engineSubtitle({
   formattedVersion,
 }: CanvasDatabaseNodeData["states"]) {
   return `${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
+}
+
+function getConnectionAddressDisplayValue(connection: DatabaseNodeConnection) {
+  if (connection.kind === "public" && !connection.publicAccess.enabled) {
+    return null;
+  }
+  if (!connection.value) {
+    return connection.kind === "private"
+      ? (connection.unavailableMessage ?? "Connection unavailable")
+      : null;
+  }
+  return (
+    connection.displayValue ?? maskDatabaseConnectionString(connection.value)
+  );
+}
+
+function shouldShowConnectionAddress(connection: DatabaseNodeConnection) {
+  if (connection.kind === "private") {
+    return true;
+  }
+  return connection.publicAccess.enabled && Boolean(connection.value);
+}
+
+function DatabaseSettingsConnectionAddressRow({
+  connection,
+  index,
+}: {
+  connection: DatabaseNodeConnection;
+  index: number;
+}) {
+  const displayValue = getConnectionAddressDisplayValue(connection);
+  if (displayValue === null) {
+    return null;
+  }
+
+  const copyable = canCopyDatabaseNodeConnection(connection);
+  const title =
+    connection.kind === "public"
+      ? (displayValue ?? undefined)
+      : (connection.value ?? displayValue ?? undefined);
+
+  return (
+    <CanvasNode.CopyableRow
+      className={cn(
+        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
+        copyable ? "min-h-18" : "min-h-11"
+      )}
+      copyAriaLabel={`Copy ${connection.label}`}
+      copyable={copyable}
+      copyValue={connection.value}
+      data-slot="database-settings-connection-address-row"
+      rowKey={getDatabaseNodeConnectionKey(connection, index)}
+      title={title}
+    >
+      {({ copied, copyable: rowCopyable }) => (
+        <>
+          <div
+            className={cn(
+              "relative z-10 flex min-w-0 items-center justify-between gap-2",
+              rowCopyable ? "pointer-events-none" : "pointer-events-auto"
+            )}
+          >
+            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
+              {connection.label}
+            </span>
+          </div>
+          <div
+            aria-hidden={rowCopyable ? true : undefined}
+            className={cn(
+              "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
+              rowCopyable
+                ? "pointer-events-none text-zinc-50"
+                : "text-muted-foreground"
+            )}
+            data-copied={copied ? "true" : undefined}
+            data-slot="database-settings-connection-address-value"
+            title={title}
+          >
+            <span className="min-w-0 truncate">{displayValue}</span>
+            <CanvasNode.CopyableRowIndicator />
+          </div>
+        </>
+      )}
+    </CanvasNode.CopyableRow>
+  );
+}
+
+function DatabaseSettingsConnectionAddressList({
+  connections,
+}: {
+  connections: readonly DatabaseNodeConnection[];
+}) {
+  const visibleConnections = connections.filter(shouldShowConnectionAddress);
+
+  if (visibleConnections.length === 0) {
+    return (
+      <div
+        className="flex min-h-11 min-w-0 items-center rounded-lg bg-zinc-950/20 px-2.5 text-muted-foreground text-xs leading-4"
+        data-slot="database-settings-connection-address-empty"
+      >
+        No connection addresses
+      </div>
+    );
+  }
+
+  return (
+    <CanvasNode.CopyFeedbackScope>
+      <div
+        className="flex min-w-0 flex-col gap-2"
+        data-slot="database-settings-connection-address-list"
+      >
+        {visibleConnections.map((connection, index) => (
+          <DatabaseSettingsConnectionAddressRow
+            connection={connection}
+            index={index}
+            key={getDatabaseNodeConnectionKey(connection, index)}
+          />
+        ))}
+      </div>
+    </CanvasNode.CopyFeedbackScope>
+  );
 }
 
 function DatabaseSettingsSlider({
@@ -127,25 +266,88 @@ export function DatabaseSettingsPane({
 }: DatabaseSettingsPaneProps) {
   const readOnly = data.settingsAccess?.readOnly === true;
   const shareToken = data.settingsAccess?.shareToken?.trim() ?? "";
-  const original = useMemo(() => dbSettingsDraftFromNodeData(data), [data]);
-  const [draft, setDraft] = useState<DatabaseSettingsDraft>(original);
-
-  useEffect(() => {
-    setDraft(original);
-  }, [original]);
-
-  const { isUpdating, updateSettings } = useDbSettingsOperations({
+  const { authReady, isUpdating, updateSettings } = useDbSettingsOperations({
     kubeconfig: readOnly ? undefined : kubeconfig,
     shareToken: readOnly ? undefined : shareToken,
   });
 
   const workload = data.workload;
   const updating = isUpdating(workload);
+  const handleSubmitPatch = useCallback(
+    (patch: DatabaseSettingsPatch) => updateSettings(workload, patch),
+    [updateSettings, workload]
+  );
+
+  return (
+    <DatabaseSettingsPaneContent
+      data={data}
+      editable={!readOnly && authReady}
+      onClose={onClose}
+      onSubmitPatch={!readOnly && authReady ? handleSubmitPatch : undefined}
+      onUpdated={onUpdated}
+      updating={updating}
+    />
+  );
+}
+
+export function DatabaseSettingsPaneContent({
+  data,
+  editable = true,
+  onClose,
+  onSubmitPatch,
+  onUpdated,
+  updating = false,
+}: DatabaseSettingsPaneContentProps) {
+  const readOnly = data.settingsAccess?.readOnly === true;
+  const canEdit = editable && !readOnly;
+  const desired = data.desired;
+  const workloadName = data.workload.name.trim();
+  const workloadNamespace = data.workload.namespace.trim();
+  const desiredCpuLimit = desired?.cpuLimit;
+  const desiredExposeNodePort = desired?.exposeNodePort === true;
+  const desiredMemoryLimit = desired?.memoryLimit;
+  const desiredReplicas = desired?.replicas;
+  const desiredStorageSize = desired?.storageSize;
+  const originalState = useMemo(() => {
+    const draft = dbSettingsDraftFromNodeData({
+      desired: {
+        ...(desiredCpuLimit === undefined ? {} : { cpuLimit: desiredCpuLimit }),
+        exposeNodePort: desiredExposeNodePort,
+        ...(desiredMemoryLimit === undefined
+          ? {}
+          : { memoryLimit: desiredMemoryLimit }),
+        ...(desiredReplicas === undefined ? {} : { replicas: desiredReplicas }),
+        ...(desiredStorageSize === undefined
+          ? {}
+          : { storageSize: desiredStorageSize }),
+      },
+    });
+
+    return {
+      draft,
+      resetKey: `${workloadNamespace}/${workloadName}`,
+    };
+  }, [
+    desiredCpuLimit,
+    desiredExposeNodePort,
+    desiredMemoryLimit,
+    desiredReplicas,
+    desiredStorageSize,
+    workloadName,
+    workloadNamespace,
+  ]);
+  const original = originalState.draft;
+  const [draft, setDraft] = useState<DatabaseSettingsDraft>(original);
+
+  useEffect(() => {
+    setDraft(originalState.draft);
+  }, [originalState]);
+
   const dirty = dbSettingsDraftIsDirty(original, draft);
-  const canUpdate = !readOnly && dirty && !updating;
+  const canUpdate = canEdit && dirty && !updating && onSubmitPatch != null;
   const statusLabel = data.states.status?.label ?? "Unknown";
   const subtitle = engineSubtitle(data.states);
-  const controlsDisabled = readOnly || updating;
+  const controlsDisabled = !canEdit || updating;
 
   const handleCancel = useCallback(() => {
     setDraft(original);
@@ -153,11 +355,11 @@ export function DatabaseSettingsPane({
 
   const handleUpdate = useCallback(async () => {
     const patch = buildDbSettingsPatch(original, draft);
-    if (patch === null) {
+    if (!canEdit || patch === null || onSubmitPatch == null) {
       return;
     }
     try {
-      await updateSettings(workload, patch);
+      await onSubmitPatch(patch);
       toast.success("Database settings updated.");
       await onUpdated?.();
     } catch (error) {
@@ -167,7 +369,7 @@ export function DatabaseSettingsPane({
           : "Could not update database settings."
       );
     }
-  }, [draft, onUpdated, original, updateSettings, workload]);
+  }, [canEdit, draft, onSubmitPatch, onUpdated, original]);
 
   return (
     <aside className="database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col gap-6 overflow-hidden px-2.5 py-5 shadow-lg">
@@ -224,6 +426,43 @@ export function DatabaseSettingsPane({
             </div>
             {dirty ? <Badge variant="outline">Draft</Badge> : null}
           </div>
+
+          <Separator />
+
+          <section className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h4 className="font-medium text-card-foreground text-sm leading-5">
+                Connection Address
+              </h4>
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-zinc-950/20 p-2.5">
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="font-medium text-card-foreground text-sm leading-5">
+                  Public connection
+                </span>
+                <span className="text-muted-foreground text-xs leading-4">
+                  {draft.exposeNodePort ? "Enabled" : "Disabled"}
+                </span>
+              </div>
+              <Switch
+                aria-label="Public connection"
+                checked={draft.exposeNodePort}
+                className="shrink-0"
+                disabled={controlsDisabled}
+                onCheckedChange={(nextEnabled) => {
+                  setDraft((current) => ({
+                    ...current,
+                    exposeNodePort: nextEnabled,
+                  }));
+                }}
+                size="lg"
+                variant="brand"
+              />
+            </div>
+            <DatabaseSettingsConnectionAddressList
+              connections={data.connections}
+            />
+          </section>
 
           <Separator />
 
@@ -315,19 +554,25 @@ export function DatabaseSettingsPane({
             />
           </section>
 
-          <div className="flex shrink-0 items-center justify-end gap-2">
-            <Button
-              disabled={!dirty || updating}
-              onClick={handleCancel}
-              type="button"
-              variant="ghost"
-            >
-              Cancel
-            </Button>
-            <Button disabled={!canUpdate} onClick={handleUpdate} type="button">
-              Update
-            </Button>
-          </div>
+          {readOnly ? null : (
+            <div className="flex shrink-0 items-center justify-end gap-2">
+              <Button
+                disabled={!dirty || updating}
+                onClick={handleCancel}
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!canUpdate}
+                onClick={handleUpdate}
+                type="button"
+              >
+                Update
+              </Button>
+            </div>
+          )}
         </section>
       </div>
     </aside>

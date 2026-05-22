@@ -82,10 +82,7 @@ export function useDbSettingsOperations(options: UseDbLifecycleOptions) {
   );
 
   const updateSettings = useCallback(
-    (
-      workload: DbLifecycleWorkloadRef,
-      patch: Record<string, unknown>
-    ): Promise<unknown> => {
+    (workload: DbLifecycleWorkloadRef, patch: object): Promise<unknown> => {
       assertAuthReady();
       const { name, namespace } = validateWorkload(workload);
       return runWithLoading(workload, () =>

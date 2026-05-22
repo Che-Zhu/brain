@@ -279,6 +279,7 @@ function databaseDesiredFromSpec(
 
   return {
     ...(cpuLimit === undefined ? {} : { cpuLimit }),
+    exposeNodePort: spec.exposeNodePort === true,
     ...(memoryLimit === undefined ? {} : { memoryLimit }),
     ...(replicas === undefined ? {} : { replicas }),
     ...(storageSize === undefined ? {} : { storageSize }),
