@@ -29,6 +29,7 @@ export const DB_SETTINGS_STORAGE_GIB = {
 
 const DB_SETTINGS_DEFAULTS = {
   cpuLimitCores: 0.5,
+  exposeNodePort: false,
   memoryLimitGi: 1,
   replicas: DB_SETTINGS_REPLICAS.min,
   storageSizeGi: 3,
@@ -169,6 +170,10 @@ export function normalizeDbSettingsStorageGi(raw: unknown): number {
   );
 }
 
+function normalizeDbSettingsExposeNodePort(raw: unknown): boolean {
+  return typeof raw === "boolean" ? raw : DB_SETTINGS_DEFAULTS.exposeNodePort;
+}
+
 export function dbSettingsCpuLimitQuantity(cores: number): string {
   const normalized = normalizeDbSettingsCpuLimitCores(cores);
   const millicores = Math.round(normalized * 1000);
@@ -193,7 +198,7 @@ export function dbSettingsStorageQuantity(storageGi: number): string {
 function normalizeDraft(draft: DatabaseSettingsDraft): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(draft.cpuLimitCores),
-    exposeNodePort: draft.exposeNodePort === true,
+    exposeNodePort: normalizeDbSettingsExposeNodePort(draft.exposeNodePort),
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(draft.memoryLimitGi),
     replicas: normalizeDbSettingsReplicas(draft.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(draft.storageSizeGi),
@@ -205,7 +210,7 @@ export function dbSettingsDraftFromNodeData({
 }: Pick<CanvasDatabaseNodeData, "desired">): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(desired?.cpuLimit),
-    exposeNodePort: desired?.exposeNodePort === true,
+    exposeNodePort: normalizeDbSettingsExposeNodePort(desired?.exposeNodePort),
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(desired?.memoryLimit),
     replicas: normalizeDbSettingsReplicas(desired?.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(desired?.storageSize),

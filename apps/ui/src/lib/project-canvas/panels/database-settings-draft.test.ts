@@ -20,7 +20,6 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
   assert.deepEqual(
     dbSettingsDraftFromNodeData({
       desired: { replicas: 12 },
-      states: { displayEngine: "PostgreSQL", name: "postgres" },
     }),
     {
       cpuLimitCores: 0.5,
@@ -34,7 +33,6 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
   assert.deepEqual(
     dbSettingsDraftFromNodeData({
       desired: {},
-      states: { displayEngine: "PostgreSQL", name: "postgres" },
     }),
     {
       cpuLimitCores: 0.5,
@@ -49,7 +47,6 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
 test("DB settings draft detects replica changes and builds focused patches", () => {
   const data = {
     desired: { exposeNodePort: false, replicas: 2 },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   };
   const original = dbSettingsDraftFromNodeData(data);
 
@@ -77,7 +74,6 @@ test("DB settings draft detects public connection changes and builds combined pa
       replicas: 2,
       storageSize: "20Gi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.equal(original.exposeNodePort, false);
@@ -124,7 +120,6 @@ test("DB settings draft normalizes resource and storage values into focused patc
       replicas: 2,
       storageSize: "20Gi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.deepEqual(original, {
@@ -137,6 +132,7 @@ test("DB settings draft normalizes resource and storage values into focused patc
 
   const draft = {
     cpuLimitCores: 2,
+    exposeNodePort: false,
     memoryLimitGi: 4,
     replicas: 3,
     storageSizeGi: 25,
@@ -161,7 +157,6 @@ test("DB settings draft builds focused single-field patches", () => {
       replicas: 2,
       storageSize: "20Gi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.deepEqual(
@@ -186,7 +181,6 @@ test("DB settings draft normalizes storage quantities to Gi draft values", () =>
       replicas: 1,
       storageSize: "20480Mi",
     },
-    states: { displayEngine: "PostgreSQL", name: "postgres" },
   });
 
   assert.equal(original.memoryLimitGi, 1);

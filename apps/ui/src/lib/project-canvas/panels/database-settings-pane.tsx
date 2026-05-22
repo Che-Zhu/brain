@@ -308,37 +308,34 @@ export function DatabaseSettingsPaneContent({
   const desiredMemoryLimit = desired?.memoryLimit;
   const desiredReplicas = desired?.replicas;
   const desiredStorageSize = desired?.storageSize;
-  const originalState = useMemo(
-    () => ({
-      draft: dbSettingsDraftFromNodeData({
-        desired: {
-          ...(desiredCpuLimit === undefined
-            ? {}
-            : { cpuLimit: desiredCpuLimit }),
-          exposeNodePort: desiredExposeNodePort,
-          ...(desiredMemoryLimit === undefined
-            ? {}
-            : { memoryLimit: desiredMemoryLimit }),
-          ...(desiredReplicas === undefined
-            ? {}
-            : { replicas: desiredReplicas }),
-          ...(desiredStorageSize === undefined
-            ? {}
-            : { storageSize: desiredStorageSize }),
-        },
-      }),
-      workloadKey: `${workloadNamespace}/${workloadName}`,
-    }),
-    [
-      desiredCpuLimit,
-      desiredExposeNodePort,
-      desiredMemoryLimit,
-      desiredReplicas,
-      desiredStorageSize,
-      workloadName,
-      workloadNamespace,
-    ]
-  );
+  const originalState = useMemo(() => {
+    const draft = dbSettingsDraftFromNodeData({
+      desired: {
+        ...(desiredCpuLimit === undefined ? {} : { cpuLimit: desiredCpuLimit }),
+        exposeNodePort: desiredExposeNodePort,
+        ...(desiredMemoryLimit === undefined
+          ? {}
+          : { memoryLimit: desiredMemoryLimit }),
+        ...(desiredReplicas === undefined ? {} : { replicas: desiredReplicas }),
+        ...(desiredStorageSize === undefined
+          ? {}
+          : { storageSize: desiredStorageSize }),
+      },
+    });
+
+    return {
+      draft,
+      resetKey: `${workloadNamespace}/${workloadName}`,
+    };
+  }, [
+    desiredCpuLimit,
+    desiredExposeNodePort,
+    desiredMemoryLimit,
+    desiredReplicas,
+    desiredStorageSize,
+    workloadName,
+    workloadNamespace,
+  ]);
   const original = originalState.draft;
   const [draft, setDraft] = useState<DatabaseSettingsDraft>(original);
 

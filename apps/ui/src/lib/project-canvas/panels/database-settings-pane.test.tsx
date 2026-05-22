@@ -25,22 +25,23 @@ const UPDATE_BUTTON_RE = />Update</;
 const CANCEL_BUTTON_RE = />Cancel</;
 const PROVISIONING_CONNECTION_RE = /Provisioning connection string/;
 
+const PRIVATE_CONNECTION = {
+  id: "private",
+  kind: "private",
+  label: "Private connection",
+  value: "postgres://user:secret@postgres.default.svc:5432/app",
+} satisfies CanvasDatabaseNodeData["connections"][number];
+
+const PUBLIC_CONNECTION = {
+  id: "public",
+  kind: "public",
+  label: "Public connection",
+  publicAccess: { enabled: true },
+  value: "postgres://user:secret@db.example.com:30432/app",
+} satisfies CanvasDatabaseNodeData["connections"][number];
+
 const BASE_DATA = {
-  connections: [
-    {
-      id: "private",
-      kind: "private",
-      label: "Private connection",
-      value: "postgres://user:secret@postgres.default.svc:5432/app",
-    },
-    {
-      id: "public",
-      kind: "public",
-      label: "Public connection",
-      publicAccess: { enabled: true },
-      value: "postgres://user:secret@db.example.com:30432/app",
-    },
-  ],
+  connections: [PRIVATE_CONNECTION, PUBLIC_CONNECTION],
   desired: {
     cpuLimit: "1",
     exposeNodePort: true,
@@ -86,7 +87,7 @@ test("database settings pane hides unprovisioned public address while public acc
       data={{
         ...BASE_DATA,
         connections: [
-          BASE_DATA.connections[0],
+          PRIVATE_CONNECTION,
           {
             id: "public",
             kind: "public",
