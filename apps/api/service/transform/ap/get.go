@@ -88,11 +88,7 @@ func mergePrivateNetworkStatus(ap map[string]interface{}, status map[string]inte
 		return
 	}
 
-	network, _ := status["network"].(map[string]interface{})
-	networkCopy := make(map[string]interface{})
-	for k, v := range network {
-		networkCopy[k] = v
-	}
+	networkCopy := networkStatusCopy(status)
 	if _, exists := networkCopy["privatePort"]; !exists {
 		networkCopy["privatePort"] = privatePort
 	}
@@ -105,16 +101,24 @@ func mergePrivateNetworkStatus(ap map[string]interface{}, status map[string]inte
 	status["network"] = networkCopy
 }
 
-func apPrivatePort(ap map[string]interface{}) (int, bool) {
+func networkStatusCopy(status map[string]interface{}) map[string]interface{} {
+	network, _ := status["network"].(map[string]interface{})
+	networkCopy := make(map[string]interface{}, len(network)+1)
+	for k, v := range network {
+		networkCopy[k] = v
+	}
+	return networkCopy
+}
+
+func apInputNetwork(ap map[string]interface{}) map[string]interface{} {
 	spec, _ := ap["spec"].(map[string]interface{})
-	if spec == nil {
-		return 0, false
-	}
 	input, _ := spec["input"].(map[string]interface{})
-	if input == nil {
-		return 0, false
-	}
 	network, _ := input["network"].(map[string]interface{})
+	return network
+}
+
+func apPrivatePort(ap map[string]interface{}) (int, bool) {
+	network := apInputNetwork(ap)
 	if network == nil {
 		return 0, false
 	}
@@ -157,11 +161,7 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 	if len(addresses) == 0 {
 		return
 	}
-	network, _ := status["network"].(map[string]interface{})
-	networkCopy := make(map[string]interface{})
-	for k, v := range network {
-		networkCopy[k] = v
-	}
+	networkCopy := networkStatusCopy(status)
 	if _, exists := networkCopy["publicAddresses"]; exists {
 		status["network"] = networkCopy
 		return
@@ -188,15 +188,7 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 }
 
 func apPublicAddresses(ap map[string]interface{}) []networkPublicAddress {
-	spec, _ := ap["spec"].(map[string]interface{})
-	if spec == nil {
-		return nil
-	}
-	input, _ := spec["input"].(map[string]interface{})
-	if input == nil {
-		return nil
-	}
-	network, _ := input["network"].(map[string]interface{})
+	network := apInputNetwork(ap)
 	if network == nil {
 		return nil
 	}

@@ -23,6 +23,9 @@ const AP_K8S_KIND = "aps";
 const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
 const LEGACY_AP_SINGLE_ENDPOINT_FIELDS = ["port", "host"] as const;
 
+type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
+  Partial<Pick<ContainerNetwork, "publicAddresses">>;
+
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
@@ -281,22 +284,10 @@ export function patchOpsForApEnvSettings(
   return patchOpsForApInput(spec, { env: list });
 }
 
-function validatedPrivatePort(privatePort: number): number {
-  const n = Number(privatePort);
-  if (!Number.isInteger(n) || n < 1 || n > 65_535) {
-    throw new Error(
-      "Private Address target port must be an integer from 1 through 65535."
-    );
-  }
-  return n;
-}
-
-function validatedPublicAddressPort(port: number): number {
+function validatedNetworkPort(port: number, label: string): number {
   const n = Number(port);
   if (!Number.isInteger(n) || n < 1 || n > 65_535) {
-    throw new Error(
-      "Public Address target port must be an integer from 1 through 65535."
-    );
+    throw new Error(`${label} must be an integer from 1 through 65535.`);
   }
   return n;
 }
@@ -322,17 +313,19 @@ function validatedPublicAddresses(
     seenHosts.add(hostKey);
     return {
       host,
-      port: validatedPublicAddressPort(address.port),
+      port: validatedNetworkPort(address.port, "Public Address target port"),
     };
   });
 }
 
 export function patchOpsForApNetworkSettings(
   spec: Record<string, unknown> | undefined,
-  network: Pick<ContainerNetwork, "privatePort"> &
-    Partial<Pick<ContainerNetwork, "publicAddresses">>
+  network: ApNetworkSettingsPatch
 ): K8sJsonPatchOp[] {
-  const privatePort = validatedPrivatePort(network.privatePort);
+  const privatePort = validatedNetworkPort(
+    network.privatePort,
+    "Private Address target port"
+  );
   const publicAddresses = validatedPublicAddresses(network.publicAddresses);
   const input = asRecord(spec?.input);
   const networkInput: Record<string, unknown> = { privatePort };
@@ -356,7 +349,7 @@ export async function applyApEnv(
 export async function applyApNetwork(
   kubeconfig: string,
   claim: Record<string, unknown>,
-  network: Pick<ContainerNetwork, "privatePort">
+  network: ApNetworkSettingsPatch
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(kubeconfig, claim, patchOpsForApNetworkSettings(spec, network));

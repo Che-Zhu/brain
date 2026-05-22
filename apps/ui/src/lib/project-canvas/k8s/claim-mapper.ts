@@ -339,27 +339,43 @@ function normalizeNetworkPublicAddresses(
   }
   const out: ContainerNetwork["publicAddresses"] = [];
   for (const item of raw) {
-    const address = asRecord(item);
-    if (address == null) {
-      continue;
+    const address = normalizeNetworkPublicAddress(item, includeObservedFields);
+    if (address != null) {
+      out.push(address);
     }
-    const host = trimStr(address.host);
-    const port = privatePortNum(address.port);
-    if (host === "" || port == null) {
-      continue;
-    }
-    const url = trimStr(address.url);
-    const type = trimStr(address.type);
-    const status = trimStr(address.status);
-    out.push({
-      host,
-      port,
-      ...(includeObservedFields && status !== "" ? { status } : {}),
-      ...(includeObservedFields && type !== "" ? { type } : {}),
-      ...(includeObservedFields && url !== "" ? { url } : {}),
-    });
   }
   return out;
+}
+
+function normalizeNetworkPublicAddress(
+  raw: unknown,
+  includeObservedFields: boolean
+): ContainerNetwork["publicAddresses"][number] | undefined {
+  const address = asRecord(raw);
+  if (address == null) {
+    return undefined;
+  }
+  const host = trimStr(address.host);
+  const port = privatePortNum(address.port);
+  if (host === "" || port == null) {
+    return undefined;
+  }
+  const normalized: ContainerNetwork["publicAddresses"][number] = {
+    host,
+    port,
+  };
+  if (!includeObservedFields) {
+    return normalized;
+  }
+  const status = trimStr(address.status);
+  const type = trimStr(address.type);
+  const url = trimStr(address.url);
+  return {
+    ...normalized,
+    ...(status === "" ? {} : { status }),
+    ...(type === "" ? {} : { type }),
+    ...(url === "" ? {} : { url }),
+  };
 }
 
 /** Prefer observed `status.endpoints` URLs; fall back to spec shape for the same port. */
