@@ -187,7 +187,12 @@ test("DB canvas nodes preserve desired replicas and effective resources for sett
     {
       items: [
         {
-          metadata: { name: "postgres", namespace: "default", uid: "db-uid" },
+          metadata: {
+            labels: { region: "192.168.12.53.nip.io" },
+            name: "postgres",
+            namespace: "default",
+            uid: "db-uid",
+          },
           spec: {
             engine: "postgresql",
             exposeNodePort: true,
@@ -223,6 +228,16 @@ test("DB canvas nodes preserve desired replicas and effective resources for sett
       memoryLimit: "2Gi",
       replicas: 3,
       storageSize: "20Gi",
+    }
+  );
+  assert.deepEqual(
+    (
+      state.nodes[0]?.data as {
+        metadata?: { labels?: Record<string, unknown> };
+      }
+    ).metadata,
+    {
+      labels: { region: "192.168.12.53.nip.io" },
     }
   );
 });

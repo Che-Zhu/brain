@@ -286,6 +286,16 @@ function databaseDesiredFromSpec(
   };
 }
 
+function databaseMetadataFromResource(
+  metadata: Record<string, unknown>
+): CanvasDatabaseNodeData["metadata"] | undefined {
+  const labels = asRecord(metadata.labels);
+  if (labels === undefined || Object.keys(labels).length === 0) {
+    return undefined;
+  }
+  return { labels };
+}
+
 function databaseCompositionNameFromSpec(
   spec: Record<string, unknown>
 ): string | undefined {
@@ -427,6 +437,7 @@ export function dbToDatabaseNodeData(
   >
 ): CanvasDatabaseNodeData {
   const root = asRecord(db) ?? {};
+  const metadata = asRecord(root.metadata) ?? {};
   const spec = asRecord(root.spec) ?? {};
   const status = asRecord(root.status) ?? {};
 
@@ -469,9 +480,12 @@ export function dbToDatabaseNodeData(
     status: databaseStatusFromResource(status),
   };
 
+  const resourceMetadata = databaseMetadataFromResource(metadata);
+
   return {
     connections: databaseConnectionsFromResource(spec, status),
     desired: databaseDesiredFromSpec(spec, status),
+    ...(resourceMetadata === undefined ? {} : { metadata: resourceMetadata }),
     states,
     ...(uid === undefined || uid === "" ? {} : { uid }),
     workload: { name, namespace },

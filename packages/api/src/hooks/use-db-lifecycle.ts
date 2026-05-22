@@ -4,6 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { API_ROUTES } from "../constants";
 import { fetcher } from "../fetch";
+import {
+  buildDbPublicAccessMergePatch,
+  type DbPublicAccessPatchOptions,
+} from "../lib/db-public-access-patch";
 import { ApiUrl } from "../utils";
 
 export interface UseDbLifecycleOptions {
@@ -54,7 +58,7 @@ function mergePatchDb(
   base: string,
   header: Record<string, string>,
   workload: DbLifecycleWorkloadRef,
-  patch: Record<string, unknown>
+  patch: object
 ): Promise<unknown> {
   const name = workload.name.trim();
   const namespace = workload.namespace.trim();
@@ -238,7 +242,11 @@ export function useDbLifecycleOperations(options: UseDbLifecycleOptions) {
   );
 
   const togglePublicAccess = useCallback(
-    async (workload: DbLifecycleWorkloadRef, nextEnabled: boolean) => {
+    async (
+      workload: DbLifecycleWorkloadRef,
+      nextEnabled: boolean,
+      patchOptions?: DbPublicAccessPatchOptions
+    ) => {
       assertAuthReady();
       validateWorkload(workload);
       setPublicAccessPendingTargets((prev) => {
@@ -253,9 +261,12 @@ export function useDbLifecycleOperations(options: UseDbLifecycleOptions) {
 
       try {
         await runWithLoading(workload, "public-access", async () => {
-          await mergePatchDb(base, headers, workload, {
-            spec: { exposeNodePort: nextEnabled },
-          });
+          await mergePatchDb(
+            base,
+            headers,
+            workload,
+            buildDbPublicAccessMergePatch(nextEnabled, patchOptions)
+          );
         });
       } catch (error) {
         clearPublicAccessPendingTarget(workload);

@@ -1,3 +1,7 @@
+import {
+  buildDbPublicAccessMergePatch,
+  type DbPublicAccessPatchOptions,
+} from "@workspace/api/lib/db-public-access-patch";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 
 export interface DatabaseSettingsNumberConstraint {
@@ -47,7 +51,12 @@ export interface DatabaseSettingsDraft {
 }
 
 export interface DatabaseSettingsPatch {
-  spec: Partial<{
+  metadata?: {
+    labels: {
+      region: string;
+    };
+  };
+  spec?: Partial<{
     cpuLimit: string;
     exposeNodePort: boolean;
     memoryLimit: string;
@@ -234,17 +243,23 @@ export function dbSettingsDraftIsDirty(
 
 export function buildDbSettingsPatch(
   original: DatabaseSettingsDraft,
-  draft: DatabaseSettingsDraft
+  draft: DatabaseSettingsDraft,
+  options: DbPublicAccessPatchOptions = {}
 ): DatabaseSettingsPatch | null {
   const normalizedOriginal = normalizeDraft(original);
   const normalizedDraft = normalizeDraft(draft);
-  const spec: DatabaseSettingsPatch["spec"] = {};
+  const spec: NonNullable<DatabaseSettingsPatch["spec"]> = {};
+  const publicAccessPatch = buildDbPublicAccessMergePatch(
+    normalizedDraft.exposeNodePort,
+    options
+  );
+  const metadata = publicAccessPatch.metadata;
 
   if (normalizedOriginal.replicas !== normalizedDraft.replicas) {
     spec.replicas = normalizedDraft.replicas;
   }
   if (normalizedOriginal.exposeNodePort !== normalizedDraft.exposeNodePort) {
-    spec.exposeNodePort = normalizedDraft.exposeNodePort;
+    spec.exposeNodePort = publicAccessPatch.spec.exposeNodePort;
   }
   if (normalizedOriginal.cpuLimitCores !== normalizedDraft.cpuLimitCores) {
     spec.cpuLimit = dbSettingsCpuLimitQuantity(normalizedDraft.cpuLimitCores);
@@ -258,8 +273,11 @@ export function buildDbSettingsPatch(
     spec.storageSize = dbSettingsStorageQuantity(normalizedDraft.storageSizeGi);
   }
 
-  if (Object.keys(spec).length === 0) {
+  if (Object.keys(spec).length === 0 && metadata === undefined) {
     return null;
   }
-  return { spec };
+  return {
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(Object.keys(spec).length === 0 ? {} : { spec }),
+  };
 }

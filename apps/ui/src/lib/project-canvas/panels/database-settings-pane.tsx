@@ -34,6 +34,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import {
   buildDbSettingsPatch,
@@ -65,6 +66,7 @@ interface DatabaseSettingsPaneContentProps {
   onClose: () => void;
   onSubmitPatch?: (patch: DatabaseSettingsPatch) => Promise<unknown> | unknown;
   onUpdated?: () => Promise<unknown>;
+  routingDomain?: string;
   updating?: boolean;
 }
 
@@ -485,6 +487,10 @@ export function DatabaseSettingsPane({
 }: DatabaseSettingsPaneProps) {
   const readOnly = data.settingsAccess?.readOnly === true;
   const shareToken = data.settingsAccess?.shareToken?.trim() ?? "";
+  const routingDomain = useMemo(
+    () => (readOnly ? "" : routingDomainFromKubeconfig(kubeconfig ?? "")),
+    [kubeconfig, readOnly]
+  );
   const { authReady, isUpdating, updateSettings } = useDbSettingsOperations({
     kubeconfig: readOnly ? undefined : kubeconfig,
     shareToken: readOnly ? undefined : shareToken,
@@ -504,6 +510,7 @@ export function DatabaseSettingsPane({
       onClose={onClose}
       onSubmitPatch={!readOnly && authReady ? handleSubmitPatch : undefined}
       onUpdated={onUpdated}
+      routingDomain={routingDomain}
       updating={updating}
     />
   );
@@ -515,6 +522,7 @@ export function DatabaseSettingsPaneContent({
   onClose,
   onSubmitPatch,
   onUpdated,
+  routingDomain,
   updating = false,
 }: DatabaseSettingsPaneContentProps) {
   const readOnly = data.settingsAccess?.readOnly === true;
@@ -562,14 +570,24 @@ export function DatabaseSettingsPaneContent({
     setDraft(originalState.draft);
   }, [originalState]);
 
-  const dirty = dbSettingsDraftIsDirty(original, draft);
-  const canUpdate = canEdit && dirty && !updating && onSubmitPatch != null;
+  const pendingPatch = useMemo(
+    () =>
+      buildDbSettingsPatch(original, draft, {
+        metadata: data.metadata,
+        routingDomain,
+      }),
+    [data.metadata, draft, original, routingDomain]
+  );
+  const dirty =
+    pendingPatch !== null || dbSettingsDraftIsDirty(original, draft);
+  const canUpdate =
+    canEdit && pendingPatch !== null && !updating && onSubmitPatch != null;
   const statusLabel = data.states.status?.label ?? "Unknown";
   const subtitle = databaseHeaderSubtitle(data.states);
   const controlsDisabled = !canEdit || updating;
 
   const handleUpdate = useCallback(async () => {
-    const patch = buildDbSettingsPatch(original, draft);
+    const patch = pendingPatch;
     if (!canEdit || patch === null || onSubmitPatch == null) {
       return;
     }
@@ -584,7 +602,7 @@ export function DatabaseSettingsPaneContent({
           : "Could not update database settings."
       );
     }
-  }, [canEdit, draft, onSubmitPatch, onUpdated, original]);
+  }, [canEdit, onSubmitPatch, onUpdated, pendingPatch]);
 
   return (
     <DatabaseSettingsPaneLayout>

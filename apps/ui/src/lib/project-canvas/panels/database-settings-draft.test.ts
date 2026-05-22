@@ -98,6 +98,63 @@ test("DB settings draft detects public connection changes and builds combined pa
   );
 });
 
+test("DB settings draft adds routing domain when public connection needs region label", () => {
+  const original = dbSettingsDraftFromNodeData({
+    desired: { exposeNodePort: false, replicas: 1 },
+  });
+
+  assert.deepEqual(
+    buildDbSettingsPatch(
+      original,
+      { ...original, exposeNodePort: true },
+      {
+        metadata: { labels: { "crossplane.io/project-name": "project" } },
+        routingDomain: "192.168.12.53.nip.io",
+      }
+    ),
+    {
+      metadata: { labels: { region: "192.168.12.53.nip.io" } },
+      spec: { exposeNodePort: true },
+    }
+  );
+});
+
+test("DB settings draft can repair missing region for already-enabled public connection", () => {
+  const original = dbSettingsDraftFromNodeData({
+    desired: { exposeNodePort: true, replicas: 1 },
+  });
+
+  assert.deepEqual(
+    buildDbSettingsPatch(original, original, {
+      metadata: { labels: { "crossplane.io/project-name": "project" } },
+      routingDomain: "192.168.12.53.nip.io",
+    }),
+    {
+      metadata: { labels: { region: "192.168.12.53.nip.io" } },
+    }
+  );
+});
+
+test("DB settings draft preserves existing public connection region label", () => {
+  const original = dbSettingsDraftFromNodeData({
+    desired: { exposeNodePort: false, replicas: 1 },
+  });
+
+  assert.deepEqual(
+    buildDbSettingsPatch(
+      original,
+      { ...original, exposeNodePort: true },
+      {
+        metadata: { labels: { region: "custom.example.com" } },
+        routingDomain: "192.168.12.53.nip.io",
+      }
+    ),
+    {
+      spec: { exposeNodePort: true },
+    }
+  );
+});
+
 test("DB settings draft normalizes resource and storage values into focused patches", () => {
   assert.deepEqual(DB_SETTINGS_CPU_LIMIT_CORES, {
     max: 4,

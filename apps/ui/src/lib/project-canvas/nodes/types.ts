@@ -77,6 +77,9 @@ export interface CanvasDatabaseNodeData extends Record<string, unknown> {
     storageSize?: string;
   };
   layout?: CanvasNodeLayoutState;
+  metadata?: {
+    labels?: Record<string, unknown>;
+  };
   settingsAccess?: CanvasNodeSettingsAccess;
   states: DatabaseNodeStates;
   uid?: string;

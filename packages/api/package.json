@@ -30,6 +30,7 @@
     "./fetch": "./src/fetch.ts",
     "./hooks": "./src/hooks/index.ts",
     "./lib/ap-list": "./src/lib/ap-list.ts",
+    "./lib/db-public-access-patch": "./src/lib/db-public-access-patch.ts",
     "./utils": "./src/utils.ts",
     "./schemas/k8s-get": "./src/schemas/k8s-get.ts"
   }

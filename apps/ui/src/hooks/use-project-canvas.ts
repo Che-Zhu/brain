@@ -23,6 +23,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import {
   canvasNodeGeometryFromNode,
   selectCanvasAnchorPair,
@@ -227,6 +228,11 @@ export function useProjectCanvas(
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
   const readOnly = options?.readOnly === true;
+  const routingDomain = useMemo(
+    () =>
+      readOnly ? "" : routingDomainFromKubeconfig(options?.kubeconfig ?? ""),
+    [options?.kubeconfig, readOnly]
+  );
   const addDbDsnReferenceIntentCounter = useRef(0);
   const connectHandledInGestureRef = useRef(false);
   const connectingFromHandleRef = useRef<ProjectCanvasConnectionHandle | null>(
@@ -353,7 +359,11 @@ export function useProjectCanvas(
         | undefined = canTogglePublicAccess
         ? (_connection, _index, nextEnabled) => {
             runMutationThenRefresh(
-              () => togglePublicAccess(workload, nextEnabled),
+              () =>
+                togglePublicAccess(workload, nextEnabled, {
+                  metadata: data.metadata,
+                  routingDomain,
+                }),
               {
                 loading: nextEnabled
                   ? `Enabling public access for "${name}"...`
@@ -453,6 +463,7 @@ export function useProjectCanvas(
       restartDbWorkload,
       runMutationThenRefresh,
       readOnly,
+      routingDomain,
       setDatabasePane,
       startDbWorkload,
       stopDbWorkload,
