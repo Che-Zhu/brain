@@ -9,6 +9,6 @@
     [data-highlighted]
   )[data-tone="destructive"]
   svg {
-  color: var(--destructive);
-  stroke: var(--destructive);
+  color: var(--color-red-500);
+  stroke: var(--color-red-500);
 }
