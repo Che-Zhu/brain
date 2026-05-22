@@ -1,0 +1,14 @@
+.project-explorer-action-menu-item[data-highlighted] {
+  color: var(--foreground);
+  background: var(--input);
+}
+
+.project-explorer-action-menu-item:is(
+    :hover,
+    :focus,
+    [data-highlighted]
+  )[data-tone="destructive"]
+  svg {
+  color: var(--destructive);
+  stroke: var(--destructive);
+}

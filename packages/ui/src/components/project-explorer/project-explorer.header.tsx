@@ -22,18 +22,13 @@ export function ProjectExplorerHeaderBrand({
       {...props}
     >
       <div className="flex items-center gap-2">
-        <LayoutGrid
-          aria-hidden
-          className="size-4 shrink-0 text-muted-foreground"
-        />
-        <div className="text-start font-mono text-base text-foreground leading-none">
+        <LayoutGrid aria-hidden className="size-5 shrink-0 text-foreground" />
+        <div className="text-start font-semibold text-2xl text-foreground">
           {label}
         </div>
       </div>
       {description ? (
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          {description}
-        </p>
+        <p className="text-muted-foreground text-sm">{description}</p>
       ) : null}
     </div>
   );
@@ -74,7 +69,7 @@ export function ProjectExplorerSearchField({
       />
       <Input
         aria-label="Search projects"
-        className="h-8 pl-9 shadow-xs"
+        className="pl-9 shadow-xs"
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder={placeholder}
         type="search"
@@ -96,7 +91,10 @@ export function ProjectExplorerNewProjectButton({
 
   return (
     <Button
-      className={className}
+      className={cn(
+        "h-9 gap-1.5 bg-blue-500 px-3 text-sm text-white hover:bg-blue-500/90",
+        className
+      )}
       size="lg"
       type="button"
       variant="default"

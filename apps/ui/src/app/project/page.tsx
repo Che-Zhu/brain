@@ -54,6 +54,27 @@ export default function ProjectIndexPage() {
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        data-slot="project-index-background"
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, color-mix(in oklab, var(--color-foreground) 6%, transparent) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse 60% 40% at 50% 100%, color-mix(in oklab, var(--color-blue-500) 22%, transparent), transparent 70%)",
+          }}
+        />
+      </div>
       {rightPaneOpen ? null : (
         <div
           className="pointer-events-auto absolute top-2 right-2 z-10 flex items-center gap-2"
@@ -71,10 +92,10 @@ export default function ProjectIndexPage() {
           </Button>
         </div>
       )}
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-4 p-6">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center gap-4 p-6">
         <ProjectExplorer.Root actions={explorerActions} states={states}>
           <ProjectExplorer.Variant1
-            className="w-full min-w-0 max-w-4xl flex-1"
+            className="w-full min-w-0 max-w-6xl flex-1"
             headerDescription="View existing projects or create a new one."
           />
         </ProjectExplorer.Root>

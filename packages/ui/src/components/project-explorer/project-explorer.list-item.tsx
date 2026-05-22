@@ -28,7 +28,7 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { cn } from "@workspace/ui/lib/utils";
-import { EllipsisVertical, Pencil, Trash2 } from "lucide-react";
+import { EllipsisVertical, SquarePen, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
 
 import { useProjectExplorer } from "./project-explorer.context";
@@ -116,10 +116,10 @@ export function ProjectExplorerListItem({
 
   return (
     <li
-      className={cn("rounded-xl px-4", className)}
+      className={cn("rounded-xl", className)}
       data-slot="project-explorer-item"
     >
-      <div className="hoverable flex min-w-0 items-center gap-2 rounded-xl p-2 sm:gap-3">
+      <div className="hoverable flex min-w-0 items-center gap-2 rounded-xl p-2.5">
         <CanvasNodeStatusDot
           size="small"
           status={{ label: "", visualTone: project.status }}
@@ -154,10 +154,10 @@ export function ProjectExplorerListItem({
               render={
                 <Button
                   aria-label={`Actions for ${project.name}`}
-                  className="shrink-0"
+                  className="size-9 shrink-0 rounded-lg text-foreground hover:bg-input/50 hover:text-foreground aria-expanded:bg-input/50 data-popup-open:bg-input/50"
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
-                  size="icon-sm"
+                  size={null}
                   type="button"
                   variant="ghost"
                 />
@@ -165,17 +165,26 @@ export function ProjectExplorerListItem({
             >
               <EllipsisVertical aria-hidden className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuContent
+              align="start"
+              className="w-38 min-w-38 rounded-md border border-border bg-input/30 p-1 text-foreground shadow-none ring-0! backdrop-blur-xl"
+              side="right"
+              sideOffset={14}
+            >
               {canRename ? (
-                <DropdownMenuItem onClick={() => setRenameOpen(true)}>
-                  <Pencil aria-hidden className="size-4" />
+                <DropdownMenuItem
+                  className="project-explorer-action-menu-item h-7 cursor-pointer rounded-md px-2 py-0 font-normal text-foreground text-sm leading-none hover:bg-input hover:text-foreground focus:bg-input focus:text-foreground"
+                  onClick={() => setRenameOpen(true)}
+                >
+                  <SquarePen aria-hidden className="size-4" />
                   Rename
                 </DropdownMenuItem>
               ) : null}
               {canDelete ? (
                 <DropdownMenuItem
+                  className="project-explorer-action-menu-item h-7 cursor-pointer rounded-md px-2 py-0 font-normal text-foreground text-sm leading-none hover:bg-input hover:text-foreground focus:bg-input focus:text-foreground"
+                  data-tone="destructive"
                   onClick={() => setDeleteOpen(true)}
-                  variant="destructive"
                 >
                   <Trash2 aria-hidden className="size-4" />
                   Delete

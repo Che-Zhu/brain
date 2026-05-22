@@ -71,7 +71,7 @@ export function ProjectExplorerList({ className }: { className?: string }) {
 
   return (
     <div className={cn(className)} data-slot="project-explorer-list">
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2.5">
         {filteredProjects.map((project) => (
           <ProjectExplorerListItem key={project.id} project={project} />
         ))}

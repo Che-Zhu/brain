@@ -1,5 +1,7 @@
 "use client";
 
+import "./project-explorer.css";
+
 import {
   ProjectExplorerContext,
   ProjectExplorerRoot,
