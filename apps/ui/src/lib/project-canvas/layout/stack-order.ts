@@ -19,8 +19,10 @@ const DEFAULT_LAYER_BY_KIND: Record<CanvasLayoutResourceRef["kind"], number> = {
   EntryPoint: 2,
 };
 
-function finiteInteger(value: number | undefined): number | undefined {
-  return Number.isInteger(value) && Number.isFinite(value) ? value : undefined;
+export function canvasStackOrderValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value)
+    ? value
+    : undefined;
 }
 
 function defaultCanvasStackLayer(ref: CanvasLayoutResourceRef): number {
@@ -31,12 +33,7 @@ function compareImplicitStackItems(
   a: CanvasStackOrderItem,
   b: CanvasStackOrderItem
 ): number {
-  const layerDiff =
-    defaultCanvasStackLayer(a.ref) - defaultCanvasStackLayer(b.ref);
-  if (layerDiff !== 0) {
-    return layerDiff;
-  }
-  return 0;
+  return defaultCanvasStackLayer(a.ref) - defaultCanvasStackLayer(b.ref);
 }
 
 export function resolveCanvasStackOrderRanks(
@@ -44,8 +41,8 @@ export function resolveCanvasStackOrderRanks(
 ): Map<string, number> {
   const withIndex = items.map((item, index) => ({ index, item }));
   const sorted = [...withIndex].sort((a, b) => {
-    const aStackOrder = finiteInteger(a.item.stackOrder);
-    const bStackOrder = finiteInteger(b.item.stackOrder);
+    const aStackOrder = canvasStackOrderValue(a.item.stackOrder);
+    const bStackOrder = canvasStackOrderValue(b.item.stackOrder);
     if (aStackOrder === undefined && bStackOrder === undefined) {
       const implicitDiff = compareImplicitStackItems(a.item, b.item);
       return implicitDiff === 0 ? a.index - b.index : implicitDiff;
@@ -63,6 +60,17 @@ export function resolveCanvasStackOrderRanks(
   return new Map(sorted.map(({ item }, rank) => [item.key, rank]));
 }
 
+export function nextExplicitCanvasStackOrder(
+  items: readonly { stackOrder?: number }[]
+): number {
+  return (
+    items.reduce((max, item) => {
+      const stackOrder = canvasStackOrderValue(item.stackOrder);
+      return stackOrder === undefined ? max : Math.max(max, stackOrder);
+    }, -1) + 1
+  );
+}
+
 export function bringCanvasStackOrderItemToFront(
   items: readonly CanvasStackOrderItem[],
   key: string
@@ -77,12 +85,15 @@ export function bringCanvasStackOrderItemToFront(
     return { changed: false };
   }
 
-  const maxExplicitRank = items.reduce((max, item) => {
-    const stackOrder = finiteInteger(item.stackOrder);
-    return stackOrder === undefined ? max : Math.max(max, stackOrder);
-  }, -1);
+  return { changed: true, stackOrder: nextExplicitCanvasStackOrder(items) };
+}
 
-  return { changed: true, stackOrder: maxExplicitRank + 1 };
+function canvasLayoutNodeWithStackOrder(
+  node: CanvasLayoutNode,
+  stackOrder: number | undefined
+): CanvasLayoutNode {
+  const { stackOrder: _ignored, ...rest } = node;
+  return stackOrder === undefined ? rest : { ...rest, stackOrder };
 }
 
 export function normalizeCanvasLayoutStackOrders(
@@ -92,7 +103,7 @@ export function normalizeCanvasLayoutStackOrders(
     .map((node, index) => ({
       index,
       node,
-      stackOrder: finiteInteger(node.stackOrder),
+      stackOrder: canvasStackOrderValue(node.stackOrder),
     }))
     .filter(
       (
@@ -113,11 +124,6 @@ export function normalizeCanvasLayoutStackOrders(
   });
 
   return nodes.map((node, index) => {
-    const stackOrder = normalizedByIndex.get(index);
-    if (stackOrder === undefined) {
-      const { stackOrder: _ignored, ...rest } = node;
-      return rest;
-    }
-    return { ...node, stackOrder };
+    return canvasLayoutNodeWithStackOrder(node, normalizedByIndex.get(index));
   });
 }

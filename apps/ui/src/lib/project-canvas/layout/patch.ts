@@ -1,6 +1,9 @@
 import { cleanupCanvasLayoutDocument } from "./cleanup";
 import { canvasLayoutResourceKey } from "./placement";
-import { normalizeCanvasLayoutStackOrders } from "./stack-order";
+import {
+  canvasStackOrderValue,
+  normalizeCanvasLayoutStackOrders,
+} from "./stack-order";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
@@ -52,12 +55,13 @@ function normalizeOptionalStackOrder(
   if (value === undefined) {
     return undefined;
   }
-  if (!(Number.isFinite(value) && Number.isInteger(value))) {
+  const stackOrder = canvasStackOrderValue(value);
+  if (stackOrder === undefined) {
     throw new CanvasLayoutValidationError(
       "stackOrder must be a finite integer."
     );
   }
-  return value;
+  return stackOrder;
 }
 
 function normalizeRef(ref: CanvasLayoutResourceRef): CanvasLayoutResourceRef {

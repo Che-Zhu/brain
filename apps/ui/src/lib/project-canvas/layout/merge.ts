@@ -13,13 +13,18 @@ import {
 import {
   applyCanvasStackOrderToNodes,
   canvasNodeStackOrder,
+  nodeWithCanvasStackOrder,
 } from "./node-stack-order";
 import {
   canvasLayoutResourceKey as layoutResourceKey,
   canvasLayoutResourceRefFromNode as layoutResourceRefFromNode,
   placeCanvasNodes,
 } from "./placement";
-import { CANVAS_STACK_ORDER_RETURN_STABILITY_MS } from "./stack-order";
+import {
+  CANVAS_STACK_ORDER_RETURN_STABILITY_MS,
+  canvasStackOrderValue,
+  nextExplicitCanvasStackOrder,
+} from "./stack-order";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
@@ -69,10 +74,6 @@ function canvasLayoutExpandedFromNode(node: Node): boolean | undefined {
   return typeof layout?.expanded === "boolean" ? layout.expanded : undefined;
 }
 
-function canvasLayoutStackOrderFromNode(node: Node): number | undefined {
-  return canvasNodeStackOrder(node);
-}
-
 function withCanvasLayoutExpansion(
   node: Node,
   expanded: boolean | undefined
@@ -95,28 +96,6 @@ function withCanvasLayoutExpansion(
   };
 }
 
-function withCanvasLayoutStackOrder(
-  node: Node,
-  stackOrder: number | undefined
-): Node {
-  if (stackOrder === undefined) {
-    return node;
-  }
-
-  const data = asRecord(node.data) ?? {};
-  const layout = asRecord(data.layout) ?? {};
-  return {
-    ...node,
-    data: {
-      ...data,
-      layout: {
-        ...layout,
-        stackOrder,
-      },
-    },
-  };
-}
-
 function lastSeenUidFromNode(node: Node): string | undefined {
   const data = asRecord(node.data);
 
@@ -132,15 +111,6 @@ function lastSeenUidFromNode(node: Node): string | undefined {
   }
 }
 
-function maxCanvasLayoutStackOrder(nodes: readonly CanvasLayoutNode[]): number {
-  return nodes.reduce((max, node) => {
-    const stackOrder = node.stackOrder;
-    return Number.isFinite(stackOrder) && Number.isInteger(stackOrder)
-      ? Math.max(max, stackOrder)
-      : max;
-  }, -1);
-}
-
 export function canvasLayoutNodeFromNode(
   node: Node
 ): CanvasLayoutNode | undefined {
@@ -151,7 +121,7 @@ export function canvasLayoutNodeFromNode(
   }
   const expanded = canvasLayoutExpandedFromNode(node) ?? false;
   const lastSeenUid = lastSeenUidFromNode(node);
-  const stackOrder = canvasLayoutStackOrderFromNode(node);
+  const stackOrder = canvasNodeStackOrder(node);
   return {
     expanded,
     ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
@@ -277,7 +247,7 @@ export function mergeCanvasLayoutWithDetectedNodes({
 
   const nowIso = now.toISOString();
   const cleanedLayout = cleanupCanvasLayoutDocument(layout, { now });
-  let nextFreshStackOrder = maxCanvasLayoutStackOrder(cleanedLayout.nodes) + 1;
+  let nextFreshStackOrder = nextExplicitCanvasStackOrder(cleanedLayout.nodes);
   const layoutByRef = new Map<string, CanvasLayoutNode>();
   for (const item of cleanedLayout.nodes) {
     layoutByRef.set(layoutResourceKey(item.ref), item);
@@ -308,10 +278,11 @@ export function mergeCanvasLayoutWithDetectedNodes({
       savedPosition === undefined
         ? { ...node }
         : { ...node, position: savedPosition };
-    return withCanvasLayoutStackOrder(
-      withCanvasLayoutExpansion(positioned, saved.expanded),
-      restored.stackOrder
-    );
+    const expandedNode = withCanvasLayoutExpansion(positioned, saved.expanded);
+    const stackOrder = canvasStackOrderValue(restored.stackOrder);
+    return stackOrder === undefined
+      ? expandedNode
+      : nodeWithCanvasStackOrder(expandedNode, stackOrder);
   });
 
   const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);

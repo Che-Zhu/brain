@@ -6,6 +6,7 @@ import {
 import {
   bringCanvasStackOrderItemToFront,
   type CanvasStackOrderItem,
+  canvasStackOrderValue,
   resolveCanvasStackOrderRanks,
 } from "./stack-order";
 
@@ -17,10 +18,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 export function canvasNodeStackOrder(node: Node): number | undefined {
   const layout = asRecord(asRecord(node.data)?.layout);
-  const stackOrder = layout?.stackOrder;
-  return Number.isFinite(stackOrder) && Number.isInteger(stackOrder)
-    ? stackOrder
-    : undefined;
+  return canvasStackOrderValue(layout?.stackOrder);
 }
 
 function canvasStackOrderItemsFromNodes(
