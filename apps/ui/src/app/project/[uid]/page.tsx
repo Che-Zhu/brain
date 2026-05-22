@@ -17,7 +17,9 @@ import {
   removePendingApDbCanvasReferences,
 } from "@/lib/project-canvas/flow/pending-connections";
 import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
+import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
@@ -105,6 +107,7 @@ export default function ProjectUidPage() {
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
   );
+  const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
   const meta = useMemo(
     () => ({
       ...canvasMeta,
@@ -185,6 +188,15 @@ export default function ProjectUidPage() {
                     onClose={closeDatabasePane}
                     open={databasePane === DATABASE_PANE.metrics}
                   />
+                  {databasePane === DATABASE_PANE.settings &&
+                  selectedDatabaseData != null ? (
+                    <DatabaseSettingsPane
+                      data={selectedDatabaseData}
+                      kubeconfig={kubeconfig}
+                      onClose={closeDatabasePane}
+                      onUpdated={refreshWorkloadLists}
+                    />
+                  ) : null}
                 </Canvas.Flow>
               </div>
             </Canvas.Root>

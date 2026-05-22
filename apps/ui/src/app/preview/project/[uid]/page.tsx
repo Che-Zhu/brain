@@ -15,7 +15,11 @@ import { useCallback, useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
+import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
+import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
 import { buildPreviewProjectCanvasState } from "@/lib/project-canvas/preview/state";
+import { DATABASE_PANE } from "@/store/canvas-store";
 
 const METRICS_REFRESH_MS = 5000;
 
@@ -145,7 +149,9 @@ export default function PreviewProjectPage() {
 
   const {
     clearSelection,
+    closeDatabasePane,
     connectionOrigin,
+    databasePane,
     meta,
     nodes,
     selectedEdge,
@@ -155,6 +161,7 @@ export default function PreviewProjectPage() {
     refreshWorkloadLists,
     shareToken,
   });
+  const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
@@ -188,6 +195,19 @@ export default function PreviewProjectPage() {
         >
           <Canvas.Flow>
             <Canvas.Panel />
+            <DatabaseMetricsPane
+              node={selectedNode}
+              onClose={closeDatabasePane}
+              open={databasePane === DATABASE_PANE.metrics}
+            />
+            {databasePane === DATABASE_PANE.settings &&
+            selectedDatabaseData != null ? (
+              <DatabaseSettingsPane
+                data={selectedDatabaseData}
+                onClose={closeDatabasePane}
+                onUpdated={refreshWorkloadLists}
+              />
+            ) : null}
           </Canvas.Flow>
         </Canvas.Root>
       </div>

@@ -1,3 +1,5 @@
+import type { CanvasNodeVisualStatusTone } from "../canvas-node/canvas-node.types";
+
 export interface ProjectExplorerProject {
   createdAt: Date | string;
   id: string;
@@ -7,6 +9,12 @@ export interface ProjectExplorerProject {
   public?: boolean;
   /** Kubernetes `metadata.name`; defaults to `name` when omitted (legacy rows). */
   resourceName?: string;
+  /**
+   * Project Aggregate Status tone, derived from sibling AP and DB phases (see
+   * CONTEXT.md). Optional so legacy callers and the loading/empty paths can
+   * omit it and render a static neutral dot.
+   */
+  status?: CanvasNodeVisualStatusTone;
 }
 
 /** Copy shown when `projects` is empty (list uses defaults when fields are omitted). */

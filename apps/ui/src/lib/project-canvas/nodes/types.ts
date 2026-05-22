@@ -35,6 +35,11 @@ export interface CanvasNodeLayoutState {
   positionSource?: "generated";
 }
 
+export interface CanvasNodeSettingsAccess {
+  readOnly?: boolean;
+  shareToken?: string;
+}
+
 export interface CanvasContainerNodeData extends Record<string, unknown> {
   actions?: ContainerNodeActions;
   addDbDsnReferenceIntent?: ContainerSettingsPaneAddDbDsnReferenceIntent | null;
@@ -45,10 +50,7 @@ export interface CanvasContainerNodeData extends Record<string, unknown> {
     references: readonly ContainerSettingsPaneConfirmedAddDbDsnReference[]
   ) => (() => void) | undefined;
   onWorkloadMutation?: () => Promise<unknown>;
-  settingsAccess?: {
-    readOnly?: boolean;
-    shareToken?: string;
-  };
+  settingsAccess?: CanvasNodeSettingsAccess;
   states: ContainerNodeStates;
 }
 
@@ -65,7 +67,17 @@ export interface CanvasDatabaseWorkloadRef {
 export interface CanvasDatabaseNodeData extends Record<string, unknown> {
   actions?: DatabaseNodeActions;
   connections: DatabaseNodeConnection[];
+  desired?: {
+    cpuLimit?: string;
+    cpuRequest?: string;
+    exposeNodePort?: boolean;
+    memoryLimit?: string;
+    memoryRequest?: string;
+    replicas?: number;
+    storageSize?: string;
+  };
   layout?: CanvasNodeLayoutState;
+  settingsAccess?: CanvasNodeSettingsAccess;
   states: DatabaseNodeStates;
   uid?: string;
   workload: CanvasDatabaseWorkloadRef;

@@ -12,6 +12,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import type { Node } from "@xyflow/react";
 import { Activity, Cpu, HardDrive, MemoryStick, X } from "lucide-react";
 import { type ComponentType, type SVGProps, useMemo } from "react";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
 import { telemetryRowsToMetricsData } from "@/lib/project-canvas/telemetry/rows-to-metrics";
 import {
@@ -20,7 +21,6 @@ import {
   metricReading,
 } from "./database-metrics-format";
 import {
-  databaseMetricsDataFromNode,
   databaseMetricsSeriesTarget,
   METRICS_SERIES_STEP_SECONDS,
   workloadMetricsSeriesWindow,
@@ -28,7 +28,7 @@ import {
 
 const METRICS_REFRESH_MS = 5000;
 
-interface DatabaseMetricsPaneProps {
+export interface DatabaseMetricsPaneProps {
   kubeconfig?: string;
   node: Node | null;
   onClose: () => void;
@@ -179,7 +179,7 @@ export function DatabaseMetricsPane({
   onClose,
   open,
 }: DatabaseMetricsPaneProps) {
-  const databaseData = open ? databaseMetricsDataFromNode(node) : null;
+  const databaseData = open ? databaseNodeDataFromNode(node) : null;
   const telemetryTarget = useMemo(
     () => databaseMetricsSeriesTarget(node, open),
     [node, open]

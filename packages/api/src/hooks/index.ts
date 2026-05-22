@@ -12,6 +12,7 @@ export {
   type UseDbLifecycleOptions,
   useDbLifecycleOperations,
 } from "./use-db-lifecycle";
+export { useDbSettingsOperations } from "./use-db-settings";
 export { useDbsK8sList } from "./use-dbs-k8s-list";
 export { useEntryPointList } from "./use-entrypoint-list";
 export {

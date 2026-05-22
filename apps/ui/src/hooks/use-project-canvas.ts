@@ -56,7 +56,12 @@ import type {
   CanvasContainerNodeData,
   CanvasDatabaseNodeData,
   CanvasNodeLayoutState,
+  CanvasNodeSettingsAccess,
 } from "@/lib/project-canvas/nodes/types";
+import {
+  databasePaneModeForNodeClick,
+  shouldClearDatabasePaneMode,
+} from "@/lib/project-canvas/panels/database-panel-mode";
 import {
   CANVAS_SERVICE_QUERY_KEY,
   CANVAS_TAB_QUERY_KEY,
@@ -182,13 +187,13 @@ function createPendingApDbReferenceMutationStartHandler({
     );
 }
 
-function containerNodeSettingsAccess({
+function canvasNodeSettingsAccess({
   readOnly,
   shareToken,
 }: {
   readOnly: boolean;
   shareToken: string | undefined;
-}): CanvasContainerNodeData["settingsAccess"] | undefined {
+}): CanvasNodeSettingsAccess | undefined {
   const st = shareToken?.trim();
   if (!(readOnly || st)) {
     return undefined;
@@ -431,6 +436,10 @@ export function useProjectCanvas(
             },
           },
           connections,
+          settingsAccess: canvasNodeSettingsAccess({
+            readOnly,
+            shareToken: options?.shareToken,
+          }),
         },
       };
     },
@@ -443,12 +452,14 @@ export function useProjectCanvas(
       isDbLifecycleLoading,
       restartDbWorkload,
       runMutationThenRefresh,
+      readOnly,
       setDatabasePane,
       startDbWorkload,
       stopDbWorkload,
       setSelectedEdge,
       setServiceUid,
       togglePublicAccess,
+      options?.shareToken,
     ]
   );
 
@@ -469,7 +480,7 @@ export function useProjectCanvas(
         nodeId: node.id,
         onConsumed: handleAddDbDsnReferenceIntentConsumed,
       });
-      const settingsAccess = containerNodeSettingsAccess({
+      const settingsAccess = canvasNodeSettingsAccess({
         readOnly,
         shareToken: options?.shareToken,
       });
@@ -828,12 +839,12 @@ export function useProjectCanvas(
 
   useEffect(() => {
     if (
-      databasePane === DATABASE_PANE.metrics &&
-      (serviceUid == null ||
-        serviceUid === "" ||
-        (selectedNode == null && rawNodes.length > 0) ||
-        (selectedNode != null &&
-          selectedNode.type !== CANVAS_DATABASE_NODE_TYPE))
+      shouldClearDatabasePaneMode({
+        databasePane,
+        rawNodeCount: rawNodes.length,
+        selectedNode,
+        serviceUid,
+      })
     ) {
       setDatabasePane(null).catch(() => undefined);
     }
@@ -899,9 +910,9 @@ export function useProjectCanvas(
         onNodeClick: (_, node: Node) => {
           frontCanvasNode(node);
           setSelectedEdge(null);
-          if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
-            setDatabasePane(null).catch(() => undefined);
-          }
+          setDatabasePane(databasePaneModeForNodeClick(node)).catch(
+            () => undefined
+          );
           setServiceUid(projectCanvasNodeServiceUid(node)).catch(
             () => undefined
           );

@@ -262,6 +262,30 @@ function databaseConnectionsFromResource(
   ];
 }
 
+function databaseDesiredFromSpec(
+  spec: Record<string, unknown>,
+  status: Record<string, unknown>
+): CanvasDatabaseNodeData["desired"] {
+  const effectiveResources = asRecord(status.effectiveResources);
+  const desiredResource = (field: "cpuLimit" | "memoryLimit" | "storageSize") =>
+    nonEmptyString(spec[field]) ?? nonEmptyString(effectiveResources?.[field]);
+  const replicas =
+    typeof spec.replicas === "number" && Number.isFinite(spec.replicas)
+      ? spec.replicas
+      : undefined;
+  const cpuLimit = desiredResource("cpuLimit");
+  const memoryLimit = desiredResource("memoryLimit");
+  const storageSize = desiredResource("storageSize");
+
+  return {
+    ...(cpuLimit === undefined ? {} : { cpuLimit }),
+    exposeNodePort: spec.exposeNodePort === true,
+    ...(memoryLimit === undefined ? {} : { memoryLimit }),
+    ...(replicas === undefined ? {} : { replicas }),
+    ...(storageSize === undefined ? {} : { storageSize }),
+  };
+}
+
 function databaseCompositionNameFromSpec(
   spec: Record<string, unknown>
 ): string | undefined {
@@ -447,6 +471,7 @@ export function dbToDatabaseNodeData(
 
   return {
     connections: databaseConnectionsFromResource(spec, status),
+    desired: databaseDesiredFromSpec(spec, status),
     states,
     ...(uid === undefined || uid === "" ? {} : { uid }),
     workload: { name, namespace },

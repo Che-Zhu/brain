@@ -8,25 +8,33 @@ import type { ComponentProps } from "react";
 
 import { useProjectExplorer } from "./project-explorer.context";
 
-/** Title row: grid icon + “Projects” label. */
+/** Title row: grid icon + “Projects” label + optional subtitle. */
 export function ProjectExplorerHeaderBrand({
   className,
+  description,
   label = "Projects",
   ...props
-}: ComponentProps<"div"> & { label?: string }) {
+}: ComponentProps<"div"> & { description?: string; label?: string }) {
   return (
     <div
-      className={cn("flex items-center gap-2", className)}
+      className={cn("flex flex-col gap-1", className)}
       data-slot="project-explorer-header-brand"
       {...props}
     >
-      <LayoutGrid
-        aria-hidden
-        className="size-4 shrink-0 text-muted-foreground"
-      />
-      <div className="text-start font-mono text-base text-foreground leading-none">
-        {label}
+      <div className="flex items-center gap-2">
+        <LayoutGrid
+          aria-hidden
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+        <div className="text-start font-mono text-base text-foreground leading-none">
+          {label}
+        </div>
       </div>
+      {description ? (
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }
