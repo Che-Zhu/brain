@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  CanvasPanelTab,
-  CanvasSelectedEdge,
-} from "@workspace/ui/components/canvas/canvas.types";
+import type { CanvasSelectedEdge } from "@workspace/ui/components/canvas/canvas.types";
 import type { Node, NodeTypes } from "@xyflow/react";
 import { atom } from "jotai";
 
@@ -15,31 +12,26 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
-import { WorkloadHistoryCanvasPanel } from "@/lib/project-canvas/panels/workload-history-panel";
-import { WorkloadLogsCanvasPanel } from "@/lib/project-canvas/panels/workload-logs-panel";
-import { WorkloadMetricsCanvasPanel } from "@/lib/project-canvas/panels/workload-metrics-panel";
-import { WorkloadSettingsCanvasPanel } from "@/lib/project-canvas/panels/workload-settings-panel";
 
 /** nuqs key for the selected workload card (Kubernetes `metadata.uid`). */
 export const CANVAS_SERVICE_QUERY_KEY = "service" as const;
 
-/** nuqs key for the workload panel tab (`?tab=…`); value matches panel tab {@link CanvasPanelTab.name}. */
-export const CANVAS_TAB_QUERY_KEY = "tab" as const;
+/** nuqs key for the AP / Container Node action pane (`?apPane=settings|metrics|logs|history`). */
+export const WORKLOAD_PANE_QUERY_KEY = "apPane" as const;
 
 /** nuqs key for the database action pane (`?dbPane=settings|metrics`). */
 export const DATABASE_PANE_QUERY_KEY = "dbPane" as const;
 
-export const DATABASE_PANE = {
+export const WORKLOAD_PANE = {
+  history: "history",
+  logs: "logs",
   metrics: "metrics",
   settings: "settings",
 } as const;
 
-/** Tab `name` values — doubles as Radix tab value and URL `?tab=…` value. */
-export const WORKLOAD_PANEL_TAB = {
-  settings: "Settings",
-  metrics: "Metrics",
-  logs: "Logs",
-  history: "History",
+export const DATABASE_PANE = {
+  metrics: "metrics",
+  settings: "settings",
 } as const;
 
 /**
@@ -71,31 +63,5 @@ export const projectCanvasFlowNodeTypes = {
   [CANVAS_DATABASE_NODE_TYPE]: CanvasDatabaseNode,
   [CANVAS_ENTRY_NODE_TYPE]: CanvasEntryNode,
 } as const satisfies NodeTypes;
-
-/** Side-panel tabs for the project canvas workload inspector (Settings uses {@link WORKLOAD_PANEL_REPLICAS}). */
-export const projectCanvasWorkloadPanelTabs: CanvasPanelTab[] = [
-  {
-    name: WORKLOAD_PANEL_TAB.settings,
-    render: ({ node }) => (
-      <WorkloadSettingsCanvasPanel key={node.id} node={node} />
-    ),
-  },
-  {
-    name: WORKLOAD_PANEL_TAB.metrics,
-    render: ({ node }) => (
-      <WorkloadMetricsCanvasPanel key={node.id} node={node} />
-    ),
-  },
-  {
-    name: WORKLOAD_PANEL_TAB.logs,
-    render: () => <WorkloadLogsCanvasPanel />,
-  },
-  {
-    name: WORKLOAD_PANEL_TAB.history,
-    render: ({ node }) => (
-      <WorkloadHistoryCanvasPanel key={node.id} node={node} />
-    ),
-  },
-];
 
 export const selectedEdgeAtom = atom<CanvasSelectedEdge>(null);

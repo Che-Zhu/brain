@@ -64,15 +64,18 @@ import {
   shouldClearDatabasePaneMode,
 } from "@/lib/project-canvas/panels/database-panel-mode";
 import {
+  shouldClearWorkloadPaneMode,
+  workloadPaneModeForNodeClick,
+} from "@/lib/project-canvas/panels/workload-pane-mode";
+import {
   CANVAS_SERVICE_QUERY_KEY,
-  CANVAS_TAB_QUERY_KEY,
   DATABASE_PANE,
   DATABASE_PANE_QUERY_KEY,
   projectCanvasFlowNodeTypes,
   projectCanvasNodeServiceUid,
-  projectCanvasWorkloadPanelTabs,
   selectedEdgeAtom,
-  WORKLOAD_PANEL_TAB,
+  WORKLOAD_PANE,
+  WORKLOAD_PANE_QUERY_KEY,
 } from "@/store/canvas-store";
 
 export interface UseProjectCanvasOptions {
@@ -206,7 +209,7 @@ function canvasNodeSettingsAccess({
 }
 
 /**
- * Wires URL-driven workload selection (`?service=`), panel tab (`?tab=`),
+ * Wires URL-driven workload selection (`?service=`), explicit pane mode,
  * edge selection (Jotai), node toolbar actions, **AP** lifecycle menu actions, and canvas `meta` for `<Canvas.Root />`.
  */
 export function useProjectCanvas(
@@ -217,9 +220,9 @@ export function useProjectCanvas(
     CANVAS_SERVICE_QUERY_KEY,
     parseAsString
   );
-  const [panelTab, setPanelTab] = useQueryState(
-    CANVAS_TAB_QUERY_KEY,
-    parseAsString.withDefault(WORKLOAD_PANEL_TAB.settings)
+  const [workloadPane, setWorkloadPane] = useQueryState(
+    WORKLOAD_PANE_QUERY_KEY,
+    parseAsString
   );
   const [databasePane, setDatabasePane] = useQueryState(
     DATABASE_PANE_QUERY_KEY,
@@ -437,6 +440,7 @@ export function useProjectCanvas(
                   ? () => {
                       setSelectedEdge(null);
                       setServiceUid(uid).catch(() => undefined);
+                      setWorkloadPane(null).catch(() => undefined);
                       setDatabasePane(DATABASE_PANE.metrics).catch(
                         () => undefined
                       );
@@ -465,6 +469,7 @@ export function useProjectCanvas(
       readOnly,
       routingDomain,
       setDatabasePane,
+      setWorkloadPane,
       startDbWorkload,
       stopDbWorkload,
       setSelectedEdge,
@@ -515,10 +520,11 @@ export function useProjectCanvas(
         };
       }
 
-      const select = (tab: string) => {
-        setPanelTab(tab).catch(() => undefined);
+      const select = (pane: string) => {
         setSelectedEdge(null);
+        setDatabasePane(null).catch(() => undefined);
         setServiceUid(uid ?? "").catch(() => undefined);
+        setWorkloadPane(pane).catch(() => undefined);
       };
 
       const ref = { name: states.name, namespace: ns };
@@ -560,7 +566,7 @@ export function useProjectCanvas(
         calendar: {
           disabled: !hasUrlActions,
           onClick: hasUrlActions
-            ? () => select(WORKLOAD_PANEL_TAB.history)
+            ? () => select(WORKLOAD_PANE.history)
             : undefined,
         },
         console: {
@@ -568,14 +574,12 @@ export function useProjectCanvas(
         },
         logs: {
           disabled: !hasUrlActions,
-          onClick: hasUrlActions
-            ? () => select(WORKLOAD_PANEL_TAB.logs)
-            : undefined,
+          onClick: hasUrlActions ? () => select(WORKLOAD_PANE.logs) : undefined,
         },
         metrics: {
           disabled: !hasUrlActions,
           onClick: hasUrlActions
-            ? () => select(WORKLOAD_PANEL_TAB.metrics)
+            ? () => select(WORKLOAD_PANE.metrics)
             : undefined,
         },
       };
@@ -610,9 +614,10 @@ export function useProjectCanvas(
       readOnly,
       restartWorkload,
       runMutationThenRefresh,
-      setPanelTab,
+      setDatabasePane,
       setSelectedEdge,
       setServiceUid,
+      setWorkloadPane,
       startWorkload,
     ]
   );
@@ -758,16 +763,16 @@ export function useProjectCanvas(
       });
       setSelectedEdge(null);
       setDatabasePane(null).catch(() => undefined);
-      setPanelTab(WORKLOAD_PANEL_TAB.settings).catch(() => undefined);
       setServiceUid(command.ap.uid).catch(() => undefined);
+      setWorkloadPane(WORKLOAD_PANE.settings).catch(() => undefined);
     },
     [
       nodes,
       readOnly,
       setDatabasePane,
-      setPanelTab,
       setSelectedEdge,
       setServiceUid,
+      setWorkloadPane,
     ]
   );
   const isSupportedCanvasConnection = useCallback(
@@ -867,22 +872,43 @@ export function useProjectCanvas(
     setDatabasePane,
   ]);
 
+  useEffect(() => {
+    if (
+      shouldClearWorkloadPaneMode({
+        rawNodeCount: rawNodes.length,
+        selectedNode,
+        serviceUid,
+        workloadPane,
+      })
+    ) {
+      setWorkloadPane(null).catch(() => undefined);
+    }
+  }, [
+    rawNodes.length,
+    selectedNode,
+    serviceUid,
+    setWorkloadPane,
+    workloadPane,
+  ]);
+
   const clearSelection = useMemo(
     () => () => {
       setSelectedEdge(null);
       setServiceUid(null).catch(() => undefined);
       setDatabasePane(null).catch(() => undefined);
+      setWorkloadPane(null).catch(() => undefined);
     },
-    [setDatabasePane, setSelectedEdge, setServiceUid]
+    [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]
   );
 
-  const closeDatabasePane = useMemo(
+  const closeResourcePane = useMemo(
     () => () => {
       setSelectedEdge(null);
       setServiceUid(null).catch(() => undefined);
       setDatabasePane(null).catch(() => undefined);
+      setWorkloadPane(null).catch(() => undefined);
     },
-    [setDatabasePane, setSelectedEdge, setServiceUid]
+    [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]
   );
 
   const meta = useMemo<CanvasMeta>(
@@ -900,10 +926,6 @@ export function useProjectCanvas(
           target: canvasNodeGeometryFromNode(targetNode),
         }),
       nodeTypes: projectCanvasFlowNodeTypes,
-      panelTabSync: { tabValue: panelTab, setTabValue: setPanelTab },
-      panelTabs: {
-        [CANVAS_CONTAINER_NODE_TYPE]: projectCanvasWorkloadPanelTabs,
-      },
       reactFlowProps: {
         ...projectCanvasInteractionProps({
           isValidConnection: isValidCanvasConnection,
@@ -921,6 +943,9 @@ export function useProjectCanvas(
         onNodeClick: (_, node: Node) => {
           frontCanvasNode(node);
           setSelectedEdge(null);
+          setWorkloadPane(workloadPaneModeForNodeClick(node)).catch(
+            () => undefined
+          );
           setDatabasePane(databasePaneModeForNodeClick(node)).catch(
             () => undefined
           );
@@ -935,6 +960,7 @@ export function useProjectCanvas(
           setSelectedEdge(edge);
           setServiceUid(null).catch(() => undefined);
           setDatabasePane(null).catch(() => undefined);
+          setWorkloadPane(null).catch(() => undefined);
         },
         onNodeDragStop: (_, node: Node) => {
           if (!readOnly) {
@@ -953,24 +979,24 @@ export function useProjectCanvas(
       handleConnectStart,
       isValidCanvasConnection,
       onNodePositionChange,
-      panelTab,
       projectCanvasConnectionLine,
       readOnly,
       setDatabasePane,
-      setPanelTab,
       setSelectedEdge,
       setServiceUid,
+      setWorkloadPane,
     ]
   );
 
   return {
     clearSelection,
-    closeDatabasePane,
+    closeResourcePane,
     connectionOrigin,
     databasePane,
     meta,
     nodes,
     selectedEdge,
     selectedNode,
+    workloadPane,
   };
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useWorkloadTelemetrySeries } from "@workspace/api/hooks";
-import { Button } from "@workspace/ui/components/button";
 import type {
   DatabaseNodeMetricKey,
   DatabaseNodeMetricValue,
@@ -10,11 +9,12 @@ import { MetricsChart } from "@workspace/ui/components/metrics-chart/metrics-cha
 import type { MetricDataPoint } from "@workspace/ui/components/metrics-chart/metrics-chart.types";
 import { cn } from "@workspace/ui/lib/utils";
 import type { Node } from "@xyflow/react";
-import { Activity, Cpu, HardDrive, MemoryStick, X } from "lucide-react";
+import { Activity, Cpu, HardDrive, MemoryStick } from "lucide-react";
 import { type ComponentType, type SVGProps, useMemo } from "react";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { computeMetricTrend } from "@/lib/project-canvas/telemetry/compute-metric-trend";
 import { telemetryRowsToMetricsData } from "@/lib/project-canvas/telemetry/rows-to-metrics";
+import { CanvasResourcePane } from "./canvas-resource-pane";
 import {
   formatPercent,
   latestPercent,
@@ -38,20 +38,6 @@ export interface DatabaseMetricsPaneProps {
 function trendLabel(series: readonly MetricDataPoint[]) {
   const trend = computeMetricTrend(series);
   return trend.charAt(0).toUpperCase() + trend.slice(1);
-}
-
-function statusPillClassName(status: string | undefined) {
-  switch (status?.trim().toLowerCase()) {
-    case "running":
-      return "bg-database-metrics-status-running text-primary";
-    case "failed":
-      return "bg-destructive/25 text-destructive";
-    case "paused":
-    case "stopped":
-      return "bg-muted text-muted-foreground";
-    default:
-      return "bg-primary/10 text-primary";
-  }
 }
 
 function DatabaseMetricCard({
@@ -211,70 +197,42 @@ export function DatabaseMetricsPane({
   const statusLabel = states.status?.label ?? "Unknown";
 
   return (
-    <aside className="database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col gap-6 overflow-hidden px-2.5 py-5 shadow-lg">
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-2.5">
-        <header className="flex shrink-0 items-start justify-between gap-3 px-2.5">
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex min-w-0 items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Activity
-                  aria-hidden
-                  className="size-4 shrink-0 text-database-metrics-chart"
-                />
-                <h2
-                  className="truncate font-semibold text-lg text-primary leading-none"
-                  title={title}
-                >
-                  {title}
-                </h2>
-              </div>
-              <span
-                className={cn(
-                  "inline-flex h-5 shrink-0 items-center rounded-full px-2.5 text-xs leading-none",
-                  statusPillClassName(statusLabel)
-                )}
-              >
-                {statusLabel}
-              </span>
-            </div>
-            <p className="truncate text-muted-foreground text-sm leading-5">
-              {subtitle}
-            </p>
-          </div>
-          <Button
-            aria-label="Close database metrics"
-            className="hoverable -mt-1 size-7 shrink-0"
-            onClick={onClose}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <X aria-hidden className="size-3.5" />
-          </Button>
-        </header>
-        <DatabaseMetricCard
-          capacity={states.metricCapacities?.cpu}
-          fallback={states.metrics?.cpu}
-          icon={Cpu}
-          label="CPU"
-          metric="cpu"
-          series={cpuSeries}
+    <CanvasResourcePane
+      bodyClassName="gap-3.5"
+      closeAriaLabel="Close database metrics"
+      icon={
+        <Activity
+          aria-hidden
+          className="size-4 shrink-0 text-database-metrics-chart"
         />
-        <DatabaseMetricCard
-          capacity={states.metricCapacities?.memory}
-          fallback={states.metrics?.memory}
-          icon={MemoryStick}
-          label="Memory"
-          metric="memory"
-          series={memorySeries}
-        />
-        <DatabaseStorageCard
-          capacity={states.metricCapacities?.storage}
-          fallback={states.metrics?.storage}
-          mountPath={states.mountPath}
-          series={storageSeries}
-        />
-      </div>
-    </aside>
+      }
+      onClose={onClose}
+      status={{ ...states.status, label: statusLabel }}
+      subtitle={subtitle}
+      title={title}
+    >
+      <DatabaseMetricCard
+        capacity={states.metricCapacities?.cpu}
+        fallback={states.metrics?.cpu}
+        icon={Cpu}
+        label="CPU"
+        metric="cpu"
+        series={cpuSeries}
+      />
+      <DatabaseMetricCard
+        capacity={states.metricCapacities?.memory}
+        fallback={states.metrics?.memory}
+        icon={MemoryStick}
+        label="Memory"
+        metric="memory"
+        series={memorySeries}
+      />
+      <DatabaseStorageCard
+        capacity={states.metricCapacities?.storage}
+        fallback={states.metrics?.storage}
+        mountPath={states.mountPath}
+        series={storageSeries}
+      />
+    </CanvasResourcePane>
   );
 }

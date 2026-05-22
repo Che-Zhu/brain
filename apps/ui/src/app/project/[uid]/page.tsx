@@ -20,6 +20,7 @@ import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/place
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
+import { WorkloadResourcePane } from "@/lib/project-canvas/panels/workload-resource-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
@@ -85,14 +86,14 @@ export default function ProjectUidPage() {
   }, [canvasState.edges, canvasState.nodes, pendingApDbReferences]);
 
   const {
-    clearSelection,
-    closeDatabasePane,
+    closeResourcePane,
     connectionOrigin,
     databasePane,
     meta: canvasMeta,
     nodes,
     selectedEdge,
     selectedNode,
+    workloadPane,
   } = useProjectCanvas(canvasState.nodes, {
     dbsData: projectServicesData.dbs,
     kubeconfig,
@@ -131,7 +132,6 @@ export default function ProjectUidPage() {
             selectedTarget={selectedTelemetryTarget}
           >
             <Canvas.Root
-              actions={{ onPanelClose: clearSelection }}
               key={`${namespace}:${uid}`}
               meta={meta}
               state={{
@@ -181,11 +181,15 @@ export default function ProjectUidPage() {
                       </Button>
                     )}
                   </Canvas.UpperRight>
-                  <Canvas.Panel />
+                  <WorkloadResourcePane
+                    mode={workloadPane}
+                    node={selectedNode}
+                    onClose={closeResourcePane}
+                  />
                   <DatabaseMetricsPane
                     kubeconfig={kubeconfig}
                     node={selectedNode}
-                    onClose={closeDatabasePane}
+                    onClose={closeResourcePane}
                     open={databasePane === DATABASE_PANE.metrics}
                   />
                   {databasePane === DATABASE_PANE.settings &&
@@ -193,7 +197,7 @@ export default function ProjectUidPage() {
                     <DatabaseSettingsPane
                       data={selectedDatabaseData}
                       kubeconfig={kubeconfig}
-                      onClose={closeDatabasePane}
+                      onClose={closeResourcePane}
                       onUpdated={refreshWorkloadLists}
                     />
                   ) : null}

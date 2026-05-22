@@ -18,6 +18,7 @@ import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-t
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
+import { WorkloadResourcePane } from "@/lib/project-canvas/panels/workload-resource-pane";
 import { buildPreviewProjectCanvasState } from "@/lib/project-canvas/preview/state";
 import { DATABASE_PANE } from "@/store/canvas-store";
 
@@ -148,14 +149,14 @@ export default function PreviewProjectPage() {
     });
 
   const {
-    clearSelection,
-    closeDatabasePane,
+    closeResourcePane,
     connectionOrigin,
     databasePane,
     meta,
     nodes,
     selectedEdge,
     selectedNode,
+    workloadPane,
   } = useProjectCanvas(canvasState.nodes, {
     readOnly: true,
     refreshWorkloadLists,
@@ -182,7 +183,6 @@ export default function PreviewProjectPage() {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Canvas.Root
-          actions={{ onPanelClose: clearSelection }}
           key={`${ns}:${uid}:${shareToken}`}
           meta={meta}
           state={{
@@ -194,17 +194,21 @@ export default function PreviewProjectPage() {
           }}
         >
           <Canvas.Flow>
-            <Canvas.Panel />
+            <WorkloadResourcePane
+              mode={workloadPane}
+              node={selectedNode}
+              onClose={closeResourcePane}
+            />
             <DatabaseMetricsPane
               node={selectedNode}
-              onClose={closeDatabasePane}
+              onClose={closeResourcePane}
               open={databasePane === DATABASE_PANE.metrics}
             />
             {databasePane === DATABASE_PANE.settings &&
             selectedDatabaseData != null ? (
               <DatabaseSettingsPane
                 data={selectedDatabaseData}
-                onClose={closeDatabasePane}
+                onClose={closeResourcePane}
                 onUpdated={refreshWorkloadLists}
               />
             ) : null}

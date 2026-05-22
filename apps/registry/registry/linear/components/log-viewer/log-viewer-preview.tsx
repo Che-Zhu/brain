@@ -54,7 +54,7 @@ export default function LogViewerPreview() {
           >
             <div className="rounded-lg border border-primary/50 border-dashed bg-primary/5 p-3">
               <p className="font-medium text-primary text-xs">
-                panelTabs-style · Log Viewer preview
+                detail-pane style · Log Viewer preview
               </p>
               <p className="mt-2 text-muted-foreground text-xs">
                 Open the <span className="text-foreground">Logs</span> tab for

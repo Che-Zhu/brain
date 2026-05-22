@@ -776,7 +776,7 @@ export const Index: RegistryIndex = {
     name: "canvas",
     title: "Canvas",
     description:
-      "React Flow workspace (dots, glow), Jotai context; container panel tabs include Settings (`ContainerSettingsPane`), Metrics, Logs, History (AP config snapshots).",
+      "React Flow workspace (dots, glow), Jotai context, and node selection state for host-rendered detail panes.",
     state: "coding",
     type: "registry:preview",
     registryDependencies: [

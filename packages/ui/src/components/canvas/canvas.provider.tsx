@@ -4,33 +4,26 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { CanvasContext } from "./canvas.context";
 import type {
-  CanvasActions,
   CanvasContextValue,
   CanvasMeta,
   CanvasState,
 } from "./canvas.types";
 
 export function CanvasProvider({
-  actions,
   children,
   meta,
   state,
 }: {
-  actions?: Partial<CanvasActions>;
   children: ReactNode;
   meta?: CanvasMeta;
   state: CanvasState;
 }) {
   const value = useMemo<CanvasContextValue>(
     () => ({
-      actions: {
-        fitView: actions?.fitView ?? (() => undefined),
-        onPanelClose: actions?.onPanelClose ?? (() => undefined),
-      },
       meta: meta ?? {},
       state,
     }),
-    [actions?.fitView, actions?.onPanelClose, meta, state]
+    [meta, state]
   );
 
   return <CanvasContext value={value}>{children}</CanvasContext>;

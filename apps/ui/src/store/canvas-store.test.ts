@@ -12,6 +12,11 @@ import {
   normalizeDatabasePaneMode,
   shouldClearDatabasePaneMode,
 } from "@/lib/project-canvas/panels/database-panel-mode";
+import {
+  normalizeWorkloadPaneMode,
+  shouldClearWorkloadPaneMode,
+  workloadPaneModeForNodeClick,
+} from "@/lib/project-canvas/panels/workload-pane-mode";
 import { projectCanvasNodeServiceUid } from "./canvas-store";
 
 test("projectCanvasNodeServiceUid reads EntryPoint resource uid", () => {
@@ -47,6 +52,25 @@ test("database node selection opens settings mode and non-DB selection clears it
   );
 });
 
+test("workload panel mode distinguishes AP pane URL values", () => {
+  assert.equal(normalizeWorkloadPaneMode("settings"), "settings");
+  assert.equal(normalizeWorkloadPaneMode("metrics"), "metrics");
+  assert.equal(normalizeWorkloadPaneMode("logs"), "logs");
+  assert.equal(normalizeWorkloadPaneMode("history"), "history");
+  assert.equal(normalizeWorkloadPaneMode("Settings"), null);
+});
+
+test("container node selection opens settings mode and non-container selection clears it", () => {
+  assert.equal(
+    workloadPaneModeForNodeClick({ type: CANVAS_CONTAINER_NODE_TYPE }),
+    "settings"
+  );
+  assert.equal(
+    workloadPaneModeForNodeClick({ type: CANVAS_DATABASE_NODE_TYPE }),
+    null
+  );
+});
+
 test("database panel mode cleanup handles stale and non-DB selections", () => {
   assert.equal(
     shouldClearDatabasePaneMode({
@@ -72,6 +96,36 @@ test("database panel mode cleanup handles stale and non-DB selections", () => {
       rawNodeCount: 2,
       selectedNode: { type: CANVAS_DATABASE_NODE_TYPE },
       serviceUid: "db-uid",
+    }),
+    false
+  );
+});
+
+test("workload panel mode cleanup handles stale and non-container selections", () => {
+  assert.equal(
+    shouldClearWorkloadPaneMode({
+      rawNodeCount: 2,
+      selectedNode: null,
+      serviceUid: "stale-ap-uid",
+      workloadPane: "settings",
+    }),
+    true
+  );
+  assert.equal(
+    shouldClearWorkloadPaneMode({
+      rawNodeCount: 2,
+      selectedNode: { type: CANVAS_DATABASE_NODE_TYPE },
+      serviceUid: "db-uid",
+      workloadPane: "metrics",
+    }),
+    true
+  );
+  assert.equal(
+    shouldClearWorkloadPaneMode({
+      rawNodeCount: 2,
+      selectedNode: { type: CANVAS_CONTAINER_NODE_TYPE },
+      serviceUid: "ap-uid",
+      workloadPane: "history",
     }),
     false
   );

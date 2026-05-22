@@ -7,7 +7,6 @@ import {
   canCopyDatabaseNodeConnection,
   type DatabaseNodeConnection,
   type DatabaseNodePublicConnection,
-  type DatabaseNodeStatus,
   getDatabaseNodeConnectionKey,
   maskDatabaseConnectionString,
 } from "@workspace/ui/components/database-node/database-node";
@@ -26,7 +25,6 @@ import {
 } from "lucide-react";
 import {
   type ComponentPropsWithoutRef,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -36,6 +34,7 @@ import { toast } from "sonner";
 
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { CanvasResourcePane } from "./canvas-resource-pane";
 import {
   buildDbSettingsPatch,
   type DatabaseSettingsDraft,
@@ -68,22 +67,6 @@ interface DatabaseSettingsPaneContentProps {
   onUpdated?: () => Promise<unknown>;
   routingDomain?: string;
   updating?: boolean;
-}
-
-function statusPillClassName(status: DatabaseNodeStatus | undefined) {
-  switch (status?.tone?.trim().toLowerCase() ?? status?.label.toLowerCase()) {
-    case "running":
-    case "ready":
-      return "bg-database-metrics-status-running text-primary";
-    case "failed":
-    case "error":
-      return "bg-destructive/25 text-destructive";
-    case "paused":
-    case "stopped":
-      return "bg-muted text-muted-foreground";
-    default:
-      return "bg-primary/10 text-primary";
-  }
 }
 
 function databaseHeaderSubtitle({
@@ -456,29 +439,6 @@ function DatabaseSettingsFooter({
   );
 }
 
-function VisuallyHiddenCloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <Button
-      aria-label="Close database settings"
-      className="sr-only"
-      onClick={onClose}
-      size="icon"
-      type="button"
-      variant="ghost"
-    />
-  );
-}
-
-function DatabaseSettingsPaneLayout({ children }: { children: ReactNode }) {
-  return (
-    <aside className="database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col overflow-hidden border-input border-l px-2.5 py-5 shadow-lg">
-      <div className="scrollbar-chat-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2.5">
-        {children}
-      </div>
-    </aside>
-  );
-}
-
 export function DatabaseSettingsPane({
   data,
   kubeconfig,
@@ -605,35 +565,14 @@ export function DatabaseSettingsPaneContent({
   }, [canEdit, onSubmitPatch, onUpdated, pendingPatch]);
 
   return (
-    <DatabaseSettingsPaneLayout>
-      <VisuallyHiddenCloseButton onClose={onClose} />
-      <header className="flex shrink-0 items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <DatabaseSettingsHeaderIcon iconUrl={data.states.iconUrl} />
-              <h2
-                className="truncate font-semibold text-lg text-primary leading-none"
-                title={data.states.name}
-              >
-                {data.states.name}
-              </h2>
-            </div>
-            <span
-              className={cn(
-                "inline-flex h-5 shrink-0 items-center rounded-full px-2.5 text-xs leading-none",
-                statusPillClassName(data.states.status)
-              )}
-            >
-              {statusLabel}
-            </span>
-          </div>
-          <p className="truncate text-muted-foreground text-sm leading-5">
-            {subtitle}
-          </p>
-        </div>
-      </header>
-
+    <CanvasResourcePane
+      closeAriaLabel="Close database settings"
+      icon={<DatabaseSettingsHeaderIcon iconUrl={data.states.iconUrl} />}
+      onClose={onClose}
+      status={{ ...data.states.status, label: statusLabel }}
+      subtitle={subtitle}
+      title={data.states.name}
+    >
       <DatabaseSettingsSection icon={Settings2} title="Replicas & Resources">
         <DatabaseSettingsSlider
           ariaLabel="Database replica count"
@@ -727,6 +666,6 @@ export function DatabaseSettingsPaneContent({
           updating={updating}
         />
       )}
-    </DatabaseSettingsPaneLayout>
+    </CanvasResourcePane>
   );
 }

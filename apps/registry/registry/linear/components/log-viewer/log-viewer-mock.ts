@@ -3,7 +3,7 @@ import type { LogsData } from "@workspace/ui/components/log-viewer/log-viewer.co
 /** Wider than default 5m so demo rows stay visible as wall time passes. */
 export const LOG_VIEWER_PREVIEW_QUICK_RANGE_MS = 24 * 60 * 60_000;
 
-/** Deterministic mock logs for registry previews (canvas panel, log viewer, etc.). */
+/** Deterministic mock logs for registry previews (detail panes, log viewer, etc.). */
 export function buildMockLogs(now: number): LogsData {
   return [
     {

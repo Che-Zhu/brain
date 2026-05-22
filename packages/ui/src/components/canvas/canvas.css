@@ -36,10 +36,6 @@
   cursor: default;
 }
 
-.canvas-panel {
-  border-left: 1px solid var(--color-border);
-}
-
 /* Unmarked handles are decorative; declare data-side to opt into visibility. */
 .canvas-surface .react-flow__handle:not([data-side]) {
   top: auto;

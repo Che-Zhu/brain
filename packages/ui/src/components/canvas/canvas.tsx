@@ -25,9 +25,8 @@ import {
   resolveCanvasEdgeAnchors,
 } from "./canvas.edge-anchors";
 import { mergeNodes } from "./canvas.node-merge";
-import { CanvasPanel } from "./canvas.panel";
 import { CanvasProvider } from "./canvas.provider";
-import type { CanvasActions, CanvasReactFlowProps } from "./canvas.types";
+import type { CanvasReactFlowProps } from "./canvas.types";
 import {
   CanvasUpperRight,
   CanvasUpperRightAnchor,
@@ -44,7 +43,6 @@ export interface CanvasFlowProps {
 }
 
 export interface CanvasRootProps {
-  actions?: Partial<CanvasActions>;
   children?: ReactNode;
   meta?: Parameters<typeof CanvasProvider>[0]["meta"];
   state: Parameters<typeof CanvasProvider>[0]["state"];
@@ -300,9 +298,9 @@ function CanvasFlow({ children }: CanvasFlowProps) {
   );
 }
 
-function CanvasRoot({ actions, children, meta, state }: CanvasRootProps) {
+function CanvasRoot({ children, meta, state }: CanvasRootProps) {
   return (
-    <CanvasProvider actions={actions} meta={meta} state={state}>
+    <CanvasProvider meta={meta} state={state}>
       {children}
     </CanvasProvider>
   );
@@ -320,7 +318,6 @@ function CanvasSurface({ children }: CanvasFlowProps) {
 
 export const Canvas = Object.assign(CanvasSurface, {
   Flow: CanvasSurface,
-  Panel: CanvasPanel,
   Root: CanvasRoot,
   UpperRight: CanvasUpperRight,
 });

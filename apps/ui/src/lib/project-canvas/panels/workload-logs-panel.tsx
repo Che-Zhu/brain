@@ -1,13 +1,40 @@
 "use client";
 
+import type { Node } from "@xyflow/react";
+import { ScrollText } from "lucide-react";
 import { memo } from "react";
 
-export const WorkloadLogsCanvasPanel = memo(function WorkloadLogsCanvasPanel() {
+import { containerStatesFromNode } from "@/lib/project-canvas/flow/container-node-workload";
+import { CanvasResourcePane } from "./canvas-resource-pane";
+
+export const WorkloadLogsPane = memo(function WorkloadLogsPane({
+  node,
+  onClose,
+}: {
+  node: Node;
+  onClose: () => void;
+}) {
+  const states = containerStatesFromNode(node);
+  const title =
+    states?.name === "" || states?.name == null ? "Logs" : states.name;
+
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+    <CanvasResourcePane
+      closeAriaLabel="Close workload logs"
+      icon={
+        <ScrollText
+          aria-hidden
+          className="size-4 shrink-0 text-database-metrics-chart"
+        />
+      }
+      onClose={onClose}
+      status={states?.status}
+      subtitle={states?.kind ?? "Workload"}
+      title={`${title} Logs`}
+    >
       <p className="text-muted-foreground text-sm">Log stream not connected.</p>
-    </div>
+    </CanvasResourcePane>
   );
 });
 
-WorkloadLogsCanvasPanel.displayName = "WorkloadLogsCanvasPanel";
+WorkloadLogsPane.displayName = "WorkloadLogsPane";

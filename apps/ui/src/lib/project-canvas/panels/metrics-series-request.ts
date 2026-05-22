@@ -33,7 +33,7 @@ export function workloadMetricsSeriesTarget(
   return metricsSeriesTarget({
     kind: telemetryKindFromWorkload(workloadKind),
     name: states?.name,
-    namespace,
+    namespace: states?.namespace?.trim() || namespace,
   });
 }
 

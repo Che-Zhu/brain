@@ -73,7 +73,7 @@
     },
     {
       "path": "../../packages/ui/src/components/container-node/index.ts",
-      "content": "export * from \"./container-node\";\n",
+      "content": "export type {\n  ContainerNodeAction,\n  ContainerNodeActions,\n  ContainerNodeContextValue,\n  ContainerNodeDeleteDialogPanelProps,\n  ContainerNodeDeleteDialogProps,\n  ContainerNodeLifecycleActionKey,\n  ContainerNodeLifecycleActions,\n  ContainerNodeMetricKey,\n  ContainerNodeMetricValue,\n  ContainerNodeProviderProps,\n  ContainerNodeQuickActionKey,\n  ContainerNodeQuickActions,\n  ContainerNodeRootProps,\n  ContainerNodeState,\n  ContainerNodeStates,\n  ContainerNodeStatus,\n  ContainerNodeStatusTone,\n} from \"./container-node\";\n// biome-ignore lint/performance/noBarrelFile: container-node public package surface\nexport {\n  ContainerNode,\n  containerNodeLifecycleMenuVisibility,\n  resolveContainerNodeStatus,\n  resolveContainerNodeVisualTone,\n} from \"./container-node\";\n\n",
       "type": "registry:component",
       "target": "components/container-node/index.ts"
     }
