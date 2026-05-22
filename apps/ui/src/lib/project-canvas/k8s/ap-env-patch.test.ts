@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { PLATFORM_ADDRESS_ID_RE } from "../platform-addresses";
 import {
   patchOpsForApEnvSettings,
   patchOpsForApNetworkSettings,
@@ -11,7 +12,6 @@ const PRIVATE_PORT_RANGE_RE =
   /Private Address target port must be an integer from 1 through 65535/;
 const PUBLIC_PORT_RANGE_RE =
   /Public Address target port must be an integer from 1 through 65535/;
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 const PLATFORM_ADDRESS_ID_INVALID_RE =
   /Platform Address ID must match \^pa_\[a-z0-9\]\{6,32\}\$/;
 const PLATFORM_ADDRESS_ID_UNIQUE_RE = /Platform Address IDs must be unique/;

@@ -13,11 +13,10 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
+import { isPlatformAddressId } from "../platform-addresses";
 
 export type CanvasDetectedConnectionKind = "EntryPointToAP" | "APToDB";
 export type CanvasConnectionResourceKind = "AP" | "DB" | "EntryPoint";
-
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 export interface CanvasConnectionResourceRef {
   kind: CanvasConnectionResourceKind;
@@ -180,10 +179,9 @@ function hasPublicAddressesFromNetwork(network: unknown): boolean {
   const platformAddresses = record?.platformAddresses;
   return (
     Array.isArray(platformAddresses) &&
-    platformAddresses.some((address) => {
-      const id = asRecord(address)?.id;
-      return typeof id === "string" && PLATFORM_ADDRESS_ID_RE.test(id.trim());
-    })
+    platformAddresses.some((address) =>
+      isPlatformAddressId(asRecord(address)?.id)
+    )
   );
 }
 

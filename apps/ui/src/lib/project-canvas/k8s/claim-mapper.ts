@@ -13,6 +13,10 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
+  platformAddressIdFromValue,
+  platformAddressIdsFromRows,
+} from "../platform-addresses";
+import {
   readApCpuLimit,
   readApEnv,
   readApImage,
@@ -27,7 +31,6 @@ const MEM_SUFFIX_GI = /^([0-9]+(?:\.[0-9]+)?)gi$/i;
 const MEM_SUFFIX_MI = /^([0-9]+(?:\.[0-9]+)?)mi$/i;
 const MEM_SUFFIX_G = /^([0-9]+(?:\.[0-9]+)?)g$/i;
 const MEM_SUFFIX_M = /^([0-9]+(?:\.[0-9]+)?)m$/i;
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
@@ -214,13 +217,11 @@ function apNetworkPublicAddresses(
     inputNetwork?.platformAddresses
   );
   if (observed.length > 0) {
-    const observedIds = new Set(
-      observed.map((address) => address.id).filter((id) => id != null)
-    );
+    const observedIds = platformAddressIdsFromRows(observed);
     return [
       ...observed,
       ...desiredPending.filter(
-        (address) => address.id == null || !observedIds.has(address.id)
+        (address) => address.id === undefined || !observedIds.has(address.id)
       ),
     ];
   }
@@ -239,9 +240,9 @@ function normalizeDesiredPlatformAddresses(
     if (address == null) {
       continue;
     }
-    const id = trimStr(address.id);
+    const id = platformAddressIdFromValue(address.id);
     const port = privatePortNum(address.port);
-    if (!PLATFORM_ADDRESS_ID_RE.test(id) || port == null) {
+    if (id === undefined || port == null) {
       continue;
     }
     out.push({ id, port, status: "progressing", type: "platform" });

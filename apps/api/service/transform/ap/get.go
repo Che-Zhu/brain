@@ -68,7 +68,7 @@ func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, se
 		delete(statusCopy, "variables")
 	}
 	mergePrivateNetworkStatus(ap, statusCopy, services)
-	mergePublicNetworkStatus(ap, statusCopy, ingresses)
+	mergePublicNetworkStatus(ap, statusCopy)
 	out["status"] = statusCopy
 
 	return out
@@ -143,13 +143,12 @@ func privateNetworkAddressForPort(services []map[string]interface{}, namespace s
 	return ""
 }
 
-type networkPublicAddress struct {
+type platformAddressRequest struct {
 	id   string
-	host string
 	port int
 }
 
-func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}, ingresses []map[string]interface{}) {
+func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}) {
 	addresses := apPlatformAddressRequests(ap)
 	if len(addresses) == 0 {
 		return
@@ -188,11 +187,7 @@ func publicAddressRowsFromValue(value interface{}) []map[string]interface{} {
 	case []map[string]interface{}:
 		out := make([]map[string]interface{}, 0, len(rows))
 		for _, row := range rows {
-			rowCopy := make(map[string]interface{}, len(row))
-			for k, v := range row {
-				rowCopy[k] = v
-			}
-			out = append(out, rowCopy)
+			out = append(out, copyPublicAddressRow(row))
 		}
 		return out
 	case []interface{}:
@@ -202,11 +197,7 @@ func publicAddressRowsFromValue(value interface{}) []map[string]interface{} {
 			if row == nil {
 				continue
 			}
-			rowCopy := make(map[string]interface{}, len(row))
-			for k, v := range row {
-				rowCopy[k] = v
-			}
-			out = append(out, rowCopy)
+			out = append(out, copyPublicAddressRow(row))
 		}
 		return out
 	default:
@@ -214,7 +205,15 @@ func publicAddressRowsFromValue(value interface{}) []map[string]interface{} {
 	}
 }
 
-func pendingPublicAddressRow(address networkPublicAddress) map[string]interface{} {
+func copyPublicAddressRow(row map[string]interface{}) map[string]interface{} {
+	rowCopy := make(map[string]interface{}, len(row))
+	for k, v := range row {
+		rowCopy[k] = v
+	}
+	return rowCopy
+}
+
+func pendingPublicAddressRow(address platformAddressRequest) map[string]interface{} {
 	return map[string]interface{}{
 		"id":     address.id,
 		"port":   address.port,
@@ -223,7 +222,7 @@ func pendingPublicAddressRow(address networkPublicAddress) map[string]interface{
 	}
 }
 
-func apPlatformAddressRequests(ap map[string]interface{}) []networkPublicAddress {
+func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressRequest {
 	network := apInputNetwork(ap)
 	if network == nil {
 		return nil
@@ -232,7 +231,7 @@ func apPlatformAddressRequests(ap map[string]interface{}) []networkPublicAddress
 	if len(raw) == 0 {
 		return nil
 	}
-	addresses := make([]networkPublicAddress, 0, len(raw))
+	addresses := make([]platformAddressRequest, 0, len(raw))
 	for _, item := range raw {
 		address, _ := item.(map[string]interface{})
 		if address == nil {
@@ -244,52 +243,9 @@ func apPlatformAddressRequests(ap map[string]interface{}) []networkPublicAddress
 		if !platformAddressIDPattern.MatchString(id) || !ok {
 			continue
 		}
-		addresses = append(addresses, networkPublicAddress{id: id, port: port})
+		addresses = append(addresses, platformAddressRequest{id: id, port: port})
 	}
 	return addresses
-}
-
-func ingressSchemeByHost(ingresses []map[string]interface{}) map[string]string {
-	result := make(map[string]string)
-	for _, ing := range ingresses {
-		spec, _ := ing["spec"].(map[string]interface{})
-		if spec == nil {
-			continue
-		}
-		tlsHosts := getTLSHosts(spec)
-		rules, _ := spec["rules"].([]interface{})
-		for _, item := range rules {
-			rule, _ := item.(map[string]interface{})
-			if rule == nil {
-				continue
-			}
-			host, _ := rule["host"].(string)
-			host = strings.TrimSpace(host)
-			if host == "" || isPlaceholderIngressHost(host) {
-				continue
-			}
-			scheme := "http"
-			if tlsHosts[host] {
-				scheme = "https"
-			}
-			result[host] = scheme
-		}
-	}
-	return result
-}
-
-func publicAccessStatusFromPhase(phaseValue interface{}) string {
-	phase, _ := phaseValue.(string)
-	switch phase {
-	case "Running":
-		return "accessible"
-	case "Progressing":
-		return "progressing"
-	case "Failed", "Degraded", "Paused":
-		return "inaccessible"
-	default:
-		return "unknown"
-	}
 }
 
 func privatePortFromValue(value interface{}) (int, bool) {

@@ -625,6 +625,19 @@ function publicAddressKey(
   );
 }
 
+function isPublicAddressDeleteTarget(
+  address: ContainerNetworkPublicAddress,
+  index: number,
+  target: ContainerNetworkPublicAddress | undefined,
+  targetIndex: number
+): boolean {
+  const targetId = target?.id?.trim();
+  if (targetId == null || targetId === "") {
+    return index === targetIndex;
+  }
+  return address.id?.trim() === targetId;
+}
+
 interface PublicAddressRowProps {
   address: ContainerNetworkPublicAddress;
   onDelete?: () => void | Promise<void>;
@@ -878,12 +891,9 @@ function NetworkSettingsSection({
       return;
     }
     const target = network.publicAddresses[index];
-    const targetId = target?.id?.trim();
     const publicAddresses = network.publicAddresses.filter(
       (address, itemIndex) =>
-        targetId != null && targetId !== ""
-          ? address.id?.trim() !== targetId
-          : itemIndex !== index
+        !isPublicAddressDeleteTarget(address, itemIndex, target, index)
     );
     await onNetworkChange({ ...network, publicAddresses });
   };

@@ -1,6 +1,8 @@
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 
+import { isPlatformAddressId } from "@/lib/project-canvas/platform-addresses";
+
 export const ENTRYPOINT_FAST_REFRESH_MS = 1000;
 export const ENTRYPOINT_STEADY_REFRESH_MS = 5000;
 
@@ -16,7 +18,6 @@ const WORKLOAD_TRANSIENT_PHASES = new Set([
   "stopping",
   "updating",
 ]);
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
 
 function normalizeWorkloadPhase(input: unknown) {
   return typeof input === "string"
@@ -31,8 +32,7 @@ function hasPlatformAddressRequest(item: unknown) {
   if (item == null || typeof item !== "object") {
     return false;
   }
-  const id = (item as Record<string, unknown>).id;
-  return typeof id === "string" && PLATFORM_ADDRESS_ID_RE.test(id.trim());
+  return isPlatformAddressId((item as Record<string, unknown>).id);
 }
 
 function hasNetworkPublicAddresses(network: unknown) {

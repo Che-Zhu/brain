@@ -31,6 +31,10 @@ import {
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
 import type { CanvasDatabaseNodeData } from "../nodes/types";
+import {
+  platformAddressIdFromValue,
+  platformAddressIdsFromRows,
+} from "../platform-addresses";
 
 const FALLBACK_COLUMNS = 3;
 const FALLBACK_COL_GAP = 340;
@@ -528,8 +532,6 @@ interface NetworkPublicAddress {
   url?: string;
 }
 
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
-
 function entryPointCanvasResources(
   data: K8sGetResponse | undefined,
   options: EntryPointsToCanvasStateOptions | undefined
@@ -621,13 +623,11 @@ function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
     inputNetwork?.platformAddresses
   );
   if (statusAddresses.length > 0) {
-    const observedIds = new Set(
-      statusAddresses.map((address) => address.id).filter((id) => id != null)
-    );
+    const observedIds = platformAddressIdsFromRows(statusAddresses);
     return [
       ...statusAddresses,
       ...desiredPending.filter(
-        (address) => address.id == null || !observedIds.has(address.id)
+        (address) => address.id === undefined || !observedIds.has(address.id)
       ),
     ];
   }
@@ -646,13 +646,9 @@ function normalizeDesiredPlatformAddresses(
     if (record === undefined) {
       continue;
     }
-    const id = nonEmptyString(record.id);
+    const id = platformAddressIdFromValue(record.id);
     const port = entryPointTargetPort(record.port);
-    if (
-      id === undefined ||
-      !PLATFORM_ADDRESS_ID_RE.test(id) ||
-      port === undefined
-    ) {
+    if (id === undefined || port === undefined) {
       continue;
     }
     out.push({ id, port, status: "progressing", type: "platform" });

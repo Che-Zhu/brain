@@ -7,9 +7,14 @@ import {
   normalizeContainerEnvRowsForSave,
   validateContainerEnvRows,
 } from "@workspace/ui/lib/container-env-rows";
-
 import { parse as parseYaml } from "yaml";
 
+import {
+  generatePlatformAddressId,
+  isPlatformAddressId,
+  normalizePlatformAddressId,
+  PLATFORM_ADDRESS_ID_PATTERN,
+} from "../platform-addresses";
 import {
   patchOpsForApInput,
   patchOpsForApResource,
@@ -20,8 +25,6 @@ import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
 const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
-const PLATFORM_ADDRESS_ID_RE = /^pa_[a-z0-9]{6,32}$/;
-const PLATFORM_ADDRESS_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
   Partial<Pick<ContainerNetwork, "publicAddresses">>;
@@ -240,23 +243,6 @@ function validatedNetworkPort(port: number, label: string): number {
   return n;
 }
 
-function generatedPlatformAddressId(): string {
-  const bytes = new Uint8Array(12);
-  if (globalThis.crypto == null) {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
-  } else {
-    globalThis.crypto.getRandomValues(bytes);
-  }
-  let suffix = "";
-  for (const byte of bytes) {
-    suffix +=
-      PLATFORM_ADDRESS_ID_ALPHABET[byte % PLATFORM_ADDRESS_ID_ALPHABET.length];
-  }
-  return `pa_${suffix}`;
-}
-
 function validatedPlatformAddresses(
   publicAddresses:
     | readonly ContainerNetwork["publicAddresses"][number][]
@@ -267,13 +253,15 @@ function validatedPlatformAddresses(
   }
   const seenIds = new Set<string>();
   return publicAddresses.map((address) => {
-    const rawId = address.id?.trim() ?? "";
-    let id = rawId === "" ? generatedPlatformAddressId() : rawId;
+    const rawId = normalizePlatformAddressId(address.id);
+    let id = rawId === "" ? generatePlatformAddressId() : rawId;
     while (rawId === "" && seenIds.has(id)) {
-      id = generatedPlatformAddressId();
+      id = generatePlatformAddressId();
     }
-    if (!PLATFORM_ADDRESS_ID_RE.test(id)) {
-      throw new Error("Platform Address ID must match ^pa_[a-z0-9]{6,32}$.");
+    if (!isPlatformAddressId(id)) {
+      throw new Error(
+        `Platform Address ID must match ${PLATFORM_ADDRESS_ID_PATTERN}.`
+      );
     }
     if (seenIds.has(id)) {
       throw new Error("Platform Address IDs must be unique.");
