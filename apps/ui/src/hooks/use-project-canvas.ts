@@ -56,6 +56,7 @@ import type {
   CanvasContainerNodeData,
   CanvasDatabaseNodeData,
   CanvasNodeLayoutState,
+  CanvasNodeSettingsAccess,
 } from "@/lib/project-canvas/nodes/types";
 import {
   databasePaneModeForNodeClick,
@@ -186,30 +187,13 @@ function createPendingApDbReferenceMutationStartHandler({
     );
 }
 
-function containerNodeSettingsAccess({
+function canvasNodeSettingsAccess({
   readOnly,
   shareToken,
 }: {
   readOnly: boolean;
   shareToken: string | undefined;
-}): CanvasContainerNodeData["settingsAccess"] | undefined {
-  const st = shareToken?.trim();
-  if (!(readOnly || st)) {
-    return undefined;
-  }
-  return {
-    ...(readOnly ? { readOnly: true } : {}),
-    ...(st ? { shareToken: st } : {}),
-  };
-}
-
-function databaseNodeSettingsAccess({
-  readOnly,
-  shareToken,
-}: {
-  readOnly: boolean;
-  shareToken: string | undefined;
-}): CanvasDatabaseNodeData["settingsAccess"] | undefined {
+}): CanvasNodeSettingsAccess | undefined {
   const st = shareToken?.trim();
   if (!(readOnly || st)) {
     return undefined;
@@ -452,7 +436,7 @@ export function useProjectCanvas(
             },
           },
           connections,
-          settingsAccess: databaseNodeSettingsAccess({
+          settingsAccess: canvasNodeSettingsAccess({
             readOnly,
             shareToken: options?.shareToken,
           }),
@@ -496,7 +480,7 @@ export function useProjectCanvas(
         nodeId: node.id,
         onConsumed: handleAddDbDsnReferenceIntentConsumed,
       });
-      const settingsAccess = containerNodeSettingsAccess({
+      const settingsAccess = canvasNodeSettingsAccess({
         readOnly,
         shareToken: options?.shareToken,
       });

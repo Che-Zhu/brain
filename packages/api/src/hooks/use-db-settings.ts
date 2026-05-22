@@ -42,21 +42,17 @@ export function useDbSettingsOperations(options: UseDbLifecycleOptions) {
   const authReady = shareToken.trim() !== "" || kubeconfig.trim() !== "";
   const base = useMemo(() => ApiUrl(), []);
 
-  const isUpdating = useCallback(
-    (workload: DbLifecycleWorkloadRef) =>
-      loadingKeys.has(workloadKey(workload)),
-    [loadingKeys]
-  );
+  const assertAuthReady = useCallback(() => {
+    if (!authReady) {
+      throw new Error("useDbSettings: kubeconfig or shareToken is required");
+    }
+  }, [authReady]);
 
-  const updateSettings = useCallback(
-    async (
+  const runWithLoading = useCallback(
+    async <T>(
       workload: DbLifecycleWorkloadRef,
-      patch: Record<string, unknown>
-    ): Promise<unknown> => {
-      if (!authReady) {
-        throw new Error("useDbSettings: kubeconfig or shareToken is required");
-      }
-      const { name, namespace } = validateWorkload(workload);
+      operation: () => Promise<T>
+    ): Promise<T> => {
       const key = workloadKey(workload);
       setLoadingKeys((prev) => {
         const next = new Set(prev);
@@ -64,14 +60,7 @@ export function useDbSettingsOperations(options: UseDbLifecycleOptions) {
         return next;
       });
       try {
-        return await fetcher<unknown>({
-          base,
-          body: patch,
-          header: headers,
-          method: "PATCH",
-          path: API_ROUTES.db.root,
-          query: { name, namespace },
-        });
+        return await operation();
       } finally {
         setLoadingKeys((prev) => {
           if (!prev.has(key)) {
@@ -83,7 +72,34 @@ export function useDbSettingsOperations(options: UseDbLifecycleOptions) {
         });
       }
     },
-    [authReady, base, headers]
+    []
+  );
+
+  const isUpdating = useCallback(
+    (workload: DbLifecycleWorkloadRef) =>
+      loadingKeys.has(workloadKey(workload)),
+    [loadingKeys]
+  );
+
+  const updateSettings = useCallback(
+    (
+      workload: DbLifecycleWorkloadRef,
+      patch: Record<string, unknown>
+    ): Promise<unknown> => {
+      assertAuthReady();
+      const { name, namespace } = validateWorkload(workload);
+      return runWithLoading(workload, () =>
+        fetcher<unknown>({
+          base,
+          body: patch,
+          header: headers,
+          method: "PATCH",
+          path: API_ROUTES.db.root,
+          query: { name, namespace },
+        })
+      );
+    },
+    [assertAuthReady, base, headers, runWithLoading]
   );
 
   return {

@@ -17,8 +17,7 @@ import {
   removePendingApDbCanvasReferences,
 } from "@/lib/project-canvas/flow/pending-connections";
 import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
-import { CANVAS_DATABASE_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
-import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
@@ -108,10 +107,7 @@ export default function ProjectUidPage() {
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
   );
-  const selectedDatabaseData =
-    selectedNode?.type === CANVAS_DATABASE_NODE_TYPE
-      ? (selectedNode.data as CanvasDatabaseNodeData)
-      : null;
+  const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
   const meta = useMemo(
     () => ({
       ...canvasMeta,

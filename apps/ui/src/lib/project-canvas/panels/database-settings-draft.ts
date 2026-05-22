@@ -33,11 +33,11 @@ export function normalizeDbSettingsReplicas(raw: unknown): number {
   return integerInRange(raw, DB_SETTINGS_REPLICAS.min);
 }
 
-export function dbSettingsDraftFromNodeData(
-  data: Pick<CanvasDatabaseNodeData, "desired" | "states">
-): DatabaseSettingsDraft {
+export function dbSettingsDraftFromNodeData({
+  desired,
+}: Pick<CanvasDatabaseNodeData, "desired">): DatabaseSettingsDraft {
   return {
-    replicas: normalizeDbSettingsReplicas(data.desired?.replicas),
+    replicas: normalizeDbSettingsReplicas(desired?.replicas),
   };
 }
 

@@ -6,8 +6,7 @@ import {
   telemetryKindFromWorkload,
   workloadClaimKindFromStates,
 } from "@/lib/project-canvas/flow/container-node-workload";
-import { CANVAS_DATABASE_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
-import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 
 export const METRICS_SERIES_RANGE_MS = 60 * 60 * 1000;
 export const METRICS_SERIES_STEP_SECONDS = 60;
@@ -38,15 +37,6 @@ export function workloadMetricsSeriesTarget(
   });
 }
 
-export function databaseMetricsDataFromNode(
-  node: MetricsPanelNode
-): CanvasDatabaseNodeData | null {
-  if (node?.type !== CANVAS_DATABASE_NODE_TYPE) {
-    return null;
-  }
-  return node.data as CanvasDatabaseNodeData;
-}
-
 export function databaseMetricsSeriesTarget(
   node: MetricsPanelNode,
   open: boolean
@@ -54,7 +44,7 @@ export function databaseMetricsSeriesTarget(
   if (!open) {
     return null;
   }
-  const data = databaseMetricsDataFromNode(node);
+  const data = databaseNodeDataFromNode(node);
   return metricsSeriesTarget({
     kind: "db",
     name: data?.workload.name,

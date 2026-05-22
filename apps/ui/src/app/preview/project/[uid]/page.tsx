@@ -15,8 +15,7 @@ import { useCallback, useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
-import { CANVAS_DATABASE_NODE_TYPE } from "@/lib/project-canvas/nodes/constants";
-import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
 import { buildPreviewProjectCanvasState } from "@/lib/project-canvas/preview/state";
@@ -162,10 +161,7 @@ export default function PreviewProjectPage() {
     refreshWorkloadLists,
     shareToken,
   });
-  const selectedDatabaseData =
-    selectedNode?.type === CANVAS_DATABASE_NODE_TYPE
-      ? (selectedNode.data as CanvasDatabaseNodeData)
-      : null;
+  const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
 
   const missingParams = shareToken === "" || ns === "" || uid === "";
   const blocked = missingParams || isLoading || error != null;
