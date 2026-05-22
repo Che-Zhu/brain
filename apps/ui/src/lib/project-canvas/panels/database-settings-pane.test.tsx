@@ -11,14 +11,14 @@ const noop = () => {
 };
 
 const CONNECTION_ADDRESS_RE = /Connection Address/;
-const PRIVATE_CONNECTION_RE = /Private connection/;
-const PUBLIC_CONNECTION_RE = /Public connection/;
+const PRIVATE_CONNECTION_RE = /Private Connection/;
+const PUBLIC_CONNECTION_RE = /Public Connection/;
 const MASKED_PRIVATE_CONNECTION_RE =
   /postgres:\/\/u\*\*\*\*\*\*\*:.*?@postgres.default.svc/;
 const MASKED_PUBLIC_CONNECTION_RE =
   /postgres:\/\/u\*\*\*\*\*\*\*:.*?@db.example.com/;
-const COPY_PRIVATE_CONNECTION_RE = /aria-label="Copy Private connection"/;
-const COPY_PUBLIC_CONNECTION_RE = /aria-label="Copy Public connection"/;
+const COPY_PRIVATE_CONNECTION_RE = /aria-label="Copy Private Connection"/;
+const COPY_PUBLIC_CONNECTION_RE = /aria-label="Copy Public Connection"/;
 const PUBLIC_CONNECTION_SWITCH_RE = /aria-label="Public connection"/;
 const DISABLED_RE = /disabled=""/;
 const UPDATE_BUTTON_RE = />Update</;
@@ -105,6 +105,32 @@ test("database settings pane hides unprovisioned public address while public acc
   assert.match(html, CONNECTION_ADDRESS_RE);
   assert.match(html, PRIVATE_CONNECTION_RE);
   assert.doesNotMatch(html, PROVISIONING_CONNECTION_RE);
+  assert.doesNotMatch(html, COPY_PUBLIC_CONNECTION_RE);
+});
+
+test("database settings pane shows pending public connection text while public access is on", () => {
+  const html = renderPane(
+    <DatabaseSettingsPaneContent
+      data={{
+        ...BASE_DATA,
+        connections: [
+          PRIVATE_CONNECTION,
+          {
+            id: "public",
+            kind: "public",
+            label: "Public connection",
+            publicAccess: { enabled: true },
+          },
+        ],
+        desired: { ...BASE_DATA.desired, exposeNodePort: true },
+      }}
+      onClose={noop}
+      onSubmitPatch={noop}
+    />
+  );
+
+  assert.match(html, PUBLIC_CONNECTION_RE);
+  assert.match(html, PROVISIONING_CONNECTION_RE);
   assert.doesNotMatch(html, COPY_PUBLIC_CONNECTION_RE);
 });
 

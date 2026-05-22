@@ -1,30 +1,37 @@
 "use client";
 
 import { useDbSettingsOperations } from "@workspace/api/hooks";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import {
   canCopyDatabaseNodeConnection,
   type DatabaseNodeConnection,
+  type DatabaseNodePublicConnection,
   type DatabaseNodeStatus,
   getDatabaseNodeConnectionKey,
   maskDatabaseConnectionString,
 } from "@workspace/ui/components/database-node/database-node";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
-import { Separator } from "@workspace/ui/components/separator";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Cpu,
+  Database,
   HardDrive,
-  Layers,
   type LucideIcon,
   MemoryStick,
-  Settings,
-  X,
+  Network,
+  Settings2,
+  Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
@@ -77,61 +84,232 @@ function statusPillClassName(status: DatabaseNodeStatus | undefined) {
   }
 }
 
-function engineSubtitle({
+function databaseHeaderSubtitle({
   displayEngine,
   formattedVersion,
 }: CanvasDatabaseNodeData["states"]) {
-  return `${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
+  return `Database ${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
-function getConnectionAddressDisplayValue(connection: DatabaseNodeConnection) {
-  if (connection.kind === "public" && !connection.publicAccess.enabled) {
+function formatReplicasValue(value: number) {
+  return `${value} ${value === 1 ? "Replica" : "Replicas"}`;
+}
+
+function formatCpuValue(value: number) {
+  const formatted = Number.isInteger(value) ? String(value) : String(value);
+  return `${formatted} ${value === 1 ? "Core" : "Cores"}`;
+}
+
+function formatGiValue(value: number) {
+  if (value < 1) {
+    return `${Math.round(value * 1024)} Mi`;
+  }
+  return `${Number.isInteger(value) ? value : value.toFixed(1)} Gi`;
+}
+
+function displayConnectionLabel(connection: DatabaseNodeConnection) {
+  if (connection.kind === "private") {
+    return "Private Connection";
+  }
+  return "Public Connection";
+}
+
+function getConnectionAddressDisplayValue(
+  connection: DatabaseNodeConnection,
+  publicConnectionEnabled = connection.kind === "public"
+    ? connection.publicAccess.enabled
+    : false
+) {
+  if (connection.kind === "public" && !publicConnectionEnabled) {
     return null;
   }
-  if (!connection.value) {
-    return connection.kind === "private"
-      ? (connection.unavailableMessage ?? "Connection unavailable")
-      : null;
+
+  if (connection.value) {
+    return (
+      connection.displayValue ?? maskDatabaseConnectionString(connection.value)
+    );
   }
-  return (
-    connection.displayValue ?? maskDatabaseConnectionString(connection.value)
-  );
+
+  if (connection.kind === "public") {
+    return connection.provisioningMessage ?? "Provisioning connection string";
+  }
+
+  return connection.unavailableMessage ?? "Connection unavailable";
 }
 
 function shouldShowConnectionAddress(connection: DatabaseNodeConnection) {
-  if (connection.kind === "private") {
-    return true;
+  return connection.kind === "private" || connection.kind === "public";
+}
+
+function DatabaseSettingsHeaderIcon({ iconUrl }: { iconUrl?: string }) {
+  const resolvedIconUrl = iconUrl?.trim();
+  if (resolvedIconUrl) {
+    return (
+      // biome-ignore lint/performance/noImgElement: DB icons are arbitrary remote URLs that are not covered by Next image domain config.
+      <img
+        alt=""
+        className="size-4 object-contain"
+        decoding="async"
+        height={16}
+        loading="lazy"
+        src={resolvedIconUrl}
+        width={16}
+      />
+    );
   }
-  return connection.publicAccess.enabled && Boolean(connection.value);
+  return <Database aria-hidden className="size-4 shrink-0 text-theme-blue" />;
+}
+
+function DatabaseSettingsSection({
+  children,
+  className,
+  icon: Icon,
+  title,
+  ...props
+}: ComponentPropsWithoutRef<"section"> & {
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-transparent",
+        className
+      )}
+      {...props}
+    >
+      <header className="flex h-11 shrink-0 items-center gap-1.5 border-border border-b px-2.5">
+        <Icon aria-hidden className="size-4 shrink-0 text-card-foreground" />
+        <h3 className="truncate font-medium text-card-foreground text-sm leading-5">
+          {title}
+        </h3>
+      </header>
+      <div className="flex min-w-0 flex-col gap-3 px-2.5 pb-3">{children}</div>
+    </section>
+  );
+}
+
+function DatabaseSettingsSlider({
+  ariaLabel,
+  constraint,
+  disabled,
+  formatBound,
+  formatValue,
+  icon,
+  label,
+  maxDecimals,
+  onValueChange,
+  value,
+}: {
+  ariaLabel: string;
+  constraint: DatabaseSettingsNumberConstraint;
+  disabled: boolean;
+  formatBound?: (value: number) => string;
+  formatValue: (value: number) => string;
+  icon?: LucideIcon;
+  label: string;
+  maxDecimals: number;
+  onValueChange: (value: number) => void;
+  value: number;
+}) {
+  const Icon = icon;
+  const boundFormatter = formatBound ?? String;
+
+  return (
+    <div className="rounded-lg bg-database-metrics-card p-2.5">
+      <ScaleSlider.Root
+        disabled={disabled}
+        max={constraint.max}
+        maxDecimals={maxDecimals}
+        min={constraint.min}
+        onValueChange={onValueChange}
+        step={constraint.step}
+        value={value}
+        valueDisplay="number"
+      >
+        <ScaleSlider.Stack className="w-full gap-1.5">
+          <ScaleSlider.Header className="mb-0.5 h-9">
+            <ScaleSlider.Group className="min-w-0 gap-1.5">
+              {Icon == null ? null : (
+                <Icon
+                  aria-hidden
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              )}
+              <ScaleSlider.Label className="truncate text-muted-foreground text-sm leading-5">
+                {label}
+              </ScaleSlider.Label>
+            </ScaleSlider.Group>
+            <span className="shrink-0 text-primary text-sm leading-5">
+              {formatValue(value)}
+            </span>
+          </ScaleSlider.Header>
+          <ScaleSlider.Control aria-label={ariaLabel} className="h-2">
+            <ScaleSlider.Track className="h-2 bg-input/80">
+              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-theme-blue" />
+            </ScaleSlider.Track>
+            <ScaleSlider.Thumb className="size-4 border-2 border-primary bg-theme-blue shadow-none ring-0" />
+          </ScaleSlider.Control>
+          <div className="flex min-w-0 items-center justify-between gap-3 text-muted-foreground text-sm leading-5">
+            <span className="truncate">{boundFormatter(constraint.min)}</span>
+            <span className="truncate text-right">
+              {boundFormatter(constraint.max)}
+            </span>
+          </div>
+        </ScaleSlider.Stack>
+      </ScaleSlider.Root>
+    </div>
+  );
 }
 
 function DatabaseSettingsConnectionAddressRow({
   connection,
+  controlsDisabled,
   index,
+  onPublicConnectionChange,
+  publicConnectionEnabled,
 }: {
   connection: DatabaseNodeConnection;
+  controlsDisabled: boolean;
   index: number;
+  onPublicConnectionChange: (nextEnabled: boolean) => void;
+  publicConnectionEnabled: boolean;
 }) {
-  const displayValue = getConnectionAddressDisplayValue(connection);
-  if (displayValue === null) {
-    return null;
-  }
-
-  const copyable = canCopyDatabaseNodeConnection(connection);
+  const displayValue = getConnectionAddressDisplayValue(
+    connection,
+    publicConnectionEnabled
+  );
+  const displayLabel = displayConnectionLabel(connection);
+  const copyable =
+    connection.kind === "public"
+      ? publicConnectionEnabled && Boolean(connection.value)
+      : canCopyDatabaseNodeConnection(connection);
+  const copyValue = copyable ? connection.value : undefined;
   const title =
     connection.kind === "public"
       ? (displayValue ?? undefined)
       : (connection.value ?? displayValue ?? undefined);
+  const publicSwitch =
+    connection.kind === "public" ? (
+      <CanvasNode.CopyableRowControl className="pointer-events-auto relative z-20 flex shrink-0 items-center">
+        <DatabaseSettingsPublicConnectionSwitch
+          connection={connection}
+          controlsDisabled={controlsDisabled}
+          onCheckedChange={onPublicConnectionChange}
+          publicConnectionEnabled={publicConnectionEnabled}
+        />
+      </CanvasNode.CopyableRowControl>
+    ) : null;
 
   return (
     <CanvasNode.CopyableRow
       className={cn(
-        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 transition-colors",
-        copyable ? "min-h-18" : "min-h-11"
+        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 shadow-sm transition-colors",
+        displayValue ? "min-h-20" : "min-h-11"
       )}
-      copyAriaLabel={`Copy ${connection.label}`}
+      copyAriaLabel={`Copy ${displayLabel}`}
       copyable={copyable}
-      copyValue={connection.value}
+      copyValue={copyValue}
       data-slot="database-settings-connection-address-row"
       rowKey={getDatabaseNodeConnectionKey(connection, index)}
       title={title}
@@ -144,42 +322,75 @@ function DatabaseSettingsConnectionAddressRow({
               rowCopyable ? "pointer-events-none" : "pointer-events-auto"
             )}
           >
-            <span className="min-w-0 truncate font-normal text-muted-foreground text-xs leading-4">
-              {connection.label}
+            <span className="min-w-0 truncate text-muted-foreground text-sm leading-5">
+              {displayLabel}
             </span>
+            {publicSwitch}
           </div>
-          <div
-            aria-hidden={rowCopyable ? true : undefined}
-            className={cn(
-              "relative z-10 flex h-7 min-w-0 items-center justify-between gap-2 py-1.5 text-left font-normal text-xs leading-4",
-              rowCopyable
-                ? "pointer-events-none text-zinc-50"
-                : "text-muted-foreground"
-            )}
-            data-copied={copied ? "true" : undefined}
-            data-slot="database-settings-connection-address-value"
-            title={title}
-          >
-            <span className="min-w-0 truncate">{displayValue}</span>
-            <CanvasNode.CopyableRowIndicator />
-          </div>
+          {displayValue === null ? null : (
+            <div
+              aria-hidden={rowCopyable ? true : undefined}
+              className={cn(
+                "relative z-10 flex h-8 min-w-0 items-center justify-between gap-2 py-1.5 text-left text-sm leading-5",
+                rowCopyable
+                  ? "pointer-events-none text-primary"
+                  : "text-muted-foreground"
+              )}
+              data-copied={copied ? "true" : undefined}
+              data-slot="database-settings-connection-address-value"
+              title={title}
+            >
+              <span className="min-w-0 truncate">{displayValue}</span>
+              <CanvasNode.CopyableRowIndicator />
+            </div>
+          )}
         </>
       )}
     </CanvasNode.CopyableRow>
   );
 }
 
+function DatabaseSettingsPublicConnectionSwitch({
+  connection,
+  controlsDisabled,
+  onCheckedChange,
+  publicConnectionEnabled,
+}: {
+  connection: DatabaseNodePublicConnection;
+  controlsDisabled: boolean;
+  onCheckedChange: (nextEnabled: boolean) => void;
+  publicConnectionEnabled: boolean;
+}) {
+  return (
+    <Switch
+      aria-label="Public connection"
+      checked={publicConnectionEnabled}
+      className="shrink-0"
+      disabled={controlsDisabled || connection.publicAccess.loading === true}
+      onCheckedChange={onCheckedChange}
+      size="lg"
+      variant="brand"
+    />
+  );
+}
+
 function DatabaseSettingsConnectionAddressList({
   connections,
+  controlsDisabled,
+  onPublicConnectionChange,
+  publicConnectionEnabled,
 }: {
   connections: readonly DatabaseNodeConnection[];
+  controlsDisabled: boolean;
+  onPublicConnectionChange: (nextEnabled: boolean) => void;
+  publicConnectionEnabled: boolean;
 }) {
   const visibleConnections = connections.filter(shouldShowConnectionAddress);
 
   if (visibleConnections.length === 0) {
     return (
       <div
-        className="flex min-h-11 min-w-0 items-center rounded-lg bg-zinc-950/20 px-2.5 text-muted-foreground text-xs leading-4"
+        className="flex min-h-11 min-w-0 items-center rounded-lg bg-zinc-950/20 px-2.5 text-muted-foreground text-sm leading-5"
         data-slot="database-settings-connection-address-empty"
       >
         No connection addresses
@@ -196,8 +407,11 @@ function DatabaseSettingsConnectionAddressList({
         {visibleConnections.map((connection, index) => (
           <DatabaseSettingsConnectionAddressRow
             connection={connection}
+            controlsDisabled={controlsDisabled}
             index={index}
             key={getDatabaseNodeConnectionKey(connection, index)}
+            onPublicConnectionChange={onPublicConnectionChange}
+            publicConnectionEnabled={publicConnectionEnabled}
           />
         ))}
       </div>
@@ -205,56 +419,61 @@ function DatabaseSettingsConnectionAddressList({
   );
 }
 
-function DatabaseSettingsSlider({
-  ariaLabel,
-  constraint,
-  disabled,
-  icon,
-  label,
-  maxDecimals,
-  onValueChange,
-  value,
+function DatabaseSettingsFooter({
+  canUpdate,
+  dirty,
+  onUpdate,
+  updating,
 }: {
-  ariaLabel: string;
-  constraint: DatabaseSettingsNumberConstraint;
-  disabled: boolean;
-  icon: LucideIcon;
-  label: string;
-  maxDecimals: number;
-  onValueChange: (value: number) => void;
-  value: number;
+  canUpdate: boolean;
+  dirty: boolean;
+  onUpdate: () => void;
+  updating: boolean;
 }) {
   return (
-    <ScaleSlider.Root
-      disabled={disabled}
-      max={constraint.max}
-      maxDecimals={maxDecimals}
-      min={constraint.min}
-      onValueChange={onValueChange}
-      step={constraint.step}
-      value={value}
-      valueDisplay="number"
-    >
-      <ScaleSlider.Stack className="w-full">
-        <ScaleSlider.Header className="min-h-6">
-          <ScaleSlider.Group className="min-w-0 gap-2">
-            <ScaleSlider.Icon className="shrink-0" icon={icon} />
-            <ScaleSlider.Label className="text-card-foreground">
-              {label}
-            </ScaleSlider.Label>
-          </ScaleSlider.Group>
-          <div className="flex h-6 min-w-0 items-center justify-end">
-            <ScaleSlider.Value />
-          </div>
-        </ScaleSlider.Header>
-        <ScaleSlider.Control aria-label={ariaLabel}>
-          <ScaleSlider.Track>
-            <ScaleSlider.Range />
-          </ScaleSlider.Track>
-          <ScaleSlider.Thumb />
-        </ScaleSlider.Control>
-      </ScaleSlider.Stack>
-    </ScaleSlider.Root>
+    <footer className="flex shrink-0 items-center justify-between gap-3 p-2.5">
+      <p
+        className={cn(
+          "min-w-0 truncate text-theme-yellow text-xs leading-4",
+          !dirty && "invisible"
+        )}
+      >
+        Unsaved configuration changes.
+      </p>
+      <Button
+        className="h-9 rounded-lg bg-database-metrics-card px-4 text-primary hover:bg-database-metrics-card/80"
+        disabled={!canUpdate}
+        onClick={onUpdate}
+        type="button"
+        variant="ghost"
+      >
+        <Upload aria-hidden className="size-4" />
+        {updating ? "Updating" : "Update"}
+      </Button>
+    </footer>
+  );
+}
+
+function VisuallyHiddenCloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <Button
+      aria-label="Close database settings"
+      className="sr-only"
+      onClick={onClose}
+      size="icon"
+      type="button"
+      variant="ghost"
+    />
+  );
+}
+
+function DatabaseSettingsPaneLayout({ children }: { children: ReactNode }) {
+  return (
+    <aside className="database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col overflow-hidden border-input border-l px-2.5 py-5 shadow-lg">
+      <div className="scrollbar-chat-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2.5">
+        {children}
+      </div>
+    </aside>
   );
 }
 
@@ -346,12 +565,8 @@ export function DatabaseSettingsPaneContent({
   const dirty = dbSettingsDraftIsDirty(original, draft);
   const canUpdate = canEdit && dirty && !updating && onSubmitPatch != null;
   const statusLabel = data.states.status?.label ?? "Unknown";
-  const subtitle = engineSubtitle(data.states);
+  const subtitle = databaseHeaderSubtitle(data.states);
   const controlsDisabled = !canEdit || updating;
-
-  const handleCancel = useCallback(() => {
-    setDraft(original);
-  }, [original]);
 
   const handleUpdate = useCallback(async () => {
     const patch = buildDbSettingsPatch(original, draft);
@@ -372,209 +587,128 @@ export function DatabaseSettingsPaneContent({
   }, [canEdit, draft, onSubmitPatch, onUpdated, original]);
 
   return (
-    <aside className="database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col gap-6 overflow-hidden px-2.5 py-5 shadow-lg">
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-2.5">
-        <header className="flex shrink-0 items-start justify-between gap-3 px-2.5">
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex min-w-0 items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Settings
-                  aria-hidden
-                  className="size-4 shrink-0 text-database-metrics-chart"
-                />
-                <h2
-                  className="truncate font-semibold text-lg text-primary leading-none"
-                  title={data.states.name}
-                >
-                  {data.states.name}
-                </h2>
-              </div>
-              <span
-                className={cn(
-                  "inline-flex h-5 shrink-0 items-center rounded-full px-2.5 text-xs leading-none",
-                  statusPillClassName(data.states.status)
-                )}
+    <DatabaseSettingsPaneLayout>
+      <VisuallyHiddenCloseButton onClose={onClose} />
+      <header className="flex shrink-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <DatabaseSettingsHeaderIcon iconUrl={data.states.iconUrl} />
+              <h2
+                className="truncate font-semibold text-lg text-primary leading-none"
+                title={data.states.name}
               >
-                {statusLabel}
-              </span>
+                {data.states.name}
+              </h2>
             </div>
-            <p className="truncate text-muted-foreground text-sm leading-5">
-              {subtitle}
-            </p>
+            <span
+              className={cn(
+                "inline-flex h-5 shrink-0 items-center rounded-full px-2.5 text-xs leading-none",
+                statusPillClassName(data.states.status)
+              )}
+            >
+              {statusLabel}
+            </span>
           </div>
-          <Button
-            aria-label="Close database settings"
-            className="hoverable -mt-1 size-7 shrink-0"
-            onClick={onClose}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <X aria-hidden className="size-3.5" />
-          </Button>
-        </header>
+          <p className="truncate text-muted-foreground text-sm leading-5">
+            {subtitle}
+          </p>
+        </div>
+      </header>
 
-        <section className="flex min-w-0 flex-col gap-5 rounded-lg bg-database-metrics-card p-4">
-          <div className="flex min-w-0 items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h3 className="font-medium text-card-foreground text-sm leading-5">
-                Configuration
-              </h3>
-              <p className="text-muted-foreground text-xs leading-4">
-                {dirty ? "Unsaved changes" : "No unsaved changes"}
-              </p>
-            </div>
-            {dirty ? <Badge variant="outline">Draft</Badge> : null}
-          </div>
+      <DatabaseSettingsSection icon={Settings2} title="Replicas & Resources">
+        <DatabaseSettingsSlider
+          ariaLabel="Database replica count"
+          constraint={DB_SETTINGS_REPLICA_COUNT}
+          disabled={controlsDisabled}
+          formatValue={formatReplicasValue}
+          label="Number of Replicas"
+          maxDecimals={0}
+          onValueChange={(value) => {
+            setDraft((current) => ({
+              ...current,
+              replicas: normalizeDbSettingsReplicas(value),
+            }));
+          }}
+          value={draft.replicas}
+        />
+        <DatabaseSettingsSlider
+          ariaLabel="Database CPU limit in cores"
+          constraint={DB_SETTINGS_CPU_LIMIT_CORES}
+          disabled={controlsDisabled}
+          formatValue={formatCpuValue}
+          icon={Cpu}
+          label="CPU"
+          maxDecimals={2}
+          onValueChange={(value) => {
+            setDraft((current) => ({
+              ...current,
+              cpuLimitCores: normalizeDbSettingsCpuLimitCores(value),
+            }));
+          }}
+          value={draft.cpuLimitCores}
+        />
+        <DatabaseSettingsSlider
+          ariaLabel="Database memory limit in Gi"
+          constraint={DB_SETTINGS_MEMORY_LIMIT_GIB}
+          disabled={controlsDisabled}
+          formatBound={formatGiValue}
+          formatValue={formatGiValue}
+          icon={MemoryStick}
+          label="Memory"
+          maxDecimals={1}
+          onValueChange={(value) => {
+            setDraft((current) => ({
+              ...current,
+              memoryLimitGi: normalizeDbSettingsMemoryLimitGi(value),
+            }));
+          }}
+          value={draft.memoryLimitGi}
+        />
+      </DatabaseSettingsSection>
 
-          <Separator />
+      <DatabaseSettingsSection icon={HardDrive} title="Storage">
+        <DatabaseSettingsSlider
+          ariaLabel="Database storage size in Gi"
+          constraint={DB_SETTINGS_STORAGE_GIB}
+          disabled={controlsDisabled}
+          formatBound={formatGiValue}
+          formatValue={formatGiValue}
+          icon={HardDrive}
+          label="Storage"
+          maxDecimals={0}
+          onValueChange={(value) => {
+            setDraft((current) => ({
+              ...current,
+              storageSizeGi: normalizeDbSettingsStorageGi(value),
+            }));
+          }}
+          value={draft.storageSizeGi}
+        />
+      </DatabaseSettingsSection>
 
-          <section className="flex min-w-0 flex-col gap-4">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h4 className="font-medium text-card-foreground text-sm leading-5">
-                Connection Address
-              </h4>
-            </div>
-            <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-zinc-950/20 p-2.5">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="font-medium text-card-foreground text-sm leading-5">
-                  Public connection
-                </span>
-                <span className="text-muted-foreground text-xs leading-4">
-                  {draft.exposeNodePort ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              <Switch
-                aria-label="Public connection"
-                checked={draft.exposeNodePort}
-                className="shrink-0"
-                disabled={controlsDisabled}
-                onCheckedChange={(nextEnabled) => {
-                  setDraft((current) => ({
-                    ...current,
-                    exposeNodePort: nextEnabled,
-                  }));
-                }}
-                size="lg"
-                variant="brand"
-              />
-            </div>
-            <DatabaseSettingsConnectionAddressList
-              connections={data.connections}
-            />
-          </section>
+      <DatabaseSettingsSection icon={Network} title="Connection Address">
+        <DatabaseSettingsConnectionAddressList
+          connections={data.connections}
+          controlsDisabled={controlsDisabled}
+          onPublicConnectionChange={(nextEnabled) => {
+            setDraft((current) => ({
+              ...current,
+              exposeNodePort: nextEnabled,
+            }));
+          }}
+          publicConnectionEnabled={draft.exposeNodePort}
+        />
+      </DatabaseSettingsSection>
 
-          <Separator />
-
-          <section className="flex min-w-0 flex-col gap-4">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h4 className="font-medium text-card-foreground text-sm leading-5">
-                Replicas & Resources
-              </h4>
-              <p className="text-muted-foreground text-xs leading-4">
-                Replicas 1-10 match the DB schema. CPU and memory limit ranges
-                are temporary product defaults for this release.
-              </p>
-            </div>
-            <div className="flex flex-col gap-5">
-              <DatabaseSettingsSlider
-                ariaLabel="Database replica count"
-                constraint={DB_SETTINGS_REPLICA_COUNT}
-                disabled={controlsDisabled}
-                icon={Layers}
-                label="Replicas"
-                maxDecimals={0}
-                onValueChange={(value) => {
-                  setDraft((current) => ({
-                    ...current,
-                    replicas: normalizeDbSettingsReplicas(value),
-                  }));
-                }}
-                value={draft.replicas}
-              />
-              <DatabaseSettingsSlider
-                ariaLabel="Database CPU limit in cores"
-                constraint={DB_SETTINGS_CPU_LIMIT_CORES}
-                disabled={controlsDisabled}
-                icon={Cpu}
-                label="CPU limit (cores)"
-                maxDecimals={2}
-                onValueChange={(value) => {
-                  setDraft((current) => ({
-                    ...current,
-                    cpuLimitCores: normalizeDbSettingsCpuLimitCores(value),
-                  }));
-                }}
-                value={draft.cpuLimitCores}
-              />
-              <DatabaseSettingsSlider
-                ariaLabel="Database memory limit in Gi"
-                constraint={DB_SETTINGS_MEMORY_LIMIT_GIB}
-                disabled={controlsDisabled}
-                icon={MemoryStick}
-                label="Memory limit (Gi)"
-                maxDecimals={1}
-                onValueChange={(value) => {
-                  setDraft((current) => ({
-                    ...current,
-                    memoryLimitGi: normalizeDbSettingsMemoryLimitGi(value),
-                  }));
-                }}
-                value={draft.memoryLimitGi}
-              />
-            </div>
-          </section>
-
-          <Separator />
-
-          <section className="flex min-w-0 flex-col gap-4">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h4 className="font-medium text-card-foreground text-sm leading-5">
-                Storage
-              </h4>
-              <p className="text-muted-foreground text-xs leading-4">
-                Storage is shown in Gi and submitted as a Kubernetes quantity.
-                The 1-100Gi range is a temporary product default.
-              </p>
-            </div>
-            <DatabaseSettingsSlider
-              ariaLabel="Database storage size in Gi"
-              constraint={DB_SETTINGS_STORAGE_GIB}
-              disabled={controlsDisabled}
-              icon={HardDrive}
-              label="Storage size (Gi)"
-              maxDecimals={0}
-              onValueChange={(value) => {
-                setDraft((current) => ({
-                  ...current,
-                  storageSizeGi: normalizeDbSettingsStorageGi(value),
-                }));
-              }}
-              value={draft.storageSizeGi}
-            />
-          </section>
-
-          {readOnly ? null : (
-            <div className="flex shrink-0 items-center justify-end gap-2">
-              <Button
-                disabled={!dirty || updating}
-                onClick={handleCancel}
-                type="button"
-                variant="ghost"
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={!canUpdate}
-                onClick={handleUpdate}
-                type="button"
-              >
-                Update
-              </Button>
-            </div>
-          )}
-        </section>
-      </div>
-    </aside>
+      {readOnly ? null : (
+        <DatabaseSettingsFooter
+          canUpdate={canUpdate}
+          dirty={dirty}
+          onUpdate={handleUpdate}
+          updating={updating}
+        />
+      )}
+    </DatabaseSettingsPaneLayout>
   );
 }
