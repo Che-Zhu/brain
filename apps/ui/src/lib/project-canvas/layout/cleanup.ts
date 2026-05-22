@@ -22,6 +22,9 @@ export function cloneCanvasLayoutNode(
   if (node.orphanedAt !== undefined) {
     clone.orphanedAt = node.orphanedAt;
   }
+  if (node.stackOrder !== undefined) {
+    clone.stackOrder = node.stackOrder;
+  }
   return clone;
 }
 

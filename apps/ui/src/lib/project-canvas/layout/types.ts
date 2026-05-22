@@ -17,6 +17,7 @@ export interface CanvasLayoutNode {
   orphanedAt?: string;
   position: CanvasLayoutPosition;
   ref: CanvasLayoutResourceRef;
+  stackOrder?: number;
 }
 
 export interface CanvasLayoutDocument {

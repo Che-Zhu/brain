@@ -1,0 +1,97 @@
+import type { Node } from "@xyflow/react";
+import {
+  canvasLayoutResourceKey,
+  canvasLayoutResourceRefFromNode,
+} from "./placement";
+import {
+  bringCanvasStackOrderItemToFront,
+  type CanvasStackOrderItem,
+  resolveCanvasStackOrderRanks,
+} from "./stack-order";
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+export function canvasNodeStackOrder(node: Node): number | undefined {
+  const layout = asRecord(asRecord(node.data)?.layout);
+  const stackOrder = layout?.stackOrder;
+  return Number.isFinite(stackOrder) && Number.isInteger(stackOrder)
+    ? stackOrder
+    : undefined;
+}
+
+function canvasStackOrderItemsFromNodes(
+  nodes: readonly Node[]
+): CanvasStackOrderItem[] {
+  return nodes.flatMap((node) => {
+    const ref = canvasLayoutResourceRefFromNode(node);
+    if (ref === undefined) {
+      return [];
+    }
+    return [
+      {
+        key: node.id,
+        ref,
+        stackOrder: canvasNodeStackOrder(node),
+      },
+    ];
+  });
+}
+
+export function nodeWithCanvasStackOrder(node: Node, stackOrder: number): Node {
+  const data = asRecord(node.data) ?? {};
+  const layout = asRecord(data.layout) ?? {};
+  return {
+    ...node,
+    data: {
+      ...data,
+      layout: {
+        ...layout,
+        stackOrder,
+      },
+    },
+  };
+}
+
+export function applyCanvasStackOrderToNodes(nodes: readonly Node[]): Node[] {
+  const ranks = resolveCanvasStackOrderRanks(
+    canvasStackOrderItemsFromNodes(nodes)
+  );
+  return nodes.map((node) => {
+    const zIndex = ranks.get(node.id);
+    return zIndex === undefined ? { ...node } : { ...node, zIndex };
+  });
+}
+
+export function canvasNodeResourceStackKey(node: Node): string | undefined {
+  const ref = canvasLayoutResourceRefFromNode(node);
+  return ref === undefined ? undefined : canvasLayoutResourceKey(ref);
+}
+
+export function bringCanvasNodeToFrontInStackOrder(
+  nodes: readonly Node[],
+  nodeId: string
+): { changed: boolean; node?: Node; nodes: Node[] } {
+  const result = bringCanvasStackOrderItemToFront(
+    canvasStackOrderItemsFromNodes(nodes),
+    nodeId
+  );
+  if (!result.changed || result.stackOrder === undefined) {
+    return { changed: false, nodes: applyCanvasStackOrderToNodes(nodes) };
+  }
+
+  const nextNodes = nodes.map((node) =>
+    node.id === nodeId
+      ? nodeWithCanvasStackOrder(node, result.stackOrder)
+      : node
+  );
+  const rankedNodes = applyCanvasStackOrderToNodes(nextNodes);
+  return {
+    changed: true,
+    node: rankedNodes.find((node) => node.id === nodeId),
+    nodes: rankedNodes,
+  };
+}

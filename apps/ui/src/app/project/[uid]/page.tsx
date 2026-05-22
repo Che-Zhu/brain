@@ -97,6 +97,7 @@ export default function ProjectUidPage() {
     namespace,
     onNodeExpansionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
+    onNodeStackOrderChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onPendingApDbReferencesStart: beginPendingApDbReferences,
     refreshWorkloadLists,
   });

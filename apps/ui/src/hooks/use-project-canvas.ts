@@ -42,6 +42,13 @@ import {
 import type { PendingApDbCanvasReference } from "@/lib/project-canvas/flow/pending-connections";
 import { dbDsnReferenceSourcesFromDbsData } from "@/lib/project-canvas/k8s/db-dsn-reference-sources";
 import {
+  applyCanvasStackOrderToNodes,
+  bringCanvasNodeToFrontInStackOrder,
+  canvasNodeResourceStackKey,
+  canvasNodeStackOrder,
+  nodeWithCanvasStackOrder,
+} from "@/lib/project-canvas/layout/node-stack-order";
+import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
@@ -68,6 +75,7 @@ export interface UseProjectCanvasOptions {
   namespace?: string;
   onNodeExpansionChange?: (node: Node) => void;
   onNodePositionChange?: (node: Node) => void;
+  onNodeStackOrderChange?: (node: Node) => void;
   onPendingApDbReferencesStart?: (
     references: readonly PendingApDbCanvasReference[]
   ) => (() => void) | undefined;
@@ -223,6 +231,9 @@ export function useProjectCanvas(
   const [connectionOrigin, setConnectionOrigin] =
     useState<ProjectCanvasConnectionOrigin | null>(null);
   const [connectionGestureActive, setConnectionGestureActive] = useState(false);
+  const [localStackOrderByRef, setLocalStackOrderByRef] = useState<
+    ReadonlyMap<string, number>
+  >(() => new Map());
   const [pendingAddDbDsnReferenceIntent, setPendingAddDbDsnReferenceIntent] =
     useState<PendingAddDbDsnReferenceIntent | null>(null);
 
@@ -255,6 +266,7 @@ export function useProjectCanvas(
   const onPendingApDbReferencesStart = options?.onPendingApDbReferencesStart;
   const onNodeExpansionChange = options?.onNodeExpansionChange;
   const onNodePositionChange = options?.onNodePositionChange;
+  const onNodeStackOrderChange = options?.onNodeStackOrderChange;
   const dbDsnReferenceSources = useMemo(
     () =>
       dbDsnReferenceSourcesFromDbsData(options?.dbsData, options?.namespace),
@@ -608,9 +620,21 @@ export function useProjectCanvas(
     [onNodeExpansionChange, readOnly]
   );
 
+  const stackOrderedRawNodes = useMemo(() => {
+    const overridden = rawNodes.map((node) => {
+      const key = canvasNodeResourceStackKey(node);
+      const stackOrder =
+        key === undefined ? undefined : localStackOrderByRef.get(key);
+      return stackOrder === undefined
+        ? node
+        : nodeWithCanvasStackOrder(node, stackOrder);
+    });
+    return applyCanvasStackOrderToNodes(overridden);
+  }, [localStackOrderByRef, rawNodes]);
+
   const nodes = useMemo(
     () =>
-      rawNodes.map((node): Node => {
+      stackOrderedRawNodes.map((node): Node => {
         const layoutNode = decorateLayoutNode(node);
 
         if (layoutNode.type === CANVAS_DATABASE_NODE_TYPE) {
@@ -623,7 +647,12 @@ export function useProjectCanvas(
 
         return layoutNode;
       }),
-    [decorateContainerNode, decorateDatabaseNode, decorateLayoutNode, rawNodes]
+    [
+      decorateContainerNode,
+      decorateDatabaseNode,
+      decorateLayoutNode,
+      stackOrderedRawNodes,
+    ]
   );
 
   const selectedNode = useMemo<CanvasSelectedNode>(() => {
@@ -634,6 +663,46 @@ export function useProjectCanvas(
       nodes.find((n) => projectCanvasNodeServiceUid(n) === serviceUid) ?? null
     );
   }, [serviceUid, nodes]);
+
+  const frontCanvasNode = useCallback(
+    (node: Node) => {
+      const sourceNodes = nodes.map((candidate) =>
+        candidate.id === node.id
+          ? { ...candidate, position: { ...node.position } }
+          : candidate
+      );
+      const result = bringCanvasNodeToFrontInStackOrder(sourceNodes, node.id);
+      const nextNode = result.node;
+      if (!result.changed || nextNode === undefined) {
+        return;
+      }
+
+      const key = canvasNodeResourceStackKey(nextNode);
+      const stackOrder = canvasNodeStackOrder(nextNode);
+      if (key !== undefined && stackOrder !== undefined) {
+        setLocalStackOrderByRef((current) => {
+          if (current.get(key) === stackOrder) {
+            return current;
+          }
+          const next = new Map(current);
+          next.set(key, stackOrder);
+          return next;
+        });
+      }
+
+      if (!readOnly) {
+        onNodeStackOrderChange?.(nextNode);
+      }
+    },
+    [nodes, onNodeStackOrderChange, readOnly]
+  );
+
+  useEffect(() => {
+    if (selectedNode == null) {
+      return;
+    }
+    frontCanvasNode(selectedNode);
+  }, [frontCanvasNode, selectedNode]);
 
   const handleConnect = useCallback<
     NonNullable<CanvasReactFlowProps["onConnect"]>
@@ -828,6 +897,7 @@ export function useProjectCanvas(
           ? undefined
           : projectCanvasConnectionLine,
         onNodeClick: (_, node: Node) => {
+          frontCanvasNode(node);
           setSelectedEdge(null);
           if (node.type !== CANVAS_DATABASE_NODE_TYPE) {
             setDatabasePane(null).catch(() => undefined);
@@ -835,6 +905,9 @@ export function useProjectCanvas(
           setServiceUid(projectCanvasNodeServiceUid(node)).catch(
             () => undefined
           );
+        },
+        onNodeDragStart: (_, node: Node) => {
+          frontCanvasNode(node);
         },
         onEdgeClick: (_, edge: Edge) => {
           setSelectedEdge(edge);
@@ -852,6 +925,7 @@ export function useProjectCanvas(
     [
       clearSelection,
       connectionGestureActive,
+      frontCanvasNode,
       handleConnect,
       handleConnectEnd,
       handleConnectStart,

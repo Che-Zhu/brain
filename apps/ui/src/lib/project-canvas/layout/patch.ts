@@ -1,5 +1,6 @@
 import { cleanupCanvasLayoutDocument } from "./cleanup";
 import { canvasLayoutResourceKey } from "./placement";
+import { normalizeCanvasLayoutStackOrders } from "./stack-order";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutNode,
@@ -45,6 +46,20 @@ function normalizeOptionalTimestamp(
   return trimmed;
 }
 
+function normalizeOptionalStackOrder(
+  value: number | undefined
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!(Number.isFinite(value) && Number.isInteger(value))) {
+    throw new CanvasLayoutValidationError(
+      "stackOrder must be a finite integer."
+    );
+  }
+  return value;
+}
+
 function normalizeRef(ref: CanvasLayoutResourceRef): CanvasLayoutResourceRef {
   return {
     kind: ref.kind,
@@ -61,12 +76,14 @@ function normalizeNode(node: CanvasLayoutNode): CanvasLayoutNode {
   }
   const lastSeenUid = optionalTrimmed(node.lastSeenUid);
   const orphanedAt = normalizeOptionalTimestamp(node.orphanedAt, "orphanedAt");
+  const stackOrder = normalizeOptionalStackOrder(node.stackOrder);
   return {
     ...(node.expanded === undefined ? {} : { expanded: node.expanded }),
     ...(lastSeenUid === undefined ? {} : { lastSeenUid }),
     ...(orphanedAt === undefined ? {} : { orphanedAt }),
     position: { x, y },
     ref: normalizeRef(node.ref),
+    ...(stackOrder === undefined ? {} : { stackOrder }),
   };
 }
 
@@ -106,10 +123,12 @@ export function applyCanvasLayoutPatch(
 
   const next = {
     namespace: assertNonEmpty(existing.namespace, "namespace"),
-    nodes: order.flatMap((key) => {
-      const node = nextByRef.get(key);
-      return node === undefined ? [] : [node];
-    }),
+    nodes: normalizeCanvasLayoutStackOrders(
+      order.flatMap((key) => {
+        const node = nextByRef.get(key);
+        return node === undefined ? [] : [node];
+      })
+    ),
     ...(projectNameSnapshot === undefined ? {} : { projectNameSnapshot }),
     projectUid: assertNonEmpty(existing.projectUid, "project UID"),
     version: existing.version + 1,
