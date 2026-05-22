@@ -39,6 +39,7 @@ const BINARY_QUANTITY_PATTERN = /^([0-9]+(?:\.[0-9]+)?)(Ki|Mi|Gi|Ti)?$/i;
 
 export interface DatabaseSettingsDraft {
   cpuLimitCores: number;
+  exposeNodePort: boolean;
   memoryLimitGi: number;
   replicas: number;
   storageSizeGi: number;
@@ -47,6 +48,7 @@ export interface DatabaseSettingsDraft {
 export interface DatabaseSettingsPatch {
   spec: Partial<{
     cpuLimit: string;
+    exposeNodePort: boolean;
     memoryLimit: string;
     replicas: number;
     storageSize: string;
@@ -191,6 +193,7 @@ export function dbSettingsStorageQuantity(storageGi: number): string {
 function normalizeDraft(draft: DatabaseSettingsDraft): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(draft.cpuLimitCores),
+    exposeNodePort: draft.exposeNodePort === true,
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(draft.memoryLimitGi),
     replicas: normalizeDbSettingsReplicas(draft.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(draft.storageSizeGi),
@@ -202,6 +205,7 @@ export function dbSettingsDraftFromNodeData({
 }: Pick<CanvasDatabaseNodeData, "desired">): DatabaseSettingsDraft {
   return {
     cpuLimitCores: normalizeDbSettingsCpuLimitCores(desired?.cpuLimit),
+    exposeNodePort: desired?.exposeNodePort === true,
     memoryLimitGi: normalizeDbSettingsMemoryLimitGi(desired?.memoryLimit),
     replicas: normalizeDbSettingsReplicas(desired?.replicas),
     storageSizeGi: normalizeDbSettingsStorageGi(desired?.storageSize),
@@ -216,6 +220,7 @@ export function dbSettingsDraftIsDirty(
   const normalizedDraft = normalizeDraft(draft);
   return (
     normalizedOriginal.cpuLimitCores !== normalizedDraft.cpuLimitCores ||
+    normalizedOriginal.exposeNodePort !== normalizedDraft.exposeNodePort ||
     normalizedOriginal.memoryLimitGi !== normalizedDraft.memoryLimitGi ||
     normalizedOriginal.replicas !== normalizedDraft.replicas ||
     normalizedOriginal.storageSizeGi !== normalizedDraft.storageSizeGi
@@ -232,6 +237,9 @@ export function buildDbSettingsPatch(
 
   if (normalizedOriginal.replicas !== normalizedDraft.replicas) {
     spec.replicas = normalizedDraft.replicas;
+  }
+  if (normalizedOriginal.exposeNodePort !== normalizedDraft.exposeNodePort) {
+    spec.exposeNodePort = normalizedDraft.exposeNodePort;
   }
   if (normalizedOriginal.cpuLimitCores !== normalizedDraft.cpuLimitCores) {
     spec.cpuLimit = dbSettingsCpuLimitQuantity(normalizedDraft.cpuLimitCores);

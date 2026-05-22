@@ -70,6 +70,7 @@ export interface CanvasDatabaseNodeData extends Record<string, unknown> {
   desired?: {
     cpuLimit?: string;
     cpuRequest?: string;
+    exposeNodePort?: boolean;
     memoryLimit?: string;
     memoryRequest?: string;
     replicas?: number;

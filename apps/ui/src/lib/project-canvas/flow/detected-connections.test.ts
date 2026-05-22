@@ -51,6 +51,128 @@ test("canvas connections detect AP to DB edges from exact DB DSN env values and 
   );
 });
 
+test("canvas connections stay resource-backed when DB public access desired state changes", () => {
+  const apsData = {
+    items: [
+      {
+        metadata: { name: "api", namespace: "default" },
+        spec: {
+          input: {
+            env: [
+              { name: "DATABASE_URL", value: "postgres://private" },
+              { name: "DATABASE_PUBLIC_URL", value: "postgres://public" },
+            ],
+          },
+        },
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData: {
+        items: [
+          {
+            metadata: { name: "postgres", namespace: "default" },
+            spec: { exposeNodePort: false },
+            status: { connectionStringPrivate: "postgres://private" },
+          },
+        ],
+      },
+      entryPointsData: undefined,
+    }),
+    [
+      {
+        kind: "APToDB",
+        source: { kind: "AP", name: "api", namespace: "default" },
+        target: { kind: "DB", name: "postgres", namespace: "default" },
+      },
+    ]
+  );
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData: {
+        items: [
+          {
+            metadata: { name: "postgres", namespace: "default" },
+            spec: { exposeNodePort: true },
+            status: { connectionStringPrivate: "postgres://private" },
+          },
+        ],
+      },
+      entryPointsData: undefined,
+    }),
+    [
+      {
+        kind: "APToDB",
+        source: { kind: "AP", name: "api", namespace: "default" },
+        target: { kind: "DB", name: "postgres", namespace: "default" },
+      },
+    ]
+  );
+});
+
+test("canvas connections detect public DB bindings only after resource status has a public DSN", () => {
+  const apsData = {
+    items: [
+      {
+        metadata: { name: "api", namespace: "default" },
+        spec: {
+          input: {
+            env: [{ name: "DATABASE_URL", value: "postgres://public" }],
+          },
+        },
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData: {
+        items: [
+          {
+            metadata: { name: "postgres", namespace: "default" },
+            spec: { exposeNodePort: true },
+            status: { connectionStringPrivate: "postgres://private" },
+          },
+        ],
+      },
+      entryPointsData: undefined,
+    }),
+    []
+  );
+
+  assert.deepEqual(
+    detectCanvasConnections({
+      apsData,
+      dbsData: {
+        items: [
+          {
+            metadata: { name: "postgres", namespace: "default" },
+            spec: { exposeNodePort: true },
+            status: {
+              connectionStringPrivate: "postgres://private",
+              connectionStringPublic: "postgres://public",
+            },
+          },
+        ],
+      },
+      entryPointsData: undefined,
+    }),
+    [
+      {
+        kind: "APToDB",
+        source: { kind: "AP", name: "api", namespace: "default" },
+        target: { kind: "DB", name: "postgres", namespace: "default" },
+      },
+    ]
+  );
+});
+
 test("canvas connections detect primitive Secret-backed AP to DB edges and de-duplicate each pair", () => {
   const apsData = {
     items: [

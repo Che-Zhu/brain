@@ -190,6 +190,7 @@ test("DB canvas nodes preserve desired replicas and effective resources for sett
           metadata: { name: "postgres", namespace: "default", uid: "db-uid" },
           spec: {
             engine: "postgresql",
+            exposeNodePort: true,
             replicas: 3,
           },
           status: {
@@ -218,6 +219,7 @@ test("DB canvas nodes preserve desired replicas and effective resources for sett
     ).desired,
     {
       cpuLimit: "1000m",
+      exposeNodePort: true,
       memoryLimit: "2Gi",
       replicas: 3,
       storageSize: "20Gi",

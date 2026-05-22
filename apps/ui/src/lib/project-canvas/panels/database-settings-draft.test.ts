@@ -24,6 +24,7 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
     }),
     {
       cpuLimitCores: 0.5,
+      exposeNodePort: false,
       memoryLimitGi: 1,
       replicas: 10,
       storageSizeGi: 3,
@@ -37,6 +38,7 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
     }),
     {
       cpuLimitCores: 0.5,
+      exposeNodePort: false,
       memoryLimitGi: 1,
       replicas: 1,
       storageSizeGi: 3,
@@ -46,7 +48,7 @@ test("DB settings draft initializes bounded replicas from desired state", () => 
 
 test("DB settings draft detects replica changes and builds focused patches", () => {
   const data = {
-    desired: { replicas: 2 },
+    desired: { exposeNodePort: false, replicas: 2 },
     states: { displayEngine: "PostgreSQL", name: "postgres" },
   };
   const original = dbSettingsDraftFromNodeData(data);
@@ -62,6 +64,40 @@ test("DB settings draft detects replica changes and builds focused patches", () 
     buildDbSettingsPatch(original, { ...original, replicas: 3 }),
     {
       spec: { replicas: 3 },
+    }
+  );
+});
+
+test("DB settings draft detects public connection changes and builds combined patches", () => {
+  const original = dbSettingsDraftFromNodeData({
+    desired: {
+      cpuLimit: "1",
+      exposeNodePort: false,
+      memoryLimit: "2Gi",
+      replicas: 2,
+      storageSize: "20Gi",
+    },
+    states: { displayEngine: "PostgreSQL", name: "postgres" },
+  });
+
+  assert.equal(original.exposeNodePort, false);
+  assert.equal(
+    dbSettingsDraftIsDirty(original, { ...original, exposeNodePort: true }),
+    true
+  );
+  assert.deepEqual(
+    buildDbSettingsPatch(original, {
+      ...original,
+      exposeNodePort: true,
+      replicas: 3,
+      storageSizeGi: 25,
+    }),
+    {
+      spec: {
+        exposeNodePort: true,
+        replicas: 3,
+        storageSize: "25Gi",
+      },
     }
   );
 });
@@ -93,6 +129,7 @@ test("DB settings draft normalizes resource and storage values into focused patc
 
   assert.deepEqual(original, {
     cpuLimitCores: 1.5,
+    exposeNodePort: false,
     memoryLimitGi: 2,
     replicas: 2,
     storageSizeGi: 20,

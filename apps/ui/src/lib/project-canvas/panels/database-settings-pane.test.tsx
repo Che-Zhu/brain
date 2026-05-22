@@ -1,0 +1,129 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { DatabaseSettingsPaneContent } from "./database-settings-pane";
+
+const noop = () => {
+  /* test noop */
+};
+
+const CONNECTION_ADDRESS_RE = /Connection Address/;
+const PRIVATE_CONNECTION_RE = /Private connection/;
+const PUBLIC_CONNECTION_RE = /Public connection/;
+const MASKED_PRIVATE_CONNECTION_RE =
+  /postgres:\/\/u\*\*\*\*\*\*\*:.*?@postgres.default.svc/;
+const MASKED_PUBLIC_CONNECTION_RE =
+  /postgres:\/\/u\*\*\*\*\*\*\*:.*?@db.example.com/;
+const COPY_PRIVATE_CONNECTION_RE = /aria-label="Copy Private connection"/;
+const COPY_PUBLIC_CONNECTION_RE = /aria-label="Copy Public connection"/;
+const PUBLIC_CONNECTION_SWITCH_RE = /aria-label="Public connection"/;
+const DISABLED_RE = /disabled=""/;
+const UPDATE_BUTTON_RE = />Update</;
+const CANCEL_BUTTON_RE = />Cancel</;
+const PROVISIONING_CONNECTION_RE = /Provisioning connection string/;
+
+const BASE_DATA = {
+  connections: [
+    {
+      id: "private",
+      kind: "private",
+      label: "Private connection",
+      value: "postgres://user:secret@postgres.default.svc:5432/app",
+    },
+    {
+      id: "public",
+      kind: "public",
+      label: "Public connection",
+      publicAccess: { enabled: true },
+      value: "postgres://user:secret@db.example.com:30432/app",
+    },
+  ],
+  desired: {
+    cpuLimit: "1",
+    exposeNodePort: true,
+    memoryLimit: "2Gi",
+    replicas: 2,
+    storageSize: "20Gi",
+  },
+  states: {
+    displayEngine: "PostgreSQL",
+    name: "postgres",
+    status: { label: "Running", tone: "running" },
+  },
+  workload: { name: "postgres", namespace: "default" },
+} satisfies CanvasDatabaseNodeData;
+
+function renderPane(
+  element: ReactElement = (
+    <DatabaseSettingsPaneContent
+      data={BASE_DATA}
+      onClose={noop}
+      onSubmitPatch={noop}
+    />
+  )
+): string {
+  return renderToStaticMarkup(element);
+}
+
+test("database settings pane renders copyable connection address rows", () => {
+  const html = renderPane();
+
+  assert.match(html, CONNECTION_ADDRESS_RE);
+  assert.match(html, PRIVATE_CONNECTION_RE);
+  assert.match(html, PUBLIC_CONNECTION_RE);
+  assert.match(html, MASKED_PRIVATE_CONNECTION_RE);
+  assert.match(html, MASKED_PUBLIC_CONNECTION_RE);
+  assert.match(html, COPY_PRIVATE_CONNECTION_RE);
+  assert.match(html, COPY_PUBLIC_CONNECTION_RE);
+});
+
+test("database settings pane hides unprovisioned public address while public access is off", () => {
+  const html = renderPane(
+    <DatabaseSettingsPaneContent
+      data={{
+        ...BASE_DATA,
+        connections: [
+          BASE_DATA.connections[0],
+          {
+            id: "public",
+            kind: "public",
+            label: "Public connection",
+            publicAccess: { enabled: false },
+          },
+        ],
+        desired: { ...BASE_DATA.desired, exposeNodePort: false },
+      }}
+      onClose={noop}
+      onSubmitPatch={noop}
+    />
+  );
+
+  assert.match(html, CONNECTION_ADDRESS_RE);
+  assert.match(html, PRIVATE_CONNECTION_RE);
+  assert.doesNotMatch(html, PROVISIONING_CONNECTION_RE);
+  assert.doesNotMatch(html, COPY_PUBLIC_CONNECTION_RE);
+});
+
+test("read-only database settings pane renders addresses without mutation controls", () => {
+  const html = renderPane(
+    <DatabaseSettingsPaneContent
+      data={{
+        ...BASE_DATA,
+        settingsAccess: { readOnly: true, shareToken: "preview-token" },
+      }}
+      onClose={noop}
+      onSubmitPatch={noop}
+    />
+  );
+
+  assert.match(html, CONNECTION_ADDRESS_RE);
+  assert.match(html, COPY_PRIVATE_CONNECTION_RE);
+  assert.match(html, COPY_PUBLIC_CONNECTION_RE);
+  assert.match(html, PUBLIC_CONNECTION_SWITCH_RE);
+  assert.match(html, DISABLED_RE);
+  assert.doesNotMatch(html, UPDATE_BUTTON_RE);
+  assert.doesNotMatch(html, CANCEL_BUTTON_RE);
+});
