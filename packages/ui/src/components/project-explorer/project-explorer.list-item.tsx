@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Button } from "@workspace/ui/components/button";
+import { CanvasNodeStatusDot } from "@workspace/ui/components/canvas-node/canvas-node.status";
 import {
   Dialog,
   DialogContent,
@@ -119,6 +120,10 @@ export function ProjectExplorerListItem({
       data-slot="project-explorer-item"
     >
       <div className="hoverable flex min-w-0 items-center gap-2 rounded-xl p-2 sm:gap-3">
+        <CanvasNodeStatusDot
+          size="small"
+          status={{ label: "", visualTone: project.status }}
+        />
         <div
           className={cn(
             "flex min-w-0 flex-1 flex-row items-baseline justify-between gap-3 text-start",

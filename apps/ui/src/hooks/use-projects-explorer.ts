@@ -2,11 +2,15 @@
 
 import { API_ROUTES } from "@workspace/api/constants";
 import { fetcher } from "@workspace/api/fetch";
+import { useApsK8sList, useDbsK8sList } from "@workspace/api/hooks";
+import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import {
+  type K8sGetResponse,
   k8sGetQuerySchema,
   k8sGetResponseSchema,
 } from "@workspace/api/schemas/k8s-get";
 import { ApiUrl } from "@workspace/api/utils";
+import { PROJECT_UID_LABEL } from "@workspace/crossplane/constants";
 import type {
   ProjectExplorerActions,
   ProjectExplorerProject,
@@ -18,10 +22,47 @@ import { toast } from "sonner";
 import useSWR from "swr";
 
 import {
+  aggregateProjectStatuses,
+  type ProjectWorkloadStatusInput,
+} from "@/lib/project-aggregate-status";
+import {
   PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
   projectsListToExplorerProjects,
 } from "@/lib/projects-to-explorer-projects";
 import { openRightPane } from "@/store/layout-store";
+
+/**
+ * Extracts `{ projectUid, phase, paused }` per workload from an AP or DB list
+ * response. Items without a `crossplane.io/project-uid` label are skipped
+ * (they aren't tied to any Project row, so they cannot contribute).
+ */
+function projectWorkloadsFromList(
+  data: K8sGetResponse | undefined
+): ProjectWorkloadStatusInput[] {
+  const items = apItemsFromList(data);
+  const result: ProjectWorkloadStatusInput[] = [];
+  for (const raw of items) {
+    if (raw == null || typeof raw !== "object") {
+      continue;
+    }
+    const item = raw as Record<string, unknown>;
+    const meta = item.metadata as Record<string, unknown> | undefined;
+    const labels = meta?.labels as Record<string, unknown> | undefined;
+    const projectUid = labels?.[PROJECT_UID_LABEL];
+    if (typeof projectUid !== "string" || projectUid === "") {
+      continue;
+    }
+    const status = item.status as Record<string, unknown> | undefined;
+    const phaseRaw = status?.phase;
+    const spec = item.spec as Record<string, unknown> | undefined;
+    result.push({
+      projectUid,
+      phase: typeof phaseRaw === "string" ? phaseRaw : undefined,
+      paused: spec?.paused === true,
+    });
+  }
+  return result;
+}
 
 function projectResourceName(p: ProjectExplorerProject): string {
   return p.resourceName ?? p.name;
@@ -38,7 +79,7 @@ export function useProjectsExplorer(options: {
   actions: ProjectExplorerActions;
   states: ProjectExplorerStates;
   /** Revalidate the projects list (e.g. after creating a project). */
-  refreshProjects: () => Promise<ProjectExplorerProject[] | undefined>;
+  refreshProjects: () => Promise<unknown>;
 } {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,10 +97,10 @@ export function useProjectsExplorer(options: {
     [ns]
   );
 
-  const { data: projects, mutate } = useSWR(
+  const { data: rawProjects, mutate } = useSWR(
     hasKubeconfig ? ([API_ROUTES.k8s.get, getParams] as const) : null,
     () =>
-      fetcher<ProjectExplorerProject[]>({
+      fetcher<K8sGetResponse>({
         base: ApiUrl(),
         path: API_ROUTES.k8s.get,
         query: { ...getParams },
@@ -67,14 +108,44 @@ export function useProjectsExplorer(options: {
           Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
         },
         method: "GET",
-        select: (raw) =>
-          projectsListToExplorerProjects(k8sGetResponseSchema.parse(raw)),
+        select: (raw) => k8sGetResponseSchema.parse(raw),
       })
+  );
+
+  // Project Aggregate Status fan-out — see ADR-0007. We list every AP/DB in
+  // the namespace that carries a `crossplane.io/project-uid` label and join in
+  // memory; project names render as soon as the projects request resolves and
+  // dots fill in when these arrive.
+  const projectUidLabelExistence = PROJECT_UID_LABEL;
+  const { data: apsData } = useApsK8sList({
+    kubeconfig,
+    labelSelector: projectUidLabelExistence,
+    namespace: ns,
+  });
+  const { data: dbsData } = useDbsK8sList({
+    kubeconfig,
+    labelSelector: projectUidLabelExistence,
+    namespace: ns,
+  });
+
+  const statusByProjectUid = useMemo(() => {
+    if (apsData === undefined && dbsData === undefined) {
+      return undefined;
+    }
+    return aggregateProjectStatuses([
+      ...projectWorkloadsFromList(apsData),
+      ...projectWorkloadsFromList(dbsData),
+    ]);
+  }, [apsData, dbsData]);
+
+  const projects = useMemo<ProjectExplorerProject[]>(
+    () => projectsListToExplorerProjects(rawProjects, statusByProjectUid),
+    [rawProjects, statusByProjectUid]
   );
 
   const states = useMemo(
     (): ProjectExplorerStates => ({
-      projects: projects ?? [],
+      projects,
     }),
     [projects]
   );

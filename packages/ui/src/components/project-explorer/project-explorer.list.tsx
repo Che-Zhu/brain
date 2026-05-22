@@ -7,7 +7,7 @@ import { ProjectExplorerListItem } from "./project-explorer.list-item";
 import type { ProjectExplorerProject } from "./project-explorer.types";
 
 const DEFAULT_EMPTY_TITLE = "No projects yet";
-const DEFAULT_EMPTY_DESCRIPTION = "Create a project to see it here.";
+const DEFAULT_EMPTY_DESCRIPTION = "Tell me what you want to build";
 const NO_MATCH_TITLE = "No matching projects";
 const NO_MATCH_DESCRIPTION = "Try a different search.";
 

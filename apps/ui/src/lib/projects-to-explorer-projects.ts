@@ -1,6 +1,8 @@
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type { ProjectExplorerProject } from "@workspace/ui/components/project-explorer/project-explorer";
 
+import type { VisualTone } from "./project-aggregate-status";
+
 /** Key on `metadata.annotations` for the UI display name (merge-patched on rename). */
 export const PROJECT_DISPLAY_NAME_ANNOTATION_KEY = "displayName";
 
@@ -60,9 +62,14 @@ function projectExplorerDisplayName(item: ProjectListItem): string | undefined {
 /**
  * Maps a Project list (or unknown k8s get / SWR `data` payload) into
  * {@link ProjectExplorerProject} rows for {@link ProjectExplorer}.
+ *
+ * When `statusByProjectUid` is provided, each row's `status` is set from the
+ * map keyed by project UID (rows with no entry are left without a status,
+ * which the renderer treats as a static neutral dot).
  */
 export function projectsListToExplorerProjects(
-  data: K8sGetResponse | undefined
+  data: K8sGetResponse | undefined,
+  statusByProjectUid?: ReadonlyMap<string, VisualTone>
 ): ProjectExplorerProject[] {
   const items = getProjectItems(data);
   if (!items) {
@@ -83,11 +90,13 @@ export function projectsListToExplorerProjects(
     }
     const createdAt = meta.creationTimestamp ?? "";
     const specPublic = item.spec?.public;
+    const status = statusByProjectUid?.get(id);
     const base: ProjectExplorerProject = {
       id,
       name,
       createdAt,
       ...(resourceName === undefined ? {} : { resourceName }),
+      ...(status === undefined ? {} : { status }),
     };
     if (specPublic === null || specPublic === undefined) {
       return base;

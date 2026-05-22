@@ -73,7 +73,10 @@ export default function ProjectIndexPage() {
       )}
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 p-6">
         <ProjectExplorer.Root actions={explorerActions} states={states}>
-          <ProjectExplorer.Variant1 className="w-full min-w-0 max-w-2xl flex-1" />
+          <ProjectExplorer.Variant1
+            className="w-full min-w-0 max-w-4xl flex-1"
+            headerDescription="View existing projects or create a new one."
+          />
         </ProjectExplorer.Root>
       </div>
 

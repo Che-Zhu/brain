@@ -91,6 +91,10 @@ A temporary canvas interaction created when a user drags a line between canvas n
 
 A normalized time-series representation of workload resource usage for AP and DB workloads. It is consumed by both compact canvas node summaries and detailed metrics panels.
 
+### Project Aggregate Status
+
+A derived health tone for one Project row in the project list, computed from the phases of the Project's APs and DBs. It is not a field on the Project resource; it is computed in the UI from sibling workload lists. It expresses "are the workloads inside this project healthy", which is what users look at on the list, and is distinct from the Project composite's own `status.conditions[Ready]` (which only reflects whether the Project composition itself reconciled).
+
 ### Custom Domain Binding (future, not yet implemented)
 
 The process of attaching a Custom Domain as a Public Address for an AP. Blocked on cert-manager infrastructure. When implemented, the desired-state location will be decided by the Custom Domain PRD; the lifecycle still includes:
@@ -387,3 +391,19 @@ Canvas telemetry snapshots use instant telemetry queries and return only the lat
 ### Custom domain implementation is deferred
 
 Custom Domain desired-state shape and resource ownership are intentionally deferred until DNS verification and certificate infrastructure are designed. Implementation requires cert-manager + Let's Encrypt infrastructure that is not yet deployed. Platform-assigned domains use a wildcard certificate (`wildcard-cert`) and do not need per-domain certificate management.
+
+### Project Aggregate Status is derived from AP and DB phases, not from Project conditions
+
+The Project composite's `status.conditions[Ready]` reflects only whether the Project composition itself reconciled; under the current composition it is True almost as soon as the Project is applied (the composition annotates its composed Instance with `gotemplating.fn.crossplane.io/ready: "True"`), so Project Ready by itself does not tell users whether the workloads inside the project are running. The project list therefore derives Project Aggregate Status from the phases of the project's APs and DBs (the workloads users care about), grouped by the `crossplane.io/project-uid` label that AP and DB compositions write on their composed resources.
+
+### Project Aggregate Status uses the canvas 5-tone visual scale
+
+Project Aggregate Status uses the same `positive | progress | warning | negative | neutral` scale as canvas node status (`packages/ui/src/components/canvas-node/canvas-node.status.tsx`), not the raw 4-color phase scale in `crossplane-status-schema.ts`. This keeps "creating / progressing" workloads blue in both surfaces; using the 4-color scale would color the same in-progress workload yellow on the list and blue on the canvas.
+
+### Project Aggregate Status uses max-severity aggregation
+
+Project Aggregate Status is the worst tone among the project's APs and DBs, with severity ordered `negative > warning > progress > positive > neutral`. Any failing workload promotes the project to negative; any in-progress workload promotes it to progress; only when every workload is positive does the project go positive. Paused workloads contribute as `neutral`, so a paused workload alongside a running one leaves the project positive, not progress.
+
+### Empty and loading project rows render a neutral dot, not a hidden cell
+
+Projects with no APs or DBs, and projects whose AP/DB lists have not loaded yet, render a static neutral dot rather than hiding the status indicator. Hiding the dot would shift the row's `name` baseline and would also remove the visual affordance that the row has a status. The neutral dot is static (no breathing) to distinguish it from active workload tones.
