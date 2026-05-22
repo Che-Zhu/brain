@@ -182,7 +182,7 @@ test("EntryPoint canvas nodes keep uid fallback when resource name is unavailabl
   });
 });
 
-test("DB canvas nodes preserve desired replicas for settings drafts", () => {
+test("DB canvas nodes preserve desired replicas and effective resources for settings drafts", () => {
   const state = dbsToCanvasState(
     {
       items: [
@@ -192,7 +192,16 @@ test("DB canvas nodes preserve desired replicas for settings drafts", () => {
             engine: "postgresql",
             replicas: 3,
           },
-          status: { phase: "Running" },
+          status: {
+            effectiveResources: {
+              cpuLimit: "1000m",
+              cpuRequest: "500m",
+              memoryLimit: "2Gi",
+              memoryRequest: "1Gi",
+              storageSize: "20Gi",
+            },
+            phase: "Running",
+          },
         },
       ],
     },
@@ -201,12 +210,17 @@ test("DB canvas nodes preserve desired replicas for settings drafts", () => {
 
   assert.equal(state.nodes[0]?.id, "db-postgres");
   assert.equal(state.nodes[0]?.type, CANVAS_DATABASE_NODE_TYPE);
-  assert.equal(
+  assert.deepEqual(
     (
       state.nodes[0]?.data as {
-        desired?: { replicas?: number };
+        desired?: Record<string, unknown>;
       }
-    ).desired?.replicas,
-    3
+    ).desired,
+    {
+      cpuLimit: "1000m",
+      memoryLimit: "2Gi",
+      replicas: 3,
+      storageSize: "20Gi",
+    }
   );
 });

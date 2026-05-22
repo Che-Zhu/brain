@@ -68,7 +68,12 @@ export interface CanvasDatabaseNodeData extends Record<string, unknown> {
   actions?: DatabaseNodeActions;
   connections: DatabaseNodeConnection[];
   desired?: {
+    cpuLimit?: string;
+    cpuRequest?: string;
+    memoryLimit?: string;
+    memoryRequest?: string;
     replicas?: number;
+    storageSize?: string;
   };
   layout?: CanvasNodeLayoutState;
   settingsAccess?: CanvasNodeSettingsAccess;

@@ -7,7 +7,7 @@ import type { DatabaseNodeStatus } from "@workspace/ui/components/database-node/
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { Separator } from "@workspace/ui/components/separator";
 import { cn } from "@workspace/ui/lib/utils";
-import { Layers, Settings, X } from "lucide-react";
+import { Cpu, HardDrive, Layers, MemoryStick, Settings, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,10 +15,17 @@ import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import {
   buildDbSettingsPatch,
   type DatabaseSettingsDraft,
+  type DatabaseSettingsNumberConstraint,
+  DB_SETTINGS_CPU_LIMIT_CORES,
+  DB_SETTINGS_MEMORY_LIMIT_GIB,
   DB_SETTINGS_REPLICAS,
+  DB_SETTINGS_STORAGE_GIB,
   dbSettingsDraftFromNodeData,
   dbSettingsDraftIsDirty,
+  normalizeDbSettingsCpuLimitCores,
+  normalizeDbSettingsMemoryLimitGi,
   normalizeDbSettingsReplicas,
+  normalizeDbSettingsStorageGi,
 } from "./database-settings-draft";
 
 interface DatabaseSettingsPaneProps {
@@ -51,6 +58,59 @@ function engineSubtitle({
   return `${displayEngine}${formattedVersion ? ` ${formattedVersion}` : ""}`;
 }
 
+function DatabaseSettingsSlider({
+  ariaLabel,
+  constraint,
+  disabled,
+  icon,
+  label,
+  maxDecimals,
+  onValueChange,
+  value,
+}: {
+  ariaLabel: string;
+  constraint: DatabaseSettingsNumberConstraint;
+  disabled: boolean;
+  icon: typeof Layers;
+  label: string;
+  maxDecimals: number;
+  onValueChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <ScaleSlider.Root
+      disabled={disabled}
+      max={constraint.max}
+      maxDecimals={maxDecimals}
+      min={constraint.min}
+      onValueChange={onValueChange}
+      step={constraint.step}
+      value={value}
+      valueDisplay="number"
+    >
+      <ScaleSlider.Stack className="w-full">
+        <ScaleSlider.Header className="min-h-6">
+          <ScaleSlider.Group className="min-w-0 gap-2">
+            <ScaleSlider.Icon className="shrink-0" icon={icon} />
+            <ScaleSlider.Label className="text-card-foreground">
+              {label}
+            </ScaleSlider.Label>
+          </ScaleSlider.Group>
+          <div className="flex h-6 min-w-0 items-center justify-end">
+            <ScaleSlider.Value />
+          </div>
+        </ScaleSlider.Header>
+        <ScaleSlider.Control aria-label={ariaLabel}>
+          <ScaleSlider.Track>
+            <ScaleSlider.Range />
+          </ScaleSlider.Track>
+          <ScaleSlider.Thumb />
+        </ScaleSlider.Control>
+      </ScaleSlider.Stack>
+    </ScaleSlider.Root>
+  );
+}
+
 export function DatabaseSettingsPane({
   data,
   kubeconfig,
@@ -77,6 +137,7 @@ export function DatabaseSettingsPane({
   const canUpdate = !readOnly && dirty && !updating;
   const statusLabel = data.states.status?.label ?? "Unknown";
   const subtitle = engineSubtitle(data.states);
+  const controlsDisabled = readOnly || updating;
 
   const handleCancel = useCallback(() => {
     setDraft(original);
@@ -158,41 +219,93 @@ export function DatabaseSettingsPane({
 
           <Separator />
 
-          <ScaleSlider.Root
-            disabled={readOnly || updating}
-            max={DB_SETTINGS_REPLICAS.max}
-            maxDecimals={0}
-            min={DB_SETTINGS_REPLICAS.min}
-            onValueChange={(value) => {
-              setDraft((current) => ({
-                ...current,
-                replicas: normalizeDbSettingsReplicas(value),
-              }));
-            }}
-            step={1}
-            value={draft.replicas}
-            valueDisplay="number"
-          >
-            <ScaleSlider.Stack className="w-full">
-              <ScaleSlider.Header className="min-h-6">
-                <ScaleSlider.Group className="min-w-0 gap-2">
-                  <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                  <ScaleSlider.Label className="text-card-foreground">
-                    Replicas
-                  </ScaleSlider.Label>
-                </ScaleSlider.Group>
-                <div className="flex h-6 min-w-0 items-center justify-end">
-                  <ScaleSlider.Value />
-                </div>
-              </ScaleSlider.Header>
-              <ScaleSlider.Control aria-label="Database replica count">
-                <ScaleSlider.Track>
-                  <ScaleSlider.Range />
-                </ScaleSlider.Track>
-                <ScaleSlider.Thumb />
-              </ScaleSlider.Control>
-            </ScaleSlider.Stack>
-          </ScaleSlider.Root>
+          <section className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h4 className="font-medium text-card-foreground text-sm leading-5">
+                Replicas & Resources
+              </h4>
+              <p className="text-muted-foreground text-xs leading-4">
+                Replicas 1-10 match the DB schema. CPU and memory limit ranges
+                are temporary product defaults for this release.
+              </p>
+            </div>
+            <div className="flex flex-col gap-5">
+              <DatabaseSettingsSlider
+                ariaLabel="Database replica count"
+                constraint={{ ...DB_SETTINGS_REPLICAS, step: 1 }}
+                disabled={controlsDisabled}
+                icon={Layers}
+                label="Replicas"
+                maxDecimals={0}
+                onValueChange={(value) => {
+                  setDraft((current) => ({
+                    ...current,
+                    replicas: normalizeDbSettingsReplicas(value),
+                  }));
+                }}
+                value={draft.replicas}
+              />
+              <DatabaseSettingsSlider
+                ariaLabel="Database CPU limit in cores"
+                constraint={DB_SETTINGS_CPU_LIMIT_CORES}
+                disabled={controlsDisabled}
+                icon={Cpu}
+                label="CPU limit (cores)"
+                maxDecimals={2}
+                onValueChange={(value) => {
+                  setDraft((current) => ({
+                    ...current,
+                    cpuLimitCores: normalizeDbSettingsCpuLimitCores(value),
+                  }));
+                }}
+                value={draft.cpuLimitCores}
+              />
+              <DatabaseSettingsSlider
+                ariaLabel="Database memory limit in Gi"
+                constraint={DB_SETTINGS_MEMORY_LIMIT_GIB}
+                disabled={controlsDisabled}
+                icon={MemoryStick}
+                label="Memory limit (Gi)"
+                maxDecimals={1}
+                onValueChange={(value) => {
+                  setDraft((current) => ({
+                    ...current,
+                    memoryLimitGi: normalizeDbSettingsMemoryLimitGi(value),
+                  }));
+                }}
+                value={draft.memoryLimitGi}
+              />
+            </div>
+          </section>
+
+          <Separator />
+
+          <section className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h4 className="font-medium text-card-foreground text-sm leading-5">
+                Storage
+              </h4>
+              <p className="text-muted-foreground text-xs leading-4">
+                Storage is shown in Gi and submitted as a Kubernetes quantity.
+                The 1-100Gi range is a temporary product default.
+              </p>
+            </div>
+            <DatabaseSettingsSlider
+              ariaLabel="Database storage size in Gi"
+              constraint={DB_SETTINGS_STORAGE_GIB}
+              disabled={controlsDisabled}
+              icon={HardDrive}
+              label="Storage size (Gi)"
+              maxDecimals={0}
+              onValueChange={(value) => {
+                setDraft((current) => ({
+                  ...current,
+                  storageSizeGi: normalizeDbSettingsStorageGi(value),
+                }));
+              }}
+              value={draft.storageSizeGi}
+            />
+          </section>
 
           <div className="flex shrink-0 items-center justify-end gap-2">
             <Button
