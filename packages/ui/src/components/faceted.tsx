@@ -17,7 +17,15 @@ import {
 } from "@workspace/ui/components/popover";
 import { cn } from "@workspace/ui/lib/utils";
 import { Check, ChevronDown, ChevronsUpDown } from "lucide-react";
-import * as React from "react";
+import {
+  type ComponentProps,
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
 type FacetedValue<Multiple extends boolean> = Multiple extends true
   ? string[]
@@ -29,12 +37,10 @@ interface FacetedContextValue<Multiple extends boolean = boolean> {
   value?: FacetedValue<Multiple>;
 }
 
-const FacetedContext = React.createContext<FacetedContextValue<boolean> | null>(
-  null
-);
+const FacetedContext = createContext<FacetedContextValue<boolean> | null>(null);
 
 function useFacetedContext(name: string) {
-  const context = React.useContext(FacetedContext);
+  const context = useContext(FacetedContext);
   if (!context) {
     throw new Error(`\`${name}\` must be within Faceted`);
   }
@@ -42,8 +48,8 @@ function useFacetedContext(name: string) {
 }
 
 interface FacetedProps<Multiple extends boolean = false>
-  extends React.ComponentProps<typeof Popover> {
-  children?: React.ReactNode;
+  extends ComponentProps<typeof Popover> {
+  children?: ReactNode;
   multiple?: Multiple;
   onValueChange?: (value: FacetedValue<Multiple> | undefined) => void;
   value?: FacetedValue<Multiple>;
@@ -62,11 +68,11 @@ function Faceted<Multiple extends boolean = false>(
     ...facetedProps
   } = props;
 
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = openProp !== undefined;
   const open = isControlled ? openProp : uncontrolledOpen;
 
-  const onOpenChange = React.useCallback(
+  const onOpenChange = useCallback(
     (newOpen: boolean, ...rest: unknown[]) => {
       if (!isControlled) {
         setUncontrolledOpen(newOpen);
@@ -79,7 +85,7 @@ function Faceted<Multiple extends boolean = false>(
     [isControlled, onOpenChangeProp]
   );
 
-  const onItemSelect = React.useCallback(
+  const onItemSelect = useCallback(
     (selectedValue: string) => {
       if (!onValueChange) {
         return;
@@ -104,7 +110,7 @@ function Faceted<Multiple extends boolean = false>(
     [multiple, value, onValueChange, onOpenChange]
   );
 
-  const contextValue = React.useMemo<FacetedContextValue<typeof multiple>>(
+  const contextValue = useMemo<FacetedContextValue<typeof multiple>>(
     () => ({ value, onItemSelect, multiple }),
     [value, onItemSelect, multiple]
   );
@@ -118,7 +124,7 @@ function Faceted<Multiple extends boolean = false>(
   );
 }
 
-function FacetedTrigger(props: React.ComponentProps<typeof PopoverTrigger>) {
+function FacetedTrigger(props: ComponentProps<typeof PopoverTrigger>) {
   const { className, children, ...triggerProps } = props;
 
   return (
@@ -131,7 +137,7 @@ function FacetedTrigger(props: React.ComponentProps<typeof PopoverTrigger>) {
   );
 }
 
-interface FacetedBadgeListProps extends React.ComponentProps<"div"> {
+interface FacetedBadgeListProps extends ComponentProps<"div"> {
   badgeClassName?: string;
   max?: number;
   options?: { label: string; value: string }[];
@@ -153,7 +159,7 @@ function FacetedBadgeList(props: FacetedBadgeListProps) {
     ? context.value
     : ([context.value].filter(Boolean) as string[]);
 
-  const getLabel = React.useCallback(
+  const getLabel = useCallback(
     (value: string) => {
       const option = options.find((opt) => opt.value === value);
       return option?.label ?? value;
@@ -200,7 +206,7 @@ function FacetedBadgeList(props: FacetedBadgeListProps) {
   );
 }
 
-function FacetedContent(props: React.ComponentProps<typeof PopoverContent>) {
+function FacetedContent(props: ComponentProps<typeof PopoverContent>) {
   const { className, children, ...contentProps } = props;
 
   return (
@@ -225,7 +231,7 @@ const FacetedEmpty = CommandEmpty;
 
 const FacetedGroup = CommandGroup;
 
-interface FacetedItemProps extends React.ComponentProps<typeof CommandItem> {
+interface FacetedItemProps extends ComponentProps<typeof CommandItem> {
   value: string;
 }
 
@@ -237,7 +243,7 @@ function FacetedItem(props: FacetedItemProps) {
     ? Array.isArray(context.value) && context.value.includes(value)
     : context.value === value;
 
-  const onItemSelect = React.useCallback(
+  const onItemSelect = useCallback(
     (currentValue: string) => {
       if (onSelect) {
         onSelect(currentValue);
@@ -319,7 +325,7 @@ function FacetedFilter({
 interface FacetedFilterAllProps {
   className?: string;
   emptyText?: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   label: string;
   onValueChange: (v: string[]) => void;
   options: string[];
