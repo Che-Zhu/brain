@@ -4,32 +4,48 @@
 
 ### EntryPoint
 
-A Crossplane XRD resource (`example.crossplane.io/v1`, kind `EntryPoint`) that represents the **public network access layer** for an AP. Each EntryPoint is 1:1 associated with an AP via `spec.apRef`. It only exists when the AP has public endpoints (i.e., at least one endpoint with `public: true` and a resolvable hostname).
+A Crossplane XRD resource (`example.crossplane.io/v1`, kind `EntryPoint`) that represents the **public address layer** for an AP. Each EntryPoint is 1:1 associated with an AP via `spec.apRef`. It only exists when the AP has one or more Public Addresses.
 
-EntryPoint is **automatically created by the AP Composition** (via provider-kubernetes Object) when the AP has public endpoints, and automatically deleted when the AP is deleted.
+EntryPoint is **automatically created by the AP Composition** (via provider-kubernetes Object) when the AP has Public Addresses, and automatically deleted when the AP is deleted.
 
 EntryPoint manages:
 
-- **Targets** — each public AP endpoint (port + platform-assigned domain), written by the AP Composition.
-- **Custom domain binding** (future) — CNAME verification + TLS certificate lifecycle for user-owned domains.
+- **Public Addresses** — externally reachable URLs/domains for the AP, each targeting an App Listening Port.
+- **Custom domain binding** (future) — CNAME verification + TLS certificate lifecycle for user-owned Public Addresses.
 
-Not to be confused with: AP endpoints (which are the raw `spec.endpoints` on the AP resource), or Ingress (which is the underlying K8s resource created by Compositions).
+Not to be confused with: App Listening Ports (container ports where the application accepts traffic), AP endpoints (the raw legacy `spec.endpoints` on the AP resource), or Ingress (which is the underlying K8s resource created by Compositions).
 
-### Target
+### App Listening Port
 
-One accessible public endpoint within an EntryPoint. Maps 1:1 to a public AP endpoint. Each target has:
+An AP container port where the application accepts traffic for a Private Address or Public Address.
 
-- A platform-assigned domain (e.g., `my-app-abc123.region.nip.io`) — written by AP Composition, read-only from user perspective
-- Zero or more custom domains (e.g., `app.mycompany.com`) — user-configured (future)
-- A status derived from AP phase (all targets share AP's phase for now)
+### Private Address
+
+The single cluster-internal URL shown for an AP, targeting one App Listening Port.
+
+### Public Address
+
+An externally reachable URL/domain alias for an AP that targets one App Listening Port.
+
+### Platform Address
+
+A system-assigned Public Address that the platform can create without user DNS or certificate setup.
+
+### Custom Domain
+
+A user-owned Public Address that requires DNS verification and TLS certificate lifecycle management.
 
 ### AP (Application)
 
-Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, basic networking, and triggers EntryPoint creation for public endpoints.
+Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, App Listening Ports, one Private Address, and EntryPoint creation for Public Addresses.
 
 ### DB (Database)
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
+
+### DB Configuration Draft
+
+A local set of pending DB configuration changes that is submitted only when the user confirms the update.
 
 ### Database Binding
 
@@ -47,6 +63,10 @@ A Project-scoped visual arrangement of the canvas, shared by everyone who opens 
 
 The per-node expanded or collapsed presentation state of a canvas node card.
 
+### Canvas Node Stack Order
+
+The per-node visual layering order used when canvas node cards overlap.
+
 ### Canvas Connection
 
 A canvas edge that represents an established runtime dependency between resources.
@@ -61,7 +81,7 @@ A normalized time-series representation of workload resource usage for AP and DB
 
 ### Custom Domain Binding (future, not yet implemented)
 
-The process of attaching a user-owned domain to an EntryPoint target. Blocked on cert-manager infrastructure. When implemented:
+The process of attaching a Custom Domain as a Public Address for an AP. Blocked on cert-manager infrastructure. When implemented:
 
 1. User PATCHes EntryPoint to add domain to `spec.customDomains`
 2. EntryPoint Composition creates Ingress rule for the custom domain
@@ -69,7 +89,7 @@ The process of attaching a user-owned domain to an EntryPoint target. Blocked on
 4. TLS certificate provisioning via cert-manager
 5. Ongoing certificate renewal
 
-Each custom domain will have its own lifecycle status, independent from the AP's health.
+Each Custom Domain will have its own lifecycle status, independent from the AP's health.
 
 ## Key Design Decisions
 
@@ -83,7 +103,7 @@ EntryPoint uses Crossplane XRD for schema registration (consistent with AP and D
 
 Two Compositions interact with EntryPoint:
 
-- **AP Composition** creates/updates EntryPoint via provider-kubernetes Object (writes `spec.apRef` + `spec.targets`). Manages EntryPoint's lifecycle — creation when public endpoints exist, deletion when AP is deleted.
+- **AP Composition** creates/updates EntryPoint via provider-kubernetes Object (writes `spec.apRef` + Public Address data). Manages EntryPoint's lifecycle — creation when Public Addresses exist, deletion when AP is deleted.
 - **EntryPoint Composition** reconciles EntryPoint's own composed resources. Currently minimal (echoes spec to status). Will be extended to manage custom domain Ingress + Certificate resources when that feature is built.
 
 These do not conflict: AP Composition writes EntryPoint's spec (external write), EntryPoint Composition writes status + composed resources (internal reconcile).
@@ -92,9 +112,49 @@ These do not conflict: AP Composition writes EntryPoint's spec (external write),
 
 The AP Composition conditionally creates an EntryPoint (via provider-kubernetes Object) when `$needIngress` is true. When the AP is deleted, Crossplane cleans up all composed resources including the Object, which in turn deletes the EntryPoint. No external watch or controller needed.
 
+### Private Address hides per-port private URLs
+
+The AP Settings UI should show one Private Address, not one private URL per App Listening Port. Additional private URLs may be technically reachable by changing the port, but the main product model should keep them hidden.
+
+### Private Address targets one app listening port
+
+The Private Address targets one App Listening Port. It may include a port in the URL when the target App Listening Port is not HTTP's default port.
+
+### Private Address omits the default HTTP port
+
+When the Private Address targets port 80, the UI should omit `:80`. When it targets another App Listening Port, the UI should include that port in the URL.
+
+### Public Addresses target app listening ports directly
+
+Each Public Address chooses the App Listening Port it should reach. Users should configure this as "the port your app is listening on," not as a public port.
+
+### Public Address ownership differs from its UI surface
+
+Public Addresses belong to the EntryPoint domain model, but the AP Settings panel's Network section is the primary UI surface for viewing and managing them because users think about network access from the AP they are configuring.
+
+### AP Settings owns the empty Public Addresses affordance
+
+The AP Settings panel should show Public Addresses even when the AP has no EntryPoint yet. Adding the first Public Address creates or enables the EntryPoint behind the scenes; users should not need a separate "create EntryPoint" action.
+
+### New APs are private by default
+
+A newly created AP should start with only its Private Address and no Public Addresses. Public Addresses are created only after an explicit user action.
+
+### Public Addresses have platform and custom forms
+
+Adding a Public Address in v1 should create a Platform Address. Custom Domains belong in the same Public Addresses area, but remain future functionality until DNS verification and TLS certificate management are implemented.
+
+### Platform Addresses are not limited to one
+
+An AP may have multiple Platform Addresses. The domain model should not assume there is only one system-assigned public URL.
+
+### Public Address identity is its URL
+
+Public Addresses should be displayed by URL only in v1. Do not introduce a separate user-facing name or label until the domain needs one.
+
 ### Entry node only appears for public APs
 
-On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only services (no public endpoints) do not produce EntryPoints or entry nodes.
+On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only APs (no Public Addresses) do not produce EntryPoints or entry nodes.
 
 ### Newly detected entry nodes anchor to their AP's left side
 
@@ -106,9 +166,9 @@ The fallback grid used for APs and DBs extends rightward from the origin, so anc
 
 Canvas Layout is not a personal browser preference. It belongs to the Project and should be reused when the same Project is opened by another user, browser, or share preview. Node positions and Canvas Node Expansion State are shared; ephemeral UI state such as the selected node, open panel, and temporary zoom can remain local.
 
-### Canvas Layout v1 stores positions and node expansion, not viewport or names
+### Canvas Layout v1 stores positions, node expansion, and stack order, not viewport or names
 
-The first persisted Canvas Layout stores node positions and Canvas Node Expansion State. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, Resource Display Names, or other non-layout state.
+The first persisted Canvas Layout stores node positions, Canvas Node Expansion State, and Canvas Node Stack Order. Opening a Project computes the initial canvas view by fitting the currently rendered AP, DB, and EntryPoint nodes that the current user is allowed to see after the saved layout is applied. It does not store pan, zoom, selected node, open panel, Resource Display Names, or other non-layout state.
 
 ### Canvas Node Expansion State defaults to collapsed
 
@@ -121,6 +181,30 @@ Canvas Node Expansion State is stored on the same Canvas Layout item as the node
 ### Canvas Node Expansion State applies to all project canvas node types
 
 Canvas Node Expansion State applies to every Project canvas node type that supports card expansion, including AP, DB, and EntryPoint nodes.
+
+### Canvas Node Stack Order is shared per Project
+
+Canvas Node Stack Order is part of the shared Canvas Layout and should be reused when the same Project is opened by another user, browser, or share preview.
+
+### Selecting a canvas node brings it to the front
+
+When a user selects a canvas node in an editable Project canvas, that node should become the topmost node in the Canvas Node Stack Order so overlapped node cards remain readable.
+
+Node click, node drag start, and URL-driven node selection all count as canvas node selection for Canvas Node Stack Order. Hover-driven expansion does not change Canvas Node Stack Order.
+
+In read-only canvases and share previews, selecting a canvas node may bring it to the front locally for readability, but it must not persist Canvas Node Stack Order changes.
+
+Selecting a Canvas Connection does not change Canvas Node Stack Order.
+
+When a canvas node has no saved Canvas Node Stack Order, its default layer follows the detected resource order: AP nodes below DB nodes, and DB nodes below EntryPoint nodes. An explicit saved Canvas Node Stack Order takes precedence over the default resource layer.
+
+Canvas Node Stack Order values are normalized by the Next.js canvas layout API before persistence. The client may optimistically bring a selected node to the front immediately, but should avoid saving when the node is already topmost.
+
+Concurrent Canvas Node Stack Order saves use last-write-wins semantics. If multiple editable sessions select different nodes close together, the later Next.js canvas layout PATCH determines the topmost saved node; the product does not provide real-time shared stacking feedback.
+
+When an orphaned Canvas Layout item reappears as a detected canvas node, it should be brought to the front only if it was absent long enough to be treated as a meaningful return. A brief absence shorter than the 10-second stack-order return stability window should restore the node's previous Canvas Node Stack Order instead of stealing the top layer.
+
+When a resource reappears with the same kind, namespace, and name but a different Kubernetes UID, its saved position and Canvas Node Expansion State should still be restored, but its Canvas Node Stack Order should be treated as a fresh return; if the orphan absence exceeded the 10-second stability window, it should be brought to the front.
 
 ### Unplaced AP and DB nodes use fallback grid raster-scan placement
 
@@ -144,11 +228,11 @@ In an editable Project canvas, hover-driven node auto-expansion updates the shar
 
 ### Canvas Layout is not live-synchronized
 
-Canvas Layout is shared through persistence, not through real-time collaboration. Users who already have the same Project open do not need to see another user's position or Canvas Node Expansion State changes until the layout is reloaded or fetched again.
+Canvas Layout is shared through persistence, not through real-time collaboration. Users who already have the same Project open do not need to see another user's position, Canvas Node Expansion State, or Canvas Node Stack Order changes until the layout is reloaded or fetched again.
 
 ### Pending local layout edits take precedence
 
-After a local user changes a node position or Canvas Node Expansion State, that pending local layout edit should remain visible until the debounced save completes. Freshly fetched shared layout should not immediately overwrite pending local edits.
+After a local user changes a node position, Canvas Node Expansion State, or Canvas Node Stack Order, that pending local layout edit should remain visible until the debounced save completes. Freshly fetched shared layout should not immediately overwrite pending local edits.
 
 ### Canvas Layout saves are debounced and merge by node
 
@@ -156,7 +240,7 @@ Canvas Layout saves should be debounced and merge changes by node resource refer
 
 ### Canvas Layout node saves send complete layout items
 
-Each saved Canvas Layout node item should include the node reference, position, Canvas Node Expansion State when known, and resource identity snapshots such as last seen UID. The server may replace that node's saved layout item as a whole because concurrent edits to the same node are already last-write-wins.
+Each saved Canvas Layout node item should include the node reference, position, Canvas Node Expansion State when known, Canvas Node Stack Order when known, and resource identity snapshots such as last seen UID. The server may replace that node's saved layout item as a whole because concurrent edits to the same node are already last-write-wins.
 
 ### Orphan Canvas Layout items are retained temporarily
 
@@ -177,6 +261,38 @@ Users may freely drag lines between canvas nodes, but unsupported Connecting Edg
 ### Database Binding belongs to AP desired state
 
 The source of truth for a Database Binding is the AP's desired state. DB does not store reverse ownership of bound APs, and the canvas visualizes AP-DB connections detected from resource state.
+
+### DB configuration changes are explicit updates
+
+The DB configuration panel should collect changes as a DB Configuration Draft and apply them only when the user confirms the update. Sliders and switches inside the panel should not immediately mutate DB desired state.
+
+### DB resource controls edit capacity limits
+
+CPU and Memory controls in the DB configuration panel represent user-facing capacity limits, while resource requests remain driven by quota presets or platform defaults.
+
+### DB configuration controls are schema-aligned
+
+The selectable ranges and steps for DB configuration controls should align with DB schema or backend-provided DB configuration capabilities, not static Figma values. Until a backend capability exists, named UI constraints may be used when they are explicitly kept aligned with the DB XRD or product defaults.
+
+### DB replica bounds belong to DB schema
+
+DB replica controls should be backed by explicit minimum and maximum values on the DB XRD so UI sliders and API validation share the same product boundary. DB replicas are limited to 1-10 in v1.
+
+### DB storage bounds are temporary UI constraints
+
+Until DB configuration capabilities exist, DB storage controls may use named UI constraints and submit storage as a Kubernetes quantity string. Storage min, max, and step should not be inferred from Figma as API schema.
+
+### DB public connection changes can be drafted
+
+When changed inside the DB configuration panel, the Public Connection setting belongs to the same DB Configuration Draft and is applied only when the user confirms the update.
+
+### DB canvas panel has explicit modes
+
+Selecting a DB node opens the DB configuration panel, while DB quick actions may switch the same right-side panel surface to another mode such as metrics.
+
+### DB configuration panel identifies the DB workload
+
+The DB configuration panel header should use the DB name as its title, engine/version as supporting context, and the DB lifecycle status as the status indicator.
 
 ### Database Binding v1 is expressed through AP environment variables
 
