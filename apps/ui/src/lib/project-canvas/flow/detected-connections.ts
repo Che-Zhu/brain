@@ -85,6 +85,10 @@ function connectionKey(connection: CanvasDetectedConnection): string {
   return `${sourceKey}->${targetKey}`;
 }
 
+function namespacedResourceKey(namespace: string, name: string): string {
+  return `${namespace}/${name}`;
+}
+
 function resourceRef(
   kind: CanvasConnectionResourceKind,
   name: string | undefined,
@@ -160,7 +164,7 @@ function entryPointRefByApKey(
     if (apRef === undefined || namespace === undefined || ref === undefined) {
       continue;
     }
-    map.set(`${namespace}/${apRef}`, ref);
+    map.set(namespacedResourceKey(namespace, apRef), ref);
   }
   return map;
 }
@@ -284,7 +288,7 @@ function addNetworkPublicAddressConnections(
     if (target === undefined) {
       continue;
     }
-    const apKey = `${target.namespace}/${target.name}`;
+    const apKey = namespacedResourceKey(target.namespace, target.name);
     const source =
       entryPointRefsByApKey.get(apKey) ??
       resourceRef("EntryPoint", target.name, target.namespace);

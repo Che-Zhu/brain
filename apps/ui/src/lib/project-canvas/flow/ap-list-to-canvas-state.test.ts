@@ -127,3 +127,49 @@ test("EntryPoint canvas nodes fall back to desired Public Addresses while observ
     ],
   });
 });
+
+test("EntryPoint canvas nodes keep uid fallback when resource name is unavailable", () => {
+  const state = entryPointsToCanvasState(
+    {
+      items: [
+        {
+          metadata: { namespace: "default", uid: "entry-uid" },
+          spec: {
+            apRef: "api",
+            targets: [
+              {
+                platformDomain: "https://api.example.com",
+                port: 8080,
+                status: "accessible",
+              },
+            ],
+          },
+        },
+      ],
+    },
+    { namespaceFallback: "default" }
+  );
+
+  assert.equal(state.nodes[0]?.id, "entry-entry-uid");
+  assert.deepEqual(state.nodes[0]?.data, {
+    accessDomain: {
+      label: "Access domain",
+      value: "api.example.com",
+    },
+    resource: {
+      apRef: "api",
+      name: "unknown",
+      namespace: "default",
+      uid: "entry-uid",
+    },
+    states: { name: "unknown" },
+    targets: [
+      {
+        id: "8080-api.example.com",
+        label: "Public Domain",
+        status: { label: "Accessible", tone: "accessible" },
+        value: "https://api.example.com/",
+      },
+    ],
+  });
+});

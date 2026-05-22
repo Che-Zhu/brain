@@ -481,10 +481,9 @@ export function entryPointsToCanvasState(
   const items = entryPointCanvasResources(data, options);
   const grid0 = options?.gridIndexOffset ?? 0;
   const nodes: Node[] = items.map((item, i) => {
-    const stable =
-      item.stableName ?? item.name ?? item.uid ?? metadataName(item.resource);
-    const name = item.name ?? "unknown";
-    const namespace = item.namespace ?? options?.namespaceFallback ?? "";
+    const stable = item.stableName;
+    const name = item.name;
+    const namespace = item.namespace;
     const uid = item.uid;
     const targets = item.targets;
     const accessDomain = entryNodeAccessDomainFromTargets(targets);
@@ -515,8 +514,7 @@ interface EntryPointCanvasResource {
   apRef?: string;
   name: string;
   namespace: string;
-  resource?: unknown;
-  stableName?: string;
+  stableName: string;
   targets: EntryNodeTarget[];
   uid?: string;
 }
@@ -535,8 +533,12 @@ function entryPointCanvasResources(
 ): EntryPointCanvasResource[] {
   const entryPointItems = apItemsFromList(data);
   if (options?.apsData === undefined) {
-    return entryPointItems.map((item) =>
-      entryPointCanvasResourceFromEntryPoint(item, options?.namespaceFallback)
+    return entryPointItems.map((item, index) =>
+      entryPointCanvasResourceFromEntryPoint(
+        item,
+        index,
+        options?.namespaceFallback
+      )
     );
   }
 
@@ -563,7 +565,6 @@ function entryPointCanvasResources(
       apRef: apName,
       name,
       namespace,
-      resource: entryPoint,
       stableName: entryPointName ?? apName,
       targets: entryNodeTargetsFromPublicAddresses(publicAddresses),
       ...(entryPointUid === undefined ? {} : { uid: entryPointUid }),
@@ -574,15 +575,18 @@ function entryPointCanvasResources(
 
 function entryPointCanvasResourceFromEntryPoint(
   item: unknown,
+  index: number,
   namespaceFallback: string | undefined
 ): EntryPointCanvasResource {
+  const name = metadataName(item);
+  const uid = metadataUid(item);
   return {
     apRef: entryPointApRefFromResource(item),
-    name: metadataName(item) ?? "unknown",
+    name: name ?? "unknown",
     namespace: metadataNamespace(item) ?? namespaceFallback ?? "",
-    resource: item,
+    stableName: name ?? uid ?? `i-${index}`,
     targets: entryNodeTargetsFromResource(item),
-    ...(metadataUid(item) === undefined ? {} : { uid: metadataUid(item) }),
+    ...(uid === undefined ? {} : { uid }),
   };
 }
 
@@ -625,34 +629,46 @@ function normalizeNetworkPublicAddresses(
   }
   const out: NetworkPublicAddress[] = [];
   for (const item of raw) {
-    const record = asRecord(item);
-    if (record === undefined) {
-      continue;
+    const address = networkPublicAddressFromRecord(item, includeObservedFields);
+    if (address !== undefined) {
+      out.push(address);
     }
-    const host = nonEmptyString(record.host);
-    const port = entryPointTargetPort(record.port);
-    if (host === undefined || port === undefined) {
-      continue;
-    }
-    out.push({
-      host,
-      port,
-      ...(includeObservedFields
-        ? {
-            ...(nonEmptyString(record.status) === undefined
-              ? {}
-              : { status: nonEmptyString(record.status) }),
-            ...(nonEmptyString(record.type) === undefined
-              ? {}
-              : { type: nonEmptyString(record.type) }),
-            ...(nonEmptyString(record.url) === undefined
-              ? {}
-              : { url: nonEmptyString(record.url) }),
-          }
-        : {}),
-    });
   }
   return out;
+}
+
+function networkPublicAddressFromRecord(
+  raw: unknown,
+  includeObservedFields: boolean
+): NetworkPublicAddress | undefined {
+  const record = asRecord(raw);
+  if (record === undefined) {
+    return undefined;
+  }
+  const host = nonEmptyString(record.host);
+  const port = entryPointTargetPort(record.port);
+  if (host === undefined || port === undefined) {
+    return undefined;
+  }
+
+  const address: NetworkPublicAddress = { host, port };
+  if (!includeObservedFields) {
+    return address;
+  }
+
+  const status = nonEmptyString(record.status);
+  const type = nonEmptyString(record.type);
+  const url = nonEmptyString(record.url);
+  if (status !== undefined) {
+    address.status = status;
+  }
+  if (type !== undefined) {
+    address.type = type;
+  }
+  if (url !== undefined) {
+    address.url = url;
+  }
+  return address;
 }
 
 function entryNodeTargetsFromPublicAddresses(
