@@ -7,10 +7,10 @@ import (
 // Register adds the AP (Application) API routes to the Huma API.
 //
 // AP is a Crossplane composite resource (example.crossplane.io/v1, kind: AP, plural: aps).
-// The AP spec is the API contract for the generated Deployment, Service(s), and Ingress:
+// The AP spec is the API contract for the generated Deployment, Service(s), Ingress, and EntryPoint:
 // - name: logical instance name used for composed resource naming; defaults to metadata.name if omitted.
 // - projectName: optional Project claim name in the same namespace (labels + ownerReference).
-// - input: image, network.privatePort, legacy/public endpoints, env, probes, imagePullPolicy.
+// - input: image, network.privatePort, network.publicAddresses, env, probes, imagePullPolicy.
 // - resource: replicas, requests, limits (Kubernetes-shaped).
 // - paused, restartRequest, ingressAnnotations: lifecycle and Ingress metadata.
 func Register(api huma.API) {

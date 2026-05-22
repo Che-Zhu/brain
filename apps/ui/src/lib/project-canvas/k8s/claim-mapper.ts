@@ -181,121 +181,6 @@ function trimStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-const STATUS_VAR_NAME = /^port-(\d+)-(internal|external)$/;
-
-interface PortAddr {
-  privateAddress?: string;
-  publicAddress?: string;
-}
-
-function mergeVariablesIntoPortMap(
-  variables: unknown,
-  map: Map<number, PortAddr>
-): void {
-  if (!Array.isArray(variables)) {
-    return;
-  }
-  for (const item of variables) {
-    const v = asRecord(item);
-    if (v == null) {
-      continue;
-    }
-    const name = typeof v.name === "string" ? v.name : "";
-    const value = trimStr(v.value);
-    const match = STATUS_VAR_NAME.exec(name);
-    if (match == null || value === "") {
-      continue;
-    }
-    const port = Number(match[1]);
-    if (!Number.isFinite(port) || port <= 0) {
-      continue;
-    }
-    const existing = map.get(port) ?? {};
-    if (match[2] === "internal") {
-      existing.privateAddress = value;
-    } else {
-      existing.publicAddress = value;
-    }
-    map.set(port, existing);
-  }
-}
-
-function mergeStatusEndpointsIntoPortMap(
-  endpoints: unknown,
-  map: Map<number, PortAddr>
-): void {
-  if (!Array.isArray(endpoints)) {
-    return;
-  }
-  for (const item of endpoints) {
-    const ep = asRecord(item);
-    if (ep == null) {
-      continue;
-    }
-    const port = portNum(ep.number ?? ep.port);
-    if (port == null || port <= 0) {
-      continue;
-    }
-    const privateAddress = trimStr(ep.privateAddress);
-    const publicAddress = trimStr(ep.publicAddress);
-    const existing = map.get(port) ?? {};
-    if (privateAddress !== "" && existing.privateAddress == null) {
-      existing.privateAddress = privateAddress;
-    }
-    if (publicAddress !== "" && existing.publicAddress == null) {
-      existing.publicAddress = publicAddress;
-    }
-    if (existing.privateAddress != null || existing.publicAddress != null) {
-      map.set(port, existing);
-    }
-  }
-}
-
-/**
- * Per-port addresses from `status.variables` (`port-{port}-internal|external` → URL),
- * produced by the API transform `APWithIngressesAndServicesFromList`. Falls back to
- * `status.endpoints` (`number|port`, `privateAddress`, `publicAddress`) if a deployment
- * publishes it directly.
- */
-function apStatusEndpointsByPort(
-  status: Record<string, unknown>
-): Map<number, PortAddr> {
-  const map = new Map<number, PortAddr>();
-  mergeVariablesIntoPortMap(status.variables, map);
-  mergeStatusEndpointsIntoPortMap(status.endpoints, map);
-  return map;
-}
-
-function apPortsFromInput(input: Record<string, unknown>): ContainerPort[] {
-  const raw = input.endpoints;
-  const out: ContainerPort[] = [];
-  if (Array.isArray(raw) && raw.length > 0) {
-    for (const item of raw) {
-      const ep = asRecord(item);
-      if (ep == null) {
-        continue;
-      }
-      const port = portNum(ep.port);
-      if (port == null || port <= 0) {
-        continue;
-      }
-      const host = typeof ep.host === "string" ? ep.host : "";
-      out.push({
-        host: host === "" ? undefined : host,
-        port,
-        protocol: "tcp",
-      });
-    }
-    return out;
-  }
-  const singlePort = portNum(input.port);
-  const singleHost = typeof input.host === "string" ? input.host : "";
-  if (singlePort != null && singlePort > 0 && singleHost !== "") {
-    return [{ host: singleHost, port: singlePort, protocol: "tcp" }];
-  }
-  return [];
-}
-
 function apNetworkFromSpecAndStatus(
   spec: Record<string, unknown>,
   status: Record<string, unknown>
@@ -378,50 +263,6 @@ function normalizeNetworkPublicAddress(
   };
 }
 
-/** Prefer observed `status.endpoints` URLs; fall back to spec shape for the same port. */
-function mergeApPorts(
-  spec: Record<string, unknown>,
-  status: Record<string, unknown>
-): ContainerPort[] {
-  const byPort = apStatusEndpointsByPort(status);
-  const specPorts = apPortsFromInput(readApInput(spec));
-
-  if (byPort.size === 0) {
-    return specPorts;
-  }
-
-  const merged: ContainerPort[] = [];
-  const seen = new Set<number>();
-
-  for (const p of specPorts) {
-    seen.add(p.port);
-    const s = byPort.get(p.port);
-    if (s == null) {
-      merged.push(p);
-      continue;
-    }
-    merged.push({
-      ...p,
-      privateAddress: s.privateAddress ?? p.privateAddress,
-      publicAddress: s.publicAddress ?? p.publicAddress,
-    });
-  }
-
-  for (const [portNum, s] of byPort) {
-    if (seen.has(portNum)) {
-      continue;
-    }
-    merged.push({
-      port: portNum,
-      privateAddress: s.privateAddress,
-      protocol: "tcp",
-      publicAddress: s.publicAddress,
-    });
-  }
-
-  return merged;
-}
-
 export interface ClaimContainerSettings {
   cpuCores: number;
   env: ContainerEnvVar[];
@@ -472,7 +313,7 @@ function mapApClaim(
     image,
     memoryMib,
     network: apNetworkFromSpecAndStatus(spec, status),
-    ports: mergeApPorts(spec, status),
+    ports: [],
     replicas,
   };
 }

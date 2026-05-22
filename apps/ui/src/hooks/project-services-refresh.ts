@@ -1,8 +1,6 @@
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 
-import { hasApPublicExposure } from "@/lib/project-canvas/k8s/ap-spec-access";
-
 export const ENTRYPOINT_FAST_REFRESH_MS = 1000;
 export const ENTRYPOINT_STEADY_REFRESH_MS = 5000;
 
@@ -60,21 +58,7 @@ export function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
       root.status != null && typeof root.status === "object"
         ? (root.status as Record<string, unknown>)
         : undefined;
-    const statusEndpoints = Array.isArray(status?.endpoints)
-      ? status.endpoints
-      : [];
     if (hasNetworkPublicAddresses(status?.network)) {
-      return true;
-    }
-    if (
-      statusEndpoints.some(
-        (endpoint) =>
-          endpoint != null &&
-          typeof endpoint === "object" &&
-          typeof (endpoint as Record<string, unknown>).publicAddress ===
-            "string"
-      )
-    ) {
       return true;
     }
 
@@ -82,10 +66,15 @@ export function hasPublicApEndpoint(data: K8sGetResponse | undefined) {
       root.spec != null && typeof root.spec === "object"
         ? (root.spec as Record<string, unknown>)
         : undefined;
-    if (spec != null) {
-      return hasApPublicExposure(spec);
-    }
-    return false;
+    const input =
+      spec?.input != null && typeof spec.input === "object"
+        ? (spec.input as Record<string, unknown>)
+        : undefined;
+    return hasNetworkPublicAddresses(
+      input?.network != null && typeof input.network === "object"
+        ? input.network
+        : undefined
+    );
   });
 }
 

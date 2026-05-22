@@ -41,7 +41,7 @@ test("AP env settings patch direct rows as standard Kubernetes value entries", (
   ]);
 });
 
-test("AP network settings patch privatePort without writing legacy endpoints", () => {
+test("AP network settings patch privatePort without writing retired endpoint fields", () => {
   const ops = patchOpsForApNetworkSettings(
     {
       input: {

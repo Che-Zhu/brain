@@ -13,9 +13,9 @@ python3 -m venv .venv-sync && .venv-sync/bin/pip install pyyaml
 .venv-sync/bin/python sync-sealos-templates.py --only agora # one template
 ```
 
-Each `template/instance` annotation lists template parameters under **`spec.input`** (`openaiApiKey`, `adminPassword`, etc.) copied from Sealos `inputs` / `defaults`. Scale and CPU/memory live under **`spec.resource`** (`replicas`, `requests`, `limits`). **`spec.projectName`** stays top-level. Do not use flat `spec.cpuRequest` / `spec.image` / `spec.endpoints` — those fields were removed from the AP XRD.
+Each `template/instance` annotation lists template parameters under **`spec.input`** (`openaiApiKey`, `adminPassword`, etc.) copied from Sealos `inputs` / `defaults`. Scale and CPU/memory live under **`spec.resource`** (`replicas`, `requests`, `limits`). **`spec.projectName`** stays top-level. Do not use historical flat fields such as `spec.cpuRequest`, `spec.image`, or `spec.endpoints`; those fields are not part of the AP XRD.
 
-For region-based ingress hosts, set `metadata.labels.region` to your cluster `BASE_HOST` (see `apps/ui/public/skills/sealos-crossplane/SKILL.md` §6.3) instead of `spec.input.host` when you want the composition to compute hostnames.
+These generated app-store template compositions are a non-product compatibility path. They may still read template-specific `spec.input.host` values because they mirror upstream Sealos templates. The active AP Settings, API docs, and default deployment composition use `spec.input.network` and `status.network`; do not add `spec.input.endpoints[]`, `status.endpoints[]`, or a port-matrix UI to support these generated templates.
 
 ## Prerequisites
 
@@ -86,13 +86,17 @@ spec:
       memory: "1024Mi"
 ```
 
-For public ingress without `metadata.labels.region`, add under `input`:
+For the active default AP composition, public access is represented under `input.network`:
 
 ```yaml
-    endpoints:
-      - port: 3000
-        host: chatgpt.mydomain.com
+    network:
+      privatePort: 3000
+      publicAddresses:
+        - host: chatgpt.mydomain.com
+          port: 3000
 ```
+
+For a generated app-store template composition, use `input.host` only when that composition's `template/instance` annotation lists `host` as a template parameter.
 
 Deploy:
 ```bash
@@ -322,14 +326,19 @@ spec:
 ### Pattern 2: Using Different Domains
 
 ```yaml
-# Subdomain
-host: app.mydomain.com
-
-# Custom domain (ensure DNS is configured)
-host: myapp.example.org
-
-# Development with nip.io
-host: myapp.192.168.1.100.nip.io
+input:
+  network:
+    privatePort: 3000
+    publicAddresses:
+      # Platform Address
+      - host: app.mydomain.com
+        port: 3000
+      # Custom Domain (ensure DNS is configured)
+      - host: myapp.example.org
+        port: 3000
+      # Development with nip.io
+      - host: myapp.192.168.1.100.nip.io
+        port: 3000
 ```
 
 ### Pattern 3: Namespace Isolation

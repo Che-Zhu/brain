@@ -10,8 +10,8 @@ import (
 // APCompositeLabel is the label key used to find ingresses for an AP (Application) instance.
 const APCompositeLabel = "crossplane.io/composite"
 
-// defaultIngressHostFromComposition is used when AP spec has no endpoints (see hub
-// aps-deployment-ingress-go-templating). It must not surface as a real connection URL.
+// defaultIngressHostFromComposition is a placeholder from older generated templates.
+// It must not surface as a real connection URL.
 const defaultIngressHostFromComposition = "placeholder.example.com"
 
 func isPlaceholderIngressHost(host string) bool {
@@ -21,18 +21,6 @@ func isPlaceholderIngressHost(host string) bool {
 	}
 	suffix := "." + defaultIngressHostFromComposition
 	return strings.HasSuffix(h, suffix)
-}
-
-// connectionVariablesEndpoints keeps endpoints only when at least one external URL exists.
-// Otherwise the UI would show internal-only rows (e.g. port 8000 cluster DNS) when there is no
-// real ingress endpoint for the app.
-func connectionVariablesEndpoints(endpoints []map[string]interface{}) []map[string]interface{} {
-	for _, ep := range endpoints {
-		if typ, _ := ep["type"].(string); typ == "external" {
-			return endpoints
-		}
-	}
-	return nil
 }
 
 // APWithIngressesServicesAndBackups extends APWithIngressesAndServicesFromList with status.backups (snapshot summaries).
@@ -49,8 +37,8 @@ func APWithIngressesServicesAndBackups(ap map[string]interface{}, ingresses, ser
 }
 
 // APWithIngressesAndServicesFromList takes an AP resource (as raw map), lists of ingresses and services,
-// and appends status.variables derived from observed ingresses/services (internal/external URLs per port).
-// Cluster-written status (e.g. status.endpoints from composition) is preserved; only variables is set by this transform.
+// and enriches status.network from spec.input.network when the cluster has not written it yet.
+// It keeps the older status.variables table populated from observed Service/Ingress state only.
 func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, services []map[string]interface{}) map[string]interface{} {
 	if ap == nil {
 		return nil
@@ -70,11 +58,12 @@ func APWithIngressesAndServicesFromList(ap map[string]interface{}, ingresses, se
 	for k, v := range status {
 		statusCopy[k] = v
 	}
-	endpoints := buildEndpoints(ap, ingresses, services)
-	if len(endpoints) == 0 {
-		endpoints = buildEndpointsFromSpec(ap, ingresses, services)
+	connectionRows := buildConnectionRows(ap, ingresses, services)
+	if variables := buildVariablesFromConnectionRows(connectionRows); len(variables) > 0 {
+		statusCopy["variables"] = variables
+	} else {
+		delete(statusCopy, "variables")
 	}
-	statusCopy["variables"] = buildVariablesFromEndpoints(endpoints)
 	mergePrivateNetworkStatus(ap, statusCopy, services)
 	mergePublicNetworkStatus(ap, statusCopy, ingresses)
 	out["status"] = statusCopy
@@ -285,9 +274,9 @@ func privatePortFromValue(value interface{}) (int, bool) {
 	return port, true
 }
 
-// buildEndpoints composes internal and external addresses for each service port.
-// Endpoint names: "port-{port}-internal", "port-{port}-external"
-func buildEndpoints(ap map[string]interface{}, ingresses, services []map[string]interface{}) []map[string]interface{} {
+// buildConnectionRows composes internal and external addresses for the older status.variables table.
+// These rows are derived from observed resources, not from the AP Network contract.
+func buildConnectionRows(ap map[string]interface{}, ingresses, services []map[string]interface{}) []map[string]interface{} {
 	apNamespace := getString(ap, "metadata", "namespace")
 	if apNamespace == "" && len(services) > 0 {
 		apNamespace = getString(services[0], "metadata", "namespace")
@@ -300,7 +289,7 @@ func buildEndpoints(ap map[string]interface{}, ingresses, services []map[string]
 	}
 	externalBySvcPort := buildExternalAddressMap(ingresses, apNamespace)
 
-	var endpoints []map[string]interface{}
+	var rows []map[string]interface{}
 	seen := make(map[string]bool)
 	for _, svc := range services {
 		svcName := getString(svc, "metadata", "name")
@@ -314,7 +303,7 @@ func buildEndpoints(ap map[string]interface{}, ingresses, services []map[string]
 			if !seen[internalName] {
 				seen[internalName] = true
 				internalAddr := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", svcName, svcNamespace, port)
-				endpoints = append(endpoints, map[string]interface{}{
+				rows = append(rows, map[string]interface{}{
 					"name":    internalName,
 					"address": internalAddr,
 					"type":    "internal",
@@ -327,7 +316,7 @@ func buildEndpoints(ap map[string]interface{}, ingresses, services []map[string]
 				externalName := "port-" + strconv.Itoa(port) + "-external"
 				if !seen[externalName] {
 					seen[externalName] = true
-					endpoints = append(endpoints, map[string]interface{}{
+					rows = append(rows, map[string]interface{}{
 						"name":    externalName,
 						"address": extAddr,
 						"type":    "external",
@@ -337,115 +326,19 @@ func buildEndpoints(ap map[string]interface{}, ingresses, services []map[string]
 			}
 		}
 	}
-	return endpoints
+	return rows
 }
 
-// buildEndpointsFromSpec builds endpoints from AP spec.endpoints when buildEndpoints returns empty.
-// Uses spec.endpoints (host, port) for external URLs and status.services for internal URLs.
-func buildEndpointsFromSpec(ap map[string]interface{}, ingresses, services []map[string]interface{}) []map[string]interface{} {
-	spec, _ := ap["spec"].(map[string]interface{})
-	if spec == nil {
+// buildVariablesFromConnectionRows converts observed connection rows to the variable table.
+// Each row becomes { name, value } with the address as the value.
+func buildVariablesFromConnectionRows(rows []map[string]interface{}) []map[string]interface{} {
+	if len(rows) == 0 {
 		return nil
 	}
-	rawEndpoints, _ := spec["endpoints"].([]interface{})
-	if len(rawEndpoints) == 0 {
-		return nil
-	}
-	apNamespace := getString(ap, "metadata", "namespace")
-	if apNamespace == "" && len(services) > 0 {
-		apNamespace = getString(services[0], "metadata", "namespace")
-	}
-	if apNamespace == "" && len(ingresses) > 0 {
-		apNamespace = getString(ingresses[0], "metadata", "namespace")
-	}
-	tlsHosts := make(map[string]bool)
-	for _, ing := range ingresses {
-		if spec, _ := ing["spec"].(map[string]interface{}); spec != nil {
-			for h := range getTLSHosts(spec) {
-				tlsHosts[h] = true
-			}
-		}
-	}
-	svcByPort := make(map[int]string)
-	for _, svc := range services {
-		svcName := getString(svc, "metadata", "name")
-		svcNs := getString(svc, "metadata", "namespace")
-		if svcNs == "" {
-			svcNs = apNamespace
-		}
-		for _, port := range getPorts(svc) {
-			svcByPort[port] = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", svcName, svcNs, port)
-		}
-	}
-	seen := make(map[string]bool)
-	var endpoints []map[string]interface{}
-	for _, ep := range rawEndpoints {
-		epMap, _ := ep.(map[string]interface{})
-		if epMap == nil {
-			continue
-		}
-		host, _ := epMap["host"].(string)
-		if host == "" || isPlaceholderIngressHost(host) {
-			continue
-		}
-		var port int
-		switch v := epMap["port"].(type) {
-		case float64:
-			port = int(v)
-		case int:
-			port = v
-		case int64:
-			port = int(v)
-		case int32:
-			port = int(v)
-		case string:
-			if p, err := strconv.Atoi(v); err == nil {
-				port = p
-			}
-		}
-		if port == 0 {
-			continue
-		}
-		scheme := "http"
-		if tlsHosts[host] {
-			scheme = "https"
-		}
-		externalName := "port-" + strconv.Itoa(port) + "-external"
-		if !seen[externalName] {
-			seen[externalName] = true
-			endpoints = append(endpoints, map[string]interface{}{
-				"name":    externalName,
-				"address": fmt.Sprintf("%s://%s/", scheme, host),
-				"type":    "external",
-				"port":    port,
-			})
-		}
-		internalName := "port-" + strconv.Itoa(port) + "-internal"
-		if !seen[internalName] {
-			if internalAddr, ok := svcByPort[port]; ok {
-				seen[internalName] = true
-				endpoints = append(endpoints, map[string]interface{}{
-					"name":    internalName,
-					"address": internalAddr,
-					"type":    "internal",
-					"port":    port,
-				})
-			}
-		}
-	}
-	return endpoints
-}
-
-// buildVariablesFromEndpoints converts endpoints to variables for the variable table.
-// Each endpoint becomes { name, value } with the address as the value.
-func buildVariablesFromEndpoints(endpoints []map[string]interface{}) []map[string]interface{} {
-	if len(endpoints) == 0 {
-		return nil
-	}
-	vars := make([]map[string]interface{}, 0, len(endpoints))
-	for _, ep := range endpoints {
-		name, _ := ep["name"].(string)
-		addr, _ := ep["address"].(string)
+	vars := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		name, _ := row["name"].(string)
+		addr, _ := row["address"].(string)
 		if name != "" && addr != "" {
 			vars = append(vars, map[string]interface{}{
 				"name":  name,

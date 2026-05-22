@@ -4,19 +4,12 @@ import { useK8sGetResource } from "@workspace/api/hooks";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
-  ContainerSettingsPane,
+  ContainerPort,
   ContainerSettingsPaneConfirmedAddDbDsnReference,
   ContainerSettingsPaneEnvChangeMeta,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
-import {
-  type ComponentProps,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { k8sPluralKindForWorkload } from "@/lib/project-canvas/flow/container-node-workload";
@@ -24,7 +17,6 @@ import {
   applyApEnv,
   applyApImage,
   applyApNetwork,
-  applyApPorts,
   applyApResourceQuotas,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
 import {
@@ -34,9 +26,7 @@ import {
   type WorkloadClaimKind,
 } from "@/lib/project-canvas/k8s/claim-mapper";
 
-export type ContainerSettingsOnPortsChange = NonNullable<
-  ComponentProps<typeof ContainerSettingsPane>["onPortsChange"]
->;
+export type ContainerSettingsOnPortsChange = (ports: ContainerPort[]) => void;
 
 export interface UseWorkloadClaimSettingsOptions {
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
@@ -209,30 +199,6 @@ export function useWorkloadClaimSettings(
     ]
   );
 
-  const onPortsChange = useCallback<ContainerSettingsOnPortsChange>(
-    async (ports) => {
-      if (!isApWorkload || readOnly) {
-        return;
-      }
-      const body = claimBodyRef.current;
-      const kc = kubeconfig.trim();
-      if (body == null || kc === "") {
-        toast.error("Claim or kubeconfig missing.");
-        return;
-      }
-      setLocalOverride((prev) => ({ ...(prev ?? {}), ports }));
-      try {
-        await applyApPorts(kc, body, ports);
-        toast.success("Ports applied.");
-        await revalidateAfterApMutation();
-      } catch (e) {
-        setLocalOverride(null);
-        toast.error(e instanceof Error ? e.message : "Apply failed");
-      }
-    },
-    [isApWorkload, kubeconfig, readOnly, revalidateAfterApMutation]
-  );
-
   const onNetworkChange = useCallback(
     async (network: NonNullable<ClaimContainerSettings["network"]>) => {
       if (!isApWorkload || readOnly) {
@@ -328,7 +294,6 @@ export function useWorkloadClaimSettings(
     onEnvChange,
     onImageChange,
     onNetworkChange,
-    onPortsChange,
     onResourceQuotasCommit,
     revalidateClaim,
   };

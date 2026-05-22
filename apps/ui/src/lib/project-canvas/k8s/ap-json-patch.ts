@@ -1,7 +1,6 @@
 import type {
   ContainerEnvVar,
   ContainerNetwork,
-  ContainerPort,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import {
   CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
@@ -21,7 +20,6 @@ import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
 const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
-const LEGACY_AP_SINGLE_ENDPOINT_FIELDS = ["port", "host"] as const;
 
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
   Partial<Pick<ContainerNetwork, "publicAddresses">>;
@@ -30,17 +28,6 @@ function asRecord(v: unknown): Record<string, unknown> | undefined {
   return v != null && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : undefined;
-}
-
-function portNum(v: unknown): number | undefined {
-  if (typeof v === "number" && Number.isFinite(v)) {
-    return v;
-  }
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : undefined;
-  }
-  return undefined;
 }
 
 function assertApClaimForPatch(
@@ -143,47 +130,6 @@ function buildEnvArray(
       }
     }
     return { name: e.name, value: e.value };
-  });
-}
-
-function portsToEndpoints(
-  ports: ContainerPort[],
-  inputSnapshot: Record<string, unknown>
-): Record<string, unknown>[] {
-  const raw = inputSnapshot.endpoints;
-  const origEps = Array.isArray(raw) ? raw : [];
-  const origByPort = new Map<number, Record<string, unknown>>();
-  for (const item of origEps) {
-    const o = asRecord(item);
-    if (o == null) {
-      continue;
-    }
-    const p = portNum(o.port);
-    if (p != null && p > 0) {
-      origByPort.set(p, o);
-    }
-  }
-
-  return ports.map((cp) => {
-    const prev = origByPort.get(cp.port);
-    const hostFromSpec =
-      cp.host != null && cp.host !== "" ? cp.host : undefined;
-    const host =
-      hostFromSpec ??
-      (prev != null && typeof prev.host === "string" && prev.host !== ""
-        ? prev.host
-        : undefined);
-    const publicPrev = prev?.public;
-    const publicFlag = typeof publicPrev === "boolean" ? publicPrev : true;
-
-    const ep: Record<string, unknown> = { port: cp.port };
-    if (host != null) {
-      ep.host = host;
-    }
-    if (!publicFlag) {
-      ep.public = false;
-    }
-    return ep;
   });
 }
 
@@ -353,19 +299,6 @@ export async function applyApNetwork(
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(kubeconfig, claim, patchOpsForApNetworkSettings(spec, network));
-}
-
-export async function applyApPorts(
-  kubeconfig: string,
-  claim: Record<string, unknown>,
-  ports: ContainerPort[]
-): Promise<void> {
-  const spec = asRecord(claim.spec);
-  const input = asRecord(spec?.input);
-  const endpoints = portsToEndpoints(ports, readApInput(spec ?? {}));
-  const ops = patchOpsForApInput(spec, { endpoints });
-  removeExistingApInputFields(ops, input, LEGACY_AP_SINGLE_ENDPOINT_FIELDS);
-  await patchAp(kubeconfig, claim, ops);
 }
 
 export async function applyApReplicas(

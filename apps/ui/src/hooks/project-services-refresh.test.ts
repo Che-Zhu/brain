@@ -34,3 +34,29 @@ test("public AP endpoint detection includes Network public addresses", () => {
     true
   );
 });
+
+test("public AP detection ignores retired endpoint fields", () => {
+  assert.equal(
+    hasPublicApEndpoint({
+      items: [
+        {
+          metadata: { name: "api", namespace: "default" },
+          spec: {
+            input: {
+              endpoints: [{ host: "api.example.com", port: 8080 }],
+            },
+          },
+          status: {
+            endpoints: [
+              {
+                number: 8080,
+                publicAddress: "https://api.example.com/",
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    false
+  );
+});

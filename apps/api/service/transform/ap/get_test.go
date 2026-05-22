@@ -179,6 +179,44 @@ func TestAPTransformEnrichesPublicNetworkAddressesFromIngress(t *testing.T) {
 	assertPublicNetworkAddress(t, addresses, "admin.example.com", "https://admin.example.com/", 9000)
 }
 
+func TestAPTransformDoesNotInferNetworkFromRetiredSpecEndpoints(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name":      "api",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"endpoints": []interface{}{
+					map[string]interface{}{"host": "api.example.com", "port": 8080},
+				},
+			},
+		},
+		[]map[string]interface{}{
+			{
+				"metadata": map[string]interface{}{
+					"name":      "api-ingress",
+					"namespace": "default",
+				},
+				"spec": map[string]interface{}{
+					"rules": []interface{}{
+						ingressRule("api.example.com", "api-service", 8080),
+					},
+				},
+			},
+		},
+		nil,
+	)
+
+	status := out["status"].(map[string]interface{})
+	if got := status["variables"]; got != nil {
+		t.Fatalf("status.variables from retired spec endpoints = %v, want nil", got)
+	}
+	if _, ok := status["network"]; ok {
+		t.Fatal("status.network should not be inferred from retired spec endpoints")
+	}
+}
+
 func TestAPTransformIgnoresInvalidPrivateNetworkPort(t *testing.T) {
 	for _, privatePort := range []interface{}{0, 65536, 8080.5} {
 		t.Run(fmt.Sprint(privatePort), func(t *testing.T) {

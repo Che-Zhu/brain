@@ -22,11 +22,11 @@ func registerGet(grp huma.API) {
 	}
 
 	huma.Register(grp, huma.Operation{
-		OperationID:  "ap-get",
+		OperationID: "ap-get",
 		Method:      http.MethodGet,
 		Path:        "/",
 		Summary:     "Get AP(s)",
-		Description: "Get a single AP by name or list APs in the namespace.\n\nParameter usage:\n- `name` is optional. If omitted, the endpoint lists all APs in the resolved namespace.\n- `namespace` is optional. It uses the kubeconfig namespace by default; admins can override it.\n\nWhat the AP represents:\n- AP is the Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes the Deployment, Service(s), and Ingress shown in the composition.\n- The AP spec may include `spec.probes` (startup, liveness, readiness) for health checks; each probe supports httpGet, tcpSocket, exec, or grpc.\n\nResponse enrichment:\n- `status.variables`: external ingress URLs per port when a real host is available (internal-only cluster DNS is omitted when there is no external URL; default composition placeholder hosts are ignored).\n- `status.backups`: concise summaries of orphaned config snapshots (ConfigMap name, image, createdAt), excluding the managed backup. Ordered newest first.",
+		Description: "Get a single AP by name or list APs in the namespace.\n\nParameter usage:\n- `name` is optional. If omitted, the endpoint lists all APs in the resolved namespace.\n- `namespace` is optional. It uses the kubeconfig namespace by default; admins can override it.\n\nWhat the AP represents:\n- AP is the Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes the Deployment, Service(s), optional Ingress, and generated EntryPoint for `spec.input.network`.\n- The AP spec may include `spec.input.probes` (startup, liveness, readiness) for health checks; each probe supports httpGet, tcpSocket, exec, or grpc.\n\nResponse enrichment:\n- `status.network`: Private Address and Public Address details derived from the Network contract and observed Service/Ingress state when the cluster has not written them yet.\n- `status.backups`: concise summaries of orphaned config snapshots (ConfigMap name, image, createdAt), excluding the managed backup. Ordered newest first.",
 		Tags:        []string{"AP"},
 	}, func(ctx context.Context, input *getInput) (*getOutput, error) {
 		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)

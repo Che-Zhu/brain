@@ -45,7 +45,6 @@ export const WorkloadSettingsCanvasPanel = memo(
       onEnvChange,
       onImageChange,
       onNetworkChange,
-      onPortsChange,
       onResourceQuotasCommit,
       claimPayload,
     } = useWorkloadClaimSettings({
@@ -117,7 +116,7 @@ export const WorkloadSettingsCanvasPanel = memo(
           onEnvChange={canEditAp ? onEnvChange : ignoreEnv}
           onImageChange={canEditAp ? onImageChange : ignoreImage}
           onNetworkChange={canEditAp ? onNetworkChange : ignoreNetwork}
-          onPortsChange={canEditAp ? onPortsChange : ignorePorts}
+          onPortsChange={ignorePorts}
           onResourceQuotasCommit={
             canEditAp ? onResourceQuotasCommit : undefined
           }

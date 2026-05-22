@@ -61,38 +61,11 @@ export function readApMemoryLimit(spec: Record<string, unknown>): unknown {
   return asRecord(readApResource(spec).limits)?.memory;
 }
 
-export function readApEndpoints(
-  spec: Record<string, unknown>
-): unknown[] | undefined {
-  const raw = readApInput(spec).endpoints;
-  return Array.isArray(raw) ? raw : undefined;
-}
-
 export function readApEnv(
   spec: Record<string, unknown>
 ): unknown[] | undefined {
   const raw = readApInput(spec).env;
   return Array.isArray(raw) ? raw : undefined;
-}
-
-/** True when any `input.endpoints[]` is public, or single `input.port` + `input.host`. */
-export function hasApPublicExposure(spec: Record<string, unknown>): boolean {
-  const input = readApInput(spec);
-  const publicAddresses = asRecord(input.network)?.publicAddresses;
-  if (Array.isArray(publicAddresses) && publicAddresses.length > 0) {
-    return true;
-  }
-
-  const endpoints = readApEndpoints(spec);
-  if (endpoints != null) {
-    return endpoints.some((endpoint) => {
-      const ep = asRecord(endpoint);
-      return ep != null && ep.public !== false;
-    });
-  }
-  const host = typeof input.host === "string" ? input.host : "";
-  const port = input.port;
-  return host !== "" && typeof port === "number" && Number.isFinite(port);
 }
 
 function patchNestedFields(

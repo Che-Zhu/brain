@@ -94,6 +94,23 @@ test("container settings pane renders editable structured environment rows", () 
   assert.doesNotMatch(html, RAW_ENV_EDITOR_RE);
 });
 
+test("container settings pane shows no AP networking surface without Network data", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[{ port: 8080, protocol: "tcp" }]}
+    />
+  );
+
+  assert.doesNotMatch(html, PORTS_TABLE_RE);
+});
+
 test("container settings pane renders Network instead of Ports for private-only APs", () => {
   const html = renderToStaticMarkup(
     <ContainerSettingsPane

@@ -12,10 +12,6 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import {
-  PortsTable,
-  type PortRow as PortsTableDisplayRow,
-} from "@workspace/ui/components/ports-table/ports-table";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
@@ -92,19 +88,13 @@ export type ContainerSettingsQuotaSliderProps =
 export interface ContainerEnvVar extends ContainerEnvRow {}
 
 export interface ContainerPort {
-  /** Optional ingress or public host (Public address column when no explicit publicAddress URL). */
+  /** Retained for non-AP callers; AP settings use `network` instead. */
   host?: string;
   port: number;
-  /**
-   * Full internal URL (e.g. from AP `status.endpoints[].privateAddress`).
-   * When set, overrides the default `0.0.0.0:{port}` in the Private address column.
-   */
+  /** Retained for non-AP callers; AP settings use `network.privateAddress` instead. */
   privateAddress?: string;
   protocol: string;
-  /**
-   * Full public URL (e.g. from AP `status.endpoints[].publicAddress`).
-   * When set, overrides host / protocol for the Public address column.
-   */
+  /** Retained for non-AP callers; AP settings use `network.publicAddresses` instead. */
   publicAddress?: string;
 }
 
@@ -153,7 +143,7 @@ export interface ContainerSettingsPaneProps {
   /** Full image reference (repository + tag/digest). */
   image: string;
   memoryQuota: ContainerSettingsControlledQuotaProps;
-  /** AP network model; when present, renders Network instead of the legacy Ports table. */
+  /** AP network model rendered by the Network section. */
   network?: ContainerNetwork;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
   onEnvChange: (
@@ -209,34 +199,6 @@ function SectionTitle({
       {children}
     </h3>
   );
-}
-
-function containerPortsToTableRows(
-  list: ContainerPort[]
-): PortsTableDisplayRow[] {
-  return list.map((entry) => {
-    const publicAddressExplicit =
-      entry.publicAddress != null && entry.publicAddress !== "";
-    const privateAddressExplicit =
-      entry.privateAddress != null && entry.privateAddress !== "";
-
-    let publicAddress: string;
-    if (publicAddressExplicit) {
-      publicAddress = entry.publicAddress ?? "";
-    } else if (entry.host != null && entry.host !== "") {
-      publicAddress = entry.host;
-    } else {
-      publicAddress = entry.protocol.toUpperCase();
-    }
-
-    return {
-      number: entry.port,
-      privateAddress: privateAddressExplicit
-        ? (entry.privateAddress ?? "")
-        : `0.0.0.0:${entry.port}`,
-      publicAddress,
-    };
-  });
 }
 
 const DB_REFERENCE_FIELD_LABELS: Record<ContainerEnvDbReferenceField, string> =
@@ -1186,7 +1148,7 @@ function NetworkSettingsSection({
 
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
- * optional replica count, environment variables, and exposed ports (`PortsTable`).
+ * optional replica count, environment variables, and AP Network settings.
  * All fields are controlled by the host.
  */
 export function ContainerSettingsPane({
@@ -1197,12 +1159,10 @@ export function ContainerSettingsPane({
   onNetworkChange,
   onEnvChange,
   onAddDbDsnReferenceIntentConsumed,
-  onPortsChange,
   cpuQuota,
   memoryQuota,
   env,
   network,
-  ports,
   replicasQuota,
   onResourceQuotasCommit,
   readOnly = false,
@@ -1334,11 +1294,6 @@ export function ContainerSettingsPane({
       setQuotaSavePending(false);
     }
   };
-
-  const portsTableRows = useMemo(
-    () => containerPortsToTableRows(ports),
-    [ports]
-  );
 
   const envValidation = useMemo(
     () => validateContainerEnvRows(envDraft),
@@ -1525,19 +1480,6 @@ export function ContainerSettingsPane({
     patch: Partial<ContainerEnvRow>
   ) => {
     setEnvDraft((rows) => updateContainerEnvRow(rows, index, patch));
-  };
-
-  const portsTableMutationProps = {
-    onAdd: (portNumber: number) =>
-      onPortsChange([...ports, { port: portNumber, protocol: "tcp" }]),
-    onDelete: (portNumber: number) =>
-      onPortsChange(ports.filter((p) => p.port !== portNumber)),
-    onUpdate: (previousPortNumber: number, nextPortNumber: number) =>
-      onPortsChange(
-        ports.map((p) =>
-          p.port === previousPortNumber ? { ...p, port: nextPortNumber } : p
-        )
-      ),
   };
 
   return (
@@ -1777,20 +1719,7 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        {network == null ? (
-          <section className="flex min-w-0 flex-col gap-2">
-            <PortsTable.Variant0
-              ports={portsTableRows}
-              {...(readOnly
-                ? {}
-                : {
-                    onAdd: portsTableMutationProps.onAdd,
-                    onDelete: portsTableMutationProps.onDelete,
-                    onUpdate: portsTableMutationProps.onUpdate,
-                  })}
-            />
-          </section>
-        ) : (
+        {network == null ? null : (
           <NetworkSettingsSection
             network={network}
             onNetworkChange={onNetworkChange}

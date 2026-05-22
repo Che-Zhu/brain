@@ -22,12 +22,9 @@ spec:
           metadata:
             type: object
             description: >
-              Claim metadata. Set metadata.labels.region to a DNS base (e.g. 192.168.12.53.nip.io).
-              When set, aps-deployment-ingress-go-templating uses {metadata.name}-{slug}.{region} as the
-              Ingress hostname for a **single** public endpoint (spec.input.endpoints[].public true, default), and
-              {metadata.name}-p{port}-{slug}.{region} when **two or more** endpoints are public, so each port
-              gets a distinct hostname. spec.input.endpoints[].host is ignored for those rules when region is set.
-              Endpoints with public false get a ClusterIP Service only.
+              Claim metadata. The default AP composition reads desired networking from
+              spec.input.network: a Private Address target App Listening Port plus optional
+              Public Addresses. metadata.labels.region is not used by the AP Network contract.
             properties:
               labels:
                 type: object
@@ -77,32 +74,11 @@ spec:
                 description: >
                   Template-specific parameters and deployment overrides. Sealos *-composite.yaml
                   compositions store Sealos inputs here. aps-deployment-ingress-go-templating uses image,
-                  endpoints, env, probes, and imagePullPolicy (and optional legacy port/host).
+                  network, env, probes, and imagePullPolicy.
                 properties:
                   image:
                     type: string
                     description: Container image (e.g. puddlecat/sealos-brain-ai:0.20.67)
-                  endpoints:
-                    type: array
-                    description: >
-                      Per-port exposure for aps-deployment-ingress-go-templating (same semantics as former
-                      spec.endpoints).
-                    items:
-                      type: object
-                      required: [port]
-                      properties:
-                        port:
-                          type: integer
-                          description: Container port and service port
-                        host:
-                          type: string
-                          description: >
-                            Optional Ingress hostname when metadata.labels.region is omitted.
-                        public:
-                          type: boolean
-                          default: true
-                          description: >
-                            When true (default), compose an Ingress rule when a hostname resolves.
                   network:
                     type: object
                     description: >
@@ -134,15 +110,6 @@ spec:
                               minimum: 1
                               maximum: 65535
                               description: Target App Listening Port for this Public Address.
-                  port:
-                    type: integer
-                    description: >
-                      (Legacy) Single port when input.endpoints is omitted; use with input.host.
-                  host:
-                    type: string
-                    description: >
-                      (Legacy) Ingress host paired with input.port when input.endpoints is omitted.
-                      Sealos *-composite templates also use this when metadata.labels.region is omitted.
                   imagePullPolicy:
                     type: string
                     default: "Always"
@@ -299,29 +266,6 @@ spec:
                 type: string
                 description: >
                   UID of the observed Project claim when spec.projectName is set and project-observe has synced.
-              endpoints:
-                type: array
-                description: >
-                  Per exposed port: Kubernetes service port number, cluster-internal URL from the composed
-                  ClusterIP Service (observed clusterIP when assigned, else in-cluster DNS), and external URL
-                  from the composed Ingress (scheme from Ingress TLS stanza).
-                items:
-                  type: object
-                  required: [number]
-                  properties:
-                    number:
-                      type: integer
-                      description: Service and Ingress backend port.
-                    privateAddress:
-                      type: string
-                      description: >
-                        http URL reachable inside the cluster (Service ClusterIP or
-                        {name}-service-port-{port}.{namespace}.svc).
-                    publicAddress:
-                      type: string
-                      description: >
-                        http(s) URL when this port is public on Ingress. Omitted when spec.input.endpoints[].public
-                        is false or no hostname was resolved for the Ingress rule.
               network:
                 type: object
                 description: AP Network observed state for the Settings Network section.

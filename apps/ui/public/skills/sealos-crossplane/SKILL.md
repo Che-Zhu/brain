@@ -21,7 +21,7 @@ template. Scope of this skill (other compositions exist on some clusters but are
 
 | Kind      | Default `compositionRef.name`                | Composes                                                        |
 |-----------|----------------------------------------------|-----------------------------------------------------------------|
-| `AP`      | `aps-deployment-ingress-go-templating`       | `Deployment`, one `Service` per endpoint, one `Ingress`, plus a config-snapshot `ConfigMap` (+ rollback `Job`). |
+| `AP`      | `aps-deployment-ingress-go-templating`       | `Deployment`, Private Address `Service`, optional public `Ingress`/`EntryPoint`, plus a config-snapshot `ConfigMap` (+ rollback `Job`). |
 | `AP` (template / app store) | one of `aps-<template>-go-templating` in `crossplane-system` | Same kinds as generic `AP`, plus template-specific Secrets/StatefulSets/etc. from the inline Go template. |
 | `Project` | `project-instance-go-templating`             | One `app.sealos.io/v1 Instance` (Sealos UI grouping object).    |
 | `DB`      | `dbs-postgresql-kubeblocks-go-templating` (default) — pick one of four per engine | `apps.kubeblocks.io/v1alpha1 Cluster`, `ServiceAccount` + `Role` + `RoleBinding`, an observe-only `Object` for KubeBlocks' auto-created conn-credential Secret, optional NodePort export Service, optional user-managed `Secret`. |
@@ -54,30 +54,19 @@ Composition behavior to know before you write a claim:
 
 - The `Ingress` uses `ingressClassName: nginx` and TLS via `secretName: wildcard-cert` in the
   same namespace.
-- **Spec layout:** workload settings live under **`spec.input`** (image, endpoints, env, probes,
-  `imagePullPolicy`, optional single `port`/`host`); scale and CPU/memory under **`spec.resource`**
+- **Spec layout:** workload settings live under **`spec.input`** (image, `network`, env, probes,
+  `imagePullPolicy`); scale and CPU/memory under **`spec.resource`**
   (`replicas`, `requests`, `limits`). Top-level **`spec.projectName`**, **`spec.paused`**,
   **`spec.restartRequest`**, and **`spec.ingressAnnotations`** are not nested under `input`.
-- If `metadata.labels.region` is set, the composition **overwrites hosts** on **public**
-  `spec.input.endpoints[]` entries (`public` defaults to `true`). `slug6` is the first 6 hex chars of
-  `sha256(name|namespace|uid)`. With **one** public endpoint the host is
-  `{metadata.name}-{slug6}.{region}`; with **two or more** public endpoints each port gets
-  `{metadata.name}-p{port}-{slug6}.{region}`. **That label must equal the ingress base host
-  `BASE_HOST`** from the active kubeconfig cluster server ([§6.3](#63-derive-the-ingress-base-host)):
-  read `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` (e.g. stdout
-  `https://192.168.12.53.nip.io:6443`), strip scheme/path/trailing `:port` → **`192.168.12.53.nip.io`**,
-  and set `region` to **that hostname only**—not the raw `https://…:6443` URL and not an invented zone.
-  Either use `region` and let it compute hosts, **or** set explicit `spec.input.endpoints[].host` and omit
-  `region`. Don't mix.
-- **If `metadata.labels.region` is omitted**, the composition **does not** replace your hosts and
-  **does not** auto-fill `BASE_HOST` or default to `*.example.com`. Ingress `rules[].host` is taken
-  **verbatim** from `spec.input.endpoints[].host` (or from `spec.input.port` + `spec.input.host` when
-  `endpoints` is omitted). See `packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml`.
-  Compare `kubectl get ap <name> -n <ns> -o yaml` with
-  `kubectl get ingress <name>-ingress -n <ns> -o yaml` if they disagree.
-- Endpoints with **`public: false`** get a ClusterIP Service only (no Ingress rule for that port).
+- **Network contract:** `spec.input.network.privatePort` is the App Listening Port targeted by
+  the Private Address. Optional `spec.input.network.publicAddresses[]` entries expose Platform
+  Addresses; each entry has `host` and target App Listening Port `port`.
+- The composition does not invent AP public hosts. Use the real `BASE_HOST` from the active
+  kubeconfig cluster server ([§6.3](#63-derive-the-ingress-base-host)) and set each Public Address
+  host explicitly, for example `<slug>.<BASE_HOST>`.
+- APs without Public Addresses stay private-only: one Service and no Ingress or EntryPoint.
 - The composed `Deployment`/`Service`/`Ingress`/`ConfigMap` ownerReference the `AP`. Composed
-  child names: `Deployment={name}`, `Service={name}-service-port-{port}`,
+  child names: `Deployment={name}`, `Service={name}-service`,
   `Ingress={name}-ingress`, ConfigMap=`{name}-config-backup` (managed) and
   `{name}-config-snapshot-{hash}` (immutable rollback artifacts).
 
@@ -89,8 +78,8 @@ Composition behavior to know before you write a claim:
 | `name`                           | string                                      | `metadata.name` | Logical instance name for composed resources. |
 | `projectName`                    | string                                      | —           | `Project` claim name in the same namespace (labels + `ownerReference`). |
 | `input.image`                    | string                                      | —           | Container image. |
-| `input.endpoints[]`              | `[{ port, host?, public? }]`                | —           | One Service + Ingress per public entry. `[]` = no Service/Ingress. |
-| `input.port` + `input.host`      | int + string                                | —           | Single endpoint when `input.endpoints` is omitted. |
+| `input.network.privatePort`      | integer                                     | —           | App Listening Port targeted by the Private Address. |
+| `input.network.publicAddresses[]` | `[{ host, port }]`                         | `[]`        | Platform hosts routed to App Listening Ports through Ingress + EntryPoint. |
 | `input.env[]`                    | `[{ name, value?, valueFrom? }]`            | `[]`        | Standard Kubernetes env shape. |
 | `input.probes`                   | Kubernetes Probe map                        | none        | `startup` / `liveness` / `readiness`; no defaults. |
 | `input.imagePullPolicy`          | `Always` \| `IfNotPresent` \| `Never`        | `Always`    | |
@@ -212,20 +201,14 @@ spec:
 `resource`, `projectName`, `paused`, `restartRequest`, `ingressAnnotations` (not flat `image` /
 `replicas`). Roll back by re-applying those nested blocks onto a live AP claim.
 
-`metadata.labels.region` (string) — **must match `BASE_HOST`** derived from
-`{.clusters[0].cluster.server}` as in [§6.3](#63-derive-the-ingress-base-host) when you use this
-strategy; see host-rewrite note above. Treated as part of the configurable surface even though it
-lives on `metadata`, not `spec`.
-
 `status` fields (read-only, useful when polling): `phase` (`Running` / `Progressing` /
-`Failed` / `Degraded` / `Paused` / `Unknown`), `configVersionHash`, `endpoints[]` (per-port
-`number`, `privateAddress`, optional `publicAddress`), `projectName`, `projectUid`,
-`conditions[]`.
+`Failed` / `Degraded` / `Paused` / `Unknown`), `configVersionHash`, `network.privateAddress`,
+`network.privatePort`, `network.publicAddresses[]`, `projectName`, `projectUid`, `conditions[]`.
 
 **JSON merge patch** (API `PATCH /api/ap/v1alpha1/`): patch nested subtrees, e.g.
 `{"spec":{"input":{"image":"nginx:1.27"}}}`, `{"spec":{"resource":{"replicas":2}}}`,
-`{"spec":{"paused":true}}`. Replacing `spec.input.endpoints` or `spec.input.env` requires sending
-the **full** desired array.
+`{"spec":{"paused":true}}`. Replacing `spec.input.network.publicAddresses` or `spec.input.env`
+requires sending the **full** desired array.
 
 ---
 
@@ -420,10 +403,10 @@ user's cluster. Read it to make decisions; never assume a value.
    `kubectl auth can-i create aps -n <ns>` (and the matching `projects` / `dbs` checks for whatever
    you are applying).
 3. For an `AP`:
-   - Nest image/endpoints/env/probes under **`spec.input`** and replicas/requests/limits under
+   - Nest image/network/env/probes under **`spec.input`** and replicas/requests/limits under
      **`spec.resource`** ([§1](#1-ap--deploy-one-docker-image)).
-   - Pick a host strategy ([§6.3](#63-derive-the-ingress-base-host)): explicit
-     `spec.input.endpoints[].host: <slug>.<base-host>` **or** `metadata.labels.region: <base-host>`.
+   - For public APs, set `spec.input.network.publicAddresses[].host` to a real
+     `<slug>.<base-host>` host from [§6.3](#63-derive-the-ingress-base-host).
    - **Template / app store:** discover templates via metadata-only listing in
      `crossplane-system` ([§1.1](#11-template-ap-app-store)); fetch **one** `template/instance`
      annotation; draft the claim; tabulate missing required `spec.input` fields and ask the user
@@ -494,18 +477,9 @@ BASE_HOST=$(printf '%s' "$SERVER" | sed -E 's#^https?://##; s#/.*$##; s#:[0-9]+$
 echo "$BASE_HOST"
 ```
 
-**`metadata.labels.region`:** when you choose the region-based host strategy, set this label to
-**exactly** the `BASE_HOST` value produced above (host only: no `https://`, no trailing `:6443`).
-Example: if the command prints `https://192.168.12.53.nip.io:6443`, then `region` must be
-`192.168.12.53.nip.io`.
-
-Then either:
-
-- Set `spec.input.endpoints[].host: <your-app>.<BASE_HOST>` per public endpoint (use distinct slugs
-  to avoid collisions in the same namespace), **or**
-- Set `metadata.labels.region: <BASE_HOST>` and let the composition compute hosts from
-  `{name}-<slug6>.<region>` (one public port) or `{name}-p<port>-<slug6>.<region>` (multiple public
-  ports). Slug6 is a deterministic hash you don't control.
+For AP Public Addresses, set `spec.input.network.publicAddresses[].host` to a concrete host under
+this `BASE_HOST`, for example `<your-app>.<BASE_HOST>`. Use distinct left-hand labels for multiple
+Public Addresses in the same namespace.
 
 For `DB`, `BASE_HOST` doubles as the value of `metadata.labels.region` **only when** you want a
 public NodePort URI (`status.connectionStringPublic`). It is not used for host rewriting; for
@@ -524,17 +498,13 @@ the platform exposes — don't guess.
 
 **Avoid host collisions**: reusing bare names like `nginx-app` across delete/recreate or
 parallel demos in the same namespace clashes on the same `rules[].host`. Append a short random
-or time-based postfix to **`metadata.name` and** the left DNS label:
+or time-based postfix to **`metadata.name` and** each Public Address host's left DNS label:
 
 ```bash
 RAND=$(openssl rand -hex 3)
 APP_SLUG="nginx-${RAND}"
 # Use $APP_SLUG as metadata.name; host="${APP_SLUG}.${BASE_HOST}"
 ```
-
-If `metadata.labels.region` is set, the composition ignores your literal `spec.input.endpoints[].host`
-for public endpoints and uses the computed host pattern ([§1](#1-ap--deploy-one-docker-image)) — pick a
-collision-safe **`metadata.name`** there too.
 
 ### 6.4 Apply and watch
 
@@ -566,10 +536,12 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 
 ### 6.5 Common gotchas
 
-- **Endpoint host clashes** when two APs pick the same host. Either keep hosts unique or use
-  `metadata.labels.region` so the composition appends a hash.
-- **`spec.input.endpoints: []`** (and no `spec.input.port`/`host`) suppresses Service and Ingress
-  entirely — useful for workers that shouldn't be reachable.
+- **Public Address host clashes** when two APs pick the same host. Keep
+  `spec.input.network.publicAddresses[].host` values unique within the namespace.
+- **No `spec.input.network.privatePort`** means the default AP composition has no App Listening Port
+  to render, so it does not create the Network Service.
+- **No `spec.input.network.publicAddresses[]`** keeps the AP private-only: Service only, no Ingress
+  or EntryPoint.
 - **Changing `spec.input.image`** rolls the Deployment and stamps a new immutable
   `{name}-config-snapshot-{hash}` ConfigMap for rollback (effective snapshot uses nested `input` /
   `resource`).
@@ -596,20 +568,20 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
 1. **Compare claim vs composed Ingress** (traffic follows the Ingress, not your YAML file on disk):
 
    ```bash
-   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.input.endpoints}' ; echo
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.spec.input.network.publicAddresses}' ; echo
    kubectl get ingress "${NAME}-ingress" -n "$NS" -o jsonpath='{.spec.rules[*].host}' ; echo
-   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.status.endpoints}' ; echo
+   kubectl get ap "$NAME" -n "$NS" -o jsonpath='{.status.network.publicAddresses}' ; echo
    ```
 
-2. **`metadata.labels.region` overrides `spec.input.endpoints[].host`** on **public** endpoints:
-   when `region` is set, the composition **replaces** hosts per [§1](#1-ap--deploy-one-docker-image).
-   Remove `metadata.labels.region` if you need full manual control of `spec.input.endpoints[].host`.
+2. **AP public hosts are explicit:** the default composition uses
+   `spec.input.network.publicAddresses[].host` directly. If the Ingress shows a different host,
+   inspect the live AP object and Crossplane reconcile status.
 
 3. **`kubectl apply ... unchanged`**: the live **AP** object already matched your manifest. If
    you thought you changed the host, re-check namespace/name, `kubectl get ap ... -o yaml`, and
-   whether another controller (SSA field manager / webhook) resets `spec.input.endpoints`.
+   whether another controller (SSA field manager / webhook) resets `spec.input.network`.
 
-4. **Stale Ingress after fixing `spec.input.endpoints`**: if the AP spec shows the new host but
+4. **Stale Ingress after fixing `spec.input.network.publicAddresses`**: if the AP spec shows the new host but
    `kubectl get ingress` still shows an old one, inspect `kubectl describe ap` (sync/ready).
    Wait for reconcile, or apply a harmless metadata annotation bump to force a new pipeline
    pass; if still wedged, recreate the AP with a **new** `metadata.name` and a fresh host.
@@ -643,9 +615,11 @@ spec:
   name: <your-app>
   input:
     image: nginx:latest
-    endpoints:
-      - port: 80
-        host: <your-app>.<base-host>
+    network:
+      privatePort: 80
+      publicAddresses:
+        - host: <your-app>.<base-host>
+          port: 80
   resource:
     replicas: 1
 ```
@@ -666,9 +640,11 @@ spec:
   projectName: <your-project>
   input:
     image: nginx:latest
-    endpoints:
-      - port: 80
-        host: <your-app>.<base-host>
+    network:
+      privatePort: 80
+      publicAddresses:
+        - host: <your-app>.<base-host>
+          port: 80
   resource:
     replicas: 1
     requests:
@@ -679,7 +655,7 @@ spec:
       memory: 1Gi
 ```
 
-### 7.3 `AP` with multiple endpoints, env, probes, ingress annotations
+### 7.3 `AP` with multiple Public Addresses, env, probes, ingress annotations
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -694,11 +670,13 @@ spec:
   name: <your-app>
   input:
     image: ghcr.io/<owner>/<repo>:<tag>
-    endpoints:
-      - port: 8080
-        host: <your-app>.<base-host>
-      - port: 9090
-        host: <your-app>-metrics.<base-host>
+    network:
+      privatePort: 8080
+      publicAddresses:
+        - host: <your-app>.<base-host>
+          port: 8080
+        - host: <your-app>-metrics.<base-host>
+          port: 9090
     env:
       - name: LOG_LEVEL
         value: "info"
@@ -722,32 +700,7 @@ spec:
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
 ```
 
-### 7.4 `AP` with composition-derived hosts (`region` label)
-
-```yaml
-apiVersion: example.crossplane.io/v1
-kind: AP
-metadata:
-  name: <your-app>
-  namespace: <your-namespace>
-  labels:
-    region: <base-host>
-spec:
-  crossplane:
-    compositionRef:
-      name: aps-deployment-ingress-go-templating
-  name: <your-app>
-  input:
-    image: nginx:latest
-    endpoints:
-      - port: 80
-        # When `region` is set, this host is NOT used for Ingress; effective host is <name>-<slug6>.<region>
-        host: dns-ignored.invalid
-  resource:
-    replicas: 1
-```
-
-### 7.4b `AP` single endpoint via `input.port` + `input.host` (no `endpoints` array)
+### 7.4 Private-only `AP`
 
 ```yaml
 apiVersion: example.crossplane.io/v1
@@ -762,8 +715,8 @@ spec:
   name: <your-app>
   input:
     image: nginx:latest
-    port: 80
-    host: <your-app>.<base-host>
+    network:
+      privatePort: 80
   resource:
     replicas: 1
 ```

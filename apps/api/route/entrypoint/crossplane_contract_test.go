@@ -89,9 +89,8 @@ func TestAPCompositionRendersEntryPointForPublicTargets(t *testing.T) {
 		`kind: EntryPoint`,
 		`apRef: {{ $name | quote }}`,
 		`targets:`,
-		`{{ range $endpoints }}`,
-		`{{ if and .public (ne (trim (toString (default "" .host))) "") }}`,
-		`platformDomain: {{ trim (toString .host) | quote }}`,
+		`{{ range $networkPublicAddresses }}`,
+		`platformDomain: {{ .host | quote }}`,
 		`status: {{ $entryTargetStatus | quote }}`,
 	} {
 		if !strings.Contains(templateText, fragment) {
@@ -112,7 +111,7 @@ func TestAPCompositionRendersEntryPointForPublicTargets(t *testing.T) {
 	}
 }
 
-func TestAPCompositionCreatesEntryPointForPublicAPEndpoints(t *testing.T) {
+func TestAPCompositionCreatesEntryPointForPublicAddresses(t *testing.T) {
 	out := renderAPComposition(t, map[string]interface{}{
 		"observed": map[string]interface{}{
 			"composite": map[string]interface{}{
@@ -128,10 +127,12 @@ func TestAPCompositionCreatesEntryPointForPublicAPEndpoints(t *testing.T) {
 					"spec": map[string]interface{}{
 						"input": map[string]interface{}{
 							"image": "nginx:1.27",
-							"endpoints": []interface{}{
-								map[string]interface{}{"port": 80},
-								map[string]interface{}{"port": 8080},
-								map[string]interface{}{"port": 9000, "public": false},
+							"network": map[string]interface{}{
+								"privatePort": 9000,
+								"publicAddresses": []interface{}{
+									map[string]interface{}{"host": "web.example.com", "port": 80},
+									map[string]interface{}{"host": "api.example.com", "port": 8080},
+								},
 							},
 						},
 					},
@@ -162,32 +163,26 @@ func TestAPCompositionCreatesEntryPointForPublicAPEndpoints(t *testing.T) {
 		t.Fatalf("EntryPoint target count = %d, want 2", got)
 	}
 
-	targetByPort := map[int]map[string]interface{}{}
+	targetByHost := map[string]map[string]interface{}{}
 	for i, target := range targets {
 		targetMap := asMap(t, target, fmt.Sprintf("entrypoint.spec.targets[%d]", i))
-		targetByPort[numberAsInt(t, targetMap["port"], fmt.Sprintf("entrypoint.spec.targets[%d].port", i))] = targetMap
+		host, ok := targetMap["platformDomain"].(string)
+		if !ok {
+			t.Fatalf("target %d platformDomain is %T, want string", i, targetMap["platformDomain"])
+		}
+		targetByHost[host] = targetMap
 	}
-	for _, port := range []int{80, 8080} {
-		target, ok := targetByPort[port]
+	for host, port := range map[string]int{"api.example.com": 8080, "web.example.com": 80} {
+		target, ok := targetByHost[host]
 		if !ok {
-			t.Fatalf("missing EntryPoint target for public AP endpoint port %d", port)
+			t.Fatalf("missing EntryPoint target for Public Address %s", host)
 		}
-		domain, ok := target["platformDomain"].(string)
-		if !ok {
-			t.Fatalf("target %d platformDomain is %T, want string", port, target["platformDomain"])
-		}
-		if wantPrefix := fmt.Sprintf("web-p%d-", port); !strings.HasPrefix(domain, wantPrefix) {
-			t.Fatalf("target %d platformDomain = %q, want prefix %q", port, domain, wantPrefix)
-		}
-		if !strings.HasSuffix(domain, ".usw.sealos.app") {
-			t.Fatalf("target %d platformDomain = %q, want usw.sealos.app suffix", port, domain)
+		if got := numberAsInt(t, target["port"], fmt.Sprintf("target %s port", host)); got != port {
+			t.Fatalf("target %s port = %d, want %d", host, got, port)
 		}
 		if got := target["status"]; got != "accessible" {
-			t.Fatalf("target %d status = %v, want accessible", port, got)
+			t.Fatalf("target %s status = %v, want accessible", host, got)
 		}
-	}
-	if _, ok := targetByPort[9000]; ok {
-		t.Fatal("EntryPoint included internal-only AP endpoint port 9000")
 	}
 }
 
@@ -197,20 +192,27 @@ func TestAPCompositionOmitsEntryPointWithoutPublicPlatformHostname(t *testing.T)
 		ap   map[string]interface{}
 	}{
 		{
-			name: "internal endpoints only",
+			name: "private network only",
 			ap: apResource(map[string]interface{}{
-				"endpoints": []interface{}{
-					map[string]interface{}{"port": 80, "public": false},
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 80,
+					},
 				},
 			}, map[string]interface{}{
 				"region": "usw.sealos.app",
 			}),
 		},
 		{
-			name: "public endpoint without resolved host",
+			name: "Public Address without host",
 			ap: apResource(map[string]interface{}{
-				"endpoints": []interface{}{
-					map[string]interface{}{"host": "  ", "port": 80, "public": true},
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 80,
+						"publicAddresses": []interface{}{
+							map[string]interface{}{"host": "  ", "port": 80},
+						},
+					},
 				},
 			}, nil),
 		},
@@ -232,6 +234,44 @@ func TestAPCompositionOmitsEntryPointWithoutPublicPlatformHostname(t *testing.T)
 				t.Fatalf("EntryPoint manifest count = %d, want 0", len(got))
 			}
 		})
+	}
+}
+
+func TestAPCompositionIgnoresLegacyEndpointMatrixPath(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"input": map[string]interface{}{
+						"endpoints": []interface{}{
+							map[string]interface{}{"host": "api.example.com", "port": 8080},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	if got := entryPointObjects(t, out); len(got) != 0 {
+		t.Fatalf("EntryPoint manifest count = %d, want 0", len(got))
+	}
+	if got := ingressObjects(t, out); len(got) != 0 {
+		t.Fatalf("Ingress manifest count = %d, want 0", len(got))
+	}
+	if got := serviceObjects(t, out); len(got) != 0 {
+		t.Fatalf("Service manifest count = %d, want 0", len(got))
+	}
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	if _, ok := status["endpoints"]; ok {
+		t.Fatal("AP status included retired endpoints field")
+	}
+	if _, ok := status["network"]; ok {
+		t.Fatal("AP status.network should not be inferred from retired endpoint fields")
 	}
 }
 
@@ -399,8 +439,13 @@ func TestAPCompositionAllowsGeneratedEntryPointCleanup(t *testing.T) {
 		"observed": map[string]interface{}{
 			"composite": map[string]interface{}{
 				"resource": apResource(map[string]interface{}{
-					"endpoints": []interface{}{
-						map[string]interface{}{"port": 80},
+					"input": map[string]interface{}{
+						"network": map[string]interface{}{
+							"privatePort": 80,
+							"publicAddresses": []interface{}{
+								map[string]interface{}{"host": "web.example.com", "port": 80},
+							},
+						},
 					},
 				}, map[string]interface{}{
 					"region": "usw.sealos.app",
@@ -448,7 +493,7 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 			continue
 		}
 		switch key {
-		case "endpoints", "env", "host", "image", "imagePullPolicy", "network", "port", "probes":
+		case "env", "image", "imagePullPolicy", "network", "probes":
 			input[key] = value
 		default:
 			fullSpec[key] = value

@@ -159,6 +159,34 @@ test("AP claim settings falls back to desired public addresses while observed UR
   ]);
 });
 
+test("AP claim settings ignores retired endpoint fields", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          endpoints: [{ host: "api.example.com", port: 8080 }],
+          image: "ghcr.io/acme/api:latest",
+        },
+      },
+      status: {
+        endpoints: [
+          {
+            number: 8080,
+            privateAddress: "http://api.default.svc:8080",
+            publicAddress: "https://api.example.com/",
+          },
+        ],
+      },
+    },
+    "AP"
+  );
+
+  assert.equal(settings.network, undefined);
+  assert.deepEqual(settings.ports, []);
+});
+
 test("AP claim settings ignores invalid private-only network ports", () => {
   const settings = claimToContainerSettings(
     {
