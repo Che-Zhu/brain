@@ -105,11 +105,12 @@ error() {
 if [ -z "$1" ]; then
     error "Usage: $0 <project-name> [release-notes]"
     error "Example: $0 ui 'bump dependencies'"
-    error "Docker Hub image: puddlecat/<monorepo-name>-<project> (monorepo name from root package.json)"
+    error "Docker Hub image: ${DOCKER_NAMESPACE:-aimerite}/<monorepo-name>-<project> (monorepo name from root package.json)"
     exit 1
 fi
 
 PROJECT=$1
+DOCKER_NAMESPACE=${DOCKER_NAMESPACE:-aimerite}
 
 # Get current git commit message as default release notes
 if [ -z "$2" ]; then
@@ -184,7 +185,7 @@ VALID_PROJECTS=$(echo "$VALID_PROJECTS" | xargs)
 # Validate project name and set Docker image name
 DOCKERFILE="apps/${PROJECT}/Dockerfile"
 if [ -f "$DOCKERFILE" ]; then
-    DOCKER_IMAGE="puddlecat/${MONOREPO_NAME}-${PROJECT}"
+    DOCKER_IMAGE="${DOCKER_NAMESPACE}/${MONOREPO_NAME}-${PROJECT}"
 else
     error "Invalid project name: $PROJECT"
     error "Valid projects: $(echo "$VALID_PROJECTS" | sed 's/ /, /g')"
