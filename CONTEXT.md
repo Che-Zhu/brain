@@ -4,9 +4,9 @@
 
 ### EntryPoint
 
-A Crossplane XRD resource (`example.crossplane.io/v1`, kind `EntryPoint`) that represents the **public address layer** for an AP. Each EntryPoint is 1:1 associated with an AP via `spec.apRef`. It only exists when the AP has one or more Public Addresses.
+A Crossplane XRD resource (`example.crossplane.io/v1`, kind `EntryPoint`) that represents the **allocated public routing layer** for an AP. Each EntryPoint is 1:1 associated with an AP via `spec.apRef`.
 
-EntryPoint is **automatically created by the AP Composition** (via provider-kubernetes Object) when the AP has Public Addresses, and automatically deleted when the AP is deleted.
+EntryPoint is **automatically created by the AP Composition** (via provider-kubernetes Object) when the AP has allocated public routing targets, and automatically deleted when the AP is deleted. A Requested Platform Address may remain pending before an EntryPoint exists.
 
 EntryPoint manages:
 
@@ -31,13 +31,25 @@ An externally reachable URL/domain alias for an AP that targets one App Listenin
 
 A system-assigned Public Address that the platform can create without user DNS or certificate setup; in v1, users request one by choosing an App Listening Port, not by providing a host or URL.
 
+### Requested Platform Address
+
+A v1 Platform Address desired entry in AP `spec.input.network.platformAddresses[]`. It has a stable Platform Address ID and target App Listening Port, but no platform-allocated host or URL yet.
+
+### Allocated Platform Address
+
+A Platform Address whose host and URL have been assigned by the platform and published through AP observed network state.
+
+### Reachable Public Address
+
+A Public Address whose allocated host resolves and successfully routes external traffic to the target App Listening Port. Business-level HTTP errors from the workload do not make the Public Address unreachable; DNS failure, TLS/connectivity failure, or routing to the wrong backend does.
+
 ### Custom Domain
 
 A user-owned Public Address that requires DNS verification and TLS certificate lifecycle management. Multiple Custom Domains may target the same App Listening Port.
 
 ### AP (Application)
 
-Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s) + Ingress + EntryPoint. Owns compute, App Listening Ports, one Private Address, and EntryPoint creation for Public Addresses.
+Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s), and optionally public Ingress + EntryPoint resources when the AP has allocated Public Addresses. Owns compute, App Listening Ports, one Private Address, and Platform Address allocation requests.
 
 ### DB (Database)
 
@@ -103,14 +115,14 @@ EntryPoint uses Crossplane XRD for schema registration (consistent with AP and D
 
 Two Compositions interact with EntryPoint:
 
-- **AP Composition** creates/updates EntryPoint via provider-kubernetes Object (writes `spec.apRef` + Public Address data). Manages EntryPoint's lifecycle — creation when Public Addresses exist, deletion when AP is deleted.
+- **AP Composition** creates/updates EntryPoint via provider-kubernetes Object (writes `spec.apRef` + allocated Public Address target data). Manages EntryPoint's lifecycle — creation when allocated public routing targets exist, deletion when AP is deleted.
 - **EntryPoint Composition** reconciles EntryPoint's own composed resources. Currently minimal (echoes spec to status). Will be extended to manage custom domain Ingress + Certificate resources when that feature is built.
 
 These do not conflict: AP Composition writes EntryPoint's spec (external write), EntryPoint Composition writes status + composed resources (internal reconcile).
 
 ### EntryPoint creation is AP-Composition-driven
 
-The AP Composition conditionally creates an EntryPoint (via provider-kubernetes Object) when `$needIngress` is true. When the AP is deleted, Crossplane cleans up all composed resources including the Object, which in turn deletes the EntryPoint. No external watch or controller needed.
+The AP Composition conditionally creates an EntryPoint (via provider-kubernetes Object) when `$needIngress` is true, which means the AP has allocated public routing targets. A Requested Platform Address can remain pending without an EntryPoint if the routing domain carrier is missing or host allocation has not happened yet. When the AP is deleted, Crossplane cleans up all composed resources including the Object, which in turn deletes the EntryPoint. No external watch or controller needed.
 
 ### Private Address hides per-port private URLs
 
@@ -132,13 +144,9 @@ Each Public Address chooses the App Listening Port it should reach. Users should
 
 For v1 Platform Addresses, the user chooses the target App Listening Port while the UI/API supplies a stable opaque Platform Address ID. The platform allocates the public host and URL, and the UI renders those values from observed state.
 
-An **Allocated Platform Address** is a Platform Address whose host and URL have been assigned and published through AP status. Allocation means the platform has declared the address, not that end-to-end browser access has been verified.
-
 Observed Public Address rows include the stable Platform Address ID so desired and observed addresses can be matched even when multiple addresses target the same App Listening Port.
 
 EntryPoint targets carry the same stable Platform Address ID as the AP desired and observed Public Address rows.
-
-A **Reachable Public Address** is a Public Address whose host resolves and successfully routes external traffic to the target App Listening Port. Business-level HTTP errors from the workload do not make the Public Address unreachable; DNS failure, TLS/connectivity failure, or routing to the wrong backend does.
 
 ### Platform Address base domain is platform configuration
 
@@ -164,7 +172,7 @@ V1 Platform Address hosts use `{dns-safe-ap-name}-{slug}.{routing-domain}`. The 
 
 ### Pending Platform Address
 
-A requested v1 Platform Address whose stable ID and target App Listening Port exist in desired state but whose platform-allocated URL has not appeared in observed state yet. The UI may show it as pending, but must not invent a host or URL.
+A Requested Platform Address whose stable ID and target App Listening Port exist in desired state but whose platform-allocated URL has not appeared in observed state yet. The UI may show it as pending, but must not invent a host or URL.
 
 If the routing domain carrier is missing, a requested Platform Address remains pending rather than falling back to a hardcoded host or exposing an invented URL.
 
@@ -180,7 +188,7 @@ Public Addresses belong to the EntryPoint domain model, but the AP Settings pane
 
 ### AP Settings owns the empty Public Addresses affordance
 
-The AP Settings panel should show Public Addresses even when the AP has no EntryPoint yet. Adding the first Public Address creates or enables the EntryPoint behind the scenes; users should not need a separate "create EntryPoint" action.
+The AP Settings panel should show Public Addresses even when the AP has no EntryPoint yet. Adding the first Public Address creates a Requested Platform Address; once allocation is possible, the AP Composition creates or enables the EntryPoint behind the scenes. Users should not need a separate "create EntryPoint" action.
 
 ### New APs are private by default
 
@@ -198,13 +206,13 @@ Multiple Custom Domains may point to the same App Listening Port because user-ow
 
 An AP may have multiple Platform Addresses, including multiple Platform Addresses that target the same App Listening Port. The domain model should not assume there is only one system-assigned public URL per AP.
 
-### Public Address identity is its URL
+### Public Addresses display by URL, Platform Addresses match by ID
 
-Public Addresses should be displayed by URL only in v1. Do not introduce a separate user-facing name or label until the domain needs one; v1 Platform Address requests are internally identified by their stable Platform Address ID.
+Public Addresses should be displayed by URL when allocated. Do not introduce a separate user-facing name or label until the domain needs one. V1 Platform Address persistence and desired/observed matching use the stable Platform Address ID; the ID is not a user-facing label.
 
 ### Entry node only appears for public APs
 
-On the canvas, an entry node card is only rendered when the AP has a corresponding EntryPoint resource. Internal-only APs (no Public Addresses) do not produce EntryPoints or entry nodes.
+On the canvas, an entry node card is rendered for APs with requested or observed Public Addresses. When a corresponding EntryPoint resource exists, the node uses EntryPoint resource metadata. Before the EntryPoint exists, the UI may render an AP-backed pending entry node from AP network desired/observed state. Internal-only APs with no Public Address request do not render entry nodes.
 
 ### Newly detected entry nodes anchor to their AP's left side
 
