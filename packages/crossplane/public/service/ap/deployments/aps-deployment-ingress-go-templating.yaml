@@ -68,14 +68,23 @@ spec:
             {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
             {{- $elasticStrategy := default dict $replicaStrategy.elastic }}
             {{- $elasticTarget := default dict $elasticStrategy.target }}
-            {{- $elasticEnabled := and (eq $replicaStrategyType "elastic") (hasKey $elasticStrategy "minReplicas") (hasKey $elasticStrategy "maxReplicas") (eq (toString ($elasticTarget.metric | default "")) "cpu") (eq (toString ($elasticTarget.type | default "")) "utilization") (hasKey $elasticTarget "utilizationPercent") }}
+            {{- $elasticCpuTarget := and (eq (toString ($elasticTarget.metric | default "")) "cpu") (eq (toString ($elasticTarget.type | default "")) "utilization") (hasKey $elasticTarget "utilizationPercent") }}
+            {{- $elasticMemoryTarget := and (eq (toString ($elasticTarget.metric | default "")) "memory") (eq (toString ($elasticTarget.type | default "")) "averageValue") (hasKey $elasticTarget "averageValue") }}
+            {{- $elasticEnabled := and (eq $replicaStrategyType "elastic") (hasKey $elasticStrategy "minReplicas") (hasKey $elasticStrategy "maxReplicas") (or $elasticCpuTarget $elasticMemoryTarget) }}
             {{- $elasticMinReplicas := 1 }}
             {{- $elasticMaxReplicas := 10 }}
+            {{- $elasticTargetMetric := "cpu" }}
             {{- $elasticCpuUtilizationPercent := 80 }}
+            {{- $elasticMemoryAverageValue := "512Mi" }}
             {{- if $elasticEnabled }}
             {{- $elasticMinReplicas = int $elasticStrategy.minReplicas }}
             {{- $elasticMaxReplicas = int $elasticStrategy.maxReplicas }}
+            {{- if $elasticMemoryTarget }}
+            {{- $elasticTargetMetric = "memory" }}
+            {{- $elasticMemoryAverageValue = toString $elasticTarget.averageValue }}
+            {{- else }}
             {{- $elasticCpuUtilizationPercent = int $elasticTarget.utilizationPercent }}
+            {{- end }}
             {{- end }}
             {{- if hasKey $fixedStrategy "replicas" }}
             {{- $replicas = int $fixedStrategy.replicas }}
@@ -177,17 +186,25 @@ spec:
                   "fixed" (dict "replicas" $replicas)
             }}
             {{- if $elasticEnabled }}
+            {{- $effectiveElasticTarget := dict
+                  "metric" "cpu"
+                  "type" "utilization"
+                  "utilizationPercent" $elasticCpuUtilizationPercent
+            }}
+            {{- if eq $elasticTargetMetric "memory" }}
+            {{- $effectiveElasticTarget = dict
+                  "metric" "memory"
+                  "type" "averageValue"
+                  "averageValue" $elasticMemoryAverageValue
+            }}
+            {{- end }}
             {{- $effectiveReplicaStrategy = dict
                   "type" "elastic"
                   "fixed" (dict "replicas" $replicas)
                   "elastic" (dict
                     "minReplicas" $elasticMinReplicas
                     "maxReplicas" $elasticMaxReplicas
-                    "target" (dict
-                      "metric" "cpu"
-                      "type" "utilization"
-                      "utilizationPercent" $elasticCpuUtilizationPercent
-                    )
+                    "target" $effectiveElasticTarget
                   )
             }}
             {{- end }}
@@ -392,10 +409,15 @@ spec:
               metrics:
               - type: Resource
                 resource:
-                  name: cpu
+                  name: {{ $elasticTargetMetric }}
                   target:
+                    {{- if eq $elasticTargetMetric "memory" }}
+                    type: AverageValue
+                    averageValue: {{ $elasticMemoryAverageValue }}
+                    {{- else }}
                     type: Utilization
                     averageUtilization: {{ $elasticCpuUtilizationPercent }}
+                    {{- end }}
             {{- end }}
 
             {{- if $ports }}

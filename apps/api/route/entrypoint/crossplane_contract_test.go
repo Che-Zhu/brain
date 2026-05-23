@@ -543,6 +543,86 @@ func TestAPCompositionRendersCPUElasticReplicaStrategy(t *testing.T) {
 	}
 }
 
+func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "elastic",
+							"fixed": map[string]interface{}{
+								"replicas": 4,
+							},
+							"elastic": map[string]interface{}{
+								"minReplicas": 2,
+								"maxReplicas": 8,
+								"target": map[string]interface{}{
+									"metric":       "memory",
+									"type":         "averageValue",
+									"averageValue": "512Mi",
+								},
+							},
+						},
+						"replicas": 3,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if _, ok := deploymentSpec["replicas"]; ok {
+		t.Fatal("Deployment spec.replicas should be omitted so the HPA controls elastic replicas")
+	}
+
+	hpa := singleKindObject(t, out, "HorizontalPodAutoscaler")
+	hpaSpec := asMap(t, hpa["spec"], "hpa.spec")
+	if got := numberAsInt(t, hpaSpec["minReplicas"], "hpa.spec.minReplicas"); got != 2 {
+		t.Fatalf("HPA minReplicas = %d, want 2", got)
+	}
+	if got := numberAsInt(t, hpaSpec["maxReplicas"], "hpa.spec.maxReplicas"); got != 8 {
+		t.Fatalf("HPA maxReplicas = %d, want 8", got)
+	}
+	metrics := asSlice(t, hpaSpec["metrics"], "hpa.spec.metrics")
+	metric := asMap(t, metrics[0], "hpa.spec.metrics[0]")
+	resourceMetric := asMap(t, metric["resource"], "hpa.spec.metrics[0].resource")
+	if got := resourceMetric["name"]; got != "memory" {
+		t.Fatalf("HPA resource metric name = %v, want memory", got)
+	}
+	target := asMap(t, resourceMetric["target"], "hpa.spec.metrics[0].resource.target")
+	if got := target["type"]; got != "AverageValue" {
+		t.Fatalf("HPA target type = %v, want AverageValue", got)
+	}
+	if got := target["averageValue"]; got != "512Mi" {
+		t.Fatalf("HPA averageValue = %v, want 512Mi", got)
+	}
+	if _, ok := target["averageUtilization"]; ok {
+		t.Fatal("HPA memory target should not include averageUtilization")
+	}
+
+	configMap := singleKindObject(t, out, "ConfigMap")
+	data := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := data["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+	}
+	if !strings.Contains(configYaml, "type: elastic") ||
+		!strings.Contains(configYaml, "replicas: 4") ||
+		!strings.Contains(configYaml, "minReplicas: 2") ||
+		!strings.Contains(configYaml, "maxReplicas: 8") ||
+		!strings.Contains(configYaml, "metric: memory") ||
+		!strings.Contains(configYaml, "type: averageValue") ||
+		!strings.Contains(configYaml, "averageValue: 512Mi") {
+		t.Fatalf("effective config did not include canonical memory elastic replica strategy:\n%s", configYaml)
+	}
+}
+
 func TestAPCompositionRendersPublicAddressesFromNetworkContract(t *testing.T) {
 	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app")
 	apiAltHost := platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app")

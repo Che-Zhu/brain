@@ -58,6 +58,10 @@ import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
 const REPLICA_LIMITS = { max: 20, min: 1 } as const;
 const CPU_UTILIZATION_TARGET_LIMITS = { max: 100, min: 1 } as const;
+const MEMORY_AVERAGE_TARGET_LIMITS = { max: 8192, min: 128 } as const;
+const DEFAULT_CPU_UTILIZATION_TARGET_PERCENT = 80;
+const DEFAULT_MEMORY_AVERAGE_TARGET_MIB = 512;
+const MEMORY_AVERAGE_VALUE_RE = /^([1-9][0-9]*)(Mi|Gi)$/;
 
 /** Quota sliders are controlled: parent owns `value` and receives `onValueChange`. */
 export interface ContainerSettingsControlledQuotaProps {
@@ -116,10 +120,20 @@ export interface ContainerCpuElasticReplicaTarget {
   utilizationPercent: number;
 }
 
+export interface ContainerMemoryElasticReplicaTarget {
+  averageValue: string;
+  metric: "memory";
+  type: "averageValue";
+}
+
+export type ContainerElasticReplicaTarget =
+  | ContainerCpuElasticReplicaTarget
+  | ContainerMemoryElasticReplicaTarget;
+
 export interface ContainerElasticReplicaSettings {
   maxReplicas: number;
   minReplicas: number;
-  target: ContainerCpuElasticReplicaTarget;
+  target: ContainerElasticReplicaTarget;
 }
 
 export interface ContainerElasticReplicaStrategy {
@@ -135,6 +149,7 @@ export type ContainerReplicaStrategy =
   | ContainerFixedReplicaStrategy;
 
 type ReplicaStrategyType = ContainerReplicaStrategy["type"];
+type ElasticTargetMetric = ContainerElasticReplicaTarget["metric"];
 
 interface ResourceQuotasDirtyReplicaStrategy {
   committed: ContainerReplicaStrategy;
@@ -153,7 +168,7 @@ const DEFAULT_ELASTIC_REPLICA_SETTINGS: ContainerElasticReplicaSettings = {
   target: {
     metric: "cpu",
     type: "utilization",
-    utilizationPercent: 80,
+    utilizationPercent: DEFAULT_CPU_UTILIZATION_TARGET_PERCENT,
   },
 };
 
@@ -171,6 +186,67 @@ function normalizeCpuUtilizationTarget(utilizationPercent: number): number {
     CPU_UTILIZATION_TARGET_LIMITS.min,
     CPU_UTILIZATION_TARGET_LIMITS.max
   );
+}
+
+function memoryAverageValueToMib(averageValue: string | undefined): number {
+  const match = MEMORY_AVERAGE_VALUE_RE.exec(averageValue ?? "");
+  if (match == null) {
+    return DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+  }
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) {
+    return DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+  }
+  return match[2] === "Gi" ? value * 1024 : value;
+}
+
+function memoryAverageMibToValue(mib: number): string {
+  return `${roundAndClamp(
+    mib,
+    MEMORY_AVERAGE_TARGET_LIMITS.min,
+    MEMORY_AVERAGE_TARGET_LIMITS.max
+  )}Mi`;
+}
+
+function normalizeMemoryAverageTarget(
+  averageValue: string | undefined
+): string {
+  return memoryAverageMibToValue(memoryAverageValueToMib(averageValue));
+}
+
+function defaultCpuElasticTarget(): ContainerCpuElasticReplicaTarget {
+  return {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: DEFAULT_CPU_UTILIZATION_TARGET_PERCENT,
+  };
+}
+
+function defaultMemoryElasticTarget(): ContainerMemoryElasticReplicaTarget {
+  return {
+    averageValue: `${DEFAULT_MEMORY_AVERAGE_TARGET_MIB}Mi`,
+    metric: "memory",
+    type: "averageValue",
+  };
+}
+
+function normalizeElasticTarget(
+  target: ContainerElasticReplicaSettings["target"] | undefined
+): ContainerElasticReplicaTarget {
+  if (target?.metric === "memory") {
+    return {
+      averageValue: normalizeMemoryAverageTarget(target.averageValue),
+      metric: "memory",
+      type: "averageValue",
+    };
+  }
+  return {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: normalizeCpuUtilizationTarget(
+      target?.utilizationPercent ?? DEFAULT_CPU_UTILIZATION_TARGET_PERCENT
+    ),
+  };
 }
 
 function normalizeFixedReplicaSettings(replicas: number): { replicas: number } {
@@ -192,14 +268,7 @@ function normalizeElasticReplicaSettings(
   return {
     maxReplicas,
     minReplicas,
-    target: {
-      metric: "cpu",
-      type: "utilization",
-      utilizationPercent: normalizeCpuUtilizationTarget(
-        settings?.target.utilizationPercent ??
-          DEFAULT_ELASTIC_REPLICA_SETTINGS.target.utilizationPercent
-      ),
-    },
+    target: normalizeElasticTarget(settings?.target),
   };
 }
 
@@ -250,9 +319,29 @@ function replicaStrategiesEqual(
   return (
     Math.round(aElastic.minReplicas) === Math.round(bElastic.minReplicas) &&
     Math.round(aElastic.maxReplicas) === Math.round(bElastic.maxReplicas) &&
-    Math.round(aElastic.target.utilizationPercent) ===
-      Math.round(bElastic.target.utilizationPercent)
+    elasticTargetsEqual(aElastic.target, bElastic.target)
   );
+}
+
+function elasticTargetsEqual(
+  a: ContainerElasticReplicaTarget,
+  b: ContainerElasticReplicaTarget
+): boolean {
+  if (a.metric !== b.metric) {
+    return false;
+  }
+  if (a.metric === "memory" && b.metric === "memory") {
+    return (
+      normalizeMemoryAverageTarget(a.averageValue) ===
+      normalizeMemoryAverageTarget(b.averageValue)
+    );
+  }
+  if (a.metric === "cpu" && b.metric === "cpu") {
+    return (
+      Math.round(a.utilizationPercent) === Math.round(b.utilizationPercent)
+    );
+  }
+  return false;
 }
 
 function replicaStrategyWithType(
@@ -1235,7 +1324,9 @@ interface ReplicaStrategySectionProps {
   };
   onElasticCpuTargetChange: (value: number) => void;
   onElasticMaxReplicasChange: (value: number) => void;
+  onElasticMemoryTargetChange: (value: number) => void;
   onElasticMinReplicasChange: (value: number) => void;
+  onElasticTargetMetricChange: (metric: ElasticTargetMetric) => void;
   onStrategyTypeChange: (type: ReplicaStrategyType) => void;
   readOnly: boolean;
   strategyType: ReplicaStrategyType;
@@ -1304,7 +1395,9 @@ function ReplicaStrategySection({
   fixedReplicasSliderParts,
   onElasticCpuTargetChange,
   onElasticMaxReplicasChange,
+  onElasticMemoryTargetChange,
   onElasticMinReplicasChange,
+  onElasticTargetMetricChange,
   onStrategyTypeChange,
   readOnly,
   strategyType,
@@ -1314,9 +1407,15 @@ function ReplicaStrategySection({
     minReplicas,
     normalizeReplicaCount(elastic.maxReplicas)
   );
-  const cpuTarget = normalizeCpuUtilizationTarget(
-    elastic.target.utilizationPercent
-  );
+  const targetMetric = elastic.target.metric;
+  const cpuTarget =
+    elastic.target.metric === "cpu"
+      ? normalizeCpuUtilizationTarget(elastic.target.utilizationPercent)
+      : DEFAULT_CPU_UTILIZATION_TARGET_PERCENT;
+  const memoryTarget =
+    elastic.target.metric === "memory"
+      ? memoryAverageValueToMib(elastic.target.averageValue)
+      : DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
   return (
     <section className="flex flex-col gap-3">
       <div className="flex h-6 min-w-0 items-center justify-between gap-2">
@@ -1393,16 +1492,65 @@ function ReplicaStrategySection({
               value={maxReplicas}
             />
 
-            <ReplicaScaleSlider
-              aria-label="CPU utilization target"
-              disabled={readOnly}
-              icon={Cpu}
-              label="CPU utilization target"
-              max={CPU_UTILIZATION_TARGET_LIMITS.max}
-              min={CPU_UTILIZATION_TARGET_LIMITS.min}
-              onValueChange={onElasticCpuTargetChange}
-              value={cpuTarget}
-            />
+            <div className="grid min-w-0 gap-2">
+              <Label className="text-foreground text-xs">Scaling target</Label>
+              <ToggleGroup
+                aria-label="Scaling target"
+                className="grid w-full grid-cols-2"
+                onValueChange={(value) => {
+                  const next = value[0];
+                  if (next === "cpu" || next === "memory") {
+                    onElasticTargetMetricChange(next);
+                  }
+                }}
+                spacing={1}
+                value={[targetMetric]}
+                variant="outline"
+              >
+                <ToggleGroupItem
+                  aria-label="CPU utilization target"
+                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  data-selected={targetMetric === "cpu" ? "true" : undefined}
+                  disabled={readOnly}
+                  value="cpu"
+                >
+                  CPU utilization target
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  aria-label="Memory average target"
+                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  data-selected={targetMetric === "memory" ? "true" : undefined}
+                  disabled={readOnly}
+                  value="memory"
+                >
+                  Memory average target
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {targetMetric === "memory" ? (
+              <ReplicaScaleSlider
+                aria-label="Memory average target"
+                disabled={readOnly}
+                icon={MemoryStick}
+                label="Memory average target"
+                max={MEMORY_AVERAGE_TARGET_LIMITS.max}
+                min={MEMORY_AVERAGE_TARGET_LIMITS.min}
+                onValueChange={onElasticMemoryTargetChange}
+                value={memoryTarget}
+              />
+            ) : (
+              <ReplicaScaleSlider
+                aria-label="CPU utilization target"
+                disabled={readOnly}
+                icon={Cpu}
+                label="CPU utilization target"
+                max={CPU_UTILIZATION_TARGET_LIMITS.max}
+                min={CPU_UTILIZATION_TARGET_LIMITS.min}
+                onValueChange={onElasticCpuTargetChange}
+                value={cpuTarget}
+              />
+            )}
           </div>
         )}
       </div>
@@ -1741,6 +1889,48 @@ export function ContainerSettingsPane({
     });
   };
 
+  const handleElasticMemoryTargetChange = (value: number) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      return {
+        elastic: {
+          ...elastic,
+          target: {
+            averageValue: memoryAverageMibToValue(value),
+            metric: "memory",
+            type: "averageValue",
+          },
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const handleElasticTargetMetricChange = (metric: ElasticTargetMetric) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      if (metric === elastic.target.metric) {
+        return { elastic, fixed: current.fixed, type: "elastic" };
+      }
+      return {
+        elastic: {
+          ...elastic,
+          target:
+            metric === "memory"
+              ? defaultMemoryElasticTarget()
+              : defaultCpuElasticTarget(),
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
   const replicaStrategyType = draftReplicaStrategy.type;
 
   const {
@@ -1981,7 +2171,9 @@ export function ContainerSettingsPane({
               fixedReplicasSliderParts={replicasSliderParts}
               onElasticCpuTargetChange={handleElasticCpuTargetChange}
               onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
+              onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
               onElasticMinReplicasChange={handleElasticMinReplicasChange}
+              onElasticTargetMetricChange={handleElasticTargetMetricChange}
               onStrategyTypeChange={handleReplicaStrategyTypeChange}
               readOnly={readOnly}
               strategyType={replicaStrategyType}

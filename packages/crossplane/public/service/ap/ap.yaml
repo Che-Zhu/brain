@@ -203,7 +203,8 @@ spec:
                           - maxReplicas
                           - target
                         description: >
-                          Elastic Scaling settings. CPU Elastic Scaling is the supported v1 target.
+                          Elastic Scaling settings. CPU targets use utilization percentage;
+                          Memory targets use an absolute average value.
                         x-kubernetes-validations:
                           - rule: "self.minReplicas <= self.maxReplicas"
                             message: "minReplicas must be less than or equal to maxReplicas."
@@ -223,22 +224,32 @@ spec:
                             required:
                               - metric
                               - type
-                              - utilizationPercent
-                            description: CPU utilization target for HorizontalPodAutoscaler.
+                            description: Discriminated HorizontalPodAutoscaler resource metric target.
+                            x-kubernetes-validations:
+                              - rule: "self.metric == 'cpu' ? self.type == 'utilization' && has(self.utilizationPercent) && !has(self.averageValue) : true"
+                                message: "CPU elastic targets require utilizationPercent and must not set averageValue."
+                              - rule: "self.metric == 'memory' ? self.type == 'averageValue' && has(self.averageValue) && !has(self.utilizationPercent) : true"
+                                message: "Memory elastic targets require averageValue and must not set utilizationPercent."
                             properties:
                               metric:
                                 type: string
                                 enum:
                                   - cpu
+                                  - memory
                               type:
                                 type: string
                                 enum:
                                   - utilization
+                                  - averageValue
                               utilizationPercent:
                                 type: integer
                                 minimum: 1
                                 maximum: 100
                                 description: Target average CPU utilization percentage.
+                              averageValue:
+                                type: string
+                                pattern: ^[1-9][0-9]*(Mi|Gi)$
+                                description: Target average Memory usage as a Kubernetes quantity, for example 512Mi.
                   replicas:
                     type: integer
                     default: 1

@@ -176,7 +176,7 @@ func TestAPXRDIncludesCPUElasticReplicaStrategyContract(t *testing.T) {
 
 	target := asMap(t, elasticProps["target"], "spec.resource.replicaStrategy.elastic.target")
 	targetRequired := asSlice(t, target["required"], "spec.resource.replicaStrategy.elastic.target.required")
-	for _, field := range []string{"metric", "type", "utilizationPercent"} {
+	for _, field := range []string{"metric", "type"} {
 		assertStringSliceContains(t, targetRequired, field)
 	}
 	targetProps := asMap(t, target["properties"], "spec.resource.replicaStrategy.elastic.target.properties")
@@ -196,6 +196,42 @@ func TestAPXRDIncludesCPUElasticReplicaStrategyContract(t *testing.T) {
 	}
 }
 
+func TestAPXRDIncludesMemoryElasticReplicaStrategyContract(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/ap.yaml"))
+	if err != nil {
+		t.Fatalf("read AP XRD: %v", err)
+	}
+
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse AP XRD: %v", err)
+	}
+
+	specProps := xrdSpecProperties(t, doc)
+	resource := asMap(t, specProps["resource"], "spec.resource")
+	resourceProps := asMap(t, resource["properties"], "spec.resource.properties")
+	replicaStrategy := asMap(t, resourceProps["replicaStrategy"], "spec.resource.replicaStrategy")
+	strategyProps := asMap(t, replicaStrategy["properties"], "spec.resource.replicaStrategy.properties")
+	elastic := asMap(t, strategyProps["elastic"], "spec.resource.replicaStrategy.elastic")
+	elasticProps := asMap(t, elastic["properties"], "spec.resource.replicaStrategy.elastic.properties")
+	target := asMap(t, elasticProps["target"], "spec.resource.replicaStrategy.elastic.target")
+	assertValidationRule(t, target, "self.metric == 'cpu' ? self.type == 'utilization' && has(self.utilizationPercent) && !has(self.averageValue) : true")
+	assertValidationRule(t, target, "self.metric == 'memory' ? self.type == 'averageValue' && has(self.averageValue) && !has(self.utilizationPercent) : true")
+
+	targetProps := asMap(t, target["properties"], "spec.resource.replicaStrategy.elastic.target.properties")
+	metric := asMap(t, targetProps["metric"], "spec.resource.replicaStrategy.elastic.target.metric")
+	assertStringSliceContains(t, asSlice(t, metric["enum"], "spec.resource.replicaStrategy.elastic.target.metric.enum"), "memory")
+	targetType := asMap(t, targetProps["type"], "spec.resource.replicaStrategy.elastic.target.type")
+	assertStringSliceContains(t, asSlice(t, targetType["enum"], "spec.resource.replicaStrategy.elastic.target.type.enum"), "averageValue")
+	averageValue := asMap(t, targetProps["averageValue"], "spec.resource.replicaStrategy.elastic.target.averageValue")
+	if got := averageValue["type"]; got != "string" {
+		t.Fatalf("Memory averageValue type = %v, want string", got)
+	}
+	if got := averageValue["pattern"]; got != "^[1-9][0-9]*(Mi|Gi)$" {
+		t.Fatalf("Memory averageValue pattern = %v, want Kubernetes Mi/Gi memory quantity", got)
+	}
+}
+
 func TestAPMutationDocsReferenceCanonicalFixedReplicaStrategy(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "apps/api/route/ap/mutation.go"))
 	if err != nil {
@@ -205,10 +241,11 @@ func TestAPMutationDocsReferenceCanonicalFixedReplicaStrategy(t *testing.T) {
 	for _, fragment := range []string{
 		"spec.resource.replicaStrategy.type: fixed or elastic AP replica behavior.",
 		"spec.resource.replicaStrategy.fixed.replicas: Fixed Replicas count, 1-20.",
-		"spec.resource.replicaStrategy.elastic: Elastic Scaling with minReplicas, maxReplicas, and CPU utilization target.",
+		"spec.resource.replicaStrategy.elastic: Elastic Scaling with minReplicas, maxReplicas, and one CPU utilization or Memory average value target.",
 		"Legacy spec.resource.replicas remains accepted as a Fixed Replicas fallback when replicaStrategy is absent.",
 		"Change Fixed Replicas: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"fixed\\\",\\\"fixed\\\":{\\\"replicas\\\":2}}}}}",
 		"Change CPU Elastic Scaling: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"elastic\\\",\\\"elastic\\\":{\\\"minReplicas\\\":2,\\\"maxReplicas\\\":8,\\\"target\\\":{\\\"metric\\\":\\\"cpu\\\",\\\"type\\\":\\\"utilization\\\",\\\"utilizationPercent\\\":75}}}}}}",
+		"Change Memory Elastic Scaling: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"elastic\\\",\\\"elastic\\\":{\\\"minReplicas\\\":2,\\\"maxReplicas\\\":8,\\\"target\\\":{\\\"metric\\\":\\\"memory\\\",\\\"type\\\":\\\"averageValue\\\",\\\"averageValue\\\":\\\"512Mi\\\"}}}}}}",
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("expected AP mutation docs to contain %q", fragment)

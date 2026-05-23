@@ -5,7 +5,9 @@ export const DEFAULT_AP_FIXED_REPLICAS = AP_REPLICA_LIMITS.min;
 export const DEFAULT_AP_ELASTIC_MIN_REPLICAS = AP_REPLICA_LIMITS.min;
 export const DEFAULT_AP_ELASTIC_MAX_REPLICAS = 10;
 export const DEFAULT_AP_ELASTIC_CPU_UTILIZATION_PERCENT = 80;
+export const DEFAULT_AP_ELASTIC_MEMORY_AVERAGE_VALUE = "512Mi";
 export const AP_ELASTIC_CPU_UTILIZATION_LIMITS = { max: 100, min: 1 } as const;
+const AP_ELASTIC_MEMORY_AVERAGE_VALUE_PATTERN = /^[1-9][0-9]*(Mi|Gi)$/;
 
 export interface ApCpuElasticReplicaTarget {
   metric: "cpu";
@@ -13,10 +15,20 @@ export interface ApCpuElasticReplicaTarget {
   utilizationPercent: number;
 }
 
+export interface ApMemoryElasticReplicaTarget {
+  averageValue: string;
+  metric: "memory";
+  type: "averageValue";
+}
+
+export type ApElasticReplicaTarget =
+  | ApCpuElasticReplicaTarget
+  | ApMemoryElasticReplicaTarget;
+
 export interface ApElasticReplicaSettings {
   maxReplicas: number;
   minReplicas: number;
-  target: ApCpuElasticReplicaTarget;
+  target: ApElasticReplicaTarget;
 }
 
 export interface ApFixedReplicaStrategy {
@@ -92,6 +104,42 @@ export function validateApElasticCpuUtilizationPercent(raw: unknown): number {
   return n;
 }
 
+export function validateApElasticMemoryAverageValue(raw: unknown): string {
+  if (typeof raw !== "string") {
+    throw new Error("Memory average target must be a Mi or Gi quantity.");
+  }
+  const value = raw.trim();
+  if (!AP_ELASTIC_MEMORY_AVERAGE_VALUE_PATTERN.test(value)) {
+    throw new Error("Memory average target must be a Mi or Gi quantity.");
+  }
+  return value;
+}
+
+function validateApElasticTarget(
+  target: ApElasticReplicaTarget
+): ApElasticReplicaTarget {
+  if (target.metric === "memory") {
+    if (target.type !== "averageValue") {
+      throw new Error("Memory elastic target must use averageValue.");
+    }
+    return {
+      averageValue: validateApElasticMemoryAverageValue(target.averageValue),
+      metric: "memory",
+      type: "averageValue",
+    };
+  }
+  if (target.type !== "utilization") {
+    throw new Error("CPU elastic target must use utilization.");
+  }
+  return {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: validateApElasticCpuUtilizationPercent(
+      target.utilizationPercent
+    ),
+  };
+}
+
 export function validateApElasticReplicaSettings(
   elastic: ApElasticReplicaSettings
 ): ApElasticReplicaSettings {
@@ -111,13 +159,7 @@ export function validateApElasticReplicaSettings(
   return {
     maxReplicas,
     minReplicas,
-    target: {
-      metric: "cpu",
-      type: "utilization",
-      utilizationPercent: validateApElasticCpuUtilizationPercent(
-        elastic.target.utilizationPercent
-      ),
-    },
+    target: validateApElasticTarget(elastic.target),
   };
 }
 
@@ -143,11 +185,45 @@ function normalizeApElasticCpuUtilizationPercent(raw: unknown): number {
   );
 }
 
+function normalizeApElasticMemoryAverageValue(raw: unknown): string {
+  if (typeof raw !== "string") {
+    return DEFAULT_AP_ELASTIC_MEMORY_AVERAGE_VALUE;
+  }
+  const value = raw.trim();
+  return AP_ELASTIC_MEMORY_AVERAGE_VALUE_PATTERN.test(value)
+    ? value
+    : DEFAULT_AP_ELASTIC_MEMORY_AVERAGE_VALUE;
+}
+
+function normalizeApElasticTarget(raw: unknown): ApElasticReplicaTarget {
+  const target = asRecord(raw);
+  if (target?.metric === "memory" && target.type === "averageValue") {
+    return {
+      averageValue: normalizeApElasticMemoryAverageValue(target.averageValue),
+      metric: "memory",
+      type: "averageValue",
+    };
+  }
+  if (target?.metric === "cpu" && target.type === "utilization") {
+    return {
+      metric: "cpu",
+      type: "utilization",
+      utilizationPercent: normalizeApElasticCpuUtilizationPercent(
+        target.utilizationPercent
+      ),
+    };
+  }
+  return {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: DEFAULT_AP_ELASTIC_CPU_UTILIZATION_PERCENT,
+  };
+}
+
 function normalizeApElasticReplicaSettings(
   raw: unknown
 ): ApElasticReplicaSettings {
   const elastic = asRecord(raw);
-  const target = asRecord(elastic?.target);
   const minReplicas = normalizeApElasticReplicas(
     elastic?.minReplicas,
     DEFAULT_AP_ELASTIC_MIN_REPLICAS
@@ -162,14 +238,7 @@ function normalizeApElasticReplicaSettings(
   return {
     maxReplicas,
     minReplicas,
-    target: {
-      metric: "cpu",
-      type: "utilization",
-      utilizationPercent:
-        target?.metric === "cpu" && target?.type === "utilization"
-          ? normalizeApElasticCpuUtilizationPercent(target.utilizationPercent)
-          : DEFAULT_AP_ELASTIC_CPU_UTILIZATION_PERCENT,
-    },
+    target: normalizeApElasticTarget(elastic?.target),
   };
 }
 

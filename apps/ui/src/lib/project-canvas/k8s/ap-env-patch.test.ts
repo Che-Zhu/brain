@@ -425,6 +425,58 @@ test("AP replica strategy settings write canonical CPU elastic branch", () => {
   ]);
 });
 
+test("AP replica strategy settings write canonical Memory elastic branch", () => {
+  const ops = patchOpsForApReplicaStrategySettings(
+    {
+      resource: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 4 },
+          type: "fixed",
+        },
+        replicas: 3,
+      },
+    },
+    {
+      elastic: {
+        maxReplicas: 8,
+        minReplicas: 2,
+        target: {
+          averageValue: "512Mi",
+          metric: "memory",
+          type: "averageValue",
+        },
+      },
+      fixed: { replicas: 4 },
+      type: "elastic",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              averageValue: "512Mi",
+              metric: "memory",
+              type: "averageValue",
+            },
+          },
+          fixed: { replicas: 4 },
+          type: "elastic",
+        },
+        replicas: 3,
+      },
+    },
+  ]);
+});
+
 test("AP env settings reject duplicate row names before patching", () => {
   assert.throws(
     () =>
