@@ -214,39 +214,42 @@ function normalizeMemoryAverageTarget(
   return memoryAverageMibToValue(memoryAverageValueToMib(averageValue));
 }
 
-function defaultCpuElasticTarget(): ContainerCpuElasticReplicaTarget {
+function cpuElasticTarget(
+  utilizationPercent = DEFAULT_CPU_UTILIZATION_TARGET_PERCENT
+): ContainerCpuElasticReplicaTarget {
   return {
     metric: "cpu",
     type: "utilization",
-    utilizationPercent: DEFAULT_CPU_UTILIZATION_TARGET_PERCENT,
+    utilizationPercent: normalizeCpuUtilizationTarget(utilizationPercent),
   };
 }
 
-function defaultMemoryElasticTarget(): ContainerMemoryElasticReplicaTarget {
+function memoryElasticTarget(
+  averageValue = `${DEFAULT_MEMORY_AVERAGE_TARGET_MIB}Mi`
+): ContainerMemoryElasticReplicaTarget {
   return {
-    averageValue: `${DEFAULT_MEMORY_AVERAGE_TARGET_MIB}Mi`,
+    averageValue: normalizeMemoryAverageTarget(averageValue),
     metric: "memory",
     type: "averageValue",
   };
+}
+
+function defaultElasticTargetForMetric(
+  metric: ElasticTargetMetric
+): ContainerElasticReplicaTarget {
+  if (metric === "memory") {
+    return memoryElasticTarget();
+  }
+  return cpuElasticTarget();
 }
 
 function normalizeElasticTarget(
   target: ContainerElasticReplicaSettings["target"] | undefined
 ): ContainerElasticReplicaTarget {
   if (target?.metric === "memory") {
-    return {
-      averageValue: normalizeMemoryAverageTarget(target.averageValue),
-      metric: "memory",
-      type: "averageValue",
-    };
+    return memoryElasticTarget(target.averageValue);
   }
-  return {
-    metric: "cpu",
-    type: "utilization",
-    utilizationPercent: normalizeCpuUtilizationTarget(
-      target?.utilizationPercent ?? DEFAULT_CPU_UTILIZATION_TARGET_PERCENT
-    ),
-  };
+  return cpuElasticTarget(target?.utilizationPercent);
 }
 
 function normalizeFixedReplicaSettings(replicas: number): { replicas: number } {
@@ -330,17 +333,22 @@ function elasticTargetsEqual(
   if (a.metric !== b.metric) {
     return false;
   }
-  if (a.metric === "memory" && b.metric === "memory") {
+
+  if (a.metric === "memory") {
     return (
+      b.metric === "memory" &&
       normalizeMemoryAverageTarget(a.averageValue) ===
-      normalizeMemoryAverageTarget(b.averageValue)
+        normalizeMemoryAverageTarget(b.averageValue)
     );
   }
-  if (a.metric === "cpu" && b.metric === "cpu") {
+
+  if (a.metric === "cpu") {
     return (
+      b.metric === "cpu" &&
       Math.round(a.utilizationPercent) === Math.round(b.utilizationPercent)
     );
   }
+
   return false;
 }
 
@@ -1877,11 +1885,7 @@ export function ContainerSettingsPane({
       return {
         elastic: {
           ...elastic,
-          target: {
-            metric: "cpu",
-            type: "utilization",
-            utilizationPercent: normalizeCpuUtilizationTarget(value),
-          },
+          target: cpuElasticTarget(value),
         },
         fixed: current.fixed,
         type: "elastic",
@@ -1897,11 +1901,7 @@ export function ContainerSettingsPane({
       return {
         elastic: {
           ...elastic,
-          target: {
-            averageValue: memoryAverageMibToValue(value),
-            metric: "memory",
-            type: "averageValue",
-          },
+          target: memoryElasticTarget(memoryAverageMibToValue(value)),
         },
         fixed: current.fixed,
         type: "elastic",
@@ -1920,10 +1920,7 @@ export function ContainerSettingsPane({
       return {
         elastic: {
           ...elastic,
-          target:
-            metric === "memory"
-              ? defaultMemoryElasticTarget()
-              : defaultCpuElasticTarget(),
+          target: defaultElasticTargetForMetric(metric),
         },
         fixed: current.fixed,
         type: "elastic",

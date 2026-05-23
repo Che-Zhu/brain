@@ -544,7 +544,7 @@ func TestAPCompositionRendersCPUElasticReplicaStrategy(t *testing.T) {
 }
 
 func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
-	out := renderAPComposition(t, map[string]interface{}{
+	data := map[string]interface{}{
 		"observed": map[string]interface{}{
 			"composite": map[string]interface{}{
 				"resource": apResource(map[string]interface{}{
@@ -571,9 +571,11 @@ func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
 				}),
 			},
 		},
-	}, map[string]map[string]interface{}{
+	}
+	composed := map[string]map[string]interface{}{
 		"app-deployment": runningDeployment(),
-	})
+	}
+	out := renderAPComposition(t, data, composed)
 
 	deployment := singleKindObject(t, out, "Deployment")
 	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
@@ -620,6 +622,30 @@ func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
 		!strings.Contains(configYaml, "type: averageValue") ||
 		!strings.Contains(configYaml, "averageValue: 512Mi") {
 		t.Fatalf("effective config did not include canonical memory elastic replica strategy:\n%s", configYaml)
+	}
+
+	configHash := effectiveConfigHash(configYaml)
+	configMapMetadata := asMap(t, configMap["metadata"], "configmap.metadata")
+	configMapAnnotations := asMap(
+		t,
+		configMapMetadata["annotations"],
+		"configmap.metadata.annotations",
+	)
+	if got := configMapAnnotations["app.sealos.io/config-version-hash"]; got != configHash {
+		t.Fatalf("config map version hash = %v, want %s", got, configHash)
+	}
+
+	rbacOut := renderAPCompositionStep(t, data, composed, 1)
+	role := singleKindObject(t, rbacOut, "Role")
+	roleMetadata := asMap(t, role["metadata"], "snapshot role.metadata")
+	if got := roleMetadata["name"]; got != fmt.Sprintf("web-config-snapshot-%s", configHash) {
+		t.Fatalf("snapshot role name = %v, want hash %s", got, configHash)
+	}
+	jobOut := renderAPCompositionStep(t, data, composed, 2)
+	job := singleKindObject(t, jobOut, "Job")
+	jobMetadata := asMap(t, job["metadata"], "snapshot job.metadata")
+	if got := jobMetadata["name"]; got != fmt.Sprintf("web-config-snapshot-%s", configHash) {
+		t.Fatalf("snapshot job name = %v, want hash %s", got, configHash)
 	}
 }
 
@@ -864,7 +890,21 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 
 func renderAPComposition(t *testing.T, data map[string]interface{}, composed map[string]map[string]interface{}) string {
 	t.Helper()
-	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"))
+	return renderAPCompositionStep(t, data, composed, 0)
+}
+
+func renderAPCompositionStep(
+	t *testing.T,
+	data map[string]interface{},
+	composed map[string]map[string]interface{},
+	stepIndex int,
+) string {
+	t.Helper()
+	templateText := compositionStepTemplate(
+		t,
+		filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"),
+		stepIndex,
+	)
 	funcs := sprig.TxtFuncMap()
 	funcs["getComposedResource"] = func(_ interface{}, name string) map[string]interface{} {
 		return composed[name]
@@ -1146,6 +1186,11 @@ func platformHost(namespace string, name string, uid string, id string, domain s
 	return fmt.Sprintf("%s-%x.%s", name, sum[:5], domain)
 }
 
+func effectiveConfigHash(configYaml string) string {
+	sum := sha256.Sum256([]byte(configYaml))
+	return fmt.Sprintf("%x", sum)[:12]
+}
+
 func numberAsInt(t *testing.T, value interface{}, path string) int {
 	t.Helper()
 	switch v := value.(type) {
@@ -1188,6 +1233,11 @@ func xrdOpenAPIProperties(t *testing.T, doc map[string]interface{}) map[string]i
 
 func compositionTemplate(t *testing.T, path string) string {
 	t.Helper()
+	return compositionStepTemplate(t, path, 0)
+}
+
+func compositionStepTemplate(t *testing.T, path string, stepIndex int) string {
+	t.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read composition %s: %v", path, err)
@@ -1201,12 +1251,27 @@ func compositionTemplate(t *testing.T, path string) string {
 	if len(pipeline) == 0 {
 		t.Fatal("spec.pipeline is empty")
 	}
-	step := asMap(t, pipeline[0], "spec.pipeline[0]")
-	input := asMap(t, step["input"], "spec.pipeline[0].input")
-	inline := asMap(t, input["inline"], "spec.pipeline[0].input.inline")
+	if stepIndex < 0 || stepIndex >= len(pipeline) {
+		t.Fatalf("spec.pipeline[%d] is out of range", stepIndex)
+	}
+	step := asMap(
+		t,
+		pipeline[stepIndex],
+		fmt.Sprintf("spec.pipeline[%d]", stepIndex),
+	)
+	input := asMap(
+		t,
+		step["input"],
+		fmt.Sprintf("spec.pipeline[%d].input", stepIndex),
+	)
+	inline := asMap(
+		t,
+		input["inline"],
+		fmt.Sprintf("spec.pipeline[%d].input.inline", stepIndex),
+	)
 	template, ok := inline["template"].(string)
 	if !ok {
-		t.Fatal("spec.pipeline[0].input.inline.template is not a string")
+		t.Fatalf("spec.pipeline[%d].input.inline.template is not a string", stepIndex)
 	}
 	return template
 }
