@@ -1,6 +1,7 @@
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 
 export const AP_REPLICA_LIMITS = { max: 20, min: 1 } as const;
+export const DEFAULT_AP_FIXED_REPLICAS = AP_REPLICA_LIMITS.min;
 
 export interface ApFixedReplicaStrategy {
   fixed: {
@@ -19,11 +20,11 @@ function asRecord(v: unknown): Record<string, unknown> | undefined {
 
 export function normalizeApFixedReplicas(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
-    return AP_REPLICA_LIMITS.min;
+    return DEFAULT_AP_FIXED_REPLICAS;
   }
   const n = Math.round(raw);
   if (n <= 0) {
-    return AP_REPLICA_LIMITS.min;
+    return DEFAULT_AP_FIXED_REPLICAS;
   }
   return clampScale(n, AP_REPLICA_LIMITS.min, AP_REPLICA_LIMITS.max);
 }
@@ -45,6 +46,13 @@ export function canonicalFixedReplicaStrategy(
 ): ApFixedReplicaStrategy {
   return {
     fixed: { replicas: validateApFixedReplicas(replicas) },
+    type: "fixed",
+  };
+}
+
+export function defaultFixedReplicaStrategy(): ApFixedReplicaStrategy {
+  return {
+    fixed: { replicas: DEFAULT_AP_FIXED_REPLICAS },
     type: "fixed",
   };
 }

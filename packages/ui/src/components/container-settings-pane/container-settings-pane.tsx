@@ -1057,13 +1057,13 @@ interface ReplicaStrategySectionProps {
       "onValueChange" | "value"
     >;
   };
-  strategy: ContainerReplicaStrategy;
+  strategyType: ContainerReplicaStrategy["type"];
 }
 
 function ReplicaStrategySection({
   readOnly,
   replicasSliderParts,
-  strategy,
+  strategyType,
 }: ReplicaStrategySectionProps) {
   return (
     <section className="flex flex-col gap-3">
@@ -1077,13 +1077,13 @@ function ReplicaStrategySection({
           aria-label="Replica Strategy"
           className="grid w-full grid-cols-2"
           spacing={1}
-          value={[strategy.type]}
+          value={[strategyType]}
           variant="outline"
         >
           <ToggleGroupItem
             aria-label="Fixed Replicas"
             className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
-            data-selected={strategy.type === "fixed" ? "true" : undefined}
+            data-selected={strategyType === "fixed" ? "true" : undefined}
             disabled={readOnly}
             value="fixed"
           >
@@ -1373,10 +1373,7 @@ export function ContainerSettingsPane({
       rest,
     };
   }, [replicasSlider]);
-  const resolvedReplicaStrategy = replicaStrategy ?? {
-    fixed: { replicas: replicasSliderParts?.replicasValue ?? 1 },
-    type: "fixed",
-  };
+  const replicaStrategyType = replicaStrategy?.type ?? "fixed";
 
   const {
     value: cpuValueRaw,
@@ -1612,7 +1609,7 @@ export function ContainerSettingsPane({
             <ReplicaStrategySection
               readOnly={readOnly}
               replicasSliderParts={replicasSliderParts}
-              strategy={resolvedReplicaStrategy}
+              strategyType={replicaStrategyType}
             />
           </>
         )}

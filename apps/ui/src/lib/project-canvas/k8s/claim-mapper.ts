@@ -18,6 +18,7 @@ import {
 } from "../platform-addresses";
 import {
   type ApReplicaStrategy,
+  defaultFixedReplicaStrategy,
   normalizeApFixedReplicas,
 } from "./ap-replica-strategy";
 import {
@@ -361,7 +362,7 @@ function mapDbSpec(spec: Record<string, unknown>): ClaimContainerSettings {
     image: engine,
     memoryMib: clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX),
     ports: [],
-    replicaStrategy: { fixed: { replicas: 1 }, type: "fixed" },
+    replicaStrategy: defaultFixedReplicaStrategy(),
     replicas: 1,
   };
 }
@@ -378,7 +379,7 @@ export function claimToContainerSettings(
       image: "",
       memoryMib: 512,
       ports: [],
-      replicaStrategy: { fixed: { replicas: 1 }, type: "fixed" },
+      replicaStrategy: defaultFixedReplicaStrategy(),
       replicas: 1,
     };
   }

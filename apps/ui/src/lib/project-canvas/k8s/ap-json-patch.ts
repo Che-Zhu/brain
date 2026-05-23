@@ -19,7 +19,10 @@ import {
   normalizePlatformAddressId,
   PLATFORM_ADDRESS_ID_PATTERN,
 } from "../platform-addresses";
-import { canonicalFixedReplicaStrategy } from "./ap-replica-strategy";
+import {
+  canonicalFixedReplicaStrategy,
+  validateApFixedReplicas,
+} from "./ap-replica-strategy";
 import {
   patchOpsForApInput,
   patchOpsForApResource,
@@ -382,10 +385,7 @@ export async function applyApReplicas(
   claim: Record<string, unknown>,
   replicas: number
 ): Promise<void> {
-  const n = Math.round(Number(replicas));
-  if (!Number.isFinite(n) || n < 1 || n > 20) {
-    throw new Error("Replicas must be between 1 and 20.");
-  }
+  const n = validateApFixedReplicas(replicas);
   const spec = asRecord(claim.spec);
   await patchAp(
     kubeconfig,
