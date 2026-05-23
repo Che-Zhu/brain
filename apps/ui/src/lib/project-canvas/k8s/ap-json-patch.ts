@@ -21,7 +21,6 @@ import {
 } from "../platform-addresses";
 import {
   type ApReplicaStrategy,
-  apReplicaStrategyFromResource,
   canonicalApReplicaStrategy,
   canonicalFixedReplicaStrategy,
   validateApFixedReplicas,
@@ -31,7 +30,7 @@ import {
   patchOpsForApResource,
   patchOpsFromEffectiveSnapshot,
   readApInput,
-  readApResource,
+  readApReplicaStrategy,
 } from "./ap-spec-access";
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
@@ -193,16 +192,15 @@ function canonicalApReplicaStrategyForPatch(
   spec: Record<string, unknown> | undefined,
   replicaStrategy: ApReplicaStrategy
 ): ApReplicaStrategy {
-  const currentStrategy = apReplicaStrategyFromResource(
-    readApResource(spec ?? {})
-  );
-  if (replicaStrategy.type === "fixed") {
-    return canonicalFixedReplicaStrategy(
-      replicaStrategy.fixed.replicas,
-      replicaStrategy.elastic ?? currentStrategy.elastic
-    );
+  if (replicaStrategy.type === "elastic") {
+    return canonicalApReplicaStrategy(replicaStrategy);
   }
-  return canonicalApReplicaStrategy(replicaStrategy);
+
+  const currentStrategy = readApReplicaStrategy(spec ?? {});
+  return canonicalFixedReplicaStrategy(
+    replicaStrategy.fixed.replicas,
+    replicaStrategy.elastic ?? currentStrategy.elastic
+  );
 }
 
 export async function applyApImage(
@@ -273,9 +271,7 @@ export function patchOpsForApResourceQuotaSettings(
     return patchOpsForApResource(spec, merge);
   }
   if (next.replicas !== undefined) {
-    const currentStrategy = apReplicaStrategyFromResource(
-      readApResource(spec ?? {})
-    );
+    const currentStrategy = readApReplicaStrategy(spec ?? {});
     merge.replicaStrategy = canonicalFixedReplicaStrategy(
       next.replicas,
       currentStrategy.elastic

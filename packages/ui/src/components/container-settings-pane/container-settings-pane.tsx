@@ -158,7 +158,6 @@ interface ResourceQuotasDirtyReplicaStrategy {
 
 interface ResourceQuotaReplicaPatch {
   replicaStrategy?: ContainerReplicaStrategy;
-  replicas?: number;
 }
 
 const DEFAULT_FIXED_REPLICAS: number = REPLICA_LIMITS.min;
