@@ -51,6 +51,18 @@ A user-owned Public Address that requires DNS verification and TLS certificate l
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s), and optionally public Ingress + EntryPoint resources when the AP has allocated Public Addresses. Owns compute, App Listening Ports, one Private Address, and Platform Address allocation requests.
 
+### AP Replica Strategy
+
+The AP configuration choice for how many workload replicas should run: either a fixed user-selected count or Elastic Scaling within user-selected bounds.
+
+### Fixed Replicas
+
+An AP Replica Strategy where the user selects one desired replica count and the platform keeps the AP at that count.
+
+### Elastic Scaling
+
+An AP Replica Strategy where the platform automatically adjusts AP replicas between a user-selected minimum and maximum based on one selected resource utilization target.
+
 ### DB (Database)
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
@@ -319,6 +331,38 @@ Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.
 ### Canvas connections are resource-backed
 
 Users may freely drag lines between canvas nodes, but unsupported Connecting Edges are discarded after lightweight feedback. Established Canvas Connections are derived from AP, DB, and EntryPoint resource state rather than stored as separate App Postgres records.
+
+### AP replica strategy belongs to AP desired state
+
+Fixed Replicas and Elastic Scaling are both AP configuration, not one-off operational commands. The AP Settings UI should update AP desired state, and the platform should reconcile the underlying workload scaling resources from that state.
+
+### AP replica strategy uses an explicit type
+
+AP desired state should represent replica strategy with an explicit `resource.replicaStrategy.type` of `fixed` or `elastic`, rather than a boolean autoscaling flag. This keeps the meaning of fixed replica count, Elastic Scaling bounds, and future strategy variants separate.
+
+Inactive replica strategy parameters may remain in AP desired state so users can switch strategies without losing their last-entered values, but only the branch selected by `resource.replicaStrategy.type` is reconciled. Inactive strategy parameters must not create or modify workload scaling resources.
+
+### AP legacy replicas are a fixed-strategy fallback
+
+Existing `resource.replicas` values are interpreted as Fixed Replicas only when `resource.replicaStrategy` is absent. New AP Settings writes should use `resource.replicaStrategy` as the canonical desired state.
+
+### Elastic Scaling v1 is single-metric horizontal scaling
+
+Elastic Scaling v1 has three user-facing choices: minimum replicas, maximum replicas, and one active scaling target. CPU targets use utilization percentage; Memory targets use an absolute average usage value such as `512Mi`. CPU and Memory capacity controls remain per-replica limits and are distinct from the Elastic Scaling target.
+
+Elastic Scaling v1 uses AP-aligned replica bounds: minimum replicas and maximum replicas are each constrained to 1-20, with `minReplicas <= maxReplicas`. Defaults are 1 minimum replica, 10 maximum replicas, CPU as the target metric, and 80% CPU utilization. When users switch to Memory as the target, the UI should use an absolute memory value rather than a request-relative percentage.
+
+### Elastic Scaling gives replica control to HPA
+
+When an AP uses Elastic Scaling, the platform-managed horizontal autoscaler controls the Deployment replica count. The AP Composition should reconcile the autoscaler configuration and should not continuously force the Deployment to a fixed replica count.
+
+### Elastic Scaling HPA is AP-composed
+
+The horizontal autoscaler for Elastic Scaling is an optional AP-composed resource. It should be created, updated, and deleted by the AP Composition according to the active AP Replica Strategy, and should carry stable AP ownership metadata.
+
+### Fixed Replicas has no HPA
+
+When an AP uses Fixed Replicas, no horizontal autoscaler should remain for that AP. Switching from Elastic Scaling to Fixed Replicas should remove the platform-managed autoscaler and restore a fixed Deployment replica count.
 
 ### Database Binding belongs to AP desired state
 
