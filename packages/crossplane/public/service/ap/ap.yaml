@@ -170,16 +170,22 @@ spec:
                     type: object
                     required:
                       - type
-                      - fixed
                     description: >
                       Canonical AP replica behavior. Fixed Replicas pins the Deployment to
-                      replicaStrategy.fixed.replicas. Legacy resource.replicas remains a fixed
-                      fallback only when replicaStrategy is absent.
+                      replicaStrategy.fixed.replicas. Elastic Scaling creates an AP-owned
+                      HorizontalPodAutoscaler from replicaStrategy.elastic. Legacy resource.replicas
+                      remains a fixed fallback only when replicaStrategy is absent.
+                    x-kubernetes-validations:
+                      - rule: "self.type == 'fixed' ? has(self.fixed) : true"
+                        message: "fixed replica strategy requires fixed settings."
+                      - rule: "self.type == 'elastic' ? has(self.elastic) : true"
+                        message: "elastic replica strategy requires elastic settings."
                     properties:
                       type:
                         type: string
                         enum:
                           - fixed
+                          - elastic
                       fixed:
                         type: object
                         required:
@@ -190,6 +196,49 @@ spec:
                             minimum: 1
                             maximum: 20
                             description: Fixed Deployment replica count.
+                      elastic:
+                        type: object
+                        required:
+                          - minReplicas
+                          - maxReplicas
+                          - target
+                        description: >
+                          Elastic Scaling settings. CPU Elastic Scaling is the supported v1 target.
+                        x-kubernetes-validations:
+                          - rule: "self.minReplicas <= self.maxReplicas"
+                            message: "minReplicas must be less than or equal to maxReplicas."
+                        properties:
+                          minReplicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Minimum AP replicas for Elastic Scaling.
+                          maxReplicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Maximum AP replicas for Elastic Scaling.
+                          target:
+                            type: object
+                            required:
+                              - metric
+                              - type
+                              - utilizationPercent
+                            description: CPU utilization target for HorizontalPodAutoscaler.
+                            properties:
+                              metric:
+                                type: string
+                                enum:
+                                  - cpu
+                              type:
+                                type: string
+                                enum:
+                                  - utilization
+                              utilizationPercent:
+                                type: integer
+                                minimum: 1
+                                maximum: 100
+                                description: Target average CPU utilization percentage.
                   replicas:
                     type: integer
                     default: 1

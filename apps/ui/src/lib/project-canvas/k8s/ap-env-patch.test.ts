@@ -5,6 +5,7 @@ import { PLATFORM_ADDRESS_ID_RE } from "../platform-addresses";
 import {
   patchOpsForApEnvSettings,
   patchOpsForApNetworkSettings,
+  patchOpsForApReplicaStrategySettings,
   patchOpsForApResourceQuotaSettings,
 } from "./ap-json-patch";
 import type { K8sJsonPatchOp } from "./http/json-patch";
@@ -320,6 +321,103 @@ test("AP resource quota settings canonicalize legacy replicas on capacity-only s
         replicaStrategy: {
           fixed: { replicas: 3 },
           type: "fixed",
+        },
+        replicas: 3,
+      },
+    },
+  ]);
+});
+
+test("AP resource quota settings preserve inactive elastic settings on fixed saves", () => {
+  const ops = patchOpsForApResourceQuotaSettings(
+    {
+      resource: {
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              metric: "cpu",
+              type: "utilization",
+              utilizationPercent: 75,
+            },
+          },
+          fixed: { replicas: 4 },
+          type: "elastic",
+        },
+      },
+    },
+    { replicas: 5 }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              metric: "cpu",
+              type: "utilization",
+              utilizationPercent: 75,
+            },
+          },
+          fixed: { replicas: 5 },
+          type: "fixed",
+        },
+      },
+    },
+  ]);
+});
+
+test("AP replica strategy settings write canonical CPU elastic branch", () => {
+  const ops = patchOpsForApReplicaStrategySettings(
+    {
+      resource: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 4 },
+          type: "fixed",
+        },
+        replicas: 3,
+      },
+    },
+    {
+      elastic: {
+        maxReplicas: 8,
+        minReplicas: 2,
+        target: {
+          metric: "cpu",
+          type: "utilization",
+          utilizationPercent: 75,
+        },
+      },
+      fixed: { replicas: 4 },
+      type: "elastic",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              metric: "cpu",
+              type: "utilization",
+              utilizationPercent: 75,
+            },
+          },
+          fixed: { replicas: 4 },
+          type: "elastic",
         },
         replicas: 3,
       },

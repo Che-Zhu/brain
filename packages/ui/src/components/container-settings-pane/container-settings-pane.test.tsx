@@ -51,6 +51,12 @@ const FIXED_REPLICAS_RE = /Fixed Replicas/;
 const ELASTIC_SCALING_RE = /Elastic Scaling/;
 const REPLICA_COUNT_RE = /Replica count/;
 const REPLICA_VALUE_RE = />4</;
+const MIN_REPLICAS_RE = /Minimum replicas/;
+const MIN_REPLICA_VALUE_RE = />2</;
+const MAX_REPLICAS_RE = /Maximum replicas/;
+const MAX_REPLICA_VALUE_RE = />8</;
+const CPU_TARGET_RE = /CPU utilization target/;
+const CPU_TARGET_VALUE_RE = />75</;
 
 function renderPane(
   readOnly = false,
@@ -208,6 +214,48 @@ test("container settings pane renders fixed replica strategy controls", () => {
   assert.match(html, ELASTIC_SCALING_RE);
   assert.match(html, REPLICA_COUNT_RE);
   assert.match(html, REPLICA_VALUE_RE);
+});
+
+test("container settings pane renders CPU elastic replica strategy controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+      replicaStrategy={
+        {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              metric: "cpu",
+              type: "utilization",
+              utilizationPercent: 75,
+            },
+          },
+          fixed: { replicas: 4 },
+          type: "elastic",
+        } as never
+      }
+      replicasQuota={{ onValueChange: noop, value: 4 }}
+    />
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, FIXED_REPLICAS_RE);
+  assert.match(html, ELASTIC_SCALING_RE);
+  assert.match(html, MIN_REPLICAS_RE);
+  assert.match(html, MIN_REPLICA_VALUE_RE);
+  assert.match(html, MAX_REPLICAS_RE);
+  assert.match(html, MAX_REPLICA_VALUE_RE);
+  assert.match(html, CPU_TARGET_RE);
+  assert.match(html, CPU_TARGET_VALUE_RE);
+  assert.doesNotMatch(html, REPLICA_COUNT_RE);
 });
 
 test("read-only network view renders addresses without mutation controls", () => {

@@ -290,6 +290,52 @@ test("AP claim settings maps legacy replicas as fixed replica strategy", () => {
   assert.equal(settings.replicas, 3);
 });
 
+test("AP claim settings maps canonical CPU elastic replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            elastic: {
+              maxReplicas: 8,
+              minReplicas: 2,
+              target: {
+                metric: "cpu",
+                type: "utilization",
+                utilizationPercent: 75,
+              },
+            },
+            fixed: { replicas: 4 },
+            type: "elastic",
+          },
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    elastic: {
+      maxReplicas: 8,
+      minReplicas: 2,
+      target: {
+        metric: "cpu",
+        type: "utilization",
+        utilizationPercent: 75,
+      },
+    },
+    fixed: { replicas: 4 },
+    type: "elastic",
+  });
+  assert.equal(settings.replicas, 4);
+});
+
 test("AP claim settings reconstruct DB DSN references only from exact current DB connection strings", () => {
   const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
     {

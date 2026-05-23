@@ -64,8 +64,20 @@ spec:
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
             {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $replicaStrategyType := toString ($replicaStrategy.type | default "") }}
             {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
-            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $elasticStrategy := default dict $replicaStrategy.elastic }}
+            {{- $elasticTarget := default dict $elasticStrategy.target }}
+            {{- $elasticEnabled := and (eq $replicaStrategyType "elastic") (hasKey $elasticStrategy "minReplicas") (hasKey $elasticStrategy "maxReplicas") (eq (toString ($elasticTarget.metric | default "")) "cpu") (eq (toString ($elasticTarget.type | default "")) "utilization") (hasKey $elasticTarget "utilizationPercent") }}
+            {{- $elasticMinReplicas := 1 }}
+            {{- $elasticMaxReplicas := 10 }}
+            {{- $elasticCpuUtilizationPercent := 80 }}
+            {{- if $elasticEnabled }}
+            {{- $elasticMinReplicas = int $elasticStrategy.minReplicas }}
+            {{- $elasticMaxReplicas = int $elasticStrategy.maxReplicas }}
+            {{- $elasticCpuUtilizationPercent = int $elasticTarget.utilizationPercent }}
+            {{- end }}
+            {{- if hasKey $fixedStrategy "replicas" }}
             {{- $replicas = int $fixedStrategy.replicas }}
             {{- else if hasKey $resource "replicas" }}
             {{- $replicas = int $resource.replicas }}
@@ -160,16 +172,32 @@ spec:
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
+            {{- $effectiveReplicaStrategy := dict
+                  "type" "fixed"
+                  "fixed" (dict "replicas" $replicas)
+            }}
+            {{- if $elasticEnabled }}
+            {{- $effectiveReplicaStrategy = dict
+                  "type" "elastic"
+                  "fixed" (dict "replicas" $replicas)
+                  "elastic" (dict
+                    "minReplicas" $elasticMinReplicas
+                    "maxReplicas" $elasticMaxReplicas
+                    "target" (dict
+                      "metric" "cpu"
+                      "type" "utilization"
+                      "utilizationPercent" $elasticCpuUtilizationPercent
+                    )
+                  )
+            }}
+            {{- end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
-                    "replicaStrategy" (dict
-                      "type" "fixed"
-                      "fixed" (dict "replicas" $replicas)
-                    )
+                    "replicaStrategy" $effectiveReplicaStrategy
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )
@@ -245,7 +273,7 @@ spec:
                 gotemplating.fn.crossplane.io/ready: "True"
                 {{- if $paused }}
                 deploy.cloud.sealos.io/pause: '{"target":"","value":""}'
-                {{- else }}
+                {{- else if not $elasticEnabled }}
                 deploy.cloud.sealos.io/minReplicas: {{ $replicas | quote }}
                 deploy.cloud.sealos.io/maxReplicas: {{ $replicas | quote }}
                 deploy.cloud.sealos.io/resize: "0Gi"
@@ -264,7 +292,9 @@ spec:
                 name: {{ $name }}
                 uid: {{ $apUid }}
             spec:
+              {{ if or $paused (not $elasticEnabled) }}
               replicas: {{ $desiredReplicas }}
+              {{ end }}
               revisionHistoryLimit: 1
               selector:
                 matchLabels:
@@ -327,6 +357,46 @@ spec:
             {{ $input.probes.readiness | toYaml | nindent 22 }}
                     {{- end }}
                     {{- end }}
+            {{- if and $elasticEnabled (not $paused) }}
+
+            ---
+
+            apiVersion: autoscaling/v2
+            kind: HorizontalPodAutoscaler
+            metadata:
+              name: {{ $name }}
+              namespace: {{ $ns }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: app-horizontal-pod-autoscaler
+                gotemplating.fn.crossplane.io/ready: "True"
+              labels:
+                crossplane.io/composite: {{ $name }}
+                {{ if ne $projectName "" }}
+                crossplane.io/project-name: {{ $projectName | quote }}
+                {{ end }}
+                {{ if and (ne $projectName "") (ne $projectUid "") }}
+                crossplane.io/project-uid: {{ $projectUid | quote }}
+                {{ end }}
+              ownerReferences:
+              - apiVersion: example.crossplane.io/v1
+                kind: AP
+                name: {{ $name }}
+                uid: {{ $apUid }}
+            spec:
+              scaleTargetRef:
+                apiVersion: apps/v1
+                kind: Deployment
+                name: {{ $name }}
+              minReplicas: {{ $elasticMinReplicas }}
+              maxReplicas: {{ $elasticMaxReplicas }}
+              metrics:
+              - type: Resource
+                resource:
+                  name: cpu
+                  target:
+                    type: Utilization
+                    averageUtilization: {{ $elasticCpuUtilizationPercent }}
+            {{- end }}
 
             {{- if $ports }}
             ---
@@ -607,8 +677,20 @@ spec:
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
             {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $replicaStrategyType := toString ($replicaStrategy.type | default "") }}
             {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
-            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $elasticStrategy := default dict $replicaStrategy.elastic }}
+            {{- $elasticTarget := default dict $elasticStrategy.target }}
+            {{- $elasticEnabled := and (eq $replicaStrategyType "elastic") (hasKey $elasticStrategy "minReplicas") (hasKey $elasticStrategy "maxReplicas") (eq (toString ($elasticTarget.metric | default "")) "cpu") (eq (toString ($elasticTarget.type | default "")) "utilization") (hasKey $elasticTarget "utilizationPercent") }}
+            {{- $elasticMinReplicas := 1 }}
+            {{- $elasticMaxReplicas := 10 }}
+            {{- $elasticCpuUtilizationPercent := 80 }}
+            {{- if $elasticEnabled }}
+            {{- $elasticMinReplicas = int $elasticStrategy.minReplicas }}
+            {{- $elasticMaxReplicas = int $elasticStrategy.maxReplicas }}
+            {{- $elasticCpuUtilizationPercent = int $elasticTarget.utilizationPercent }}
+            {{- end }}
+            {{- if hasKey $fixedStrategy "replicas" }}
             {{- $replicas = int $fixedStrategy.replicas }}
             {{- else if hasKey $resource "replicas" }}
             {{- $replicas = int $resource.replicas }}
@@ -670,16 +752,32 @@ spec:
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
+            {{- $effectiveReplicaStrategy := dict
+                  "type" "fixed"
+                  "fixed" (dict "replicas" $replicas)
+            }}
+            {{- if $elasticEnabled }}
+            {{- $effectiveReplicaStrategy = dict
+                  "type" "elastic"
+                  "fixed" (dict "replicas" $replicas)
+                  "elastic" (dict
+                    "minReplicas" $elasticMinReplicas
+                    "maxReplicas" $elasticMaxReplicas
+                    "target" (dict
+                      "metric" "cpu"
+                      "type" "utilization"
+                      "utilizationPercent" $elasticCpuUtilizationPercent
+                    )
+                  )
+            }}
+            {{- end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
-                    "replicaStrategy" (dict
-                      "type" "fixed"
-                      "fixed" (dict "replicas" $replicas)
-                    )
+                    "replicaStrategy" $effectiveReplicaStrategy
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )
@@ -769,8 +867,20 @@ spec:
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
             {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $replicaStrategyType := toString ($replicaStrategy.type | default "") }}
             {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
-            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $elasticStrategy := default dict $replicaStrategy.elastic }}
+            {{- $elasticTarget := default dict $elasticStrategy.target }}
+            {{- $elasticEnabled := and (eq $replicaStrategyType "elastic") (hasKey $elasticStrategy "minReplicas") (hasKey $elasticStrategy "maxReplicas") (eq (toString ($elasticTarget.metric | default "")) "cpu") (eq (toString ($elasticTarget.type | default "")) "utilization") (hasKey $elasticTarget "utilizationPercent") }}
+            {{- $elasticMinReplicas := 1 }}
+            {{- $elasticMaxReplicas := 10 }}
+            {{- $elasticCpuUtilizationPercent := 80 }}
+            {{- if $elasticEnabled }}
+            {{- $elasticMinReplicas = int $elasticStrategy.minReplicas }}
+            {{- $elasticMaxReplicas = int $elasticStrategy.maxReplicas }}
+            {{- $elasticCpuUtilizationPercent = int $elasticTarget.utilizationPercent }}
+            {{- end }}
+            {{- if hasKey $fixedStrategy "replicas" }}
             {{- $replicas = int $fixedStrategy.replicas }}
             {{- else if hasKey $resource "replicas" }}
             {{- $replicas = int $resource.replicas }}
@@ -832,16 +942,32 @@ spec:
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
+            {{- $effectiveReplicaStrategy := dict
+                  "type" "fixed"
+                  "fixed" (dict "replicas" $replicas)
+            }}
+            {{- if $elasticEnabled }}
+            {{- $effectiveReplicaStrategy = dict
+                  "type" "elastic"
+                  "fixed" (dict "replicas" $replicas)
+                  "elastic" (dict
+                    "minReplicas" $elasticMinReplicas
+                    "maxReplicas" $elasticMaxReplicas
+                    "target" (dict
+                      "metric" "cpu"
+                      "type" "utilization"
+                      "utilizationPercent" $elasticCpuUtilizationPercent
+                    )
+                  )
+            }}
+            {{- end }}
             {{- $effective := dict
                   "name" $name
                   "namespace" $ns
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
-                    "replicaStrategy" (dict
-                      "type" "fixed"
-                      "fixed" (dict "replicas" $replicas)
-                    )
+                    "replicaStrategy" $effectiveReplicaStrategy
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )

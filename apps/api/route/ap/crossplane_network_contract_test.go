@@ -113,7 +113,7 @@ func TestAPXRDIncludesFixedReplicaStrategyContract(t *testing.T) {
 	}
 	replicaStrategyRequired := asSlice(t, replicaStrategy["required"], "spec.resource.replicaStrategy.required")
 	assertStringSliceContains(t, replicaStrategyRequired, "type")
-	assertStringSliceContains(t, replicaStrategyRequired, "fixed")
+	assertValidationRule(t, replicaStrategy, "self.type == 'fixed' ? has(self.fixed) : true")
 	strategyProps := asMap(t, replicaStrategy["properties"], "spec.resource.replicaStrategy.properties")
 	strategyType := asMap(t, strategyProps["type"], "spec.resource.replicaStrategy.type")
 	assertStringSliceContains(t, asSlice(t, strategyType["enum"], "spec.resource.replicaStrategy.type.enum"), "fixed")
@@ -134,6 +134,68 @@ func TestAPXRDIncludesFixedReplicaStrategyContract(t *testing.T) {
 	}
 }
 
+func TestAPXRDIncludesCPUElasticReplicaStrategyContract(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/ap.yaml"))
+	if err != nil {
+		t.Fatalf("read AP XRD: %v", err)
+	}
+
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse AP XRD: %v", err)
+	}
+
+	specProps := xrdSpecProperties(t, doc)
+	resource := asMap(t, specProps["resource"], "spec.resource")
+	resourceProps := asMap(t, resource["properties"], "spec.resource.properties")
+	replicaStrategy := asMap(t, resourceProps["replicaStrategy"], "spec.resource.replicaStrategy")
+	strategyProps := asMap(t, replicaStrategy["properties"], "spec.resource.replicaStrategy.properties")
+	assertValidationRule(t, replicaStrategy, "self.type == 'elastic' ? has(self.elastic) : true")
+	strategyType := asMap(t, strategyProps["type"], "spec.resource.replicaStrategy.type")
+	assertStringSliceContains(t, asSlice(t, strategyType["enum"], "spec.resource.replicaStrategy.type.enum"), "elastic")
+
+	elastic := asMap(t, strategyProps["elastic"], "spec.resource.replicaStrategy.elastic")
+	elasticRequired := asSlice(t, elastic["required"], "spec.resource.replicaStrategy.elastic.required")
+	for _, field := range []string{"minReplicas", "maxReplicas", "target"} {
+		assertStringSliceContains(t, elasticRequired, field)
+	}
+	elasticProps := asMap(t, elastic["properties"], "spec.resource.replicaStrategy.elastic.properties")
+	for _, field := range []string{"minReplicas", "maxReplicas"} {
+		replicas := asMap(t, elasticProps[field], "spec.resource.replicaStrategy.elastic."+field)
+		if got := replicas["type"]; got != "integer" {
+			t.Fatalf("elastic %s type = %v, want integer", field, got)
+		}
+		if got := replicas["minimum"]; got != float64(1) {
+			t.Fatalf("elastic %s minimum = %v, want 1", field, got)
+		}
+		if got := replicas["maximum"]; got != float64(20) {
+			t.Fatalf("elastic %s maximum = %v, want 20", field, got)
+		}
+	}
+	assertValidationRule(t, elastic, "self.minReplicas <= self.maxReplicas")
+
+	target := asMap(t, elasticProps["target"], "spec.resource.replicaStrategy.elastic.target")
+	targetRequired := asSlice(t, target["required"], "spec.resource.replicaStrategy.elastic.target.required")
+	for _, field := range []string{"metric", "type", "utilizationPercent"} {
+		assertStringSliceContains(t, targetRequired, field)
+	}
+	targetProps := asMap(t, target["properties"], "spec.resource.replicaStrategy.elastic.target.properties")
+	metric := asMap(t, targetProps["metric"], "spec.resource.replicaStrategy.elastic.target.metric")
+	assertStringSliceContains(t, asSlice(t, metric["enum"], "spec.resource.replicaStrategy.elastic.target.metric.enum"), "cpu")
+	targetType := asMap(t, targetProps["type"], "spec.resource.replicaStrategy.elastic.target.type")
+	assertStringSliceContains(t, asSlice(t, targetType["enum"], "spec.resource.replicaStrategy.elastic.target.type.enum"), "utilization")
+	utilization := asMap(t, targetProps["utilizationPercent"], "spec.resource.replicaStrategy.elastic.target.utilizationPercent")
+	if got := utilization["type"]; got != "integer" {
+		t.Fatalf("CPU utilizationPercent type = %v, want integer", got)
+	}
+	if got := utilization["minimum"]; got != float64(1) {
+		t.Fatalf("CPU utilizationPercent minimum = %v, want 1", got)
+	}
+	if got := utilization["maximum"]; got != float64(100) {
+		t.Fatalf("CPU utilizationPercent maximum = %v, want 100", got)
+	}
+}
+
 func TestAPMutationDocsReferenceCanonicalFixedReplicaStrategy(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "apps/api/route/ap/mutation.go"))
 	if err != nil {
@@ -141,17 +203,16 @@ func TestAPMutationDocsReferenceCanonicalFixedReplicaStrategy(t *testing.T) {
 	}
 	text := string(raw)
 	for _, fragment := range []string{
-		"spec.resource.replicaStrategy.type: fixed AP replica behavior.",
+		"spec.resource.replicaStrategy.type: fixed or elastic AP replica behavior.",
 		"spec.resource.replicaStrategy.fixed.replicas: Fixed Replicas count, 1-20.",
+		"spec.resource.replicaStrategy.elastic: Elastic Scaling with minReplicas, maxReplicas, and CPU utilization target.",
 		"Legacy spec.resource.replicas remains accepted as a Fixed Replicas fallback when replicaStrategy is absent.",
 		"Change Fixed Replicas: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"fixed\\\",\\\"fixed\\\":{\\\"replicas\\\":2}}}}}",
+		"Change CPU Elastic Scaling: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"elastic\\\",\\\"elastic\\\":{\\\"minReplicas\\\":2,\\\"maxReplicas\\\":8,\\\"target\\\":{\\\"metric\\\":\\\"cpu\\\",\\\"type\\\":\\\"utilization\\\",\\\"utilizationPercent\\\":75}}}}}}",
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("expected AP mutation docs to contain %q", fragment)
 		}
-	}
-	if strings.Contains(text, "fixed or elastic AP replica behavior") {
-		t.Fatal("AP mutation docs should not advertise elastic replica strategy before the schema supports it")
 	}
 }
 
@@ -217,4 +278,16 @@ func assertStringSliceContains(t *testing.T, values []interface{}, want string) 
 		}
 	}
 	t.Fatalf("%q missing from %v", want, values)
+}
+
+func assertValidationRule(t *testing.T, schema map[string]interface{}, want string) {
+	t.Helper()
+	validations := asSlice(t, schema["x-kubernetes-validations"], "x-kubernetes-validations")
+	for _, validation := range validations {
+		validationMap := asMap(t, validation, "x-kubernetes-validations[]")
+		if validationMap["rule"] == want {
+			return
+		}
+	}
+	t.Fatalf("validation rule %q missing from %v", want, validations)
 }
