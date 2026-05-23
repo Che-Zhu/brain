@@ -227,21 +227,19 @@ test("container settings pane renders CPU elastic replica strategy controls", ()
       onImageChange={noop}
       onPortsChange={noop}
       ports={[]}
-      replicaStrategy={
-        {
-          elastic: {
-            maxReplicas: 8,
-            minReplicas: 2,
-            target: {
-              metric: "cpu",
-              type: "utilization",
-              utilizationPercent: 75,
-            },
+      replicaStrategy={{
+        elastic: {
+          maxReplicas: 8,
+          minReplicas: 2,
+          target: {
+            metric: "cpu",
+            type: "utilization",
+            utilizationPercent: 75,
           },
-          fixed: { replicas: 4 },
-          type: "elastic",
-        } as never
-      }
+        },
+        fixed: { replicas: 4 },
+        type: "elastic",
+      }}
       replicasQuota={{ onValueChange: noop, value: 4 }}
     />
   );

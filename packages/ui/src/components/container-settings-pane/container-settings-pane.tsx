@@ -42,6 +42,7 @@ import {
   Copy,
   Cpu,
   Layers,
+  type LucideIcon,
   MemoryStick,
   Plus,
   Save,
@@ -55,11 +56,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
-
-interface ResourceQuotasDirtyReplicaStrategy {
-  committed: ContainerReplicaStrategy;
-  draft: ContainerReplicaStrategy;
-}
+const REPLICA_LIMITS = { max: 20, min: 1 } as const;
+const CPU_UTILIZATION_TARGET_LIMITS = { max: 100, min: 1 } as const;
 
 /** Quota sliders are controlled: parent owns `value` and receives `onValueChange`. */
 export interface ContainerSettingsControlledQuotaProps {
@@ -136,10 +134,22 @@ export type ContainerReplicaStrategy =
   | ContainerElasticReplicaStrategy
   | ContainerFixedReplicaStrategy;
 
-const DEFAULT_FIXED_REPLICAS = 1;
+type ReplicaStrategyType = ContainerReplicaStrategy["type"];
+
+interface ResourceQuotasDirtyReplicaStrategy {
+  committed: ContainerReplicaStrategy;
+  draft: ContainerReplicaStrategy;
+}
+
+interface ResourceQuotaReplicaPatch {
+  replicaStrategy?: ContainerReplicaStrategy;
+  replicas?: number;
+}
+
+const DEFAULT_FIXED_REPLICAS: number = REPLICA_LIMITS.min;
 const DEFAULT_ELASTIC_REPLICA_SETTINGS: ContainerElasticReplicaSettings = {
   maxReplicas: 10,
-  minReplicas: 1,
+  minReplicas: REPLICA_LIMITS.min,
   target: {
     metric: "cpu",
     type: "utilization",
@@ -151,20 +161,32 @@ function roundAndClamp(n: number, min: number, max: number): number {
   return clampScale(Math.round(n), min, max);
 }
 
+function normalizeReplicaCount(replicas: number): number {
+  return roundAndClamp(replicas, REPLICA_LIMITS.min, REPLICA_LIMITS.max);
+}
+
+function normalizeCpuUtilizationTarget(utilizationPercent: number): number {
+  return roundAndClamp(
+    utilizationPercent,
+    CPU_UTILIZATION_TARGET_LIMITS.min,
+    CPU_UTILIZATION_TARGET_LIMITS.max
+  );
+}
+
+function normalizeFixedReplicaSettings(replicas: number): { replicas: number } {
+  return { replicas: normalizeReplicaCount(replicas) };
+}
+
 function normalizeElasticReplicaSettings(
   settings: ContainerElasticReplicaSettings | undefined
 ): ContainerElasticReplicaSettings {
-  const minReplicas = roundAndClamp(
-    settings?.minReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.minReplicas,
-    1,
-    20
+  const minReplicas = normalizeReplicaCount(
+    settings?.minReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.minReplicas
   );
   const maxReplicas = Math.max(
     minReplicas,
-    roundAndClamp(
-      settings?.maxReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.maxReplicas,
-      1,
-      20
+    normalizeReplicaCount(
+      settings?.maxReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.maxReplicas
     )
   );
   return {
@@ -173,11 +195,9 @@ function normalizeElasticReplicaSettings(
     target: {
       metric: "cpu",
       type: "utilization",
-      utilizationPercent: roundAndClamp(
+      utilizationPercent: normalizeCpuUtilizationTarget(
         settings?.target.utilizationPercent ??
-          DEFAULT_ELASTIC_REPLICA_SETTINGS.target.utilizationPercent,
-        1,
-        100
+          DEFAULT_ELASTIC_REPLICA_SETTINGS.target.utilizationPercent
       ),
     },
   };
@@ -187,9 +207,9 @@ function normalizeReplicaStrategy(
   strategy: ContainerReplicaStrategy | undefined,
   fixedReplicas = DEFAULT_FIXED_REPLICAS
 ): ContainerReplicaStrategy {
-  const fixed = {
-    replicas: roundAndClamp(strategy?.fixed.replicas ?? fixedReplicas, 1, 20),
-  };
+  const fixed = normalizeFixedReplicaSettings(
+    strategy?.fixed.replicas ?? fixedReplicas
+  );
   if (strategy?.type === "elastic") {
     return {
       elastic: normalizeElasticReplicaSettings(strategy.elastic),
@@ -206,7 +226,7 @@ function normalizeReplicaStrategy(
   };
 }
 
-function elasticForComparison(
+function elasticSettingsFromStrategy(
   strategy: ContainerReplicaStrategy
 ): ContainerElasticReplicaSettings {
   if (strategy.type === "elastic") {
@@ -225,14 +245,41 @@ function replicaStrategiesEqual(
   if (Math.round(a.fixed.replicas) !== Math.round(b.fixed.replicas)) {
     return false;
   }
-  const aElastic = elasticForComparison(a);
-  const bElastic = elasticForComparison(b);
+  const aElastic = elasticSettingsFromStrategy(a);
+  const bElastic = elasticSettingsFromStrategy(b);
   return (
     Math.round(aElastic.minReplicas) === Math.round(bElastic.minReplicas) &&
     Math.round(aElastic.maxReplicas) === Math.round(bElastic.maxReplicas) &&
     Math.round(aElastic.target.utilizationPercent) ===
       Math.round(bElastic.target.utilizationPercent)
   );
+}
+
+function replicaStrategyWithType(
+  current: ContainerReplicaStrategy,
+  type: ReplicaStrategyType
+): ContainerReplicaStrategy {
+  const elastic = normalizeElasticReplicaSettings(
+    elasticSettingsFromStrategy(current)
+  );
+  const fixed = normalizeFixedReplicaSettings(current.fixed.replicas);
+  if (type === "elastic") {
+    return { elastic, fixed, type: "elastic" };
+  }
+  return { elastic, fixed, type: "fixed" };
+}
+
+function replicaPatchFromDraft(
+  hasReplicasQuota: boolean,
+  draftReplicaStrategy: ContainerReplicaStrategy
+): ResourceQuotaReplicaPatch {
+  if (!hasReplicasQuota) {
+    return {};
+  }
+  if (draftReplicaStrategy.type === "fixed") {
+    return { replicas: draftReplicaStrategy.fixed.replicas };
+  }
+  return { replicaStrategy: draftReplicaStrategy };
 }
 
 function resourceQuotasDirty(
@@ -1189,9 +1236,67 @@ interface ReplicaStrategySectionProps {
   onElasticCpuTargetChange: (value: number) => void;
   onElasticMaxReplicasChange: (value: number) => void;
   onElasticMinReplicasChange: (value: number) => void;
-  onStrategyTypeChange: (type: ContainerReplicaStrategy["type"]) => void;
+  onStrategyTypeChange: (type: ReplicaStrategyType) => void;
   readOnly: boolean;
-  strategyType: ContainerReplicaStrategy["type"];
+  strategyType: ReplicaStrategyType;
+}
+
+interface ReplicaScaleSliderProps {
+  "aria-label": string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  max: number;
+  min: number;
+  onValueChange: (value: number) => void;
+  rest?: Omit<ContainerSettingsControlledQuotaProps, "onValueChange" | "value">;
+  value: number;
+}
+
+function ReplicaScaleSlider({
+  "aria-label": ariaLabel,
+  disabled,
+  icon,
+  label,
+  max,
+  min,
+  onValueChange,
+  rest,
+  value,
+}: ReplicaScaleSliderProps) {
+  return (
+    <ScaleSlider.Root
+      {...rest}
+      disabled={disabled ?? rest?.disabled}
+      max={max}
+      maxDecimals={0}
+      min={min}
+      onValueChange={onValueChange}
+      step={rest?.step ?? 1}
+      value={value}
+      valueDisplay="number"
+    >
+      <ScaleSlider.Stack className="w-full">
+        <ScaleSlider.Header className="min-h-6">
+          <ScaleSlider.Group className="min-w-0 gap-2">
+            <ScaleSlider.Icon className="shrink-0" icon={icon} />
+            <ScaleSlider.Label className="text-foreground">
+              {label}
+            </ScaleSlider.Label>
+          </ScaleSlider.Group>
+          <div className="flex h-6 min-w-0 items-center justify-end">
+            <ScaleSlider.Value />
+          </div>
+        </ScaleSlider.Header>
+        <ScaleSlider.Control aria-label={ariaLabel}>
+          <ScaleSlider.Track>
+            <ScaleSlider.Range />
+          </ScaleSlider.Track>
+          <ScaleSlider.Thumb />
+        </ScaleSlider.Control>
+      </ScaleSlider.Stack>
+    </ScaleSlider.Root>
+  );
 }
 
 function ReplicaStrategySection({
@@ -1204,12 +1309,14 @@ function ReplicaStrategySection({
   readOnly,
   strategyType,
 }: ReplicaStrategySectionProps) {
-  const minReplicas = roundAndClamp(elastic.minReplicas, 1, 20);
+  const minReplicas = normalizeReplicaCount(elastic.minReplicas);
   const maxReplicas = Math.max(
     minReplicas,
-    roundAndClamp(elastic.maxReplicas, 1, 20)
+    normalizeReplicaCount(elastic.maxReplicas)
   );
-  const cpuTarget = roundAndClamp(elastic.target.utilizationPercent, 1, 100);
+  const cpuTarget = normalizeCpuUtilizationTarget(
+    elastic.target.utilizationPercent
+  );
   return (
     <section className="flex flex-col gap-3">
       <div className="flex h-6 min-w-0 items-center justify-between gap-2">
@@ -1252,127 +1359,50 @@ function ReplicaStrategySection({
         </ToggleGroup>
 
         {strategyType === "fixed" ? (
-          <ScaleSlider.Root
-            {...fixedReplicasSliderParts.rest}
-            maxDecimals={0}
+          <ReplicaScaleSlider
+            aria-label="Replica count"
+            icon={Layers}
+            label="Replica count"
+            max={fixedReplicasSliderParts.rest.max ?? REPLICA_LIMITS.max}
+            min={fixedReplicasSliderParts.rest.min ?? REPLICA_LIMITS.min}
             onValueChange={fixedReplicasSliderParts.onReplicasQuotaChange}
+            rest={fixedReplicasSliderParts.rest}
             value={fixedReplicasSliderParts.replicasValue}
-            valueDisplay="number"
-          >
-            <ScaleSlider.Stack className="w-full">
-              <ScaleSlider.Header className="min-h-6">
-                <ScaleSlider.Group className="min-w-0 gap-2">
-                  <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                  <ScaleSlider.Label className="text-foreground">
-                    Replica count
-                  </ScaleSlider.Label>
-                </ScaleSlider.Group>
-                <div className="flex h-6 min-w-0 items-center justify-end">
-                  <ScaleSlider.Value />
-                </div>
-              </ScaleSlider.Header>
-              <ScaleSlider.Control aria-label="Replica count">
-                <ScaleSlider.Track>
-                  <ScaleSlider.Range />
-                </ScaleSlider.Track>
-                <ScaleSlider.Thumb />
-              </ScaleSlider.Control>
-            </ScaleSlider.Stack>
-          </ScaleSlider.Root>
+          />
         ) : (
           <div className="flex flex-col gap-5">
-            <ScaleSlider.Root
+            <ReplicaScaleSlider
+              aria-label="Minimum replicas"
               disabled={readOnly}
-              max={20}
-              maxDecimals={0}
-              min={1}
+              icon={Layers}
+              label="Minimum replicas"
+              max={REPLICA_LIMITS.max}
+              min={REPLICA_LIMITS.min}
               onValueChange={onElasticMinReplicasChange}
-              step={1}
               value={minReplicas}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                    <ScaleSlider.Label className="text-foreground">
-                      Minimum replicas
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="Minimum replicas">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
+            />
 
-            <ScaleSlider.Root
+            <ReplicaScaleSlider
+              aria-label="Maximum replicas"
               disabled={readOnly}
-              max={20}
-              maxDecimals={0}
-              min={1}
+              icon={Layers}
+              label="Maximum replicas"
+              max={REPLICA_LIMITS.max}
+              min={REPLICA_LIMITS.min}
               onValueChange={onElasticMaxReplicasChange}
-              step={1}
               value={maxReplicas}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                    <ScaleSlider.Label className="text-foreground">
-                      Maximum replicas
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="Maximum replicas">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
+            />
 
-            <ScaleSlider.Root
+            <ReplicaScaleSlider
+              aria-label="CPU utilization target"
               disabled={readOnly}
-              max={100}
-              maxDecimals={0}
-              min={1}
+              icon={Cpu}
+              label="CPU utilization target"
+              max={CPU_UTILIZATION_TARGET_LIMITS.max}
+              min={CPU_UTILIZATION_TARGET_LIMITS.min}
               onValueChange={onElasticCpuTargetChange}
-              step={1}
               value={cpuTarget}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={Cpu} />
-                    <ScaleSlider.Label className="text-foreground">
-                      CPU utilization target
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="CPU utilization target">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
+            />
           </div>
         )}
       </div>
@@ -1531,23 +1561,16 @@ export function ContainerSettingsPane({
     if (onResourceQuotasCommit == null) {
       return;
     }
-    const replicaStrategyPatch: {
-      replicaStrategy?: ContainerReplicaStrategy;
-      replicas?: number;
-    } = {};
-    if (replicasQuota != null) {
-      if (draftReplicaStrategy.type === "fixed") {
-        replicaStrategyPatch.replicas = draftReplicaStrategy.fixed.replicas;
-      } else {
-        replicaStrategyPatch.replicaStrategy = draftReplicaStrategy;
-      }
-    }
+    const replicaPatch = replicaPatchFromDraft(
+      replicasQuota != null,
+      draftReplicaStrategy
+    );
     setQuotaSavePending(true);
     try {
       await onResourceQuotasCommit({
         cpu: draftCpu,
         memory: draftMem,
-        ...replicaStrategyPatch,
+        ...replicaPatch,
       });
     } finally {
       setQuotaSavePending(false);
@@ -1611,8 +1634,8 @@ export function ContainerSettingsPane({
       return null;
     }
     const base = {
-      min: 1,
-      max: 20,
+      min: REPLICA_LIMITS.min,
+      max: REPLICA_LIMITS.max,
       step: 1,
       ...replicasQuota,
       ...(readOnly ? { disabled: true } : {}),
@@ -1623,7 +1646,7 @@ export function ContainerSettingsPane({
         onValueChange: (value: number) => {
           setDraftReplicaStrategy((current) => ({
             ...current,
-            fixed: { replicas: roundAndClamp(value, 1, 20) },
+            fixed: normalizeFixedReplicaSettings(value),
           }));
         },
         value: draftReplicaStrategy.fixed.replicas,
@@ -1656,33 +1679,18 @@ export function ContainerSettingsPane({
       rest,
     };
   }, [replicasSlider]);
-  const handleReplicaStrategyTypeChange = (
-    type: ContainerReplicaStrategy["type"]
-  ) => {
+  const handleReplicaStrategyTypeChange = (type: ReplicaStrategyType) => {
     setDraftReplicaStrategy((current) => {
-      if (type === "elastic") {
-        return {
-          elastic: normalizeElasticReplicaSettings(
-            elasticForComparison(current)
-          ),
-          fixed: { replicas: roundAndClamp(current.fixed.replicas, 1, 20) },
-          type: "elastic",
-        };
-      }
-      return {
-        elastic: normalizeElasticReplicaSettings(elasticForComparison(current)),
-        fixed: { replicas: roundAndClamp(current.fixed.replicas, 1, 20) },
-        type: "fixed",
-      };
+      return replicaStrategyWithType(current, type);
     });
   };
 
   const handleElasticMinReplicasChange = (value: number) => {
     setDraftReplicaStrategy((current) => {
       const elastic = normalizeElasticReplicaSettings(
-        elasticForComparison(current)
+        elasticSettingsFromStrategy(current)
       );
-      const minReplicas = roundAndClamp(value, 1, 20);
+      const minReplicas = normalizeReplicaCount(value);
       return {
         elastic: {
           ...elastic,
@@ -1698,9 +1706,9 @@ export function ContainerSettingsPane({
   const handleElasticMaxReplicasChange = (value: number) => {
     setDraftReplicaStrategy((current) => {
       const elastic = normalizeElasticReplicaSettings(
-        elasticForComparison(current)
+        elasticSettingsFromStrategy(current)
       );
-      const maxReplicas = roundAndClamp(value, 1, 20);
+      const maxReplicas = normalizeReplicaCount(value);
       return {
         elastic: {
           ...elastic,
@@ -1716,7 +1724,7 @@ export function ContainerSettingsPane({
   const handleElasticCpuTargetChange = (value: number) => {
     setDraftReplicaStrategy((current) => {
       const elastic = normalizeElasticReplicaSettings(
-        elasticForComparison(current)
+        elasticSettingsFromStrategy(current)
       );
       return {
         elastic: {
@@ -1724,7 +1732,7 @@ export function ContainerSettingsPane({
           target: {
             metric: "cpu",
             type: "utilization",
-            utilizationPercent: roundAndClamp(value, 1, 100),
+            utilizationPercent: normalizeCpuUtilizationTarget(value),
           },
         },
         fixed: current.fixed,
@@ -1968,7 +1976,7 @@ export function ContainerSettingsPane({
 
             <ReplicaStrategySection
               elastic={normalizeElasticReplicaSettings(
-                elasticForComparison(draftReplicaStrategy)
+                elasticSettingsFromStrategy(draftReplicaStrategy)
               )}
               fixedReplicasSliderParts={replicasSliderParts}
               onElasticCpuTargetChange={handleElasticCpuTargetChange}
