@@ -396,6 +396,60 @@ func TestAPCompositionRendersCanonicalFixedReplicaStrategy(t *testing.T) {
 	}
 }
 
+func TestAPCompositionIgnoresInactiveElasticBranchForFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "fixed",
+							"fixed": map[string]interface{}{
+								"replicas": 5,
+							},
+							"elastic": map[string]interface{}{
+								"minReplicas": 2,
+								"maxReplicas": 9,
+								"target": map[string]interface{}{
+									"metric":             "cpu",
+									"type":               "utilization",
+									"utilizationPercent": 70,
+								},
+							},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 5 {
+		t.Fatalf("Deployment replicas = %d, want active fixed replicas 5", got)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for inactive elastic branch", len(got))
+	}
+	configMap := singleKindObject(t, out, "ConfigMap")
+	data := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := data["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+	}
+	if strings.Contains(configYaml, "minReplicas: 2") ||
+		strings.Contains(configYaml, "maxReplicas: 9") ||
+		strings.Contains(configYaml, "utilizationPercent: 70") {
+		t.Fatalf("effective config reconciled inactive elastic settings:\n%s", configYaml)
+	}
+}
+
 func TestAPCompositionRendersLegacyReplicasAsFixedReplicaStrategy(t *testing.T) {
 	out := renderAPComposition(t, map[string]interface{}{
 		"observed": map[string]interface{}{

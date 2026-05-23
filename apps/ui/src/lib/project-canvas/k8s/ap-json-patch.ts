@@ -189,6 +189,22 @@ function buildEnvArray(
   });
 }
 
+function canonicalApReplicaStrategyForPatch(
+  spec: Record<string, unknown> | undefined,
+  replicaStrategy: ApReplicaStrategy
+): ApReplicaStrategy {
+  const currentStrategy = apReplicaStrategyFromResource(
+    readApResource(spec ?? {})
+  );
+  if (replicaStrategy.type === "fixed") {
+    return canonicalFixedReplicaStrategy(
+      replicaStrategy.fixed.replicas,
+      replicaStrategy.elastic ?? currentStrategy.elastic
+    );
+  }
+  return canonicalApReplicaStrategy(replicaStrategy);
+}
+
 export async function applyApImage(
   kubeconfig: string,
   claim: Record<string, unknown>,
@@ -250,7 +266,10 @@ export function patchOpsForApResourceQuotaSettings(
     merge.limits = limits;
   }
   if (next.replicaStrategy !== undefined) {
-    merge.replicaStrategy = canonicalApReplicaStrategy(next.replicaStrategy);
+    merge.replicaStrategy = canonicalApReplicaStrategyForPatch(
+      spec,
+      next.replicaStrategy
+    );
     return patchOpsForApResource(spec, merge);
   }
   if (next.replicas !== undefined) {
@@ -270,7 +289,7 @@ export function patchOpsForApReplicaStrategySettings(
   replicaStrategy: ApReplicaStrategy
 ): K8sJsonPatchOp[] {
   return patchOpsForApResource(spec, {
-    replicaStrategy: canonicalApReplicaStrategy(replicaStrategy),
+    replicaStrategy: canonicalApReplicaStrategyForPatch(spec, replicaStrategy),
   });
 }
 
@@ -429,9 +448,7 @@ export async function applyApReplicas(
   await patchAp(
     kubeconfig,
     claim,
-    patchOpsForApResource(spec, {
-      replicaStrategy: canonicalFixedReplicaStrategy(n),
-    })
+    patchOpsForApReplicaStrategySettings(spec, canonicalFixedReplicaStrategy(n))
   );
 }
 

@@ -366,15 +366,12 @@ function replicaStrategyWithType(
   return { elastic, fixed, type: "fixed" };
 }
 
-function replicaPatchFromDraft(
+export function resourceQuotaReplicaPatchFromDraft(
   hasReplicasQuota: boolean,
   draftReplicaStrategy: ContainerReplicaStrategy
 ): ResourceQuotaReplicaPatch {
   if (!hasReplicasQuota) {
     return {};
-  }
-  if (draftReplicaStrategy.type === "fixed") {
-    return { replicas: draftReplicaStrategy.fixed.replicas };
   }
   return { replicaStrategy: draftReplicaStrategy };
 }
@@ -442,7 +439,7 @@ export interface ContainerSettingsPaneProps {
   /**
    * When set (and not `readOnly`), CPU/memory/replicas sliders keep local drafts until Save; Cancel reverts.
    * Omit for live slider updates via `cpuQuota` / `memoryQuota` / `replicasQuota` `onValueChange`.
-   * When `replicasQuota` is set, `replicas` is included on Save.
+   * When `replicasQuota` is set, the draft `replicaStrategy` is included on Save.
    */
   onResourceQuotasCommit?: (next: {
     cpu: number;
@@ -1717,7 +1714,7 @@ export function ContainerSettingsPane({
     if (onResourceQuotasCommit == null) {
       return;
     }
-    const replicaPatch = replicaPatchFromDraft(
+    const replicaPatch = resourceQuotaReplicaPatchFromDraft(
       replicasQuota != null,
       draftReplicaStrategy
     );

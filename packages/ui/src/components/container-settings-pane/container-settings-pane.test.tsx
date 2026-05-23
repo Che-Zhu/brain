@@ -3,10 +3,14 @@ import { test } from "node:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { ContainerEnvVar } from "./container-settings-pane";
+import type {
+  ContainerEnvVar,
+  ContainerReplicaStrategy,
+} from "./container-settings-pane";
 import {
   ContainerSettingsPane,
   confirmedAddDbDsnReferencesFromEnvDraft,
+  resourceQuotaReplicaPatchFromDraft,
 } from "./container-settings-pane";
 
 const noop = () => {
@@ -293,6 +297,26 @@ test("container settings pane renders Memory elastic replica strategy controls",
   assert.match(html, MEMORY_TARGET_RE);
   assert.match(html, MEMORY_TARGET_VALUE_RE);
   assert.doesNotMatch(html, REPLICA_COUNT_RE);
+});
+
+test("container settings pane fixed save payload preserves inactive elastic branch", () => {
+  const draft: ContainerReplicaStrategy = {
+    elastic: {
+      maxReplicas: 9,
+      minReplicas: 3,
+      target: {
+        averageValue: "768Mi",
+        metric: "memory",
+        type: "averageValue",
+      },
+    },
+    fixed: { replicas: 4 },
+    type: "fixed",
+  };
+
+  assert.deepEqual(resourceQuotaReplicaPatchFromDraft(true, draft), {
+    replicaStrategy: draft,
+  });
 });
 
 test("read-only network view renders addresses without mutation controls", () => {

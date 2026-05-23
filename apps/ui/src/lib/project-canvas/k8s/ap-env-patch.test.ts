@@ -373,6 +373,54 @@ test("AP resource quota settings preserve inactive elastic settings on fixed sav
   ]);
 });
 
+test("AP replica strategy settings preserve existing inactive elastic branch on fixed saves", () => {
+  const ops = patchOpsForApReplicaStrategySettings(
+    {
+      resource: {
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              averageValue: "512Mi",
+              metric: "memory",
+              type: "averageValue",
+            },
+          },
+          fixed: { replicas: 3 },
+          type: "elastic",
+        },
+      },
+    },
+    {
+      fixed: { replicas: 5 },
+      type: "fixed",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              averageValue: "512Mi",
+              metric: "memory",
+              type: "averageValue",
+            },
+          },
+          fixed: { replicas: 5 },
+          type: "fixed",
+        },
+      },
+    },
+  ]);
+});
+
 test("AP replica strategy settings write canonical CPU elastic branch", () => {
   const ops = patchOpsForApReplicaStrategySettings(
     {
