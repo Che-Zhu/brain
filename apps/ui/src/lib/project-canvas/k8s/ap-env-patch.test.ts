@@ -5,6 +5,7 @@ import { PLATFORM_ADDRESS_ID_RE } from "../platform-addresses";
 import {
   patchOpsForApEnvSettings,
   patchOpsForApNetworkSettings,
+  patchOpsForApResourceQuotaSettings,
 } from "./ap-json-patch";
 import type { K8sJsonPatchOp } from "./http/json-patch";
 
@@ -270,6 +271,60 @@ test("AP network settings validate Platform Address IDs and Public Address ports
       ),
     PUBLIC_PORT_RANGE_RE
   );
+});
+
+test("AP resource quota settings write canonical fixed replica strategy", () => {
+  const ops = patchOpsForApResourceQuotaSettings(
+    {
+      resource: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicas: 2,
+      },
+    },
+    { cpuCores: 2, memoryMib: 2048, replicas: 4 }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        limits: { cpu: "2", memory: "2048Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 4 },
+          type: "fixed",
+        },
+        replicas: 2,
+      },
+    },
+  ]);
+});
+
+test("AP resource quota settings canonicalize legacy replicas on capacity-only saves", () => {
+  const ops = patchOpsForApResourceQuotaSettings(
+    {
+      resource: {
+        limits: { cpu: "1000m", memory: "1024Mi" },
+        replicas: 3,
+      },
+    },
+    { cpuCores: 2, replicas: 3 }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        limits: { cpu: "2", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 3 },
+          type: "fixed",
+        },
+        replicas: 3,
+      },
+    },
+  ]);
 });
 
 test("AP env settings reject duplicate row names before patching", () => {

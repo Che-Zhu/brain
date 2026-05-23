@@ -166,12 +166,36 @@ spec:
                   aps-deployment-ingress-go-templating for Deployment replicas and container
                   resources.requests/limits.
                 properties:
+                  replicaStrategy:
+                    type: object
+                    required:
+                      - type
+                      - fixed
+                    description: >
+                      Canonical AP replica behavior. Fixed Replicas pins the Deployment to
+                      replicaStrategy.fixed.replicas. Legacy resource.replicas remains a fixed
+                      fallback only when replicaStrategy is absent.
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - fixed
+                      fixed:
+                        type: object
+                        required:
+                          - replicas
+                        properties:
+                          replicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Fixed Deployment replica count.
                   replicas:
                     type: integer
                     default: 1
                     minimum: 1
                     maximum: 20
-                    description: Desired Deployment replica count.
+                    description: Legacy Desired Deployment replica count. Used only when replicaStrategy is absent.
                   requests:
                     type: object
                     description: Container resources.requests
@@ -206,7 +230,8 @@ spec:
                 description: >
                   When true, scales the composed Deployment to 0 replicas and applies SealOS-style
                   pause annotations (compatible with workloads managed by SealOS Deploy). When false,
-                  the Deployment uses spec.resource.replicas (default 1).
+                  the Deployment uses spec.resource.replicaStrategy fixed replicas, falling back to
+                  legacy spec.resource.replicas (default 1) when replicaStrategy is absent.
               restartRequest:
                 type: integer
                 minimum: 0

@@ -63,7 +63,13 @@ spec:
             {{- $req := default dict $resource.requests }}
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
-            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
+            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $replicas = int $fixedStrategy.replicas }}
+            {{- else if hasKey $resource "replicas" }}
+            {{- $replicas = int $resource.replicas }}
+            {{- end }}
             {{- $cpuRequest := "200m" }}
             {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
             {{- $memoryRequest := "204Mi" }}
@@ -160,6 +166,10 @@ spec:
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
+                    "replicaStrategy" (dict
+                      "type" "fixed"
+                      "fixed" (dict "replicas" $replicas)
+                    )
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )
@@ -596,7 +606,13 @@ spec:
             {{- $req := default dict $resource.requests }}
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
-            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
+            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $replicas = int $fixedStrategy.replicas }}
+            {{- else if hasKey $resource "replicas" }}
+            {{- $replicas = int $resource.replicas }}
+            {{- end }}
             {{- $cpuRequest := "200m" }}
             {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
             {{- $memoryRequest := "204Mi" }}
@@ -660,6 +676,10 @@ spec:
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
+                    "replicaStrategy" (dict
+                      "type" "fixed"
+                      "fixed" (dict "replicas" $replicas)
+                    )
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )
@@ -748,7 +768,13 @@ spec:
             {{- $req := default dict $resource.requests }}
             {{- $lim := default dict $resource.limits }}
             {{- $replicas := 1 }}
-            {{- if hasKey $resource "replicas" }}{{ $replicas = int $resource.replicas }}{{ end }}
+            {{- $replicaStrategy := default dict $resource.replicaStrategy }}
+            {{- $fixedStrategy := default dict $replicaStrategy.fixed }}
+            {{- if and (eq (toString ($replicaStrategy.type | default "")) "fixed") (hasKey $fixedStrategy "replicas") }}
+            {{- $replicas = int $fixedStrategy.replicas }}
+            {{- else if hasKey $resource "replicas" }}
+            {{- $replicas = int $resource.replicas }}
+            {{- end }}
             {{- $cpuRequest := "200m" }}
             {{- if $req.cpu }}{{ $cpuRequest = $req.cpu }}{{ end }}
             {{- $memoryRequest := "204Mi" }}
@@ -812,6 +838,10 @@ spec:
                   "input" $effectiveInput
                   "resource" (dict
                     "replicas" $replicas
+                    "replicaStrategy" (dict
+                      "type" "fixed"
+                      "fixed" (dict "replicas" $replicas)
+                    )
                     "requests" (dict "cpu" $cpuRequest "memory" $memoryRequest)
                     "limits" (dict "cpu" $cpuLimit "memory" $memoryLimit)
                   )

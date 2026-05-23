@@ -199,10 +199,12 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         onResourceQuotasCommit={canEditAp ? onResourceQuotasCommit : undefined}
         ports={display.ports}
         readOnly={!isApWorkload || settingsReadOnly}
+        replicaStrategy={display.replicaStrategy}
         replicasQuota={
-          canEditAp
+          isApWorkload
             ? {
                 ...WORKLOAD_PANEL_REPLICAS,
+                disabled: !canEditAp,
                 onValueChange: ignoreReplicas,
                 step: 1,
                 value: display.replicas,

@@ -211,6 +211,85 @@ test("AP claim settings ignores invalid private-only network ports", () => {
   assert.equal(settings.network, undefined);
 });
 
+test("AP claim settings maps canonical fixed replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            fixed: { replicas: 4 },
+            type: "fixed",
+          },
+          replicas: 2,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 4 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 4);
+});
+
+test("AP claim settings clamps displayed fixed replica strategy to AP bounds", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            fixed: { replicas: 42 },
+            type: "fixed",
+          },
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 20 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 20);
+});
+
+test("AP claim settings maps legacy replicas as fixed replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 3 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 3);
+});
+
 test("AP claim settings reconstruct DB DSN references only from exact current DB connection strings", () => {
   const dbDsnReferenceSources = dbDsnReferenceSourcesFromDbsData(
     {

@@ -46,6 +46,11 @@ const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
 const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
 const PORTS_TABLE_RE = /data-slot="ports-table"/;
 const PRIVATE_PORT_VALUE_RE = /value="8080"/;
+const REPLICA_STRATEGY_RE = /Replica Strategy/;
+const FIXED_REPLICAS_RE = /Fixed Replicas/;
+const ELASTIC_SCALING_RE = /Elastic Scaling/;
+const REPLICA_COUNT_RE = /Replica count/;
+const REPLICA_VALUE_RE = />4</;
 
 function renderPane(
   readOnly = false,
@@ -177,6 +182,32 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
   assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
+});
+
+test("container settings pane renders fixed replica strategy controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+      replicaStrategy={{
+        fixed: { replicas: 4 },
+        type: "fixed",
+      }}
+      replicasQuota={{ onValueChange: noop, value: 4 }}
+    />
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, FIXED_REPLICAS_RE);
+  assert.match(html, ELASTIC_SCALING_RE);
+  assert.match(html, REPLICA_COUNT_RE);
+  assert.match(html, REPLICA_VALUE_RE);
 });
 
 test("read-only network view renders addresses without mutation controls", () => {

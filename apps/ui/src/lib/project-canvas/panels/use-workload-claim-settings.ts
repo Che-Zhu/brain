@@ -19,6 +19,7 @@ import {
   applyApNetwork,
   applyApResourceQuotas,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
+import { canonicalFixedReplicaStrategy } from "@/lib/project-canvas/k8s/ap-replica-strategy";
 import {
   type ClaimContainerSettings,
   claimToContainerSettings,
@@ -252,6 +253,9 @@ export function useWorkloadClaimSettings(
         cpuCores: next.cpu,
         memoryMib: next.memory,
         ...(nextRep === undefined ? {} : { replicas: nextRep }),
+        ...(nextRep === undefined
+          ? {}
+          : { replicaStrategy: canonicalFixedReplicaStrategy(nextRep) }),
       }));
       try {
         await applyApResourceQuotas(

@@ -318,7 +318,7 @@ function entryPointApRefFromResource(input: unknown): string | undefined {
 
 /**
  * Maps one AP list item (example.crossplane.io/v1 `AP`) into {@link ContainerNodeStates}.
- * Sets **kind**, **image**, **name**, **replicas** (from `spec.resource`), **uid**
+ * Sets **kind**, **image**, **name**, **replicas** (from AP replica strategy), **uid**
  * (from `metadata.uid` when present), and **status** from `status.phase`.
  * When paused or desired replicas are zero, status is shown as **Paused** regardless of `status.phase`.
  */

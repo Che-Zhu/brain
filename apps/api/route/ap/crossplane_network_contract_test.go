@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"sigs.k8s.io/yaml"
@@ -89,6 +90,68 @@ func TestAPXRDIncludesNetworkContract(t *testing.T) {
 		if _, ok := statusPublicAddressProps[field]; !ok {
 			t.Fatalf("status.network.publicAddresses[].%s is missing", field)
 		}
+	}
+}
+
+func TestAPXRDIncludesFixedReplicaStrategyContract(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/ap.yaml"))
+	if err != nil {
+		t.Fatalf("read AP XRD: %v", err)
+	}
+
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse AP XRD: %v", err)
+	}
+
+	specProps := xrdSpecProperties(t, doc)
+	resource := asMap(t, specProps["resource"], "spec.resource")
+	resourceProps := asMap(t, resource["properties"], "spec.resource.properties")
+	replicaStrategy := asMap(t, resourceProps["replicaStrategy"], "spec.resource.replicaStrategy")
+	if got := replicaStrategy["type"]; got != "object" {
+		t.Fatalf("replicaStrategy type = %v, want object", got)
+	}
+	replicaStrategyRequired := asSlice(t, replicaStrategy["required"], "spec.resource.replicaStrategy.required")
+	assertStringSliceContains(t, replicaStrategyRequired, "type")
+	assertStringSliceContains(t, replicaStrategyRequired, "fixed")
+	strategyProps := asMap(t, replicaStrategy["properties"], "spec.resource.replicaStrategy.properties")
+	strategyType := asMap(t, strategyProps["type"], "spec.resource.replicaStrategy.type")
+	assertStringSliceContains(t, asSlice(t, strategyType["enum"], "spec.resource.replicaStrategy.type.enum"), "fixed")
+
+	fixed := asMap(t, strategyProps["fixed"], "spec.resource.replicaStrategy.fixed")
+	fixedRequired := asSlice(t, fixed["required"], "spec.resource.replicaStrategy.fixed.required")
+	assertStringSliceContains(t, fixedRequired, "replicas")
+	fixedProps := asMap(t, fixed["properties"], "spec.resource.replicaStrategy.fixed.properties")
+	replicas := asMap(t, fixedProps["replicas"], "spec.resource.replicaStrategy.fixed.replicas")
+	if got := replicas["type"]; got != "integer" {
+		t.Fatalf("fixed replicas type = %v, want integer", got)
+	}
+	if got := replicas["minimum"]; got != float64(1) {
+		t.Fatalf("fixed replicas minimum = %v, want 1", got)
+	}
+	if got := replicas["maximum"]; got != float64(20) {
+		t.Fatalf("fixed replicas maximum = %v, want 20", got)
+	}
+}
+
+func TestAPMutationDocsReferenceCanonicalFixedReplicaStrategy(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "apps/api/route/ap/mutation.go"))
+	if err != nil {
+		t.Fatalf("read AP mutation docs: %v", err)
+	}
+	text := string(raw)
+	for _, fragment := range []string{
+		"spec.resource.replicaStrategy.type: fixed AP replica behavior.",
+		"spec.resource.replicaStrategy.fixed.replicas: Fixed Replicas count, 1-20.",
+		"Legacy spec.resource.replicas remains accepted as a Fixed Replicas fallback when replicaStrategy is absent.",
+		"Change Fixed Replicas: {\\\"spec\\\":{\\\"resource\\\":{\\\"replicaStrategy\\\":{\\\"type\\\":\\\"fixed\\\",\\\"fixed\\\":{\\\"replicas\\\":2}}}}}",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("expected AP mutation docs to contain %q", fragment)
+		}
+	}
+	if strings.Contains(text, "fixed or elastic AP replica behavior") {
+		t.Fatal("AP mutation docs should not advertise elastic replica strategy before the schema supports it")
 	}
 }
 

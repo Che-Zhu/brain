@@ -354,6 +354,92 @@ func TestAPCompositionRendersPrivateOnlyNetworkPath(t *testing.T) {
 	}
 }
 
+func TestAPCompositionRendersCanonicalFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "fixed",
+							"fixed": map[string]interface{}{
+								"replicas": 4,
+							},
+						},
+						"replicas": 2,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 4 {
+		t.Fatalf("Deployment replicas = %d, want canonical fixed replicas 4", got)
+	}
+	deploymentAnnotations := asMap(t, asMap(t, deployment["metadata"], "deployment.metadata")["annotations"], "deployment.metadata.annotations")
+	if got := deploymentAnnotations["deploy.cloud.sealos.io/minReplicas"]; got != "4" {
+		t.Fatalf("Deployment minReplicas annotation = %v, want 4", got)
+	}
+	if got := deploymentAnnotations["deploy.cloud.sealos.io/maxReplicas"]; got != "4" {
+		t.Fatalf("Deployment maxReplicas annotation = %v, want 4", got)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for fixed replica strategy", len(got))
+	}
+}
+
+func TestAPCompositionRendersLegacyReplicasAsFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicas": 3,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 3 {
+		t.Fatalf("Deployment replicas = %d, want legacy fixed replicas 3", got)
+	}
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	if got := status["phase"]; got != "Running" {
+		t.Fatalf("AP status.phase = %v, want Running", got)
+	}
+	configMap := singleKindObject(t, out, "ConfigMap")
+	data := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := data["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+	}
+	if !strings.Contains(configYaml, "replicaStrategy:") ||
+		!strings.Contains(configYaml, "replicas: 3") ||
+		!strings.Contains(configYaml, "type: fixed") {
+		t.Fatalf("effective config did not include canonical fixed replica strategy:\n%s", configYaml)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for legacy fixed replicas", len(got))
+	}
+}
+
 func TestAPCompositionRendersPublicAddressesFromNetworkContract(t *testing.T) {
 	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app")
 	apiAltHost := platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app")

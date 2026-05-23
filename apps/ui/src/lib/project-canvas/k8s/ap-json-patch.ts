@@ -19,6 +19,7 @@ import {
   normalizePlatformAddressId,
   PLATFORM_ADDRESS_ID_PATTERN,
 } from "../platform-addresses";
+import { canonicalFixedReplicaStrategy } from "./ap-replica-strategy";
 import {
   patchOpsForApInput,
   patchOpsForApResource,
@@ -221,6 +222,27 @@ export async function applyApMemoryLimit(
 }
 
 /** One JSON Patch for CPU, memory, and/or replicas (avoids parallel PATCH races). */
+export function patchOpsForApResourceQuotaSettings(
+  spec: Record<string, unknown> | undefined,
+  next: { cpuCores?: number; memoryMib?: number; replicas?: number }
+): K8sJsonPatchOp[] {
+  const merge: Record<string, unknown> = {};
+  const limits: Record<string, unknown> = {};
+  if (next.cpuCores !== undefined) {
+    limits.cpu = coresToCpuLimit(next.cpuCores);
+  }
+  if (next.memoryMib !== undefined) {
+    limits.memory = mibToMemoryLimit(next.memoryMib);
+  }
+  if (Object.keys(limits).length > 0) {
+    merge.limits = limits;
+  }
+  if (next.replicas !== undefined) {
+    merge.replicaStrategy = canonicalFixedReplicaStrategy(next.replicas);
+  }
+  return patchOpsForApResource(spec, merge);
+}
+
 export async function applyApResourceQuotas(
   kubeconfig: string,
   claim: Record<string, unknown>,
@@ -243,26 +265,13 @@ export async function applyApResourceQuotas(
   }
 
   const spec = asRecord(claim.spec);
-  const merge: Record<string, unknown> = {};
-  const limits: Record<string, unknown> = {};
-  if (cpuChanged) {
-    limits.cpu = coresToCpuLimit(next.cpuCores);
-  }
-  if (memChanged) {
-    limits.memory = mibToMemoryLimit(next.memoryMib);
-  }
-  if (Object.keys(limits).length > 0) {
-    merge.limits = limits;
-  }
-  if (replicasChanged && repNext !== undefined) {
-    const n = Math.round(Number(repNext));
-    if (!Number.isFinite(n) || n < 1 || n > 20) {
-      throw new Error("Replicas must be between 1 and 20.");
-    }
-    merge.replicas = n;
-  }
+  const patch = patchOpsForApResourceQuotaSettings(spec, {
+    ...(cpuChanged ? { cpuCores: next.cpuCores } : {}),
+    ...(memChanged ? { memoryMib: next.memoryMib } : {}),
+    ...(repNext === undefined ? {} : { replicas: repNext }),
+  });
 
-  await patchAp(kubeconfig, claim, patchOpsForApResource(spec, merge));
+  await patchAp(kubeconfig, claim, patch);
 }
 
 export function patchOpsForApEnvSettings(
@@ -381,7 +390,9 @@ export async function applyApReplicas(
   await patchAp(
     kubeconfig,
     claim,
-    patchOpsForApResource(spec, { replicas: n })
+    patchOpsForApResource(spec, {
+      replicaStrategy: canonicalFixedReplicaStrategy(n),
+    })
   );
 }
 

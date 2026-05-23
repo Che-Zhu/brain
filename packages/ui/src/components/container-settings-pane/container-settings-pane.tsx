@@ -17,6 +17,10 @@ import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.u
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
 import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@workspace/ui/components/toggle-group";
+import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
   type ContainerEnvDbDsnFieldOption,
@@ -113,6 +117,15 @@ export interface ContainerNetwork {
   publicAddresses: ContainerNetworkPublicAddress[];
 }
 
+export interface ContainerFixedReplicaStrategy {
+  fixed: {
+    replicas: number;
+  };
+  type: "fixed";
+}
+
+export type ContainerReplicaStrategy = ContainerFixedReplicaStrategy;
+
 export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
   dbName: string;
   dbNamespace: string;
@@ -171,8 +184,10 @@ export interface ContainerSettingsPaneProps {
    * Host may pass no-op callbacks.
    */
   readOnly?: boolean;
+  /** AP replica behavior rendered as a mutually exclusive strategy control. */
+  replicaStrategy?: ContainerReplicaStrategy;
   /**
-   * Deployment replica count (AP `spec.replicas`). Omit to hide the control (e.g. DB workloads).
+   * Fixed AP replica count. Omit to hide the control (e.g. DB workloads).
    */
   replicasQuota?: ContainerSettingsControlledQuotaProps;
 }
@@ -1032,6 +1047,90 @@ function NetworkSettingsSection({
   );
 }
 
+interface ReplicaStrategySectionProps {
+  readOnly: boolean;
+  replicasSliderParts: {
+    onReplicasQuotaChange: (value: number) => void;
+    replicasValue: number;
+    rest: Omit<
+      ContainerSettingsControlledQuotaProps,
+      "onValueChange" | "value"
+    >;
+  };
+  strategy: ContainerReplicaStrategy;
+}
+
+function ReplicaStrategySection({
+  readOnly,
+  replicasSliderParts,
+  strategy,
+}: ReplicaStrategySectionProps) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
+        <SectionTitle className="m-0 min-w-0 shrink leading-none">
+          Replica Strategy
+        </SectionTitle>
+      </div>
+      <div className="grid min-w-0 gap-3">
+        <ToggleGroup
+          aria-label="Replica Strategy"
+          className="grid w-full grid-cols-2"
+          spacing={1}
+          value={[strategy.type]}
+          variant="outline"
+        >
+          <ToggleGroupItem
+            aria-label="Fixed Replicas"
+            className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+            data-selected={strategy.type === "fixed" ? "true" : undefined}
+            disabled={readOnly}
+            value="fixed"
+          >
+            Fixed Replicas
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            aria-label="Elastic Scaling"
+            className="h-8 min-w-0 text-xs"
+            disabled
+            value="elastic"
+          >
+            Elastic Scaling
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <ScaleSlider.Root
+          {...replicasSliderParts.rest}
+          maxDecimals={0}
+          onValueChange={replicasSliderParts.onReplicasQuotaChange}
+          value={replicasSliderParts.replicasValue}
+          valueDisplay="number"
+        >
+          <ScaleSlider.Stack className="w-full">
+            <ScaleSlider.Header className="min-h-6">
+              <ScaleSlider.Group className="min-w-0 gap-2">
+                <ScaleSlider.Icon className="shrink-0" icon={Layers} />
+                <ScaleSlider.Label className="text-foreground">
+                  Replica count
+                </ScaleSlider.Label>
+              </ScaleSlider.Group>
+              <div className="flex h-6 min-w-0 items-center justify-end">
+                <ScaleSlider.Value />
+              </div>
+            </ScaleSlider.Header>
+            <ScaleSlider.Control aria-label="Replica count">
+              <ScaleSlider.Track>
+                <ScaleSlider.Range />
+              </ScaleSlider.Track>
+              <ScaleSlider.Thumb />
+            </ScaleSlider.Control>
+          </ScaleSlider.Stack>
+        </ScaleSlider.Root>
+      </div>
+    </section>
+  );
+}
+
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
  * optional replica count, environment variables, and AP Network settings.
@@ -1050,6 +1149,7 @@ export function ContainerSettingsPane({
   env,
   network,
   replicasQuota,
+  replicaStrategy,
   onResourceQuotasCommit,
   readOnly = false,
   dbDsnReferenceSources = [],
@@ -1273,6 +1373,10 @@ export function ContainerSettingsPane({
       rest,
     };
   }, [replicasSlider]);
+  const resolvedReplicaStrategy = replicaStrategy ?? {
+    fixed: { replicas: replicasSliderParts?.replicasValue ?? 1 },
+    type: "fixed",
+  };
 
   const {
     value: cpuValueRaw,
@@ -1498,38 +1602,20 @@ export function ContainerSettingsPane({
                 </ScaleSlider.Control>
               </ScaleSlider.Stack>
             </ScaleSlider.Root>
-
-            {replicasSliderParts == null ? null : (
-              <ScaleSlider.Root
-                {...replicasSliderParts.rest}
-                maxDecimals={0}
-                onValueChange={replicasSliderParts.onReplicasQuotaChange}
-                value={replicasSliderParts.replicasValue}
-                valueDisplay="number"
-              >
-                <ScaleSlider.Stack className="w-full">
-                  <ScaleSlider.Header className="min-h-6">
-                    <ScaleSlider.Group className="min-w-0 gap-2">
-                      <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                      <ScaleSlider.Label className="text-foreground">
-                        Replicas
-                      </ScaleSlider.Label>
-                    </ScaleSlider.Group>
-                    <div className="flex h-6 min-w-0 items-center justify-end">
-                      <ScaleSlider.Value />
-                    </div>
-                  </ScaleSlider.Header>
-                  <ScaleSlider.Control aria-label="Replica count">
-                    <ScaleSlider.Track>
-                      <ScaleSlider.Range />
-                    </ScaleSlider.Track>
-                    <ScaleSlider.Thumb />
-                  </ScaleSlider.Control>
-                </ScaleSlider.Stack>
-              </ScaleSlider.Root>
-            )}
           </div>
         </section>
+
+        {replicasSliderParts == null ? null : (
+          <>
+            <Separator />
+
+            <ReplicaStrategySection
+              readOnly={readOnly}
+              replicasSliderParts={replicasSliderParts}
+              strategy={resolvedReplicaStrategy}
+            />
+          </>
+        )}
 
         <Separator />
 
