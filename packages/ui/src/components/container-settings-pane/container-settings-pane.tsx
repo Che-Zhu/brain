@@ -1398,6 +1398,98 @@ function ReplicaScaleSlider({
   );
 }
 
+function ReadOnlyReplicaValue({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background/60 px-2.5 py-2">
+      <span className="min-w-0 truncate text-muted-foreground text-xs">
+        {label}
+      </span>
+      <span className="shrink-0 font-medium text-foreground text-xs tabular-nums">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+interface ReadOnlyReplicaStrategySummaryProps {
+  cpuTarget: number;
+  elastic: ContainerElasticReplicaSettings;
+  fixedReplicas: number;
+  maxReplicas: number;
+  memoryTargetMib: number;
+  minReplicas: number;
+  strategyType: ReplicaStrategyType;
+  targetMetric: ElasticTargetMetric;
+}
+
+function ReadOnlyReplicaStrategySummary({
+  cpuTarget,
+  elastic,
+  fixedReplicas,
+  maxReplicas,
+  memoryTargetMib,
+  minReplicas,
+  strategyType,
+  targetMetric,
+}: ReadOnlyReplicaStrategySummaryProps) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
+        <SectionTitle className="m-0 min-w-0 shrink leading-none">
+          Replica Strategy
+        </SectionTitle>
+      </div>
+      <div className="grid min-w-0 gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+        <ReadOnlyReplicaValue
+          label="Strategy"
+          value={
+            strategyType === "elastic" ? "Elastic Scaling" : "Fixed Replicas"
+          }
+        />
+        {strategyType === "fixed" ? (
+          <ReadOnlyReplicaValue label="Replica count" value={fixedReplicas} />
+        ) : (
+          <>
+            <ReadOnlyReplicaValue
+              label="Minimum replicas"
+              value={minReplicas}
+            />
+            <ReadOnlyReplicaValue
+              label="Maximum replicas"
+              value={maxReplicas}
+            />
+            <ReadOnlyReplicaValue
+              label="Scaling target"
+              value={targetMetric === "memory" ? "Memory" : "CPU"}
+            />
+            {targetMetric === "memory" ? (
+              <ReadOnlyReplicaValue
+                label="Memory average target"
+                value={
+                  elastic.target.metric === "memory"
+                    ? elastic.target.averageValue
+                    : `${memoryTargetMib}Mi`
+                }
+              />
+            ) : (
+              <ReadOnlyReplicaValue
+                label="CPU utilization target"
+                value={`${cpuTarget}%`}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ReplicaStrategySection({
   elastic,
   fixedReplicasSliderParts,
@@ -1424,6 +1516,22 @@ function ReplicaStrategySection({
     elastic.target.metric === "memory"
       ? memoryAverageValueToMib(elastic.target.averageValue)
       : DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+
+  if (readOnly) {
+    return (
+      <ReadOnlyReplicaStrategySummary
+        cpuTarget={cpuTarget}
+        elastic={elastic}
+        fixedReplicas={fixedReplicasSliderParts.replicasValue}
+        maxReplicas={maxReplicas}
+        memoryTargetMib={memoryTarget}
+        minReplicas={minReplicas}
+        strategyType={strategyType}
+        targetMetric={targetMetric}
+      />
+    );
+  }
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex h-6 min-w-0 items-center justify-between gap-2">
