@@ -311,16 +311,18 @@ function ProjectAssistantChatSession({
     <Chat.Root>
       <Chat className="h-full min-h-0 flex-1 border-0 bg-[#101219] shadow-none">
         <Chat.Header
-          className="shrink-0 pr-12"
+          className="shrink-0 py-2 pr-12"
           threadHistory={threadHistory}
           threadName={threadLabel}
         >
           <Chat.Export
+            className="size-9"
             disabled={messages.length === 0}
             onExport={exportTranscript}
           />
           <Chat.NewThread
             aria-label="Create thread"
+            className="size-9"
             creating={creatingThread}
             onNewThread={createThreadClicked}
           />
@@ -493,7 +495,7 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
   return (
     <header
       className={cn(
-        "flex h-12 shrink-0 items-center gap-2 bg-background px-2",
+        "flex h-13 shrink-0 items-center gap-2 bg-background px-2",
         !rightPaneOpen && "pr-12"
       )}
     >
@@ -553,7 +555,7 @@ export default function ProjectChatPaneLayout({
         aria-label={
           rightPaneOpen ? "Close assistant panel" : "Open assistant panel"
         }
-        className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 rounded-xl"
+        className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
         onClick={toggleRightPane}
         size="icon-lg"
         type="button"
