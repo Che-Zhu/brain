@@ -1403,6 +1403,11 @@ function normalizeCustomDomainDraft(value: string): string {
   return value.trim().toLowerCase().replace(/\.+$/g, "");
 }
 
+interface VisibleDomainRows {
+  customDomains: ContainerNetworkCustomDomain[];
+  publicAddresses: ContainerNetworkPublicAddress[];
+}
+
 interface CnameBindingDialogProps {
   address: ContainerNetworkPublicAddress | undefined;
   onBind: (domain: ContainerNetworkCustomDomain) => void;
@@ -1527,7 +1532,7 @@ function CnameBindingDialog({
   );
 }
 
-function visibleDomainRows(network: ContainerNetwork) {
+function visibleDomainRows(network: ContainerNetwork): VisibleDomainRows {
   const customDomains = network.customDomains ?? [];
   const boundPlatformAddressIds = new Set(
     customDomains.map((domain) => domain.platformAddressId.trim())
@@ -1540,19 +1545,19 @@ function visibleDomainRows(network: ContainerNetwork) {
   };
 }
 
-async function commitNetworkDraft(
+async function commitNetworkChange(
   network: ContainerNetwork,
-  onNetworkDraftChange: ((network: ContainerNetwork) => void) | undefined,
-  onNetworkChange:
-    | ((network: ContainerNetwork) => void | Promise<void>)
-    | undefined
+  options: Pick<
+    NetworkSettingsSectionProps,
+    "onNetworkChange" | "onNetworkDraftChange"
+  >
 ) {
-  if (onNetworkDraftChange != null) {
-    onNetworkDraftChange(network);
+  if (options.onNetworkDraftChange != null) {
+    options.onNetworkDraftChange(network);
     return;
   }
-  if (onNetworkChange != null) {
-    await onNetworkChange(network);
+  if (options.onNetworkChange != null) {
+    await options.onNetworkChange(network);
   }
 }
 
@@ -1721,7 +1726,6 @@ interface DomainListSectionProps {
   addOpen: boolean;
   canMutateNetwork: boolean;
   defaultPort: number;
-  domainRows: ReturnType<typeof visibleDomainRows>;
   hiddenPublicAddressCount: number;
   onAddPublicAddress: (address: PublicAddressDraft) => void | Promise<void>;
   onBindAddress: (address: ContainerNetworkPublicAddress) => void;
@@ -1731,6 +1735,7 @@ interface DomainListSectionProps {
   onShowAllPublicAddresses: () => void;
   platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   readOnly: boolean;
+  visibleDomainRows: VisibleDomainRows;
   visiblePublicAddresses: ContainerNetworkPublicAddress[];
 }
 
@@ -1738,7 +1743,6 @@ function DomainListSection({
   addOpen,
   canMutateNetwork,
   defaultPort,
-  domainRows,
   hiddenPublicAddressCount,
   onAddPublicAddress,
   onBindAddress,
@@ -1748,11 +1752,12 @@ function DomainListSection({
   onShowAllPublicAddresses,
   platformAddressDraftContext,
   readOnly,
+  visibleDomainRows,
   visiblePublicAddresses,
 }: DomainListSectionProps) {
   const noDomains =
-    domainRows.publicAddresses.length === 0 &&
-    domainRows.customDomains.length === 0;
+    visibleDomainRows.publicAddresses.length === 0 &&
+    visibleDomainRows.customDomains.length === 0;
 
   return (
     <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
@@ -1791,7 +1796,7 @@ function DomainListSection({
         </div>
       ) : (
         <div className="grid gap-2">
-          {domainRows.customDomains.map((domain, index) => (
+          {visibleDomainRows.customDomains.map((domain, index) => (
             <CustomDomainRow
               domain={domain}
               key={customDomainKey(domain, index)}
@@ -1851,7 +1856,7 @@ function NetworkSettingsSection({
   const portDraft = privatePortDraft ?? draftPort;
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
-  const domainRows = visibleDomainRows(network);
+  const visibleDomains = visibleDomainRows(network);
   const usesPanelDraft = hasNetworkPanelDraftControls({
     onNetworkDraftChange,
     onPrivatePortDraftChange,
@@ -1862,10 +1867,10 @@ function NetworkSettingsSection({
     readOnly,
   });
   const visiblePublicAddresses = showAllPublicAddresses
-    ? domainRows.publicAddresses
-    : domainRows.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+    ? visibleDomains.publicAddresses
+    : visibleDomains.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
   const hiddenPublicAddressCount =
-    domainRows.publicAddresses.length - visiblePublicAddresses.length;
+    visibleDomains.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
     if (privatePortDraft == null) {
@@ -1875,10 +1880,10 @@ function NetworkSettingsSection({
   }, [network.privatePort, privatePortDraft]);
 
   useEffect(() => {
-    if (domainRows.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+    if (visibleDomains.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
       setShowAllPublicAddresses(false);
     }
-  }, [domainRows.publicAddresses.length]);
+  }, [visibleDomains.publicAddresses.length]);
 
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   const effectivePortError =
@@ -1929,39 +1934,36 @@ function NetworkSettingsSection({
   };
 
   const handleAddPublicAddress = async (address: PublicAddressDraft) => {
-    await commitNetworkDraft(
+    await commitNetworkChange(
       {
         ...network,
         publicAddresses: [...network.publicAddresses, address],
       },
-      onNetworkDraftChange,
-      onNetworkChange
+      { onNetworkChange, onNetworkDraftChange }
     );
   };
 
   const handleDeletePublicAddress = async (index: number) => {
-    const target = domainRows.publicAddresses[index];
+    const target = visibleDomains.publicAddresses[index];
     const publicAddresses = network.publicAddresses.filter(
       (address, itemIndex) =>
         !isPublicAddressDeleteTarget(address, itemIndex, target, index)
     );
-    await commitNetworkDraft(
+    await commitNetworkChange(
       { ...network, publicAddresses },
-      onNetworkDraftChange,
-      onNetworkChange
+      { onNetworkChange, onNetworkDraftChange }
     );
   };
 
   const handleBindCustomDomain = async (
     domain: ContainerNetworkCustomDomain
   ) => {
-    await commitNetworkDraft(
+    await commitNetworkChange(
       {
         ...network,
         customDomains: [...(network.customDomains ?? []), domain],
       },
-      onNetworkDraftChange,
-      onNetworkChange
+      { onNetworkChange, onNetworkDraftChange }
     );
   };
 
@@ -2036,7 +2038,6 @@ function NetworkSettingsSection({
             addOpen={addOpen}
             canMutateNetwork={canMutateNetwork}
             defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-            domainRows={domainRows}
             hiddenPublicAddressCount={hiddenPublicAddressCount}
             onAddPublicAddress={handleAddPublicAddress}
             onBindAddress={setCnameAddress}
@@ -2046,6 +2047,7 @@ function NetworkSettingsSection({
             onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
             platformAddressDraftContext={platformAddressDraftContext}
             readOnly={readOnly}
+            visibleDomainRows={visibleDomains}
             visiblePublicAddresses={visiblePublicAddresses}
           />
         </div>
