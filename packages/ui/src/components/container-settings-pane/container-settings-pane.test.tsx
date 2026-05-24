@@ -10,6 +10,7 @@ import type {
 import {
   ContainerSettingsPane,
   confirmedAddDbDsnReferencesFromEnvDraft,
+  containerSettingsDraftIsDirty,
   resourceQuotaReplicaPatchFromDraft,
 } from "./container-settings-pane";
 
@@ -30,6 +31,9 @@ const PASSWORD_FIELD_RE = /Password/;
 const UNAVAILABLE_DB_RE = /empty \(unavailable\)/;
 const REMOVE_ENV_RE = /aria-label="Remove environment variable"/;
 const SAVE_ENV_RE = /Save environment/;
+const SAVE_SETTINGS_RE = /aria-label="Save settings"/;
+const CANCEL_ENV_RE = /Cancel environment changes/;
+const CANCEL_SETTINGS_RE = /aria-label="Cancel settings changes"/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
 const MYSQL_OPTION_SELECTED_RE =
   /<option value="default\/mysql" selected="">mysql/;
@@ -576,4 +580,85 @@ test("container settings pane reports confirmed dragged DB reference rows from t
   assert.deepEqual(confirmedAddDbDsnReferencesFromEnvDraft([draftRow]), [
     { dbName: "mysql", dbNamespace: "default", id: "drag-1" },
   ]);
+});
+
+test("container settings draft detects dirty AP settings and restored state", () => {
+  const original = {
+    cpuCores: 1,
+    env: [{ name: "DATABASE_URL", value: "postgres://old" }],
+    image: "ghcr.io/acme/api:old",
+    memoryMib: 1024,
+    network: {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_old123", port: 80 }],
+    },
+    replicaStrategy: {
+      fixed: { replicas: 2 },
+      type: "fixed",
+    },
+  } satisfies Parameters<typeof containerSettingsDraftIsDirty>[0];
+
+  assert.equal(containerSettingsDraftIsDirty(original, original), false);
+  assert.equal(
+    containerSettingsDraftIsDirty(original, {
+      ...original,
+      env: [...original.env, { name: "FEATURE_FLAG", value: "true" }],
+      image: "ghcr.io/acme/api:new",
+      network: {
+        privatePort: 8080,
+        publicAddresses: [
+          { id: "pa_old123", port: 80 },
+          { id: "pa_new456", port: 9000 },
+        ],
+      },
+      replicaStrategy: {
+        elastic: {
+          maxReplicas: 8,
+          minReplicas: 2,
+          target: {
+            metric: "cpu",
+            type: "utilization",
+            utilizationPercent: 75,
+          },
+        },
+        fixed: { replicas: 2 },
+        type: "elastic",
+      },
+    }),
+    true
+  );
+  assert.equal(containerSettingsDraftIsDirty(original, { ...original }), false);
+});
+
+test("container settings pane exposes panel-level draft actions without environment save controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      addDbDsnReferenceIntent={{
+        dbName: "mysql",
+        dbNamespace: "default",
+        id: "drag-1",
+      }}
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      dbDsnReferenceSources={[
+        {
+          name: "mysql",
+          namespace: "default",
+          privateDsn: "mysql://private",
+        },
+      ]}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      onSettingsDraftCommit={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, SAVE_SETTINGS_RE);
+  assert.match(html, CANCEL_SETTINGS_RE);
+  assert.doesNotMatch(html, SAVE_ENV_RE);
+  assert.doesNotMatch(html, CANCEL_ENV_RE);
 });

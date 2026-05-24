@@ -12,6 +12,15 @@ import {
 } from "@workspace/ui/components/database-node/database-node";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { Switch } from "@workspace/ui/components/switch";
+import {
+  applySettingsDraftBackingResult,
+  commitSettingsDraftBackingState,
+  createSettingsDraftBackingState,
+  failSettingsDraftSave,
+  keepEditingSettingsDraftBackingState,
+  reloadSettingsDraftBackingState,
+  syncSettingsDraftBackingState,
+} from "@workspace/ui/lib/settings-draft-backing";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Cpu,
@@ -51,11 +60,13 @@ import {
   normalizeDbSettingsReplicas,
   normalizeDbSettingsStorageGi,
 } from "./database-settings-draft";
+import type { SettingsLeaveGuardRegistration } from "./settings-leave-guard";
 
 interface DatabaseSettingsPaneProps {
   data: CanvasDatabaseNodeData;
   kubeconfig?: string;
   onClose: () => void;
+  onSettingsLeaveGuardChange?: SettingsLeaveGuardRegistration;
   onUpdated?: () => Promise<unknown>;
 }
 
@@ -63,6 +74,7 @@ interface DatabaseSettingsPaneContentProps {
   data: CanvasDatabaseNodeData;
   editable?: boolean;
   onClose: () => void;
+  onSettingsLeaveGuardChange?: SettingsLeaveGuardRegistration;
   onSubmitPatch?: (patch: DatabaseSettingsPatch) => Promise<unknown> | unknown;
   onUpdated?: () => Promise<unknown>;
   routingDomain?: string;
@@ -405,44 +417,93 @@ function DatabaseSettingsConnectionAddressList({
 }
 
 function DatabaseSettingsFooter({
+  backingResourceChanged,
   canUpdate,
   dirty,
+  onKeepEditing,
+  onReload,
   onUpdate,
+  saveFailureMessage,
   updating,
 }: {
+  backingResourceChanged: boolean;
   canUpdate: boolean;
   dirty: boolean;
+  onKeepEditing: () => void;
+  onReload: () => void;
   onUpdate: () => void;
+  saveFailureMessage: string | null;
   updating: boolean;
 }) {
   return (
-    <footer className="flex shrink-0 items-center justify-between gap-3 p-2.5">
-      <p
-        className={cn(
-          "min-w-0 truncate text-theme-yellow text-xs leading-4",
-          !dirty && "invisible"
-        )}
-      >
-        Unsaved configuration changes.
-      </p>
-      <Button
-        className="h-9 rounded-lg bg-database-metrics-card px-4 text-primary hover:bg-database-metrics-card/80"
-        disabled={!canUpdate}
-        onClick={onUpdate}
-        type="button"
-        variant="ghost"
-      >
-        <Upload aria-hidden className="size-4" />
-        {updating ? "Updating" : "Update"}
-      </Button>
+    <footer className="flex shrink-0 flex-col gap-2 p-2.5">
+      {backingResourceChanged ? (
+        <div
+          className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-theme-yellow/40 bg-theme-yellow/10 px-2.5 py-2 text-theme-yellow text-xs leading-4"
+          role="status"
+        >
+          <span className="min-w-0 truncate">Backing resource changed.</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onReload}
+              type="button"
+              variant="ghost"
+            >
+              Reload
+            </Button>
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onKeepEditing}
+              type="button"
+              variant="ghost"
+            >
+              Keep editing
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {saveFailureMessage == null ? null : (
+        <p className="text-destructive text-xs leading-4" role="alert">
+          {saveFailureMessage}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className={cn(
+            "min-w-0 truncate text-theme-yellow text-xs leading-4",
+            !dirty && "invisible"
+          )}
+        >
+          Unsaved configuration changes.
+        </p>
+        <Button
+          className="h-9 rounded-lg bg-database-metrics-card px-4 text-primary hover:bg-database-metrics-card/80"
+          disabled={!canUpdate}
+          onClick={onUpdate}
+          type="button"
+          variant="ghost"
+        >
+          <Upload aria-hidden className="size-4" />
+          {updating ? "Updating" : "Update"}
+        </Button>
+      </div>
     </footer>
   );
+}
+
+function databaseSettingsBackingKey(
+  identityKey: string,
+  draft: DatabaseSettingsDraft
+) {
+  return JSON.stringify({ draft, identityKey });
 }
 
 export function DatabaseSettingsPane({
   data,
   kubeconfig,
   onClose,
+  onSettingsLeaveGuardChange,
   onUpdated,
 }: DatabaseSettingsPaneProps) {
   const readOnly = data.settingsAccess?.readOnly === true;
@@ -468,6 +529,7 @@ export function DatabaseSettingsPane({
       data={data}
       editable={!readOnly && authReady}
       onClose={onClose}
+      onSettingsLeaveGuardChange={onSettingsLeaveGuardChange}
       onSubmitPatch={!readOnly && authReady ? handleSubmitPatch : undefined}
       onUpdated={onUpdated}
       routingDomain={routingDomain}
@@ -480,6 +542,7 @@ export function DatabaseSettingsPaneContent({
   data,
   editable = true,
   onClose,
+  onSettingsLeaveGuardChange,
   onSubmitPatch,
   onUpdated,
   routingDomain,
@@ -495,6 +558,7 @@ export function DatabaseSettingsPaneContent({
   const desiredMemoryLimit = desired?.memoryLimit;
   const desiredReplicas = desired?.replicas;
   const desiredStorageSize = desired?.storageSize;
+  const identityKey = `${workloadNamespace}/${workloadName}`;
   const originalState = useMemo(() => {
     const draft = dbSettingsDraftFromNodeData({
       desired: {
@@ -511,8 +575,9 @@ export function DatabaseSettingsPaneContent({
     });
 
     return {
+      backingKey: databaseSettingsBackingKey(identityKey, draft),
       draft,
-      resetKey: `${workloadNamespace}/${workloadName}`,
+      identityKey,
     };
   }, [
     desiredCpuLimit,
@@ -520,15 +585,36 @@ export function DatabaseSettingsPaneContent({
     desiredMemoryLimit,
     desiredReplicas,
     desiredStorageSize,
-    workloadName,
-    workloadNamespace,
+    identityKey,
   ]);
-  const original = originalState.draft;
-  const [draft, setDraft] = useState<DatabaseSettingsDraft>(original);
+  const [draft, setDraft] = useState<DatabaseSettingsDraft>(
+    originalState.draft
+  );
+  const [backingState, setBackingState] = useState(() =>
+    createSettingsDraftBackingState(
+      originalState.draft,
+      originalState.backingKey,
+      originalState.identityKey
+    )
+  );
+  const original = backingState.base;
 
   useEffect(() => {
-    setDraft(originalState.draft);
-  }, [originalState]);
+    const synced = syncSettingsDraftBackingState(backingState, {
+      backing: originalState.draft,
+      backingKey: originalState.backingKey,
+      draft,
+      identityKey: originalState.identityKey,
+      isDirty: dbSettingsDraftIsDirty,
+    });
+    if (synced.state === backingState && synced.draft === undefined) {
+      return;
+    }
+    applySettingsDraftBackingResult(synced, {
+      draft: setDraft,
+      state: setBackingState,
+    });
+  }, [backingState, draft, originalState]);
 
   const pendingPatch = useMemo(
     () =>
@@ -546,23 +632,84 @@ export function DatabaseSettingsPaneContent({
   const subtitle = databaseHeaderSubtitle(data.states);
   const controlsDisabled = !canEdit || updating;
 
-  const handleUpdate = useCallback(async () => {
+  const saveSettingsDraft = useCallback(async () => {
     const patch = pendingPatch;
     if (!canEdit || patch === null || onSubmitPatch == null) {
-      return;
+      throw new Error("Database settings draft cannot be saved yet.");
     }
+    setBackingState((current) => ({ ...current, saveFailureMessage: null }));
     try {
       await onSubmitPatch(patch);
+      setBackingState((current) =>
+        commitSettingsDraftBackingState(current, draft)
+      );
       toast.success("Database settings updated.");
       await onUpdated?.();
     } catch (error) {
+      setBackingState((current) =>
+        failSettingsDraftSave(
+          current,
+          error,
+          "Could not update database settings."
+        )
+      );
       toast.error(
         error instanceof Error
           ? error.message
           : "Could not update database settings."
       );
+      throw error;
     }
-  }, [canEdit, onSubmitPatch, onUpdated, pendingPatch]);
+  }, [canEdit, draft, onSubmitPatch, onUpdated, pendingPatch]);
+
+  const handleUpdate = useCallback(() => {
+    saveSettingsDraft().catch(() => {
+      /* Keep the user on the settings draft; panel state already shows failure. */
+    });
+  }, [saveSettingsDraft]);
+
+  const handleReloadDraft = useCallback(() => {
+    applySettingsDraftBackingResult(
+      reloadSettingsDraftBackingState(backingState),
+      {
+        draft: setDraft,
+        state: setBackingState,
+      }
+    );
+  }, [backingState]);
+
+  const handleKeepEditingDraft = useCallback(() => {
+    setBackingState((current) => keepEditingSettingsDraftBackingState(current));
+  }, []);
+
+  useEffect(() => {
+    if (!canEdit || onSettingsLeaveGuardChange == null) {
+      return;
+    }
+
+    onSettingsLeaveGuardChange(
+      dirty
+        ? {
+            canSave: canUpdate,
+            dirty: true,
+            discard: handleReloadDraft,
+            save: saveSettingsDraft,
+            scope: "database",
+          }
+        : null
+    );
+
+    return () => {
+      onSettingsLeaveGuardChange(null);
+    };
+  }, [
+    canEdit,
+    canUpdate,
+    dirty,
+    handleReloadDraft,
+    onSettingsLeaveGuardChange,
+    saveSettingsDraft,
+  ]);
 
   return (
     <CanvasResourcePane
@@ -660,9 +807,13 @@ export function DatabaseSettingsPaneContent({
 
       {readOnly ? null : (
         <DatabaseSettingsFooter
+          backingResourceChanged={backingState.resourceChanged}
           canUpdate={canUpdate}
           dirty={dirty}
+          onKeepEditing={handleKeepEditingDraft}
+          onReload={handleReloadDraft}
           onUpdate={handleUpdate}
+          saveFailureMessage={backingState.saveFailureMessage}
           updating={updating}
         />
       )}

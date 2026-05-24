@@ -87,8 +87,10 @@ export default function ProjectUidPage() {
     databasePane,
     meta: canvasMeta,
     nodes,
+    registerSettingsLeaveGuard,
     selectedEdge,
     selectedNode,
+    settingsLeaveGuardDialog,
     workloadPane,
   } = useProjectCanvas(canvasState.nodes, {
     dbsData: projectServicesData.dbs,
@@ -163,6 +165,7 @@ export default function ProjectUidPage() {
                     mode={workloadPane}
                     node={selectedNode}
                     onClose={closeResourcePane}
+                    onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
                   />
                   <DatabaseMetricsPane
                     kubeconfig={kubeconfig}
@@ -176,9 +179,11 @@ export default function ProjectUidPage() {
                       data={selectedDatabaseData}
                       kubeconfig={kubeconfig}
                       onClose={closeResourcePane}
+                      onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
                       onUpdated={refreshWorkloadLists}
                     />
                   ) : null}
+                  {settingsLeaveGuardDialog}
                 </Canvas.Flow>
               </div>
             </Canvas.Root>

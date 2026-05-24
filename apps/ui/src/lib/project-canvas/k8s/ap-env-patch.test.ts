@@ -7,6 +7,7 @@ import {
   patchOpsForApNetworkSettings,
   patchOpsForApReplicaStrategySettings,
   patchOpsForApResourceQuotaSettings,
+  patchOpsForApSettingsDraft,
 } from "./ap-json-patch";
 import type { K8sJsonPatchOp } from "./http/json-patch";
 
@@ -646,4 +647,179 @@ test("AP env settings preserve non-direct rows unless they are deleted", () => {
     ),
     [{ name: "DATABASE_URL", value: "postgres://db:5432/app" }]
   );
+});
+
+test("AP settings draft builds one patch for combined dirty settings", () => {
+  const previous = {
+    cpuCores: 1,
+    env: [{ name: "DATABASE_URL", value: "postgres://old" }],
+    image: "ghcr.io/acme/api:old",
+    memoryMib: 1024,
+    network: {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_old123", port: 80 }],
+    },
+    replicaStrategy: {
+      fixed: { replicas: 2 },
+      type: "fixed",
+    },
+  } as const;
+
+  const ops = patchOpsForApSettingsDraft(
+    {
+      input: {
+        env: [{ name: "DATABASE_URL", value: "postgres://old" }],
+        image: "ghcr.io/acme/api:old",
+        network: {
+          privatePort: 80,
+          platformAddresses: [{ id: "pa_old123", port: 80 }],
+        },
+      },
+      resource: {
+        limits: { cpu: "1", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 2 },
+          type: "fixed",
+        },
+        replicas: 2,
+      },
+    },
+    {
+      cpuCores: 2,
+      env: [
+        { name: "DATABASE_URL", value: "postgres://new" },
+        { name: "FEATURE_FLAG", value: "true" },
+      ],
+      image: "ghcr.io/acme/api:new",
+      memoryMib: 2048,
+      network: {
+        privatePort: 8080,
+        publicAddresses: [
+          { id: "pa_old123", port: 8080 },
+          { id: "pa_new456", port: 9000 },
+        ],
+      },
+      replicaStrategy: {
+        elastic: {
+          maxReplicas: 8,
+          minReplicas: 2,
+          target: {
+            metric: "cpu",
+            type: "utilization",
+            utilizationPercent: 75,
+          },
+        },
+        fixed: { replicas: 2 },
+        type: "elastic",
+      },
+    },
+    previous,
+    {
+      metadata: { labels: { "crossplane.io/project-name": "demo" } },
+      routingDomain: "192.168.12.53.nip.io",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/image",
+      value: "ghcr.io/acme/api:new",
+    },
+    {
+      op: "replace",
+      path: "/spec/input/env",
+      value: [
+        { name: "DATABASE_URL", value: "postgres://new" },
+        { name: "FEATURE_FLAG", value: "true" },
+      ],
+    },
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        privatePort: 8080,
+        platformAddresses: [
+          { id: "pa_old123", port: 8080 },
+          { id: "pa_new456", port: 9000 },
+        ],
+      },
+    },
+    {
+      op: "add",
+      path: "/metadata/labels/region",
+      value: "192.168.12.53.nip.io",
+    },
+    {
+      op: "replace",
+      path: "/spec/resource",
+      value: {
+        limits: { cpu: "2", memory: "2048Mi" },
+        replicaStrategy: {
+          elastic: {
+            maxReplicas: 8,
+            minReplicas: 2,
+            target: {
+              metric: "cpu",
+              type: "utilization",
+              utilizationPercent: 75,
+            },
+          },
+          fixed: { replicas: 2 },
+          type: "elastic",
+        },
+        replicas: 2,
+      },
+    },
+  ]);
+});
+
+test("AP settings draft omits unchanged settings from the patch", () => {
+  const previous = {
+    cpuCores: 1,
+    env: [{ name: "DATABASE_URL", value: "postgres://old" }],
+    image: "ghcr.io/acme/api:old",
+    memoryMib: 1024,
+    network: {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_old123", port: 80 }],
+    },
+    replicaStrategy: {
+      fixed: { replicas: 2 },
+      type: "fixed",
+    },
+  } as const;
+
+  const ops = patchOpsForApSettingsDraft(
+    {
+      input: {
+        env: [{ name: "DATABASE_URL", value: "postgres://old" }],
+        image: "ghcr.io/acme/api:old",
+        network: {
+          privatePort: 80,
+          platformAddresses: [{ id: "pa_old123", port: 80 }],
+        },
+      },
+      resource: {
+        limits: { cpu: "1", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 2 },
+          type: "fixed",
+        },
+      },
+    },
+    {
+      ...previous,
+      env: [{ name: "DATABASE_URL", value: "postgres://new" }],
+    },
+    previous
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/env",
+      value: [{ name: "DATABASE_URL", value: "postgres://new" }],
+    },
+  ]);
 });
