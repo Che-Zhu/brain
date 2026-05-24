@@ -1,9 +1,5 @@
 "use client";
 
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@workspace/ui/components/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
 import AppSidebar from "@/components/app-sidebar";
@@ -15,12 +11,9 @@ import AppSidebar from "@/components/app-sidebar";
  */
 export function AppShellChrome({ children }: { children: ReactNode }) {
   return (
-    <SidebarProvider
-      className="h-svh max-h-svh min-h-0 overflow-hidden"
-      defaultOpen={false}
-    >
+    <div className="flex h-svh max-h-svh min-h-0 overflow-hidden">
       {children}
-    </SidebarProvider>
+    </div>
   );
 }
 
@@ -30,10 +23,13 @@ export function AppShellView({
   children,
   className,
   ...rest
-}: ComponentProps<typeof SidebarInset>) {
+}: ComponentProps<"main">) {
   return (
-    <SidebarInset
-      className={cn("min-h-0 min-w-0 overflow-hidden", className)}
+    <main
+      className={cn(
+        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+        className
+      )}
       {...rest}
     >
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -41,7 +37,7 @@ export function AppShellView({
           {children}
         </div>
       </div>
-    </SidebarInset>
+    </main>
   );
 }
 

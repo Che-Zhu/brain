@@ -26,7 +26,7 @@ export function ProjectExplorerHeader({
   ...props
 }: ComponentProps<"div"> & { children?: ReactNode }) {
   return (
-    <div className={cn("px-4 pt-3 pb-6", className)} {...props}>
+    <div className={cn("px-0 pt-0 pb-6", className)} {...props}>
       {children}
     </div>
   );
