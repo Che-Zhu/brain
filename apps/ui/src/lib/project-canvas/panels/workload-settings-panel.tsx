@@ -7,6 +7,7 @@ import { Settings2 } from "lucide-react";
 import { memo } from "react";
 
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
+import { verifyCustomDomainCnameFromApi } from "@/lib/project-canvas/custom-domain-cname-client";
 import {
   containerStatesFromNode,
   workloadClaimKindFromStates,
@@ -210,6 +211,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         onAddDbDsnReferenceIntentConsumed={
           data?.onAddDbDsnReferenceIntentConsumed
         }
+        onCustomDomainCnameVerify={verifyCustomDomainCnameFromApi}
         onEnvChange={canEditAp ? onEnvChange : ignoreEnv}
         onImageChange={canEditAp ? onImageChange : ignoreImage}
         onNetworkChange={canEditAp ? onNetworkChange : ignoreNetwork}

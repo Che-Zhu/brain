@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
+  customDomainBindingIdFromValue,
   platformAddressEndpoint,
   platformAddressIdFromValue,
   platformAddressIdsFromRows,
@@ -214,6 +215,7 @@ function apNetworkFromSpecAndStatus(
   const privateAddress = trimStr(statusNetwork?.privateAddress);
   return {
     ...(privateAddress === "" ? {} : { privateAddress }),
+    ...apNetworkCustomDomains(inputNetwork),
     privatePort,
     publicAddresses: apNetworkPublicAddresses(
       metadata,
@@ -221,6 +223,15 @@ function apNetworkFromSpecAndStatus(
       statusNetwork
     ),
   };
+}
+
+function apNetworkCustomDomains(
+  inputNetwork: Record<string, unknown> | undefined
+): Pick<ContainerNetwork, "customDomains"> | Record<string, never> {
+  const customDomains = normalizeDesiredCustomDomains(
+    inputNetwork?.customDomains
+  );
+  return customDomains.length === 0 ? {} : { customDomains };
 }
 
 function apNetworkPublicAddresses(
@@ -247,6 +258,36 @@ function apNetworkPublicAddresses(
     ];
   }
   return desiredPending;
+}
+
+function normalizeDesiredCustomDomains(
+  raw: unknown
+): NonNullable<ContainerNetwork["customDomains"]> {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: NonNullable<ContainerNetwork["customDomains"]> = [];
+  for (const item of raw) {
+    const binding = asRecord(item);
+    if (binding == null) {
+      continue;
+    }
+    const id = customDomainBindingIdFromValue(binding.id);
+    const platformAddressId = platformAddressIdFromValue(
+      binding.platformAddressId
+    );
+    const domain = trimStr(binding.domain).toLowerCase();
+    if (id === undefined || platformAddressId === undefined || domain === "") {
+      continue;
+    }
+    out.push({
+      domain,
+      id,
+      platformAddressId,
+      status: "pending",
+    });
+  }
+  return out;
 }
 
 function normalizeDesiredPlatformAddresses(

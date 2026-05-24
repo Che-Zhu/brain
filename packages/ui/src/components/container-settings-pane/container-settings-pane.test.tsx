@@ -51,8 +51,11 @@ const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
 const DRAFT_PUBLIC_ADDRESS_VALUE_RE =
   /https:\/\/api-58b271f360.apps.example.com\//;
 const PUBLIC_ADDRESS_STATUS_RE = /Public Address status: accessible/;
+const CUSTOM_DOMAIN_VALUE_RE = /www\.example\.com/;
+const CUSTOM_DOMAIN_STATUS_RE = /Custom Domain status: accessible/;
 const COPY_PUBLIC_ADDRESS_RE = /aria-label="Copy Public Address"/;
 const CNAME_RE = /CNAME/;
+const BIND_CUSTOM_DOMAIN_RE = /aria-label="Bind Custom Domain"/;
 const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
 const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
 const ADD_DOMAIN_RE = /Add Domain/;
@@ -204,6 +207,7 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, PUBLIC_ADDRESS_STATUS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
   assert.match(html, CNAME_RE);
+  assert.match(html, BIND_CUSTOM_DOMAIN_RE);
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_DOMAIN_RE);
@@ -248,6 +252,49 @@ test("container settings pane renders draft-visible Platform Address hosts", () 
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
   assert.match(html, CNAME_RE);
   assert.doesNotMatch(html, NO_DOMAINS_RE);
+});
+
+test("container settings pane shows Custom Domain rows instead of bound Platform Addresses", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+            status: "accessible",
+          },
+        ],
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api.example.com",
+            id: "pa_abc123",
+            port: 8080,
+            status: "accessible",
+            type: "platform",
+            url: "https://api.example.com/",
+          },
+        ],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, CUSTOM_DOMAIN_VALUE_RE);
+  assert.match(html, CUSTOM_DOMAIN_STATUS_RE);
+  assert.doesNotMatch(html, PUBLIC_ADDRESS_VALUE_RE);
+  assert.doesNotMatch(html, BIND_CUSTOM_DOMAIN_RE);
 });
 
 test("container settings pane renders fixed replica strategy controls", () => {

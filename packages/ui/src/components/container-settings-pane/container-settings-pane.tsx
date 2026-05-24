@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  generateCustomDomainBindingId,
   generatePlatformAddressId,
   platformAddressEndpoint,
 } from "@workspace/crossplane/lib/platform-address";
@@ -118,13 +119,22 @@ export interface ContainerPort {
 export interface ContainerNetworkPublicAddress {
   host?: string;
   id?: string;
+  platformAddressId?: string;
   port: number;
   status?: string;
   type?: string;
   url?: string;
 }
 
+export interface ContainerNetworkCustomDomain {
+  domain: string;
+  id: string;
+  platformAddressId: string;
+  status?: string;
+}
+
 export interface ContainerNetwork {
+  customDomains?: ContainerNetworkCustomDomain[];
   privateAddress?: string;
   privatePort: number;
   publicAddresses: ContainerNetworkPublicAddress[];
@@ -135,6 +145,17 @@ export interface ContainerNetworkPlatformAddressDraftContext {
   namespace?: string;
   routingDomain?: string;
 }
+
+export interface ContainerCustomDomainCnameVerificationResult {
+  message?: string;
+  ok: boolean;
+  reason?: string;
+}
+
+export type ContainerCustomDomainCnameVerifier = (input: {
+  domain: string;
+  target: string;
+}) => Promise<ContainerCustomDomainCnameVerificationResult>;
 
 export interface ContainerFixedReplicaStrategy {
   elastic?: ContainerElasticReplicaSettings;
@@ -474,6 +495,7 @@ export interface ContainerSettingsPaneProps {
   network?: ContainerNetwork;
   networkPlatformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
+  onCustomDomainCnameVerify?: ContainerCustomDomainCnameVerifier;
   onEnvChange: (
     env: ContainerEnvVar[],
     meta?: ContainerSettingsPaneEnvChangeMeta
@@ -536,6 +558,27 @@ function publicAddressDraftsEqual(
   });
 }
 
+function customDomainDraftsEqual(
+  a: readonly ContainerNetworkCustomDomain[] | undefined,
+  b: readonly ContainerNetworkCustomDomain[] | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((domain, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      domain.id.trim() === other.id.trim() &&
+      domain.domain.trim().toLowerCase() ===
+        other.domain.trim().toLowerCase() &&
+      domain.platformAddressId.trim() === other.platformAddressId.trim()
+    );
+  });
+}
+
 function containerNetworksEqual(
   a: ContainerNetwork | undefined,
   b: ContainerNetwork | undefined
@@ -545,7 +588,8 @@ function containerNetworksEqual(
   }
   return (
     Math.round(a.privatePort) === Math.round(b.privatePort) &&
-    publicAddressDraftsEqual(a.publicAddresses, b.publicAddresses)
+    publicAddressDraftsEqual(a.publicAddresses, b.publicAddresses) &&
+    customDomainDraftsEqual(a.customDomains, b.customDomains)
   );
 }
 
@@ -1080,6 +1124,7 @@ function EditableEnvRows({
 
 interface NetworkSettingsSectionProps {
   network: ContainerNetwork;
+  onCustomDomainCnameVerify?: ContainerCustomDomainCnameVerifier;
   onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
   onNetworkDraftChange?: (network: ContainerNetwork) => void;
   onPrivatePortDraftChange?: (value: string) => void;
@@ -1113,6 +1158,24 @@ function canMutateNetworkDraft({
 
 function publicAddressValue(address: ContainerNetworkPublicAddress): string {
   return address.url?.trim() || address.host?.trim() || "";
+}
+
+function publicAddressHostValue(
+  address: ContainerNetworkPublicAddress | undefined
+): string {
+  const host = address?.host?.trim() ?? "";
+  if (host !== "") {
+    return host;
+  }
+  const url = address?.url?.trim() ?? "";
+  if (url === "") {
+    return "";
+  }
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
 }
 
 function publicAddressStatusLabel(
@@ -1155,6 +1218,10 @@ function publicAddressStatusDotClass(
   return "bg-theme-gray ring-theme-gray/20";
 }
 
+function customDomainStatusLabel(domain: ContainerNetworkCustomDomain): string {
+  return domain.status?.trim() || "Pending";
+}
+
 function publicAddressKey(
   address: ContainerNetworkPublicAddress,
   index: number
@@ -1163,6 +1230,15 @@ function publicAddressKey(
     address.id?.trim() ||
     address.host?.trim().toLowerCase() ||
     `pending-${index}`
+  );
+}
+
+function customDomainKey(
+  domain: ContainerNetworkCustomDomain,
+  index: number
+): string {
+  return (
+    domain.id.trim() || domain.domain.trim().toLowerCase() || `cd-${index}`
   );
 }
 
@@ -1201,12 +1277,14 @@ function isPublicAddressDeleteTarget(
 
 interface PublicAddressRowProps {
   address: ContainerNetworkPublicAddress;
+  onBindCustomDomain?: () => void;
   onDelete?: () => void | Promise<void>;
   readOnly: boolean;
 }
 
 function PublicAddressRow({
   address,
+  onBindCustomDomain,
   onDelete,
   readOnly,
 }: PublicAddressRowProps) {
@@ -1253,15 +1331,29 @@ function PublicAddressRow({
       <div className="flex shrink-0 items-center gap-1">
         <Button
           aria-label="Copy Public Address"
-          className="h-9 min-w-16 px-3 text-sm"
+          className="h-9"
           disabled={value === ""}
           onClick={handleCopy}
-          size="lg"
+          size="icon-lg"
+          title="Copy Public Address"
           type="button"
-          variant="secondary"
+          variant="ghost"
         >
-          CNAME
+          <Copy aria-hidden />
         </Button>
+        {readOnly || onBindCustomDomain == null ? null : (
+          <Button
+            aria-label="Bind Custom Domain"
+            className="h-9 min-w-16 px-3 text-sm"
+            disabled={value === ""}
+            onClick={onBindCustomDomain}
+            size="lg"
+            type="button"
+            variant="secondary"
+          >
+            CNAME
+          </Button>
+        )}
         {readOnly || onDelete == null ? null : (
           <Button
             aria-label="Delete Public Address"
@@ -1276,6 +1368,236 @@ function PublicAddressRow({
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+interface CustomDomainRowProps {
+  domain: ContainerNetworkCustomDomain;
+}
+
+function CustomDomainRow({ domain }: CustomDomainRowProps) {
+  return (
+    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+      <span
+        aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
+        className={cn(
+          "size-3 shrink-0 rounded-full ring-4",
+          publicAddressStatusDotClass({ port: 1, status: domain.status })
+        )}
+        role="img"
+      />
+      <div className="grid min-w-0 flex-1 gap-1">
+        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+          {domain.domain}
+        </div>
+        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+          {domain.platformAddressId}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function normalizeCustomDomainDraft(value: string): string {
+  return value.trim().toLowerCase().replace(/\.+$/g, "");
+}
+
+interface CnameBindingDialogProps {
+  address: ContainerNetworkPublicAddress | undefined;
+  onBind: (domain: ContainerNetworkCustomDomain) => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  verify?: ContainerCustomDomainCnameVerifier;
+}
+
+function CnameBindingDialog({
+  address,
+  onBind,
+  onOpenChange,
+  open,
+  verify,
+}: CnameBindingDialogProps) {
+  const inputId = useId();
+  const target = publicAddressHostValue(address);
+  const platformAddressId = address?.id?.trim() ?? "";
+  const [domainDraft, setDomainDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setDomainDraft("");
+      setError(null);
+      setPending(false);
+    }
+  }, [open]);
+
+  const handleVerify = async () => {
+    const domain = normalizeCustomDomainDraft(domainDraft);
+    if (domain === "") {
+      setError("Custom Domain is required.");
+      return;
+    }
+    if (target === "" || platformAddressId === "") {
+      setError("Platform Address host is not ready.");
+      return;
+    }
+    if (verify == null) {
+      setError("CNAME verification is unavailable.");
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+    try {
+      const result = await verify({ domain, target });
+      if (!result.ok) {
+        setError(result.message ?? "CNAME verification failed.");
+        return;
+      }
+      onBind({
+        domain,
+        id: generateCustomDomainBindingId(),
+        platformAddressId,
+        status: "verified",
+      });
+      onOpenChange(false);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "CNAME verification failed."
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Bind Custom Domain</DialogTitle>
+          <DialogDescription>
+            Configure a CNAME record pointing to this Platform Address.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label>CNAME target</Label>
+            <div className="min-w-0 truncate rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm">
+              {target === "" ? "Pending domain" : target}
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={inputId}>Custom Domain</Label>
+            <Input
+              aria-invalid={error != null}
+              className="font-mono text-sm"
+              disabled={pending}
+              id={inputId}
+              onChange={(event) => {
+                setDomainDraft(event.target.value);
+                setError(null);
+              }}
+              placeholder="www.example.com"
+              value={domainDraft}
+            />
+          </div>
+          {error == null ? null : (
+            <p className="text-destructive text-xs" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={pending}
+            onClick={() => onOpenChange(false)}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button disabled={pending} onClick={handleVerify} type="button">
+            {pending ? "Verifying" : "Verify"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function visibleDomainRows(network: ContainerNetwork) {
+  const customDomains = network.customDomains ?? [];
+  const boundPlatformAddressIds = new Set(
+    customDomains.map((domain) => domain.platformAddressId.trim())
+  );
+  return {
+    customDomains,
+    publicAddresses: network.publicAddresses.filter(
+      (address) => !boundPlatformAddressIds.has(address.id?.trim() ?? "")
+    ),
+  };
+}
+
+async function commitNetworkDraft(
+  network: ContainerNetwork,
+  onNetworkDraftChange: ((network: ContainerNetwork) => void) | undefined,
+  onNetworkChange:
+    | ((network: ContainerNetwork) => void | Promise<void>)
+    | undefined
+) {
+  if (onNetworkDraftChange != null) {
+    onNetworkDraftChange(network);
+    return;
+  }
+  if (onNetworkChange != null) {
+    await onNetworkChange(network);
+  }
+}
+
+interface NetworkSettingsHeaderProps {
+  canSave: boolean;
+  onCancel: () => void;
+  onSave: () => void | Promise<void>;
+  pending: boolean;
+  showActions: boolean;
+}
+
+function NetworkSettingsHeader({
+  canSave,
+  onCancel,
+  onSave,
+  pending,
+  showActions,
+}: NetworkSettingsHeaderProps) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <SectionTitle>Network</SectionTitle>
+      {showActions ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            className="h-7 px-2 text-xs"
+            disabled={pending}
+            onClick={onCancel}
+            type="button"
+            variant="ghost"
+          >
+            Cancel
+          </Button>
+          <Button
+            className="h-7 px-2 text-xs"
+            disabled={!canSave}
+            onClick={async () => {
+              await onSave();
+            }}
+            type="button"
+            variant="secondary"
+          >
+            Save
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1395,8 +1717,121 @@ function AddPublicAddressForm({
   );
 }
 
+interface DomainListSectionProps {
+  addOpen: boolean;
+  canMutateNetwork: boolean;
+  defaultPort: number;
+  domainRows: ReturnType<typeof visibleDomainRows>;
+  hiddenPublicAddressCount: number;
+  onAddPublicAddress: (address: PublicAddressDraft) => void | Promise<void>;
+  onBindAddress: (address: ContainerNetworkPublicAddress) => void;
+  onCancelAddPublicAddress: () => void;
+  onDeletePublicAddress: (index: number) => void | Promise<void>;
+  onOpenAddPublicAddress: () => void;
+  onShowAllPublicAddresses: () => void;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
+  readOnly: boolean;
+  visiblePublicAddresses: ContainerNetworkPublicAddress[];
+}
+
+function DomainListSection({
+  addOpen,
+  canMutateNetwork,
+  defaultPort,
+  domainRows,
+  hiddenPublicAddressCount,
+  onAddPublicAddress,
+  onBindAddress,
+  onCancelAddPublicAddress,
+  onDeletePublicAddress,
+  onOpenAddPublicAddress,
+  onShowAllPublicAddresses,
+  platformAddressDraftContext,
+  readOnly,
+  visiblePublicAddresses,
+}: DomainListSectionProps) {
+  const noDomains =
+    domainRows.publicAddresses.length === 0 &&
+    domainRows.customDomains.length === 0;
+
+  return (
+    <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
+      <div className="flex min-w-0 items-center gap-2 px-0.5">
+        <Network
+          aria-hidden
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={2}
+        />
+        <Label className="truncate text-foreground text-sm">Domain List</Label>
+      </div>
+      {readOnly ? null : (
+        <Button
+          aria-label="Add Public Address"
+          className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+          disabled={addOpen || !canMutateNetwork}
+          onClick={onOpenAddPublicAddress}
+          type="button"
+          variant="secondary"
+        >
+          <Plus aria-hidden className="text-primary" />
+          Add Domain
+        </Button>
+      )}
+      {addOpen ? (
+        <AddPublicAddressForm
+          defaultPort={defaultPort}
+          onCancel={onCancelAddPublicAddress}
+          onSubmit={canMutateNetwork ? onAddPublicAddress : undefined}
+          platformAddressDraftContext={platformAddressDraftContext}
+        />
+      ) : null}
+      {noDomains ? (
+        <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
+          No domains yet
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          {domainRows.customDomains.map((domain, index) => (
+            <CustomDomainRow
+              domain={domain}
+              key={customDomainKey(domain, index)}
+            />
+          ))}
+          {visiblePublicAddresses.map((address, index) => (
+            <PublicAddressRow
+              address={address}
+              key={publicAddressKey(address, index)}
+              onBindCustomDomain={
+                canMutateNetwork ? () => onBindAddress(address) : undefined
+              }
+              onDelete={
+                canMutateNetwork
+                  ? () => onDeletePublicAddress(index)
+                  : undefined
+              }
+              readOnly={readOnly}
+            />
+          ))}
+        </div>
+      )}
+      {hiddenPublicAddressCount > 0 ? (
+        <Button
+          className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+          onClick={onShowAllPublicAddresses}
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
+          View All
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function NetworkSettingsSection({
   network,
+  onCustomDomainCnameVerify,
   platformAddressDraftContext,
   onNetworkDraftChange,
   onNetworkChange,
@@ -1410,9 +1845,13 @@ function NetworkSettingsSection({
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
+  const [cnameAddress, setCnameAddress] = useState<
+    ContainerNetworkPublicAddress | undefined
+  >(undefined);
   const portDraft = privatePortDraft ?? draftPort;
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
+  const domainRows = visibleDomainRows(network);
   const usesPanelDraft = hasNetworkPanelDraftControls({
     onNetworkDraftChange,
     onPrivatePortDraftChange,
@@ -1423,10 +1862,10 @@ function NetworkSettingsSection({
     readOnly,
   });
   const visiblePublicAddresses = showAllPublicAddresses
-    ? network.publicAddresses
-    : network.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+    ? domainRows.publicAddresses
+    : domainRows.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
   const hiddenPublicAddressCount =
-    network.publicAddresses.length - visiblePublicAddresses.length;
+    domainRows.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
     if (privatePortDraft == null) {
@@ -1436,10 +1875,10 @@ function NetworkSettingsSection({
   }, [network.privatePort, privatePortDraft]);
 
   useEffect(() => {
-    if (network.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+    if (domainRows.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
       setShowAllPublicAddresses(false);
     }
-  }, [network.publicAddresses.length]);
+  }, [domainRows.publicAddresses.length]);
 
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   const effectivePortError =
@@ -1490,187 +1929,139 @@ function NetworkSettingsSection({
   };
 
   const handleAddPublicAddress = async (address: PublicAddressDraft) => {
-    const nextNetwork = {
-      ...network,
-      publicAddresses: [...network.publicAddresses, address],
-    };
-    if (onNetworkDraftChange != null) {
-      onNetworkDraftChange(nextNetwork);
-      return;
-    }
-    if (onNetworkChange == null) {
-      return;
-    }
-    await onNetworkChange(nextNetwork);
+    await commitNetworkDraft(
+      {
+        ...network,
+        publicAddresses: [...network.publicAddresses, address],
+      },
+      onNetworkDraftChange,
+      onNetworkChange
+    );
   };
 
   const handleDeletePublicAddress = async (index: number) => {
-    const target = network.publicAddresses[index];
+    const target = domainRows.publicAddresses[index];
     const publicAddresses = network.publicAddresses.filter(
       (address, itemIndex) =>
         !isPublicAddressDeleteTarget(address, itemIndex, target, index)
     );
-    const nextNetwork = { ...network, publicAddresses };
-    if (onNetworkDraftChange != null) {
-      onNetworkDraftChange(nextNetwork);
-      return;
-    }
-    if (onNetworkChange == null) {
-      return;
-    }
-    await onNetworkChange(nextNetwork);
+    await commitNetworkDraft(
+      { ...network, publicAddresses },
+      onNetworkDraftChange,
+      onNetworkChange
+    );
+  };
+
+  const handleBindCustomDomain = async (
+    domain: ContainerNetworkCustomDomain
+  ) => {
+    await commitNetworkDraft(
+      {
+        ...network,
+        customDomains: [...(network.customDomains ?? []), domain],
+      },
+      onNetworkDraftChange,
+      onNetworkChange
+    );
   };
 
   return (
-    <section className="flex min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <SectionTitle>Network</SectionTitle>
-        {readOnly || usesPanelDraft || !portDirty ? null : (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={savePending}
-              onClick={handleCancel}
-              type="button"
-              variant="ghost"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={!canSave}
-              onClick={async () => {
-                await handleSave();
-              }}
-              type="button"
-              variant="secondary"
-            >
-              Save
-            </Button>
-          </div>
-        )}
-      </div>
+    <>
+      <section className="flex min-w-0 flex-col gap-3">
+        <NetworkSettingsHeader
+          canSave={canSave}
+          onCancel={handleCancel}
+          onSave={handleSave}
+          pending={savePending}
+          showActions={!(readOnly || usesPanelDraft) && portDirty}
+        />
 
-      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
-        <div className="grid min-w-0 gap-1.5">
-          <Label className="text-muted-foreground text-xs">
-            Private Address
-          </Label>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
-              {hasPrivateAddress ? privateAddress : "Pending"}
-            </div>
-            <Button
-              aria-label="Copy Private Address"
-              disabled={!hasPrivateAddress}
-              onClick={handleCopyPrivateAddress}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            >
-              <Copy aria-hidden />
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid min-w-0 gap-1.5">
-          <Label htmlFor={networkInputId}>Private Address target port</Label>
-          <Input
-            aria-describedby={
-              effectivePortError == null ? undefined : `${networkInputId}-error`
-            }
-            aria-invalid={effectivePortError != null}
-            className="h-8 max-w-32 font-mono text-xs"
-            disabled={readOnly}
-            id={networkInputId}
-            inputMode="numeric"
-            onChange={(event) => {
-              if (onPrivatePortDraftChange == null) {
-                setDraftPort(event.target.value);
-              } else {
-                onPrivatePortDraftChange(event.target.value);
-              }
-              setPortError(null);
-            }}
-            value={portDraft}
-          />
-          {effectivePortError == null ? null : (
-            <p
-              className="text-destructive text-xs"
-              id={`${networkInputId}-error`}
-              role="alert"
-            >
-              {effectivePortError}
-            </p>
-          )}
-        </div>
-
-        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
-          <div className="flex min-w-0 items-center gap-2 px-0.5">
-            <Network
-              aria-hidden
-              className="size-4 shrink-0 text-muted-foreground"
-              strokeWidth={2}
-            />
-            <Label className="truncate text-foreground text-sm">
-              Domain List
+        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
+          <div className="grid min-w-0 gap-1.5">
+            <Label className="text-muted-foreground text-xs">
+              Private Address
             </Label>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
+                {hasPrivateAddress ? privateAddress : "Pending"}
+              </div>
+              <Button
+                aria-label="Copy Private Address"
+                disabled={!hasPrivateAddress}
+                onClick={handleCopyPrivateAddress}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <Copy aria-hidden />
+              </Button>
+            </div>
           </div>
-          {readOnly ? null : (
-            <Button
-              aria-label="Add Public Address"
-              className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
-              disabled={addOpen || !canMutateNetwork}
-              onClick={() => setAddOpen(true)}
-              type="button"
-              variant="secondary"
-            >
-              <Plus aria-hidden className="text-primary" />
-              Add Domain
-            </Button>
-          )}
-          {addOpen ? (
-            <AddPublicAddressForm
-              defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-              onCancel={handleCancelAddPublicAddress}
-              onSubmit={canMutateNetwork ? handleAddPublicAddress : undefined}
-              platformAddressDraftContext={platformAddressDraftContext}
+
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor={networkInputId}>Private Address target port</Label>
+            <Input
+              aria-describedby={
+                effectivePortError == null
+                  ? undefined
+                  : `${networkInputId}-error`
+              }
+              aria-invalid={effectivePortError != null}
+              className="h-8 max-w-32 font-mono text-xs"
+              disabled={readOnly}
+              id={networkInputId}
+              inputMode="numeric"
+              onChange={(event) => {
+                if (onPrivatePortDraftChange == null) {
+                  setDraftPort(event.target.value);
+                } else {
+                  onPrivatePortDraftChange(event.target.value);
+                }
+                setPortError(null);
+              }}
+              value={portDraft}
             />
-          ) : null}
-          {network.publicAddresses.length === 0 ? (
-            <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
-              No domains yet
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {visiblePublicAddresses.map((address, index) => (
-                <PublicAddressRow
-                  address={address}
-                  key={publicAddressKey(address, index)}
-                  onDelete={
-                    canMutateNetwork
-                      ? () => handleDeletePublicAddress(index)
-                      : undefined
-                  }
-                  readOnly={readOnly}
-                />
-              ))}
-            </div>
-          )}
-          {hiddenPublicAddressCount > 0 ? (
-            <Button
-              className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
-              onClick={() => setShowAllPublicAddresses(true)}
-              size="xs"
-              type="button"
-              variant="ghost"
-            >
-              View All
-            </Button>
-          ) : null}
+            {effectivePortError == null ? null : (
+              <p
+                className="text-destructive text-xs"
+                id={`${networkInputId}-error`}
+                role="alert"
+              >
+                {effectivePortError}
+              </p>
+            )}
+          </div>
+
+          <DomainListSection
+            addOpen={addOpen}
+            canMutateNetwork={canMutateNetwork}
+            defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
+            domainRows={domainRows}
+            hiddenPublicAddressCount={hiddenPublicAddressCount}
+            onAddPublicAddress={handleAddPublicAddress}
+            onBindAddress={setCnameAddress}
+            onCancelAddPublicAddress={handleCancelAddPublicAddress}
+            onDeletePublicAddress={handleDeletePublicAddress}
+            onOpenAddPublicAddress={() => setAddOpen(true)}
+            onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+            platformAddressDraftContext={platformAddressDraftContext}
+            readOnly={readOnly}
+            visiblePublicAddresses={visiblePublicAddresses}
+          />
         </div>
-      </div>
-    </section>
+      </section>
+      <CnameBindingDialog
+        address={cnameAddress}
+        onBind={handleBindCustomDomain}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCnameAddress(undefined);
+          }
+        }}
+        open={cnameAddress != null}
+        verify={onCustomDomainCnameVerify}
+      />
+    </>
   );
 }
 
@@ -2137,6 +2528,7 @@ export function ContainerSettingsPane({
   env,
   network,
   networkPlatformAddressDraftContext,
+  onCustomDomainCnameVerify,
   replicasQuota,
   replicaStrategy,
   onResourceQuotasCommit,
@@ -3082,6 +3474,7 @@ export function ContainerSettingsPane({
         {networkForRender == null ? null : (
           <NetworkSettingsSection
             network={networkForRender}
+            onCustomDomainCnameVerify={onCustomDomainCnameVerify}
             onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
             onNetworkDraftChange={
               settingsCommitMode ? setDraftNetwork : undefined

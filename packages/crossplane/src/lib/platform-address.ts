@@ -13,6 +13,10 @@ export interface PlatformAddressEndpoint {
 
 export const PLATFORM_ADDRESS_ID_PATTERN = "^pa_[a-z0-9]{6,32}$";
 export const PLATFORM_ADDRESS_ID_RE = new RegExp(PLATFORM_ADDRESS_ID_PATTERN);
+export const CUSTOM_DOMAIN_BINDING_ID_PATTERN = "^cd_[a-z0-9]{6,32}$";
+export const CUSTOM_DOMAIN_BINDING_ID_RE = new RegExp(
+  CUSTOM_DOMAIN_BINDING_ID_PATTERN
+);
 const PLATFORM_ADDRESS_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const PLATFORM_ADDRESS_ID_RANDOM_BYTES = 12;
 const PLATFORM_ADDRESS_DEFAULT_HOST_PREFIX = "ap";
@@ -33,13 +37,30 @@ export function normalizePlatformAddressId(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export function normalizeCustomDomainBindingId(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function isPlatformAddressId(value: unknown): boolean {
   return PLATFORM_ADDRESS_ID_RE.test(normalizePlatformAddressId(value));
+}
+
+export function isCustomDomainBindingId(value: unknown): boolean {
+  return CUSTOM_DOMAIN_BINDING_ID_RE.test(
+    normalizeCustomDomainBindingId(value)
+  );
 }
 
 export function platformAddressIdFromValue(value: unknown): string | undefined {
   const id = normalizePlatformAddressId(value);
   return PLATFORM_ADDRESS_ID_RE.test(id) ? id : undefined;
+}
+
+export function customDomainBindingIdFromValue(
+  value: unknown
+): string | undefined {
+  const id = normalizeCustomDomainBindingId(value);
+  return CUSTOM_DOMAIN_BINDING_ID_RE.test(id) ? id : undefined;
 }
 
 export function platformAddressIdsFromRows(
@@ -55,6 +76,14 @@ export function platformAddressIdsFromRows(
 }
 
 export function generatePlatformAddressId(): string {
+  return generateOpaqueId("pa");
+}
+
+export function generateCustomDomainBindingId(): string {
+  return generateOpaqueId("cd");
+}
+
+function generateOpaqueId(prefix: "cd" | "pa"): string {
   const bytes = new Uint8Array(PLATFORM_ADDRESS_ID_RANDOM_BYTES);
   if (globalThis.crypto == null) {
     for (let i = 0; i < bytes.length; i += 1) {
@@ -69,7 +98,7 @@ export function generatePlatformAddressId(): string {
     suffix +=
       PLATFORM_ADDRESS_ID_ALPHABET[byte % PLATFORM_ADDRESS_ID_ALPHABET.length];
   }
-  return `pa_${suffix}`;
+  return `${prefix}_${suffix}`;
 }
 const SHA256_K = sha256Words(
   "428a2f98",

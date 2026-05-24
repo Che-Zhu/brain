@@ -15,8 +15,11 @@ import {
   routingDomainFromKubeconfig,
 } from "@/lib/kubeconfig-routing-domain";
 import {
+  CUSTOM_DOMAIN_BINDING_ID_PATTERN,
   generatePlatformAddressId,
+  isCustomDomainBindingId,
   isPlatformAddressId,
+  normalizeCustomDomainBindingId,
   normalizePlatformAddressId,
   PLATFORM_ADDRESS_ID_PATTERN,
 } from "../platform-addresses";
@@ -42,7 +45,7 @@ const AP_K8S_KIND = "aps";
 const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
 
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
-  Partial<Pick<ContainerNetwork, "publicAddresses">>;
+  Partial<Pick<ContainerNetwork, "customDomains" | "publicAddresses">>;
 
 interface ApNetworkSettingsPatchOptions {
   metadata?: Record<string, unknown>;
@@ -294,6 +297,33 @@ function publicAddressesEqual(
   });
 }
 
+function customDomainsEqual(
+  a:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined,
+  b:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((domain, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      normalizeCustomDomainBindingId(domain.id) ===
+        normalizeCustomDomainBindingId(other.id) &&
+      domain.domain.trim().toLowerCase() ===
+        other.domain.trim().toLowerCase() &&
+      normalizePlatformAddressId(domain.platformAddressId) ===
+        normalizePlatformAddressId(other.platformAddressId)
+    );
+  });
+}
+
 function apNetworksEqual(
   a: ApNetworkSettingsPatch | undefined,
   b: ApNetworkSettingsPatch | undefined
@@ -303,7 +333,8 @@ function apNetworksEqual(
   }
   return (
     Math.round(a.privatePort) === Math.round(b.privatePort) &&
-    publicAddressesEqual(a.publicAddresses, b.publicAddresses)
+    publicAddressesEqual(a.publicAddresses, b.publicAddresses) &&
+    customDomainsEqual(a.customDomains, b.customDomains)
   );
 }
 
@@ -323,9 +354,16 @@ function buildApNetworkInput(network: ApNetworkSettingsPatch): {
     "Private Address target port"
   );
   const platformAddresses = validatedPlatformAddresses(network.publicAddresses);
+  const customDomains = validatedCustomDomains(
+    network.customDomains,
+    platformAddresses
+  );
   const networkInput: Record<string, unknown> = { privatePort };
   if (platformAddresses != null && platformAddresses.length > 0) {
     networkInput.platformAddresses = platformAddresses;
+  }
+  if (customDomains != null && customDomains.length > 0) {
+    networkInput.customDomains = customDomains;
   }
   return {
     hasPublicAddresses: (platformAddresses?.length ?? 0) > 0,
@@ -510,6 +548,61 @@ function validatedPlatformAddresses(
       id,
       port: validatedNetworkPort(address.port, "Public Address target port"),
     };
+  });
+}
+
+function validatedCustomDomains(
+  customDomains:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined,
+  platformAddresses: readonly Record<string, unknown>[] | undefined
+): Record<string, unknown>[] | undefined {
+  if (customDomains == null) {
+    return undefined;
+  }
+
+  const platformAddressIds = new Set(
+    (platformAddresses ?? []).flatMap((address) => {
+      const id = normalizePlatformAddressId(address.id);
+      return isPlatformAddressId(id) ? [id] : [];
+    })
+  );
+  const seenIds = new Set<string>();
+  const seenPlatformAddressIds = new Set<string>();
+
+  return customDomains.map((customDomain) => {
+    const id = normalizeCustomDomainBindingId(customDomain.id);
+    if (!isCustomDomainBindingId(id)) {
+      throw new Error(
+        `Custom Domain Binding ID must match ${CUSTOM_DOMAIN_BINDING_ID_PATTERN}.`
+      );
+    }
+    if (seenIds.has(id)) {
+      throw new Error("Custom Domain Binding IDs must be unique.");
+    }
+    seenIds.add(id);
+
+    const platformAddressId = normalizePlatformAddressId(
+      customDomain.platformAddressId
+    );
+    if (!platformAddressIds.has(platformAddressId)) {
+      throw new Error(
+        "Custom Domain Binding must reference an existing Platform Address."
+      );
+    }
+    if (seenPlatformAddressIds.has(platformAddressId)) {
+      throw new Error(
+        "Platform Address can only be bound to one Custom Domain."
+      );
+    }
+    seenPlatformAddressIds.add(platformAddressId);
+
+    const domain = customDomain.domain.trim().toLowerCase();
+    if (domain === "") {
+      throw new Error("Custom Domain is required.");
+    }
+
+    return { domain, id, platformAddressId };
   });
 }
 

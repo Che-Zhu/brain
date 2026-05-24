@@ -189,6 +189,55 @@ test("AP claim settings falls back to desired Platform Addresses while observed 
   ]);
 });
 
+test("AP claim settings maps desired Custom Domain Bindings into the network draft", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: {
+        labels: { region: "apps.example.com" },
+        name: "api",
+        namespace: "default",
+      },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            customDomains: [
+              {
+                domain: "www.example.com",
+                id: "cd_def456",
+                platformAddressId: "pa_abc123",
+              },
+            ],
+            privatePort: 8080,
+            platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          },
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.customDomains, [
+    {
+      domain: "www.example.com",
+      id: "cd_def456",
+      platformAddressId: "pa_abc123",
+      status: "pending",
+    },
+  ]);
+  assert.deepEqual(settings.network?.publicAddresses, [
+    {
+      host: "api-7c6ad52581.apps.example.com",
+      id: "pa_abc123",
+      port: 8080,
+      status: "progressing",
+      type: "platform",
+      url: "https://api-7c6ad52581.apps.example.com/",
+    },
+  ]);
+});
+
 test("AP claim settings Platform Address host ignores AP UID and target port", () => {
   const settings = claimToContainerSettings(
     {

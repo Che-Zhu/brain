@@ -115,6 +115,32 @@ spec:
                               minimum: 1
                               maximum: 65535
                               description: Target App Listening Port for this Public Address.
+                      customDomains:
+                        type: array
+                        x-kubernetes-list-type: map
+                        x-kubernetes-list-map-keys:
+                          - id
+                        description: >
+                          Custom Domain Binding requests desired for this AP. Each entry binds a
+                          user-owned domain to an existing Platform Address by stable ID.
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - domain
+                            - platformAddressId
+                          properties:
+                            id:
+                              type: string
+                              pattern: ^cd_[a-z0-9]{6,32}$
+                              description: Stable opaque Custom Domain Binding ID.
+                            domain:
+                              type: string
+                              description: User-owned Custom Domain.
+                            platformAddressId:
+                              type: string
+                              pattern: ^pa_[a-z0-9]{6,32}$
+                              description: Existing Platform Address ID used as the CNAME target.
                   imagePullPolicy:
                     type: string
                     default: "Always"

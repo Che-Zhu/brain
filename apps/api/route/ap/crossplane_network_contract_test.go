@@ -71,6 +71,36 @@ func TestAPXRDIncludesNetworkContract(t *testing.T) {
 	if got := publicPort["maximum"]; got != float64(65535) {
 		t.Fatalf("platformAddresses port maximum = %v, want 65535", got)
 	}
+	customDomains := asMap(t, networkProps["customDomains"], "spec.input.network.customDomains")
+	if got := customDomains["type"]; got != "array" {
+		t.Fatalf("customDomains type = %v, want array", got)
+	}
+	customDomainsListType, _ := customDomains["x-kubernetes-list-type"].(string)
+	if customDomainsListType != "map" {
+		t.Fatalf("customDomains x-kubernetes-list-type = %v, want map", customDomainsListType)
+	}
+	customDomainMapKeys := asSlice(t, customDomains["x-kubernetes-list-map-keys"], "spec.input.network.customDomains.x-kubernetes-list-map-keys")
+	assertStringSliceContains(t, customDomainMapKeys, "id")
+	customDomainItem := asMap(t, customDomains["items"], "spec.input.network.customDomains.items")
+	customDomainRequired := asSlice(t, customDomainItem["required"], "spec.input.network.customDomains.items.required")
+	for _, field := range []string{"id", "domain", "platformAddressId"} {
+		assertStringSliceContains(t, customDomainRequired, field)
+	}
+	customDomainProps := asMap(t, customDomainItem["properties"], "spec.input.network.customDomains.items.properties")
+	customDomainId := asMap(t, customDomainProps["id"], "spec.input.network.customDomains.items.id")
+	if got := customDomainId["pattern"]; got != "^cd_[a-z0-9]{6,32}$" {
+		t.Fatalf("customDomains id pattern = %v, want v1 opaque ID pattern", got)
+	}
+	customDomainPlatformAddressID := asMap(t, customDomainProps["platformAddressId"], "spec.input.network.customDomains.items.platformAddressId")
+	if got := customDomainPlatformAddressID["pattern"]; got != "^pa_[a-z0-9]{6,32}$" {
+		t.Fatalf("customDomains platformAddressId pattern = %v, want Platform Address ID pattern", got)
+	}
+	for _, field := range []string{"domain", "platformAddressId"} {
+		prop := asMap(t, customDomainProps[field], "spec.input.network.customDomains.items."+field)
+		if got := prop["type"]; got != "string" {
+			t.Fatalf("customDomains %s type = %v, want string", field, got)
+		}
+	}
 
 	statusProps := xrdStatusProperties(t, doc)
 	statusNetwork := asMap(t, statusProps["network"], "status.network")
