@@ -553,8 +553,10 @@ export default function ProjectChatPaneLayout({
       <aside
         aria-hidden={!rightPaneOpen}
         className={cn(
-          "box-border flex min-h-0 w-[40%] min-w-[420px] shrink-0 flex-col overflow-hidden border-border border-l bg-background",
-          !rightPaneOpen && "hidden"
+          "box-border flex min-h-0 shrink-0 flex-col overflow-hidden border-l bg-background transition-[width,min-width,opacity,transform,border-color] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
+          rightPaneOpen
+            ? "w-104 min-w-104 translate-x-0 border-border opacity-100"
+            : "pointer-events-none w-0 min-w-0 translate-x-4 border-transparent opacity-0"
         )}
         data-slot="project-right-pane"
       >
