@@ -242,7 +242,7 @@ function apNetworkPublicAddresses(
   const observed = normalizeNetworkPublicAddresses(
     statusNetwork?.publicAddresses,
     true
-  ).filter((address) => address.type?.trim().toLowerCase() !== "custom");
+  ).filter(isPlatformPublicAddressRow);
   const desiredPending = normalizeDesiredPlatformAddresses(
     inputNetwork?.platformAddresses,
     metadata,
@@ -258,6 +258,18 @@ function apNetworkPublicAddresses(
     ];
   }
   return desiredPending;
+}
+
+function isCustomPublicAddressRow(
+  address: ContainerNetwork["publicAddresses"][number]
+): boolean {
+  return address.type?.trim().toLowerCase() === "custom";
+}
+
+function isPlatformPublicAddressRow(
+  address: ContainerNetwork["publicAddresses"][number]
+): boolean {
+  return !isCustomPublicAddressRow(address);
 }
 
 function normalizeDesiredCustomDomains(

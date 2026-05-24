@@ -159,33 +159,21 @@ type customDomainRequest struct {
 }
 
 func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}) {
-	addresses := apPlatformAddressRequests(ap)
-	if len(addresses) == 0 {
+	platformAddresses := apPlatformAddressRequests(ap)
+	if len(platformAddresses) == 0 {
 		return
 	}
-	customDomains := apCustomDomainRequests(ap, addresses)
+	customDomains := apCustomDomainRequests(ap, platformAddresses)
 	networkCopy := networkStatusCopy(status)
 	if _, exists := networkCopy["publicAddresses"]; exists {
 		publicAddresses := publicAddressRowsFromValue(networkCopy["publicAddresses"])
-		seenIDs := make(map[string]bool, len(publicAddresses))
-		promotedPlatformAddressIDs := make(map[string]bool)
-		for _, address := range publicAddresses {
-			id, _ := address["id"].(string)
-			if id != "" {
-				seenIDs[id] = true
-			}
-			platformAddressID, _ := address["platformAddressId"].(string)
-			platformAddressID = strings.TrimSpace(platformAddressID)
-			if platformAddressIDPattern.MatchString(platformAddressID) {
-				promotedPlatformAddressIDs[platformAddressID] = true
-			}
-		}
+		seenIDs, promotedPlatformAddressIDs := publicAddressMergeState(publicAddresses)
 		for _, customDomain := range customDomains {
 			if seenIDs[customDomain.id] {
 				promotedPlatformAddressIDs[customDomain.platformAddressID] = true
 				continue
 			}
-			row := pendingCustomDomainRow(ap, addresses, customDomain)
+			row := pendingCustomDomainRow(ap, platformAddresses, customDomain)
 			if row == nil {
 				continue
 			}
@@ -194,7 +182,7 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 			promotedPlatformAddressIDs[customDomain.platformAddressID] = true
 		}
 		publicAddresses = hidePromotedPlatformAddressRows(publicAddresses, promotedPlatformAddressIDs)
-		for _, address := range addresses {
+		for _, address := range platformAddresses {
 			if seenIDs[address.id] || promotedPlatformAddressIDs[address.id] {
 				continue
 			}
@@ -206,16 +194,16 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 	}
 
 	promotedPlatformAddressIDs := make(map[string]bool)
-	publicAddresses := make([]map[string]interface{}, 0, len(addresses)+len(customDomains))
+	publicAddresses := make([]map[string]interface{}, 0, len(platformAddresses)+len(customDomains))
 	for _, customDomain := range customDomains {
-		row := pendingCustomDomainRow(ap, addresses, customDomain)
+		row := pendingCustomDomainRow(ap, platformAddresses, customDomain)
 		if row == nil {
 			continue
 		}
 		publicAddresses = append(publicAddresses, row)
 		promotedPlatformAddressIDs[customDomain.platformAddressID] = true
 	}
-	for _, address := range addresses {
+	for _, address := range platformAddresses {
 		if promotedPlatformAddressIDs[address.id] {
 			continue
 		}
@@ -256,6 +244,23 @@ func copyPublicAddressRow(row map[string]interface{}) map[string]interface{} {
 	return rowCopy
 }
 
+func publicAddressMergeState(rows []map[string]interface{}) (map[string]bool, map[string]bool) {
+	seenIDs := make(map[string]bool, len(rows))
+	promotedPlatformAddressIDs := make(map[string]bool)
+	for _, row := range rows {
+		id, _ := row["id"].(string)
+		if id != "" {
+			seenIDs[id] = true
+		}
+		platformAddressID, _ := row["platformAddressId"].(string)
+		platformAddressID = strings.TrimSpace(platformAddressID)
+		if platformAddressIDPattern.MatchString(platformAddressID) {
+			promotedPlatformAddressIDs[platformAddressID] = true
+		}
+	}
+	return seenIDs, promotedPlatformAddressIDs
+}
+
 func hidePromotedPlatformAddressRows(rows []map[string]interface{}, promotedPlatformAddressIDs map[string]bool) []map[string]interface{} {
 	if len(promotedPlatformAddressIDs) == 0 {
 		return rows
@@ -263,13 +268,17 @@ func hidePromotedPlatformAddressRows(rows []map[string]interface{}, promotedPlat
 	out := make([]map[string]interface{}, 0, len(rows))
 	for _, row := range rows {
 		id, _ := row["id"].(string)
-		rowType, _ := row["type"].(string)
-		if promotedPlatformAddressIDs[id] && strings.ToLower(strings.TrimSpace(rowType)) != "custom" {
+		if promotedPlatformAddressIDs[id] && !isCustomPublicAddressRow(row) {
 			continue
 		}
 		out = append(out, row)
 	}
 	return out
+}
+
+func isCustomPublicAddressRow(row map[string]interface{}) bool {
+	rowType, _ := row["type"].(string)
+	return strings.ToLower(strings.TrimSpace(rowType)) == "custom"
 }
 
 func pendingPublicAddressRow(ap map[string]interface{}, address platformAddressRequest) map[string]interface{} {
@@ -293,8 +302,12 @@ func pendingPublicAddressRow(ap map[string]interface{}, address platformAddressR
 	return row
 }
 
-func pendingCustomDomainRow(ap map[string]interface{}, addresses []platformAddressRequest, customDomain customDomainRequest) map[string]interface{} {
-	target, ok := platformAddressRequestByID(addresses, customDomain.platformAddressID)
+func pendingCustomDomainRow(
+	ap map[string]interface{},
+	platformAddresses []platformAddressRequest,
+	customDomain customDomainRequest,
+) map[string]interface{} {
+	target, ok := platformAddressRequestByID(platformAddresses, customDomain.platformAddressID)
 	if !ok {
 		return nil
 	}
@@ -354,7 +367,7 @@ func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressReque
 	return addresses
 }
 
-func apCustomDomainRequests(ap map[string]interface{}, addresses []platformAddressRequest) []customDomainRequest {
+func apCustomDomainRequests(ap map[string]interface{}, platformAddresses []platformAddressRequest) []customDomainRequest {
 	network := apInputNetwork(ap)
 	if network == nil {
 		return nil
@@ -363,10 +376,7 @@ func apCustomDomainRequests(ap map[string]interface{}, addresses []platformAddre
 	if len(raw) == 0 {
 		return nil
 	}
-	platformAddressIDs := make(map[string]bool, len(addresses))
-	for _, address := range addresses {
-		platformAddressIDs[address.id] = true
-	}
+	platformAddressIDs := platformAddressIDSet(platformAddresses)
 	customDomains := make([]customDomainRequest, 0, len(raw))
 	for _, item := range raw {
 		customDomain, _ := item.(map[string]interface{})
@@ -389,6 +399,14 @@ func apCustomDomainRequests(ap map[string]interface{}, addresses []platformAddre
 		})
 	}
 	return customDomains
+}
+
+func platformAddressIDSet(addresses []platformAddressRequest) map[string]bool {
+	ids := make(map[string]bool, len(addresses))
+	for _, address := range addresses {
+		ids[address.id] = true
+	}
+	return ids
 }
 
 func apRoutingDomain(ap map[string]interface{}) string {

@@ -664,26 +664,44 @@ function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
     inputNetwork?.platformAddresses
   );
   if (statusAddresses.length > 0) {
-    const observedIds = platformAddressIdsFromRows(
-      statusAddresses.filter(
-        (address) => address.type?.trim().toLowerCase() !== "custom"
-      )
+    const observedPlatformAddresses = statusAddresses.filter(
+      isPlatformPublicAddressRow
     );
+    const observedIds = platformAddressIdsFromRows(observedPlatformAddresses);
     const promotedPlatformAddressIds =
       platformAddressIdsFromCustomRows(statusAddresses);
     return [
       ...statusAddresses,
       ...desiredPending.filter(
         (address) =>
-          address.id === undefined ||
-          !(
-            observedIds.has(address.id) ||
-            promotedPlatformAddressIds.has(address.id)
+          !isKnownPlatformAddress(
+            address,
+            observedIds,
+            promotedPlatformAddressIds
           )
       ),
     ];
   }
   return desiredPending;
+}
+
+function isKnownPlatformAddress(
+  address: NetworkPublicAddress,
+  observedIds: ReadonlySet<string>,
+  promotedPlatformAddressIds: ReadonlySet<string>
+): boolean {
+  return (
+    address.id !== undefined &&
+    (observedIds.has(address.id) || promotedPlatformAddressIds.has(address.id))
+  );
+}
+
+function isCustomPublicAddressRow(address: NetworkPublicAddress): boolean {
+  return address.type?.trim().toLowerCase() === "custom";
+}
+
+function isPlatformPublicAddressRow(address: NetworkPublicAddress): boolean {
+  return !isCustomPublicAddressRow(address);
 }
 
 function platformAddressIdsFromCustomRows(
@@ -692,7 +710,7 @@ function platformAddressIdsFromCustomRows(
   const ids = new Set<string>();
   for (const address of addresses) {
     if (
-      address.type?.trim().toLowerCase() === "custom" &&
+      isCustomPublicAddressRow(address) &&
       address.platformAddressId !== undefined
     ) {
       ids.add(address.platformAddressId);
