@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  generatePlatformAddressId,
+  platformAddressHost,
+} from "@workspace/crossplane/lib/platform-address";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -124,6 +128,12 @@ export interface ContainerNetwork {
   privateAddress?: string;
   privatePort: number;
   publicAddresses: ContainerNetworkPublicAddress[];
+}
+
+export interface ContainerNetworkPlatformAddressDraftContext {
+  appName?: string;
+  namespace?: string;
+  routingDomain?: string;
 }
 
 export interface ContainerFixedReplicaStrategy {
@@ -462,6 +472,7 @@ export interface ContainerSettingsPaneProps {
   memoryQuota: ContainerSettingsControlledQuotaProps;
   /** AP network model rendered by the Network section. */
   network?: ContainerNetwork;
+  networkPlatformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
   onEnvChange: (
     env: ContainerEnvVar[],
@@ -1072,6 +1083,7 @@ interface NetworkSettingsSectionProps {
   onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
   onNetworkDraftChange?: (network: ContainerNetwork) => void;
   onPrivatePortDraftChange?: (value: string) => void;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   privatePortDraft?: string;
   readOnly: boolean;
 }
@@ -1152,6 +1164,18 @@ function publicAddressKey(
     address.host?.trim().toLowerCase() ||
     `pending-${index}`
   );
+}
+
+function platformAddressDraftHost(
+  id: string,
+  context: ContainerNetworkPlatformAddressDraftContext | undefined
+): string | undefined {
+  return platformAddressHost({
+    appName: context?.appName ?? "",
+    namespace: context?.namespace ?? "",
+    platformAddressId: id,
+    routingDomain: context?.routingDomain ?? "",
+  });
 }
 
 function isPublicAddressDeleteTarget(
@@ -1248,7 +1272,8 @@ function PublicAddressRow({
   );
 }
 
-interface PublicAddressDraft {
+interface PublicAddressDraft extends ContainerNetworkPublicAddress {
+  id: string;
   port: number;
 }
 
@@ -1257,26 +1282,40 @@ type PublicAddressDraftValidation =
   | { message: string; ok: false };
 
 function validatePublicAddressDraft(
-  portDraft: string
+  portDraft: string,
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext
 ): PublicAddressDraftValidation {
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   if (!parsedPort.ok) {
     return { message: parsedPort.message, ok: false };
   }
 
-  return { address: { port: parsedPort.n }, ok: true };
+  const id = generatePlatformAddressId();
+  const host = platformAddressDraftHost(id, platformAddressDraftContext);
+  return {
+    address: {
+      ...(host === undefined ? {} : { host, url: `https://${host}/` }),
+      id,
+      port: parsedPort.n,
+      status: "progressing",
+      type: "platform",
+    },
+    ok: true,
+  };
 }
 
 interface AddPublicAddressFormProps {
   defaultPort: number;
   onCancel: () => void;
   onSubmit?: (address: PublicAddressDraft) => void | Promise<void>;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
 }
 
 function AddPublicAddressForm({
   defaultPort,
   onCancel,
   onSubmit,
+  platformAddressDraftContext,
 }: AddPublicAddressFormProps) {
   const portInputId = useId();
   const errorId = `${portInputId}-error`;
@@ -1288,7 +1327,10 @@ function AddPublicAddressForm({
     if (onSubmit == null) {
       return;
     }
-    const validation = validatePublicAddressDraft(draftPort);
+    const validation = validatePublicAddressDraft(
+      draftPort,
+      platformAddressDraftContext
+    );
     if (!validation.ok) {
       setError(validation.message);
       return;
@@ -1352,6 +1394,7 @@ function AddPublicAddressForm({
 
 function NetworkSettingsSection({
   network,
+  platformAddressDraftContext,
   onNetworkDraftChange,
   onNetworkChange,
   onPrivatePortDraftChange,
@@ -1588,6 +1631,7 @@ function NetworkSettingsSection({
               defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
               onCancel={handleCancelAddPublicAddress}
               onSubmit={canMutateNetwork ? handleAddPublicAddress : undefined}
+              platformAddressDraftContext={platformAddressDraftContext}
             />
           ) : null}
           {network.publicAddresses.length === 0 ? (
@@ -2089,6 +2133,7 @@ export function ContainerSettingsPane({
   memoryQuota,
   env,
   network,
+  networkPlatformAddressDraftContext,
   replicasQuota,
   replicaStrategy,
   onResourceQuotasCommit,
@@ -3041,6 +3086,7 @@ export function ContainerSettingsPane({
             onPrivatePortDraftChange={
               settingsCommitMode ? setNetworkPrivatePortDraft : undefined
             }
+            platformAddressDraftContext={networkPlatformAddressDraftContext}
             privatePortDraft={
               settingsCommitMode ? networkPrivatePortDraft : undefined
             }

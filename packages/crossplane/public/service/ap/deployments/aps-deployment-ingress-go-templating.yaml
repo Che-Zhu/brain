@@ -139,7 +139,7 @@ spec:
             {{- $networkPublicAddresses := list }}
             {{- if ne $routingDomain "" }}
             {{- range $platformAddresses }}
-            {{- $slug := sha256sum (printf "%s/%s/%s/%s" $ns $name $apUid .id) | trunc 10 }}
+            {{- $slug := sha256sum (printf "%s/%s/%s" $ns $name .id) | trunc 10 }}
             {{- $hostPrefix := $safeAPName | trunc 52 | trimSuffix "-" }}
             {{- if eq $hostPrefix "" }}{{ $hostPrefix = "ap" }}{{ end }}
             {{- $host := printf "%s-%s.%s" $hostPrefix $slug $routingDomain }}

@@ -164,8 +164,8 @@ func TestAPCompositionCreatesEntryPointForPublicAddresses(t *testing.T) {
 		t.Fatalf("EntryPoint target count = %d, want 2", got)
 	}
 
-	webHost := platformHost("project-a", "web", "ap-uid-1", "pa_web001", "usw.sealos.app")
-	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_api001", "usw.sealos.app")
+	webHost := platformHost("project-a", "web", "pa_web001", "usw.sealos.app")
+	apiHost := platformHost("project-a", "web", "pa_api001", "usw.sealos.app")
 	targetByHost := map[string]map[string]interface{}{}
 	for i, target := range targets {
 		targetMap := asMap(t, target, fmt.Sprintf("entrypoint.spec.targets[%d]", i))
@@ -704,9 +704,9 @@ func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
 }
 
 func TestAPCompositionRendersPublicAddressesFromNetworkContract(t *testing.T) {
-	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app")
-	apiAltHost := platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app")
-	adminHost := platformHost("project-a", "web", "ap-uid-1", "pa_admin9", "usw.sealos.app")
+	apiHost := platformHost("project-a", "web", "pa_abc123", "usw.sealos.app")
+	apiAltHost := platformHost("project-a", "web", "pa_def456", "usw.sealos.app")
+	adminHost := platformHost("project-a", "web", "pa_admin9", "usw.sealos.app")
 	out := renderAPComposition(t, map[string]interface{}{
 		"observed": map[string]interface{}{
 			"composite": map[string]interface{}{
@@ -814,18 +814,18 @@ func TestAPCompositionRendersV1PlatformAddressesFromNetworkContract(t *testing.T
 			"spec": map[string]interface{}{
 				"tls": []interface{}{
 					map[string]interface{}{"hosts": []interface{}{
-						platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app"),
-						platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app"),
-						platformHost("project-a", "web", "ap-uid-1", "pa_admin9", "usw.sealos.app"),
+						platformHost("project-a", "web", "pa_abc123", "usw.sealos.app"),
+						platformHost("project-a", "web", "pa_def456", "usw.sealos.app"),
+						platformHost("project-a", "web", "pa_admin9", "usw.sealos.app"),
 					}},
 				},
 			},
 		},
 	})
 
-	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app")
-	apiAltHost := platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app")
-	adminHost := platformHost("project-a", "web", "ap-uid-1", "pa_admin9", "usw.sealos.app")
+	apiHost := platformHost("project-a", "web", "pa_abc123", "usw.sealos.app")
+	apiAltHost := platformHost("project-a", "web", "pa_def456", "usw.sealos.app")
+	adminHost := platformHost("project-a", "web", "pa_admin9", "usw.sealos.app")
 
 	services := serviceObjects(t, out)
 	if got := len(services); got != 1 {
@@ -853,6 +853,53 @@ func TestAPCompositionRendersV1PlatformAddressesFromNetworkContract(t *testing.T
 	assertStatusPublicAddressByID(t, publicAddresses, "pa_abc123", apiHost, fmt.Sprintf("https://%s/", apiHost), 8080)
 	assertStatusPublicAddressByID(t, publicAddresses, "pa_def456", apiAltHost, fmt.Sprintf("https://%s/", apiAltHost), 8080)
 	assertStatusPublicAddressByID(t, publicAddresses, "pa_admin9", adminHost, fmt.Sprintf("https://%s/", adminHost), 9000)
+}
+
+func TestAPCompositionPlatformAddressHostIgnoresUIDAndTargetPort(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"labels": map[string]interface{}{
+							"region": "usw.sealos.app",
+						},
+						"name":      "web",
+						"namespace": "project-a",
+						"uid":       "different-ap-uid",
+					},
+					"spec": map[string]interface{}{
+						"input": map[string]interface{}{
+							"image": "nginx:1.27",
+							"network": map[string]interface{}{
+								"privatePort": 8080,
+								"platformAddresses": []interface{}{
+									map[string]interface{}{"id": "pa_abc123", "port": 9000},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	host := platformHost("project-a", "web", "pa_abc123", "usw.sealos.app")
+	if forbidden := platformHostWithUIDAndPort("project-a", "web", "different-ap-uid", "pa_abc123", 9000, "usw.sealos.app"); forbidden == host {
+		t.Fatal("test fixture should distinguish forbidden UID/port-based host")
+	}
+
+	entryPoint := manifestFromObject(t, singleEntryPointObject(t, out), "entrypoint object")
+	entryPointSpec := asMap(t, entryPoint["spec"], "entrypoint.spec")
+	entryPointTargets := asSlice(t, entryPointSpec["targets"], "entrypoint.spec.targets")
+	assertEntryPointTargetByID(t, entryPointTargets, "pa_abc123", host, 9000)
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	network := asMap(t, status["network"], "ap.status.network")
+	publicAddresses := asSlice(t, network["publicAddresses"], "ap.status.network.publicAddresses")
+	assertStatusPublicAddressByID(t, publicAddresses, "pa_abc123", host, fmt.Sprintf("http://%s/", host), 9000)
 }
 
 func TestProviderKubernetesRBACAllowsEntryPointWrites(t *testing.T) {
@@ -1235,8 +1282,13 @@ func assertStatusPublicAddressByID(t *testing.T, addresses []interface{}, id str
 	t.Fatalf("missing status public address for id %s", id)
 }
 
-func platformHost(namespace string, name string, uid string, id string, domain string) string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%s/%s/%s", namespace, name, uid, id)))
+func platformHost(namespace string, name string, id string, domain string) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%s/%s", namespace, name, id)))
+	return fmt.Sprintf("%s-%x.%s", name, sum[:5], domain)
+}
+
+func platformHostWithUIDAndPort(namespace string, name string, uid string, id string, port int, domain string) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%s/%s/%s/%d", namespace, name, uid, id, port)))
 	return fmt.Sprintf("%s-%x.%s", name, sum[:5], domain)
 }
 

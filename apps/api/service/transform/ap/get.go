@@ -1,6 +1,7 @@
 package ap
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math"
 	"regexp"
@@ -167,7 +168,7 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 			if seenIDs[address.id] {
 				continue
 			}
-			publicAddresses = append(publicAddresses, pendingPublicAddressRow(address))
+			publicAddresses = append(publicAddresses, pendingPublicAddressRow(ap, address))
 		}
 		networkCopy["publicAddresses"] = publicAddresses
 		status["network"] = networkCopy
@@ -176,7 +177,7 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 
 	publicAddresses := make([]map[string]interface{}, 0, len(addresses))
 	for _, address := range addresses {
-		publicAddresses = append(publicAddresses, pendingPublicAddressRow(address))
+		publicAddresses = append(publicAddresses, pendingPublicAddressRow(ap, address))
 	}
 	networkCopy["publicAddresses"] = publicAddresses
 	status["network"] = networkCopy
@@ -213,13 +214,25 @@ func copyPublicAddressRow(row map[string]interface{}) map[string]interface{} {
 	return rowCopy
 }
 
-func pendingPublicAddressRow(address platformAddressRequest) map[string]interface{} {
-	return map[string]interface{}{
+func pendingPublicAddressRow(ap map[string]interface{}, address platformAddressRequest) map[string]interface{} {
+	row := map[string]interface{}{
 		"id":     address.id,
 		"port":   address.port,
 		"status": "progressing",
 		"type":   "platform",
 	}
+	host := platformAddressHost(
+		getString(ap, "metadata", "namespace"),
+		getString(ap, "metadata", "name"),
+		address.id,
+		apRoutingDomain(ap),
+	)
+	if host == "" {
+		return row
+	}
+	row["host"] = host
+	row["url"] = fmt.Sprintf("https://%s/", host)
+	return row
 }
 
 func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressRequest {
@@ -246,6 +259,36 @@ func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressReque
 		addresses = append(addresses, platformAddressRequest{id: id, port: port})
 	}
 	return addresses
+}
+
+func apRoutingDomain(ap map[string]interface{}) string {
+	return strings.TrimSpace(getString(ap, "metadata", "labels", "region"))
+}
+
+func platformAddressHost(namespace string, name string, id string, domain string) string {
+	namespace = strings.TrimSpace(namespace)
+	name = strings.TrimSpace(name)
+	id = strings.TrimSpace(id)
+	domain = strings.TrimSpace(domain)
+	if namespace == "" || name == "" || !platformAddressIDPattern.MatchString(id) || domain == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%s/%s", namespace, name, id)))
+	return fmt.Sprintf("%s-%x.%s", platformAddressHostPrefix(name), sum[:5], domain)
+}
+
+func platformAddressHostPrefix(name string) string {
+	prefix := strings.ToLower(strings.TrimSpace(name))
+	prefix = regexp.MustCompile(`[^a-z0-9-]+`).ReplaceAllString(prefix, "-")
+	prefix = strings.Trim(prefix, "-")
+	if len(prefix) > 52 {
+		prefix = prefix[:52]
+		prefix = strings.TrimRight(prefix, "-")
+	}
+	if prefix == "" {
+		return "ap"
+	}
+	return prefix
 }
 
 func privatePortFromValue(value interface{}) (int, bool) {

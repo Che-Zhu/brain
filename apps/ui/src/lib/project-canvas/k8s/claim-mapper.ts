@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
+  platformAddressHost,
   platformAddressIdFromValue,
   platformAddressIdsFromRows,
 } from "../platform-addresses";
@@ -190,7 +191,15 @@ function trimStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+function apRoutingDomainFromMetadata(
+  metadata: Record<string, unknown> | undefined
+): string {
+  const labels = asRecord(metadata?.labels);
+  return trimStr(labels?.region);
+}
+
 function apNetworkFromSpecAndStatus(
+  metadata: Record<string, unknown> | undefined,
   spec: Record<string, unknown>,
   status: Record<string, unknown>
 ): ContainerNetwork | undefined {
@@ -206,11 +215,16 @@ function apNetworkFromSpecAndStatus(
   return {
     ...(privateAddress === "" ? {} : { privateAddress }),
     privatePort,
-    publicAddresses: apNetworkPublicAddresses(inputNetwork, statusNetwork),
+    publicAddresses: apNetworkPublicAddresses(
+      metadata,
+      inputNetwork,
+      statusNetwork
+    ),
   };
 }
 
 function apNetworkPublicAddresses(
+  metadata: Record<string, unknown> | undefined,
   inputNetwork: Record<string, unknown> | undefined,
   statusNetwork: Record<string, unknown> | undefined
 ): ContainerNetwork["publicAddresses"] {
@@ -219,7 +233,9 @@ function apNetworkPublicAddresses(
     true
   );
   const desiredPending = normalizeDesiredPlatformAddresses(
-    inputNetwork?.platformAddresses
+    inputNetwork?.platformAddresses,
+    metadata,
+    apRoutingDomainFromMetadata(metadata)
   );
   if (observed.length > 0) {
     const observedIds = platformAddressIdsFromRows(observed);
@@ -234,11 +250,15 @@ function apNetworkPublicAddresses(
 }
 
 function normalizeDesiredPlatformAddresses(
-  raw: unknown
+  raw: unknown,
+  metadata: Record<string, unknown> | undefined,
+  routingDomain: string
 ): ContainerNetwork["publicAddresses"] {
   if (!Array.isArray(raw)) {
     return [];
   }
+  const namespace = trimStr(metadata?.namespace);
+  const appName = trimStr(metadata?.name);
   const out: ContainerNetwork["publicAddresses"] = [];
   for (const item of raw) {
     const address = asRecord(item);
@@ -250,7 +270,19 @@ function normalizeDesiredPlatformAddresses(
     if (id === undefined || port == null) {
       continue;
     }
-    out.push({ id, port, status: "progressing", type: "platform" });
+    const host = platformAddressHost({
+      appName,
+      namespace,
+      platformAddressId: id,
+      routingDomain,
+    });
+    out.push({
+      ...(host === undefined ? {} : { host, url: `https://${host}/` }),
+      id,
+      port,
+      status: "progressing",
+      type: "platform",
+    });
   }
   return out;
 }
@@ -326,6 +358,7 @@ export interface ClaimToContainerSettingsOptions {
 }
 
 function mapApClaim(
+  metadata: Record<string, unknown>,
   spec: Record<string, unknown>,
   status: Record<string, unknown>,
   options?: ClaimToContainerSettingsOptions
@@ -342,7 +375,7 @@ function mapApClaim(
     env: envFromSpecEnvList(readApEnv(spec), options?.dbDsnReferenceSources),
     image,
     memoryMib,
-    network: apNetworkFromSpecAndStatus(spec, status),
+    network: apNetworkFromSpecAndStatus(metadata, spec, status),
     ports: [],
     replicaStrategy,
     replicas,
@@ -385,7 +418,8 @@ export function claimToContainerSettings(
   }
   const spec = asRecord(claim.spec) ?? {};
   const status = asRecord(claim.status) ?? {};
+  const metadata = asRecord(claim.metadata) ?? {};
   return workloadKind === "DB"
     ? mapDbSpec(spec)
-    : mapApClaim(spec, status, options);
+    : mapApClaim(metadata, spec, status, options);
 }

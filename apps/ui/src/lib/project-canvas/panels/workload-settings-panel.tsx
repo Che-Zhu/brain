@@ -6,6 +6,7 @@ import { useAtomValue } from "jotai";
 import { Settings2 } from "lucide-react";
 import { memo } from "react";
 
+import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import {
   containerStatesFromNode,
   workloadClaimKindFromStates,
@@ -30,6 +31,23 @@ function workloadSettingsSubtitle({
 }) {
   const imageValue = image?.trim() ?? "";
   return imageValue === "" ? kind : `${kind} · ${imageValue}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function draftRoutingDomainFromClaim(
+  claim: Record<string, unknown> | undefined,
+  kubeconfig: string
+): string {
+  const metadata = asRecord(claim?.metadata);
+  const labels = asRecord(metadata?.labels);
+  const claimRoutingDomain =
+    typeof labels?.region === "string" ? labels.region.trim() : "";
+  return claimRoutingDomain || routingDomainFromKubeconfig(kubeconfig);
 }
 
 type WorkloadSettingsShellProps = Pick<
@@ -119,6 +137,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     workloadKind,
   });
   const claim = k8sGetClaimBody(claimPayload);
+  const draftRoutingDomain = draftRoutingDomainFromClaim(claim, kubeconfig);
 
   if (ns === "" || name === "") {
     return (
@@ -183,6 +202,11 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
           value: display.memoryMib,
         }}
         network={display.network}
+        networkPlatformAddressDraftContext={{
+          appName: name,
+          namespace: ns,
+          routingDomain: draftRoutingDomain,
+        }}
         onAddDbDsnReferenceIntentConsumed={
           data?.onAddDbDsnReferenceIntentConsumed
         }

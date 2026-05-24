@@ -48,6 +48,8 @@ const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
 const DOMAIN_LIST_RE = /Domain List/;
 const NO_DOMAINS_RE = /No domains yet/;
 const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
+const DRAFT_PUBLIC_ADDRESS_VALUE_RE =
+  /https:\/\/api-58b271f360.apps.example.com\//;
 const PUBLIC_ADDRESS_STATUS_RE = /Public Address status: accessible/;
 const COPY_PUBLIC_ADDRESS_RE = /aria-label="Copy Public Address"/;
 const CNAME_RE = /CNAME/;
@@ -205,6 +207,46 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_DOMAIN_RE);
+  assert.doesNotMatch(html, NO_DOMAINS_RE);
+});
+
+test("container settings pane renders draft-visible Platform Address hosts", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api-58b271f360.apps.example.com",
+            id: "pa_old123",
+            port: 8080,
+            status: "progressing",
+            type: "platform",
+            url: "https://api-58b271f360.apps.example.com/",
+          },
+        ],
+      }}
+      networkPlatformAddressDraftContext={{
+        appName: "api",
+        namespace: "project-a",
+        routingDomain: "apps.example.com",
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, DRAFT_PUBLIC_ADDRESS_VALUE_RE);
+  assert.match(html, COPY_PUBLIC_ADDRESS_RE);
+  assert.match(html, CNAME_RE);
   assert.doesNotMatch(html, NO_DOMAINS_RE);
 });
 
