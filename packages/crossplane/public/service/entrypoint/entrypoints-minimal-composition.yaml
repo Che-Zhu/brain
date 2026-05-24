@@ -52,6 +52,9 @@ spec:
             {{-       if eq $resourceName "" }}{{ $resourceName = $safeID }}{{ end }}
             {{-       $resourceName = trunc 59 $resourceName | trimSuffix "-" }}
             {{-       $secretName := printf "%s-tls" $resourceName }}
+            {{-       $ingressCompositionResourceName := printf "custom-domain-ingress-%s" $safeID }}
+            {{-       $issuerCompositionResourceName := printf "custom-domain-issuer-%s" $safeID }}
+            {{-       $certificateCompositionResourceName := printf "custom-domain-certificate-%s" $safeID }}
             {{-       $customDomains = concat $customDomains (list (dict
                         "id" $id
                         "domain" $domain
@@ -61,6 +64,9 @@ spec:
                         "safeID" $safeID
                         "resourceName" $resourceName
                         "secretName" $secretName
+                        "ingressCompositionResourceName" $ingressCompositionResourceName
+                        "issuerCompositionResourceName" $issuerCompositionResourceName
+                        "certificateCompositionResourceName" $certificateCompositionResourceName
                       )) }}
             {{-     end }}
             {{-   end }}
@@ -73,7 +79,7 @@ spec:
               name: {{ .resourceName }}
               namespace: {{ $ns }}
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ printf "custom-domain-ingress-%s" .safeID | quote }}
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ .ingressCompositionResourceName | quote }}
                 gotemplating.fn.crossplane.io/ready: "True"
                 nginx.ingress.kubernetes.io/proxy-body-size: 32m
                 nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -111,7 +117,7 @@ spec:
               name: {{ .resourceName }}
               namespace: {{ $ns }}
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ printf "custom-domain-issuer-%s" .safeID | quote }}
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ .issuerCompositionResourceName | quote }}
                 gotemplating.fn.crossplane.io/ready: "True"
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
@@ -136,7 +142,7 @@ spec:
               name: {{ .resourceName }}
               namespace: {{ $ns }}
               annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: {{ printf "custom-domain-certificate-%s" .safeID | quote }}
+                gotemplating.fn.crossplane.io/composition-resource-name: {{ .certificateCompositionResourceName | quote }}
                 gotemplating.fn.crossplane.io/ready: "True"
               ownerReferences:
               - apiVersion: example.crossplane.io/v1
@@ -161,7 +167,7 @@ spec:
             {{-   $certificateStatus := "pending" }}
             {{-   $certificateReason := "CertificatePending" }}
             {{-   $certificateMessage := "Certificate resource has not been observed yet." }}
-            {{-   $certObs := getComposedResource $ (printf "custom-domain-certificate-%s" $binding.safeID) }}
+            {{-   $certObs := getComposedResource $ $binding.certificateCompositionResourceName }}
             {{-   if $certObs }}
             {{-     $certificateStatus = "unknown" }}
             {{-     $certificateReason = "ReadyConditionMissing" }}
@@ -186,7 +192,7 @@ spec:
             {{-   $routingStatus := "pending" }}
             {{-   $routingReason := "IngressPending" }}
             {{-   $routingMessage := "Custom Domain Ingress has not been observed yet." }}
-            {{-   $ingObs := getComposedResource $ (printf "custom-domain-ingress-%s" $binding.safeID) }}
+            {{-   $ingObs := getComposedResource $ $binding.ingressCompositionResourceName }}
             {{-   if $ingObs }}
             {{-     $ruleConfigured := false }}
             {{-     $tlsConfigured := false }}

@@ -141,33 +141,10 @@ func TestEntryPointMinimalCompositionSurfacesAggregateStatus(t *testing.T) {
 }
 
 func TestEntryPointCompositionRendersCustomDomainRoutingAndTLS(t *testing.T) {
-	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
-		"apRef": "web",
-		"targets": []interface{}{
-			map[string]interface{}{
-				"id":             "pa_abc123",
-				"port":           8080,
-				"platformDomain": "web.example.platform",
-				"status":         "accessible",
-			},
-		},
-		"customDomains": []interface{}{
-			map[string]interface{}{
-				"id":                "cd_def456",
-				"domain":            "www.example.com",
-				"platformAddressId": "pa_abc123",
-				"targetPort":        8080,
-				"cnameTarget":       "web.example.platform",
-			},
-			map[string]interface{}{
-				"id":                "cd_admin9",
-				"domain":            "admin.example.com",
-				"platformAddressId": "pa_admin9",
-				"targetPort":        9000,
-				"cnameTarget":       "admin.example.platform",
-			},
-		},
-	}), nil)
+	out := renderEntryPointComposition(t, entryPointResourceWithCustomDomains(
+		entryPointCustomDomain("cd_def456", "www.example.com", "pa_abc123", 8080, "web.example.platform"),
+		entryPointCustomDomain("cd_admin9", "admin.example.com", "pa_admin9", 9000, "admin.example.platform"),
+	), nil)
 
 	ingresses := ingressObjects(t, out)
 	if got := len(ingresses); got != 2 {
@@ -215,26 +192,7 @@ func TestEntryPointCompositionRendersCustomDomainRoutingAndTLS(t *testing.T) {
 }
 
 func TestEntryPointCompositionProjectsCustomDomainHealthFromCertificateAndIngress(t *testing.T) {
-	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
-		"apRef": "web",
-		"targets": []interface{}{
-			map[string]interface{}{
-				"id":             "pa_abc123",
-				"port":           8080,
-				"platformDomain": "web.example.platform",
-				"status":         "accessible",
-			},
-		},
-		"customDomains": []interface{}{
-			map[string]interface{}{
-				"id":                "cd_def456",
-				"domain":            "www.example.com",
-				"platformAddressId": "pa_abc123",
-				"targetPort":        8080,
-				"cnameTarget":       "web.example.platform",
-			},
-		},
-	}), map[string]map[string]interface{}{
+	out := renderEntryPointComposition(t, entryPointResourceWithCustomDomains(), map[string]map[string]interface{}{
 		"custom-domain-ingress-cd-def456": observedIngress("www.example.com", "web-service", 8080, "web-cd-def456-tls"),
 		"custom-domain-certificate-cd-def456": observedCertificate(
 			"web-cd-def456-tls",
@@ -278,26 +236,7 @@ func TestEntryPointCompositionProjectsCustomDomainHealthFromCertificateAndIngres
 }
 
 func TestEntryPointCompositionKeepsCustomDomainPendingUntilRoutingObserved(t *testing.T) {
-	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
-		"apRef": "web",
-		"targets": []interface{}{
-			map[string]interface{}{
-				"id":             "pa_abc123",
-				"port":           8080,
-				"platformDomain": "web.example.platform",
-				"status":         "accessible",
-			},
-		},
-		"customDomains": []interface{}{
-			map[string]interface{}{
-				"id":                "cd_def456",
-				"domain":            "www.example.com",
-				"platformAddressId": "pa_abc123",
-				"targetPort":        8080,
-				"cnameTarget":       "web.example.platform",
-			},
-		},
-	}), nil)
+	out := renderEntryPointComposition(t, entryPointResourceWithCustomDomains(), nil)
 
 	status := asMap(t, singleKindObject(t, out, "EntryPoint")["status"], "entrypoint.status")
 	if got := status["phase"]; got != "Progressing" {
@@ -314,26 +253,7 @@ func TestEntryPointCompositionKeepsCustomDomainPendingUntilRoutingObserved(t *te
 }
 
 func TestEntryPointCompositionBlocksCustomDomainOnCertificateFailure(t *testing.T) {
-	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
-		"apRef": "web",
-		"targets": []interface{}{
-			map[string]interface{}{
-				"id":             "pa_abc123",
-				"port":           8080,
-				"platformDomain": "web.example.platform",
-				"status":         "accessible",
-			},
-		},
-		"customDomains": []interface{}{
-			map[string]interface{}{
-				"id":                "cd_def456",
-				"domain":            "www.example.com",
-				"platformAddressId": "pa_abc123",
-				"targetPort":        8080,
-				"cnameTarget":       "web.example.platform",
-			},
-		},
-	}), map[string]map[string]interface{}{
+	out := renderEntryPointComposition(t, entryPointResourceWithCustomDomains(), map[string]map[string]interface{}{
 		"custom-domain-ingress-cd-def456": observedIngress("www.example.com", "web-service", 8080, "web-cd-def456-tls"),
 		"custom-domain-certificate-cd-def456": observedCertificate(
 			"web-cd-def456-tls",
@@ -1381,6 +1301,40 @@ func entryPointResource(spec map[string]interface{}) map[string]interface{} {
 			"uid":       "entrypoint-uid-1",
 		},
 		"spec": spec,
+	}
+}
+
+func entryPointResourceWithCustomDomains(customDomains ...map[string]interface{}) map[string]interface{} {
+	if len(customDomains) == 0 {
+		customDomains = []map[string]interface{}{
+			entryPointCustomDomain("cd_def456", "www.example.com", "pa_abc123", 8080, "web.example.platform"),
+		}
+	}
+	domains := make([]interface{}, 0, len(customDomains))
+	for _, customDomain := range customDomains {
+		domains = append(domains, customDomain)
+	}
+	return entryPointResource(map[string]interface{}{
+		"apRef": "web",
+		"targets": []interface{}{
+			map[string]interface{}{
+				"id":             "pa_abc123",
+				"port":           8080,
+				"platformDomain": "web.example.platform",
+				"status":         "accessible",
+			},
+		},
+		"customDomains": domains,
+	})
+}
+
+func entryPointCustomDomain(id string, domain string, platformAddressID string, targetPort int, cnameTarget string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":                id,
+		"domain":            domain,
+		"platformAddressId": platformAddressID,
+		"targetPort":        targetPort,
+		"cnameTarget":       cnameTarget,
 	}
 }
 
