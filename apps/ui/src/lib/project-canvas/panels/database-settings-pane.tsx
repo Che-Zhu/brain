@@ -628,7 +628,6 @@ export function DatabaseSettingsPaneContent({
     pendingPatch !== null || dbSettingsDraftIsDirty(original, draft);
   const canUpdate =
     canEdit && pendingPatch !== null && !updating && onSubmitPatch != null;
-  const statusLabel = data.states.status?.label ?? "Unknown";
   const subtitle = databaseHeaderSubtitle(data.states);
   const controlsDisabled = !canEdit || updating;
 
@@ -716,7 +715,6 @@ export function DatabaseSettingsPaneContent({
       closeAriaLabel="Close database settings"
       icon={<DatabaseSettingsHeaderIcon iconUrl={data.states.iconUrl} />}
       onClose={onClose}
-      status={{ ...data.states.status, label: statusLabel }}
       subtitle={subtitle}
       title={data.states.name}
     >

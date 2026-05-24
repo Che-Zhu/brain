@@ -118,7 +118,6 @@ export const WorkloadMetricsPane = memo(function WorkloadMetricsPane({
         />
       }
       onClose={onClose}
-      status={states?.status}
       subtitle={`${states?.kind ?? "Workload"} · Last 60 minutes`}
       title={`${name} Metrics`}
     >

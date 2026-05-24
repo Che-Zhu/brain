@@ -35,13 +35,12 @@ import {
 
 type WorkloadHistoryShellProps = Pick<
   CanvasResourcePaneProps,
-  "children" | "onClose" | "status" | "subtitle" | "title"
+  "children" | "onClose" | "subtitle" | "title"
 >;
 
 function WorkloadHistoryShell({
   children,
   onClose,
-  status,
   subtitle,
   title,
 }: WorkloadHistoryShellProps) {
@@ -55,7 +54,6 @@ function WorkloadHistoryShell({
         />
       }
       onClose={onClose}
-      status={status}
       subtitle={subtitle}
       title={title}
     >
@@ -163,7 +161,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     return (
       <WorkloadHistoryShell
         onClose={onClose}
-        status={states?.status}
         subtitle={workloadKind}
         title={title}
       >
@@ -178,7 +175,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     return (
       <WorkloadHistoryShell
         onClose={onClose}
-        status={states?.status}
         subtitle={workloadKind}
         title={title}
       >
@@ -194,7 +190,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     return (
       <WorkloadHistoryShell
         onClose={onClose}
-        status={states?.status}
         subtitle={workloadKind}
         title={title}
       >
@@ -209,7 +204,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     return (
       <WorkloadHistoryShell
         onClose={onClose}
-        status={states?.status}
         subtitle={workloadKind}
         title={title}
       >
@@ -222,7 +216,6 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
     <>
       <WorkloadHistoryShell
         onClose={onClose}
-        status={states?.status}
         subtitle={workloadKind}
         title={title}
       >

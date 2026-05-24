@@ -34,13 +34,12 @@ function workloadSettingsSubtitle({
 
 type WorkloadSettingsShellProps = Pick<
   CanvasResourcePaneProps,
-  "children" | "onClose" | "status" | "subtitle" | "title"
+  "children" | "onClose" | "subtitle" | "title"
 >;
 
 function WorkloadSettingsShell({
   children,
   onClose,
-  status,
   subtitle,
   title,
 }: WorkloadSettingsShellProps) {
@@ -54,7 +53,6 @@ function WorkloadSettingsShell({
         />
       }
       onClose={onClose}
-      status={status}
       subtitle={subtitle}
       title={title}
     >
@@ -126,7 +124,6 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -141,7 +138,6 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -156,7 +152,6 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -166,12 +161,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
   }
 
   return (
-    <WorkloadSettingsShell
-      onClose={onClose}
-      status={states?.status}
-      subtitle={subtitle}
-      title={title}
-    >
+    <WorkloadSettingsShell onClose={onClose} subtitle={subtitle} title={title}>
       <ContainerSettingsPane
         addDbDsnReferenceIntent={data?.addDbDsnReferenceIntent}
         className="gap-4"
