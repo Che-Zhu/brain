@@ -1,6 +1,9 @@
 import { apItemsFromList } from "@workspace/api/lib/ap-list";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
-import type { ContainerNetworkCustomDomain } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import type {
+  ContainerNetworkCustomDomain,
+  ContainerNetworkCustomDomainDetail,
+} from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 
 import {
   customDomainBindingIdFromValue,
@@ -58,14 +61,17 @@ function portNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isInteger(value)) {
     return value;
   }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isInteger(parsed) ? parsed : undefined;
+  const text = trimString(value);
+  if (text === "") {
+    return undefined;
   }
-  return undefined;
+  const parsed = Number(text);
+  return Number.isInteger(parsed) ? parsed : undefined;
 }
 
-function lifecycleDetail(value: unknown) {
+function lifecycleDetail(
+  value: unknown
+): ContainerNetworkCustomDomainDetail | undefined {
   const record = asRecord(value);
   if (record == null) {
     return undefined;
@@ -140,6 +146,26 @@ function entryPointMatchesAp(
   return apRef === name || (apRef === "" && metadataName(entryPoint) === name);
 }
 
+function customDomainBindingsFromRecords(
+  source: unknown,
+  base: Pick<ExistingCustomDomainBinding, "apRef" | "namespace">
+): ExistingCustomDomainBinding[] {
+  return customDomainRecords(source).flatMap((record) => {
+    const domain = normalizeCustomDomainName(record.domain);
+    if (domain === "") {
+      return [];
+    }
+    const id = customDomainBindingIdFromValue(record.id);
+    return [
+      {
+        ...base,
+        domain,
+        ...(id == null ? {} : { id }),
+      },
+    ];
+  });
+}
+
 export function entryPointCustomDomainStatusesForAp(
   data: K8sGetResponse | undefined,
   apMetadata: Record<string, unknown>
@@ -176,19 +202,13 @@ export function existingCustomDomainBindingsFromEntryPoints(
       specRecord(entryPoint)?.customDomains,
       statusRecord(entryPoint)?.customDomains,
     ]) {
-      for (const record of customDomainRecords(source)) {
-        const domain = normalizeCustomDomainName(record.domain);
-        if (domain === "") {
-          continue;
-        }
-        const id = customDomainBindingIdFromValue(record.id);
+      for (const binding of customDomainBindingsFromRecords(source, {
+        apRef,
+        namespace,
+      })) {
+        const { domain, id } = binding;
         const key = `${namespace}/${apRef}/${id ?? domain}`;
-        out.set(key, {
-          apRef,
-          domain,
-          ...(id == null ? {} : { id }),
-          namespace,
-        });
+        out.set(key, binding);
       }
     }
   }

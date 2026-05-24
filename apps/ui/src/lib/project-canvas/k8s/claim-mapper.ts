@@ -37,6 +37,14 @@ import {
 } from "./entrypoint-custom-domains";
 
 export type WorkloadClaimKind = "AP" | "DB";
+type ContainerCustomDomain = NonNullable<
+  ContainerNetwork["customDomains"]
+>[number];
+type CustomDomainReadModelPatch = Partial<ContainerCustomDomain>;
+type CustomDomainReadModelById = ReadonlyMap<
+  string,
+  CustomDomainReadModelPatch
+>;
 
 const MEM_SUFFIX_GI = /^([0-9]+(?:\.[0-9]+)?)gi$/i;
 const MEM_SUFFIX_MI = /^([0-9]+(?:\.[0-9]+)?)mi$/i;
@@ -218,15 +226,16 @@ function apNetworkFromSpecAndStatus(
     return undefined;
   }
   const privateAddress = trimStr(statusNetwork?.privateAddress);
+  const entryPointCustomDomains = entryPointCustomDomainStatusesForAp(
+    options?.entryPointsData,
+    metadata ?? {}
+  );
   return {
     ...(privateAddress === "" ? {} : { privateAddress }),
     ...apNetworkCustomDomains(
       inputNetwork,
       statusNetwork,
-      entryPointCustomDomainStatusesForAp(
-        options?.entryPointsData,
-        metadata ?? {}
-      )
+      entryPointCustomDomains
     ),
     privatePort,
     publicAddresses: apNetworkPublicAddresses(
@@ -240,10 +249,7 @@ function apNetworkFromSpecAndStatus(
 function apNetworkCustomDomains(
   inputNetwork: Record<string, unknown> | undefined,
   statusNetwork: Record<string, unknown> | undefined,
-  entryPointCustomDomains: ReadonlyMap<
-    string,
-    NonNullable<ContainerNetwork["customDomains"]>[number]
-  >
+  entryPointCustomDomains: ReadonlyMap<string, ContainerCustomDomain>
 ): Pick<ContainerNetwork, "customDomains"> | Record<string, never> {
   const customDomains = normalizeDesiredCustomDomains(
     inputNetwork?.customDomains,
@@ -293,13 +299,10 @@ function isPlatformPublicAddressRow(
 
 function normalizeDesiredCustomDomains(
   raw: unknown,
-  projectedCustomDomains: ReadonlyMap<
-    string,
-    Partial<NonNullable<ContainerNetwork["customDomains"]>[number]>
-  > = new Map(),
+  projectedCustomDomains: CustomDomainReadModelById = new Map(),
   entryPointCustomDomains: ReadonlyMap<
     string,
-    NonNullable<ContainerNetwork["customDomains"]>[number]
+    ContainerCustomDomain
   > = new Map()
 ): NonNullable<ContainerNetwork["customDomains"]> {
   if (!Array.isArray(raw)) {
@@ -319,39 +322,43 @@ function normalizeDesiredCustomDomains(
     if (id === undefined || platformAddressId === undefined || domain === "") {
       continue;
     }
-    const projected = projectedCustomDomains.get(id);
-    const entryPoint = entryPointCustomDomains.get(id);
-    const merged = {
-      status: "pending",
-      ...projected,
-      ...entryPoint,
-    };
-    out.push({
-      ...merged,
-      domain: entryPoint?.domain ?? projected?.domain ?? domain,
-      id,
-      platformAddressId:
-        entryPoint?.platformAddressId ??
-        projected?.platformAddressId ??
-        platformAddressId,
-    });
+    out.push(
+      mergedCustomDomainReadModel(
+        { domain, id, platformAddressId },
+        projectedCustomDomains.get(id),
+        entryPointCustomDomains.get(id)
+      )
+    );
   }
   return out;
 }
 
-function projectedCustomDomainsById(
-  raw: unknown
-): ReadonlyMap<
-  string,
-  Partial<NonNullable<ContainerNetwork["customDomains"]>[number]>
-> {
+function mergedCustomDomainReadModel(
+  desired: Pick<ContainerCustomDomain, "domain" | "id" | "platformAddressId">,
+  projected: CustomDomainReadModelPatch | undefined,
+  entryPoint: ContainerCustomDomain | undefined
+): ContainerCustomDomain {
+  const observed = {
+    status: "pending",
+    ...projected,
+    ...entryPoint,
+  };
+  return {
+    ...observed,
+    domain: entryPoint?.domain ?? projected?.domain ?? desired.domain,
+    id: desired.id,
+    platformAddressId:
+      entryPoint?.platformAddressId ??
+      projected?.platformAddressId ??
+      desired.platformAddressId,
+  };
+}
+
+function projectedCustomDomainsById(raw: unknown): CustomDomainReadModelById {
   if (!Array.isArray(raw)) {
     return new Map();
   }
-  const out = new Map<
-    string,
-    Partial<NonNullable<ContainerNetwork["customDomains"]>[number]>
-  >();
+  const out = new Map<string, CustomDomainReadModelPatch>();
   for (const item of raw) {
     const row = asRecord(item);
     if (row == null || trimStr(row.type).toLowerCase() !== "custom") {
