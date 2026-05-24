@@ -51,6 +51,10 @@ A user-owned Public Address that requires DNS verification and TLS certificate l
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that composes Deployment + Service(s), and optionally public Ingress + EntryPoint resources when the AP has allocated Public Addresses. Owns compute, App Listening Ports, one Private Address, and Platform Address allocation requests.
 
+### AP Settings
+
+The primary UI surface for viewing and editing AP desired configuration, including image, resource capacity, Replica Strategy, environment, and network settings.
+
 ### AP Replica Strategy
 
 The AP configuration choice for how many workload replicas should run: either a fixed user-selected count or Elastic Scaling within user-selected bounds.
