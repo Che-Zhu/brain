@@ -440,6 +440,22 @@ test("AP network settings reject duplicate Custom Domains in the namespace routi
       metadata: { name: "api", namespace: "default" },
     })
   );
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings({ input: {} }, network, {
+        existingCustomDomains: [
+          {
+            apRef: "worker",
+            domain: "www.example.com",
+            id: "cd_def456",
+            namespace: "default",
+          },
+        ],
+        metadata: { name: "api", namespace: "default" },
+      }),
+    CUSTOM_DOMAIN_DUPLICATE_RE
+  );
 });
 
 test("AP network settings keep bound Custom Domains following Platform Address port changes", () => {

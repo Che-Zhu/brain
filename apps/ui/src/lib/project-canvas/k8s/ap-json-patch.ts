@@ -616,7 +616,7 @@ function validatedCustomDomains(
       throw new Error("Custom Domain can only be bound once.");
     }
     seenDomains.add(domain);
-    assertCustomDomainAvailableInNamespace(domain, id, options);
+    assertCustomDomainAvailableInNamespace(domain, options);
 
     return { domain, id, platformAddressId };
   });
@@ -624,7 +624,6 @@ function validatedCustomDomains(
 
 function assertCustomDomainAvailableInNamespace(
   domain: string,
-  id: string,
   options: ApNetworkSettingsPatchOptions
 ): void {
   const metadata = options.metadata;
@@ -643,7 +642,7 @@ function assertCustomDomainAvailableInNamespace(
     if (normalizeCustomDomainName(binding.domain) !== domain) {
       continue;
     }
-    if (binding.apRef.trim() === currentAp || binding.id?.trim() === id) {
+    if (binding.apRef.trim() === currentAp) {
       continue;
     }
     throw new Error("Custom Domain is already bound in this namespace.");
