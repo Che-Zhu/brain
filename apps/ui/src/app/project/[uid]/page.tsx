@@ -1,10 +1,8 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
-import { PanelRightOpen } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
@@ -25,14 +23,12 @@ import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/wo
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { DATABASE_PANE } from "@/store/canvas-store";
-import { openRightPane, rightPaneOpenAtom } from "@/store/layout-store";
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
   const uid = decodeURIComponent(params.uid ?? "");
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespace = useAtomValue(namespaceAtom);
-  const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
   const [pendingApDbReferences, setPendingApDbReferences] = useState<
     PendingApDbCanvasReference[]
   >([]);
@@ -163,24 +159,6 @@ export default function ProjectUidPage() {
                   </div>
                 ) : null}
                 <Canvas.Flow>
-                  <Canvas.UpperRight>
-                    {rightPaneOpen ? null : (
-                      <Button
-                        aria-label="Open assistant panel"
-                        className="hoverable rounded-xl"
-                        onClick={openRightPane}
-                        size="icon-lg"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <PanelRightOpen
-                          aria-hidden
-                          className="size-4"
-                          strokeWidth={2}
-                        />
-                      </Button>
-                    )}
-                  </Canvas.UpperRight>
                   <WorkloadResourcePane
                     mode={workloadPane}
                     node={selectedNode}

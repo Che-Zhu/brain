@@ -1,17 +1,21 @@
 "use client";
 
 import { useChat as useAIChat } from "@ai-sdk/react";
+import { Button } from "@workspace/ui/components/button";
 import {
   Chat,
   downloadChatMessagesJson,
 } from "@workspace/ui/components/chat/chat";
 import type { ChatHeaderThreadHistory } from "@workspace/ui/components/chat/chat.types";
+import { SidebarTrigger } from "@workspace/ui/components/sidebar";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 import { useAtomValue } from "jotai";
+import { PanelRightOpen } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { parseAsString, useQueryState } from "nuqs";
 import {
@@ -24,6 +28,7 @@ import {
 } from "react";
 import { useSWRConfig } from "swr";
 import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
+import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
 import { useGithubDeployer } from "@/hooks/use-github-deployer";
 import {
   createAssistantThread,
@@ -485,6 +490,47 @@ function ProjectAssistantChatPane({
   );
 }
 
+function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
+  const params = useParams<{ uid?: string }>();
+  const projectUid = decodeURIComponent(params.uid ?? "");
+  const kubeconfig = useAtomValue(kubeconfigAtom);
+  const namespace = useAtomValue(namespaceAtom);
+  const currentProject = useCurrentProjectDisplayName({
+    kubeconfig,
+    namespace,
+    projectUid,
+  });
+  const showProjectName = projectUid.trim() !== "";
+
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-2 bg-background px-2">
+      <SidebarTrigger className="-ml-1 md:hidden" />
+      <div className="min-w-0 flex-1">
+        {showProjectName && currentProject.isLoading ? (
+          <Skeleton className="h-5 w-36 max-w-full" />
+        ) : null}
+        {showProjectName && !currentProject.isLoading ? (
+          <h1 className="truncate font-medium text-foreground text-sm">
+            {currentProject.displayName ?? "Project"}
+          </h1>
+        ) : null}
+      </div>
+      {rightPaneOpen ? null : (
+        <Button
+          aria-label="Open assistant panel"
+          className="hoverable rounded-xl"
+          onClick={toggleRightPaneVisibility}
+          size="icon-lg"
+          type="button"
+          variant="ghost"
+        >
+          <PanelRightOpen aria-hidden className="size-4" strokeWidth={2} />
+        </Button>
+      )}
+    </header>
+  );
+}
+
 /** Main project column + optional right assistant chat pane (`POST /api/chat` + AI SDK). */
 export default function ProjectChatPaneLayout({
   children,
@@ -495,7 +541,15 @@ export default function ProjectChatPaneLayout({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
-      {children}
+      <section
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        data-slot="project-main-pane"
+      >
+        <ProjectRouteTopBar rightPaneOpen={rightPaneOpen} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
+      </section>
       <aside
         aria-hidden={!rightPaneOpen}
         className={cn(

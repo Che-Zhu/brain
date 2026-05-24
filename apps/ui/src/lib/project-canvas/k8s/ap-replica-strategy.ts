@@ -264,7 +264,7 @@ export function defaultFixedReplicaStrategy(): ApFixedReplicaStrategy {
 
 export function canonicalElasticReplicaStrategy(
   elastic: ApElasticReplicaSettings,
-  fixedReplicas = DEFAULT_AP_FIXED_REPLICAS
+  fixedReplicas: number = DEFAULT_AP_FIXED_REPLICAS
 ): ApElasticReplicaStrategy {
   return {
     elastic: validateApElasticReplicaSettings(elastic),
