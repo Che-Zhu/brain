@@ -55,9 +55,10 @@ Composition behavior to know before you write a claim:
 - The `Ingress` uses `ingressClassName: nginx` and TLS via `secretName: wildcard-cert` in the
   same namespace.
 - **Spec layout:** workload settings live under **`spec.input`** (image, `network`, env, probes,
-  `imagePullPolicy`); scale and CPU/memory under **`spec.resource`**
-  (`replicas`, `requests`, `limits`). Top-level **`spec.projectName`**, **`spec.paused`**,
-  **`spec.restartRequest`**, and **`spec.ingressAnnotations`** are not nested under `input`.
+  `imagePullPolicy`); AP Replica Strategy and CPU/memory live under **`spec.resource`**
+  (`replicaStrategy`, `requests`, `limits`). Top-level **`spec.projectName`**,
+  **`spec.paused`**, **`spec.restartRequest`**, and **`spec.ingressAnnotations`** are not nested
+  under `input`.
 - **Network contract:** `spec.input.network.privatePort` is the App Listening Port targeted by
   the Private Address. Optional `spec.input.network.platformAddresses[]` entries request Platform
   Addresses; each entry has stable opaque `id` and target App Listening Port `port`.
@@ -82,13 +83,29 @@ Composition behavior to know before you write a claim:
 | `input.env[]`                    | `[{ name, value?, valueFrom? }]`            | `[]`        | Standard Kubernetes env shape. |
 | `input.probes`                   | Kubernetes Probe map                        | none        | `startup` / `liveness` / `readiness`; no defaults. |
 | `input.imagePullPolicy`          | `Always` \| `IfNotPresent` \| `Never`        | `Always`    | |
-| `resource.replicas`              | integer                                     | `1`         | Deployment replica count (1–20). |
+| `resource.replicaStrategy.type`  | `fixed` \| `elastic`                       | `fixed`     | AP Replica Strategy for new AP Settings writes. |
+| `resource.replicaStrategy.fixed.replicas` | integer                           | `1`         | Fixed Replicas count (1-20). |
+| `resource.replicaStrategy.elastic` | `{ minReplicas, maxReplicas, target }`    | `1`-`10`, CPU 80% | Elastic Scaling bounds and one active CPU or Memory target. |
+| `resource.replicas`              | integer                                     | `1`         | Legacy Fixed Replicas fallback, used only when `resource.replicaStrategy` is absent. |
 | `resource.requests` / `limits`   | `{ cpu, memory }`                           | `200m`/`204Mi` / `2000m`/`2048Mi` | Kubernetes quantities. |
 | `paused`                         | boolean                                     | `false`     | Scale to 0 with SealOS pause annotations when true. |
 | `restartRequest`                 | integer                                     | `0`         | Bump to roll pods via Composition. |
 | `ingressAnnotations`             | `map[string]string`                         | `{}`        | Extra Ingress annotations. |
 | `type`                           | `prelude`                                   | unset       | UI hint that the image may not be pullable yet. |
 | `hooksYamlTmpl` / `webhookSecret` / `webhookListenPort` / `webhookExtraArgs` / `imagePullSecrets` | various | — | **Only** for composition `aps-webhook-go-templating` (GitHub webhooks), not the default deployment composition. |
+
+### AP Replica Strategy
+
+Use `resource.replicaStrategy` for all new AP Settings writes. Fixed Replicas uses
+`resource.replicaStrategy.type: fixed` plus `fixed.replicas`; Elastic Scaling uses
+`resource.replicaStrategy.type: elastic` plus `elastic.minReplicas`, `elastic.maxReplicas`, and
+one target: CPU utilization percentage or Memory average value. Existing `resource.replicas`
+claims remain valid only as a legacy Fixed Replicas fallback when `resource.replicaStrategy` is
+absent. AP Settings must not create unmanaged autoscaler resources through the generic Kubernetes autoscale API.
+
+Representative examples live in `packages/crossplane/public/example/ap/`:
+`ap-legacy-fixed-example.yaml`, `ap-fixed-replicas-example.yaml`,
+`ap-cpu-elastic-example.yaml`, and `ap-memory-elastic-example.yaml`.
 
 **Sealos app templates** (`*-composite.yaml` compositions) store Sealos template `inputs` under
 `spec.input` (same object as deployment overrides). Generic deploys use
@@ -114,7 +131,9 @@ A template AP claim still uses kind **`AP`** and the same **`spec.input` + `spec
 layout. It selects the template composition via **`spec.crossplane.compositionSelector.matchLabels.template`**
 (or explicit **`spec.crossplane.compositionRef.name`**) and sets **`spec.template`** to the same
 label value. Template-specific parameters (passwords, API keys, host slugs, etc.) live under
-**`spec.input`**; scale and CPU/memory under **`spec.resource`**.
+**`spec.input`**; AP Replica Strategy and CPU/memory live under **`spec.resource`**.
+Use `spec.resource.replicaStrategy` for new AP Replica Strategy writes; `spec.resource.replicas`
+is only the legacy Fixed Replicas fallback.
 
 #### Token cost warning — do not bulk-fetch templates
 
@@ -186,7 +205,10 @@ spec:
   input:
     # template-specific keys from template/instance …
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
     requests:
       cpu: 100m
       memory: 102Mi
@@ -205,7 +227,8 @@ spec:
 `network.privatePort`, `network.publicAddresses[]`, `projectName`, `projectUid`, `conditions[]`.
 
 **JSON merge patch** (API `PATCH /api/ap/v1alpha1/`): patch nested subtrees, e.g.
-`{"spec":{"input":{"image":"nginx:1.27"}}}`, `{"spec":{"resource":{"replicas":2}}}`,
+`{"spec":{"input":{"image":"nginx:1.27"}}}`,
+`{"spec":{"resource":{"replicaStrategy":{"type":"fixed","fixed":{"replicas":2}}}}}`,
 `{"spec":{"paused":true}}`. Replacing `spec.input.network.platformAddresses` or `spec.input.env`
 requires sending the **full** desired array.
 
@@ -545,7 +568,8 @@ storage-provisioning, backup-repo, and image-pull errors there, not on the `DB` 
   `{name}-config-snapshot-{hash}` ConfigMap for rollback (effective snapshot uses nested `input` /
   `resource`).
 - **`spec.paused: true`** scales the Deployment to 0 with SealOS pause annotations; resume with
-  `spec.paused: false` (replica count comes from `spec.resource.replicas`).
+  `spec.paused: false` (replica count comes from the active AP Replica Strategy, falling back to
+  legacy `spec.resource.replicas` only when `spec.resource.replicaStrategy` is absent).
 - **Deleting an AP** garbage-collects the Deployment/Service/Ingress/managed ConfigMap (they
   ownerReference the AP), but orphan config-snapshot ConfigMaps and their RBAC intentionally
   survive. Clean them up manually with
@@ -621,7 +645,10 @@ spec:
         - id: pa_app001
           port: 80
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
 ```
 
 ### 7.2 `AP` attached to a `Project`, with explicit resources
@@ -646,7 +673,10 @@ spec:
         - id: pa_app001
           port: 80
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
     requests:
       cpu: 250m
       memory: 512Mi
@@ -718,7 +748,10 @@ spec:
     network:
       privatePort: 80
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
 ```
 
 ### 7.5 Minimal `Project`

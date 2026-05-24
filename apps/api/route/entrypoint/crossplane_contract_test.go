@@ -583,10 +583,10 @@ func TestAPCompositionRendersCPUElasticReplicaStrategy(t *testing.T) {
 	}
 
 	configMap := singleKindObject(t, out, "ConfigMap")
-	data := asMap(t, configMap["data"], "configmap.data")
-	configYaml, ok := data["config.yaml"].(string)
+	configData := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := configData["config.yaml"].(string)
 	if !ok {
-		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+		t.Fatalf("config.yaml is %T, want string", configData["config.yaml"])
 	}
 	if !strings.Contains(configYaml, "type: elastic") ||
 		!strings.Contains(configYaml, "replicas: 4") ||
@@ -663,10 +663,10 @@ func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
 	}
 
 	configMap := singleKindObject(t, out, "ConfigMap")
-	data := asMap(t, configMap["data"], "configmap.data")
-	configYaml, ok := data["config.yaml"].(string)
+	configData := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := configData["config.yaml"].(string)
 	if !ok {
-		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+		t.Fatalf("config.yaml is %T, want string", configData["config.yaml"])
 	}
 	if !strings.Contains(configYaml, "type: elastic") ||
 		!strings.Contains(configYaml, "replicas: 4") ||
@@ -1241,6 +1241,10 @@ func platformHost(namespace string, name string, uid string, id string, domain s
 }
 
 func effectiveConfigHash(configYaml string) string {
+	configYaml = strings.TrimPrefix(configYaml, "\n")
+	if !strings.HasSuffix(configYaml, "\n") {
+		configYaml += "\n"
+	}
 	sum := sha256.Sum256([]byte(configYaml))
 	return fmt.Sprintf("%x", sum)[:12]
 }

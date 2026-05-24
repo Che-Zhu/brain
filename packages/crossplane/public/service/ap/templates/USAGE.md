@@ -13,9 +13,61 @@ python3 -m venv .venv-sync && .venv-sync/bin/pip install pyyaml
 .venv-sync/bin/python sync-sealos-templates.py --only agora # one template
 ```
 
-Each `template/instance` annotation lists template parameters under **`spec.input`** (`openaiApiKey`, `adminPassword`, etc.) copied from Sealos `inputs` / `defaults`. Scale and CPU/memory live under **`spec.resource`** (`replicas`, `requests`, `limits`). **`spec.projectName`** stays top-level. Do not use historical flat fields such as `spec.cpuRequest`, `spec.image`, or `spec.endpoints`; those fields are not part of the AP XRD.
+Each `template/instance` annotation lists template parameters under **`spec.input`** (`openaiApiKey`, `adminPassword`, etc.) copied from Sealos `inputs` / `defaults`. AP Replica Strategy and CPU/memory live under **`spec.resource`** (`replicaStrategy`, `requests`, `limits`). **`spec.projectName`** stays top-level. Do not use historical flat fields such as `spec.cpuRequest`, `spec.image`, or `spec.endpoints`; those fields are not part of the AP XRD. Legacy `spec.resource.replicas` remains accepted only as a Fixed Replicas fallback when `spec.resource.replicaStrategy` is absent.
 
 These generated app-store template compositions are a non-product compatibility path. They may still read template-specific `spec.input.host` values because they mirror upstream Sealos templates. The active AP Settings, API docs, and default deployment composition use `spec.input.network` and `status.network`; do not add `spec.input.endpoints[]`, `status.endpoints[]`, or a port-matrix UI to support these generated templates.
+
+## Canonical AP Replica Strategy examples
+
+For new AP Settings writes, use `spec.resource.replicaStrategy` as the canonical AP Replica
+Strategy model. AP Settings must not create unmanaged autoscaler resources through the generic Kubernetes autoscale API. Elastic Scaling is reconciled by the AP Composition as an AP-owned horizontal autoscaler.
+
+Representative AP examples live in `packages/crossplane/public/example/ap/`:
+
+- `ap-fixed-replicas-example.yaml` - Fixed Replicas.
+- `ap-cpu-elastic-example.yaml` - CPU Elastic Scaling.
+- `ap-memory-elastic-example.yaml` - Memory Elastic Scaling.
+- `ap-legacy-fixed-example.yaml` - legacy `spec.resource.replicas` fallback.
+
+Fixed Replicas:
+
+```yaml
+resource:
+  replicaStrategy:
+    type: fixed
+    fixed:
+      replicas: 2
+```
+
+CPU Elastic Scaling:
+
+```yaml
+resource:
+  replicaStrategy:
+    type: elastic
+    elastic:
+      minReplicas: 2
+      maxReplicas: 8
+      target:
+        metric: cpu
+        type: utilization
+        utilizationPercent: 75
+```
+
+Memory Elastic Scaling:
+
+```yaml
+resource:
+  replicaStrategy:
+    type: elastic
+    elastic:
+      minReplicas: 2
+      maxReplicas: 8
+      target:
+        metric: memory
+        type: averageValue
+        averageValue: 512Mi
+```
 
 ## Prerequisites
 
@@ -77,7 +129,10 @@ spec:
     # azureApiVersion: "2023-05-15"
 
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
     requests:
       cpu: "100m"
       memory: "128Mi"
