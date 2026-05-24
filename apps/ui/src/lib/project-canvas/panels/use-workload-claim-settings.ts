@@ -8,6 +8,7 @@ import type {
   ContainerSettingsDraft,
   ContainerSettingsPaneConfirmedAddDbDsnReference,
   ContainerSettingsPaneEnvChangeMeta,
+  ContainerSettingsPaneSettingsDraftCommitMeta,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -344,7 +345,7 @@ export function useWorkloadClaimSettings(
   const onSettingsDraftCommit = useCallback(
     async (
       draft: ContainerSettingsDraft,
-      meta?: ContainerSettingsPaneEnvChangeMeta
+      meta?: ContainerSettingsPaneSettingsDraftCommitMeta
     ) => {
       if (!isApWorkload || readOnly) {
         return;
@@ -352,11 +353,12 @@ export function useWorkloadClaimSettings(
       const body = claimBodyRef.current;
       const kc = kubeconfig.trim();
       if (body == null || kc === "") {
-        toast.error("Claim or kubeconfig missing.");
-        return;
+        const error = new Error("Claim or kubeconfig missing.");
+        toast.error(error.message);
+        throw error;
       }
 
-      const previous: ContainerSettingsDraft = {
+      const previous: ContainerSettingsDraft = meta?.baseDraft ?? {
         cpuCores: display.cpuCores,
         env: display.env,
         image: display.image,
@@ -371,28 +373,17 @@ export function useWorkloadClaimSettings(
           ? undefined
           : onAddDbDsnReferenceMutationStart?.(confirmedReferences);
 
-      setLocalOverride((prev) => ({
-        ...(prev ?? {}),
-        cpuCores: draft.cpuCores,
-        env: [...draft.env],
-        image: draft.image,
-        memoryMib: draft.memoryMib,
-        ...(draft.network == null ? {} : { network: draft.network }),
-        ...(draft.replicaStrategy == null
-          ? {}
-          : {
-              replicaStrategy: draft.replicaStrategy,
-              replicas: draft.replicaStrategy.fixed.replicas,
-            }),
-      }));
-
       try {
         await applyApSettingsDraft(kc, body, draft, previous);
         toast.success("Settings applied.");
         await revalidateAfterApMutation();
       } catch (e) {
-        setLocalOverride(null);
-        toast.error(e instanceof Error ? e.message : "Apply failed");
+        toast.error(
+          e instanceof Error
+            ? `${e.message} Your draft is still available.`
+            : "Apply failed. Your draft is still available."
+        );
+        throw e;
       } finally {
         clearPendingReferences?.();
       }

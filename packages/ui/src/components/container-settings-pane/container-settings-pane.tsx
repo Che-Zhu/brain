@@ -52,8 +52,23 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import {
+  commitSettingsDraftBackingState,
+  createSettingsDraftBackingState,
+  failSettingsDraftSave,
+  keepEditingSettingsDraftBackingState,
+  reloadSettingsDraftBackingState,
+  syncSettingsDraftBackingState,
+} from "../../lib/settings-draft-backing";
 import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
@@ -421,6 +436,11 @@ export interface ContainerSettingsDraft {
   replicas?: number;
 }
 
+export interface ContainerSettingsPaneSettingsDraftCommitMeta
+  extends Partial<ContainerSettingsPaneEnvChangeMeta> {
+  baseDraft: ContainerSettingsDraft;
+}
+
 export interface ContainerSettingsPaneProps {
   /**
    * One-shot request from a Canvas Connecting Edge to append an Add Reference row
@@ -460,7 +480,7 @@ export interface ContainerSettingsPaneProps {
   /** Panel-level AP Settings Draft commit. When set, all editable controls save through one draft update. */
   onSettingsDraftCommit?: (
     draft: ContainerSettingsDraft,
-    meta?: ContainerSettingsPaneEnvChangeMeta
+    meta?: ContainerSettingsPaneSettingsDraftCommitMeta
   ) => void | Promise<void>;
   /** Exposed container ports + protocol labels. */
   ports: ContainerPort[];
@@ -542,6 +562,17 @@ export function containerSettingsDraftIsDirty(
     containerDraftResourcesDirty(original, draft) ||
     !containerNetworksEqual(original.network, draft.network)
   );
+}
+
+function containerSettingsDraftBackingKey(draft: ContainerSettingsDraft) {
+  return JSON.stringify(draft);
+}
+
+function containerSettingsSaveFailureMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return `${error.message} Your draft is still available.`;
+  }
+  return "Could not save settings. Your draft is still available.";
 }
 
 function SectionTitle({
@@ -1918,55 +1949,96 @@ function ReplicaStrategySection({
 }
 
 function ContainerSettingsDraftFooter({
+  backingResourceChanged,
   canSave,
   dirty,
   onCancel,
+  onKeepEditing,
+  onReload,
   onSave,
   pending,
+  saveFailureMessage,
 }: {
+  backingResourceChanged: boolean;
   canSave: boolean;
   dirty: boolean;
   onCancel: () => void;
+  onKeepEditing: () => void;
+  onReload: () => void;
   onSave: () => void | Promise<void>;
   pending: boolean;
+  saveFailureMessage: string | null;
 }) {
   return (
     <footer
-      className="flex shrink-0 items-center justify-between gap-3 border-border border-t pt-3"
+      className="flex shrink-0 flex-col gap-2 border-border border-t pt-3"
       data-slot="container-settings-draft-actions"
     >
-      <p
-        className={cn(
-          "min-w-0 truncate text-theme-yellow text-xs leading-4",
-          !dirty && "invisible"
-        )}
-      >
-        Unsaved settings changes.
-      </p>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          aria-label="Cancel settings changes"
-          className="h-8 px-3 text-xs"
-          disabled={!dirty || pending}
-          onClick={onCancel}
-          type="button"
-          variant="ghost"
+      {backingResourceChanged ? (
+        <div
+          className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-theme-yellow/40 bg-theme-yellow/10 px-2.5 py-2 text-theme-yellow text-xs leading-4"
+          role="status"
         >
-          Cancel
-        </Button>
-        <Button
-          aria-label="Save settings"
-          className="h-8 px-3 text-xs"
-          disabled={!canSave}
-          onClick={async () => {
-            await onSave();
-          }}
-          type="button"
-          variant="secondary"
+          <span className="min-w-0 truncate">Backing resource changed.</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onReload}
+              type="button"
+              variant="ghost"
+            >
+              Reload
+            </Button>
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onKeepEditing}
+              type="button"
+              variant="ghost"
+            >
+              Keep editing
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {saveFailureMessage == null ? null : (
+        <p className="text-destructive text-xs leading-4" role="alert">
+          {saveFailureMessage}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className={cn(
+            "min-w-0 truncate text-theme-yellow text-xs leading-4",
+            !dirty && "invisible"
+          )}
         >
-          <Save aria-hidden data-icon="inline-start" />
-          {pending ? "Saving" : "Save"}
-        </Button>
+          Unsaved settings changes.
+        </p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            aria-label="Cancel settings changes"
+            className="h-8 px-3 text-xs"
+            disabled={!dirty || pending}
+            onClick={onCancel}
+            type="button"
+            variant="ghost"
+          >
+            Cancel
+          </Button>
+          <Button
+            aria-label="Save settings"
+            className="h-8 px-3 text-xs"
+            disabled={!canSave}
+            onClick={async () => {
+              await onSave();
+            }}
+            type="button"
+            variant="secondary"
+          >
+            <Save aria-hidden data-icon="inline-start" />
+            {pending ? "Saving" : "Save"}
+          </Button>
+        </div>
       </div>
     </footer>
   );
@@ -2050,18 +2122,27 @@ export function ContainerSettingsPane({
   );
 
   useEffect(() => {
+    if (settingsCommitMode) {
+      return;
+    }
     setDraftImage(image);
     setImageDialogDraft(image);
-  }, [image]);
+  }, [image, settingsCommitMode]);
 
   useEffect(() => {
+    if (settingsCommitMode) {
+      return;
+    }
     setDraftNetwork(network);
     setNetworkPrivatePortDraft(
       network == null ? "" : String(network.privatePort)
     );
-  }, [network]);
+  }, [network, settingsCommitMode]);
 
   useEffect(() => {
+    if (settingsCommitMode) {
+      return;
+    }
     setDraftCpu(cpuQuota.value);
     setDraftMem(memoryQuota.value);
     setDraftReplicaStrategy(
@@ -2070,9 +2151,18 @@ export function ContainerSettingsPane({
         replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
       )
     );
-  }, [cpuQuota.value, memoryQuota.value, replicaStrategy, replicasQuota]);
+  }, [
+    cpuQuota.value,
+    memoryQuota.value,
+    replicaStrategy,
+    replicasQuota,
+    settingsCommitMode,
+  ]);
 
   useEffect(() => {
+    if (settingsCommitMode) {
+      return;
+    }
     if (containerEnvRowsModelEqual(env, syncedEnvRef.current)) {
       return;
     }
@@ -2081,7 +2171,7 @@ export function ContainerSettingsPane({
     setEnvDraftKeys(
       createEnvDraftKeys(env.length, envDraftKeyPrefix, envDraftKeyCounter)
     );
-  }, [env, envDraftKeyPrefix]);
+  }, [env, envDraftKeyPrefix, settingsCommitMode]);
 
   useEffect(() => {
     const intent = addDbDsnReferenceIntent;
@@ -2184,53 +2274,149 @@ export function ContainerSettingsPane({
       : parsePortNumberDigits(networkPrivatePortDraft.trim());
   const networkPrivatePortValid =
     parsedNetworkPrivatePort == null || parsedNetworkPrivatePort.ok;
-  const activeDraftNetwork = draftNetwork ?? network;
-  const settingsDraftNetwork =
-    activeDraftNetwork == null
-      ? undefined
-      : {
-          ...activeDraftNetwork,
-          privatePort: parsedNetworkPrivatePort?.ok
-            ? parsedNetworkPrivatePort.n
-            : activeDraftNetwork.privatePort,
-        };
-  const committedReplicaStrategy =
-    replicasQuota == null
-      ? undefined
-      : normalizeReplicaStrategy(replicaStrategy, replicasQuota.value);
-  const originalSettingsDraft: ContainerSettingsDraft = {
-    cpuCores: cpuQuota.value,
-    env,
-    image,
-    memoryMib: memoryQuota.value,
-    ...(network == null ? {} : { network }),
-    ...(committedReplicaStrategy == null
-      ? {}
-      : {
-          replicaStrategy: committedReplicaStrategy,
-          replicas: committedReplicaStrategy.fixed.replicas,
-        }),
-  };
-  const settingsDraft: ContainerSettingsDraft = {
-    cpuCores: draftCpu,
-    env: envDraft,
-    image: draftImage,
-    memoryMib: draftMem,
-    ...(settingsDraftNetwork == null ? {} : { network: settingsDraftNetwork }),
-    ...(replicasQuota == null
-      ? {}
-      : {
-          replicaStrategy: draftReplicaStrategy,
-          replicas: draftReplicaStrategy.fixed.replicas,
-        }),
-  };
-  const settingsDirty = containerSettingsDraftIsDirty(
+  const activeDraftNetwork = settingsCommitMode
+    ? draftNetwork
+    : (draftNetwork ?? network);
+  const settingsDraftNetwork = useMemo(
+    () =>
+      activeDraftNetwork == null
+        ? undefined
+        : {
+            ...activeDraftNetwork,
+            privatePort: parsedNetworkPrivatePort?.ok
+              ? parsedNetworkPrivatePort.n
+              : activeDraftNetwork.privatePort,
+          },
+    [activeDraftNetwork, parsedNetworkPrivatePort]
+  );
+  const committedReplicaStrategy = useMemo(
+    () =>
+      replicasQuota == null
+        ? undefined
+        : normalizeReplicaStrategy(replicaStrategy, replicasQuota.value),
+    [replicaStrategy, replicasQuota]
+  );
+  const originalSettingsDraft = useMemo<ContainerSettingsDraft>(
+    () => ({
+      cpuCores: cpuQuota.value,
+      env,
+      image,
+      memoryMib: memoryQuota.value,
+      ...(network == null ? {} : { network }),
+      ...(committedReplicaStrategy == null
+        ? {}
+        : {
+            replicaStrategy: committedReplicaStrategy,
+            replicas: committedReplicaStrategy.fixed.replicas,
+          }),
+    }),
+    [
+      committedReplicaStrategy,
+      cpuQuota.value,
+      env,
+      image,
+      memoryQuota.value,
+      network,
+    ]
+  );
+  const originalSettingsDraftKey = useMemo(
+    () => containerSettingsDraftBackingKey(originalSettingsDraft),
+    [originalSettingsDraft]
+  );
+  const settingsDraft = useMemo<ContainerSettingsDraft>(
+    () => ({
+      cpuCores: draftCpu,
+      env: envDraft,
+      image: draftImage,
+      memoryMib: draftMem,
+      ...(settingsDraftNetwork == null
+        ? {}
+        : { network: settingsDraftNetwork }),
+      ...(replicasQuota == null
+        ? {}
+        : {
+            replicaStrategy: draftReplicaStrategy,
+            replicas: draftReplicaStrategy.fixed.replicas,
+          }),
+    }),
+    [
+      draftCpu,
+      draftImage,
+      draftMem,
+      draftReplicaStrategy,
+      envDraft,
+      replicasQuota,
+      settingsDraftNetwork,
+    ]
+  );
+  const [settingsBackingState, setSettingsBackingState] = useState(() =>
+    createSettingsDraftBackingState(
+      originalSettingsDraft,
+      originalSettingsDraftKey
+    )
+  );
+  const applySettingsDraftToLocalState = useCallback(
+    (next: ContainerSettingsDraft) => {
+      setDraftImage(next.image);
+      setImageDialogDraft(next.image);
+      setDraftCpu(next.cpuCores);
+      setDraftMem(next.memoryMib);
+      setDraftReplicaStrategy(
+        normalizeReplicaStrategy(
+          next.replicaStrategy,
+          next.replicas ?? replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
+        )
+      );
+      setEnvDraft(next.env.map((row) => ({ ...row })));
+      setEnvDraftKeys(
+        createEnvDraftKeys(
+          next.env.length,
+          envDraftKeyPrefix,
+          envDraftKeyCounter
+        )
+      );
+      syncedEnvRef.current = next.env;
+      setDraftNetwork(next.network);
+      setNetworkPrivatePortDraft(
+        next.network == null ? "" : String(next.network.privatePort)
+      );
+    },
+    [envDraftKeyPrefix, replicasQuota?.value]
+  );
+  useEffect(() => {
+    if (!settingsCommitMode) {
+      return;
+    }
+    const synced = syncSettingsDraftBackingState(settingsBackingState, {
+      backing: originalSettingsDraft,
+      backingKey: originalSettingsDraftKey,
+      draft: settingsDraft,
+      isDirty: containerSettingsDraftIsDirty,
+    });
+    if (synced.state === settingsBackingState && synced.draft === undefined) {
+      return;
+    }
+    setSettingsBackingState(synced.state);
+    if (synced.draft !== undefined) {
+      applySettingsDraftToLocalState(synced.draft);
+    }
+  }, [
+    applySettingsDraftToLocalState,
     originalSettingsDraft,
+    originalSettingsDraftKey,
+    settingsBackingState,
+    settingsCommitMode,
+    settingsDraft,
+  ]);
+  const settingsBaseDraft = settingsBackingState.base;
+  const settingsDirty = containerSettingsDraftIsDirty(
+    settingsBaseDraft,
     settingsDraft
   );
+  const baseNetworkPrivatePort = settingsBaseDraft.network?.privatePort;
   const networkPrivatePortDirty =
-    network != null &&
-    networkPrivatePortDraft.trim() !== String(network.privatePort);
+    baseNetworkPrivatePort != null &&
+    networkPrivatePortDraft.trim() !== String(baseNetworkPrivatePort);
   const panelDraftDirty = settingsDirty || networkPrivatePortDirty;
   const canSaveSettings =
     settingsCommitMode &&
@@ -2520,14 +2706,25 @@ export function ContainerSettingsPane({
   };
 
   const resetSettingsDraft = () => {
-    setDraftImage(image);
-    setImageDialogDraft(image);
+    applySettingsDraftToLocalState(settingsBaseDraft);
     setImageDialogOpen(false);
-    handleQuotaCancel();
-    handleCancelEnvRows();
-    setDraftNetwork(network);
-    setNetworkPrivatePortDraft(
-      network == null ? "" : String(network.privatePort)
+    setSettingsBackingState((current) => ({
+      ...current,
+      saveFailureMessage: null,
+    }));
+  };
+
+  const reloadSettingsDraft = () => {
+    const reloaded = reloadSettingsDraftBackingState(settingsBackingState);
+    setSettingsBackingState(reloaded.state);
+    if (reloaded.draft !== undefined) {
+      applySettingsDraftToLocalState(reloaded.draft);
+    }
+  };
+
+  const keepEditingSettingsDraft = () => {
+    setSettingsBackingState((current) =>
+      keepEditingSettingsDraftBackingState(current)
     );
   };
 
@@ -2542,13 +2739,21 @@ export function ContainerSettingsPane({
       ...settingsDraft,
       env: normalizedEnv,
     };
+    const meta: ContainerSettingsPaneSettingsDraftCommitMeta = {
+      baseDraft: settingsBaseDraft,
+      ...(confirmedAddDbDsnReferences.length === 0
+        ? {}
+        : { confirmedAddDbDsnReferences }),
+    };
     setSettingsSavePending(true);
+    setSettingsBackingState((current) => ({
+      ...current,
+      saveFailureMessage: null,
+    }));
     try {
-      await onSettingsDraftCommit(
-        draft,
-        confirmedAddDbDsnReferences.length === 0
-          ? undefined
-          : { confirmedAddDbDsnReferences }
+      await onSettingsDraftCommit(draft, meta);
+      setSettingsBackingState((current) =>
+        commitSettingsDraftBackingState(current, draft)
       );
       setEnvDraft(
         normalizedEnv.map((row, index) => {
@@ -2557,6 +2762,14 @@ export function ContainerSettingsPane({
             ? row
             : { ...row, canvasAddDbDsnReferenceIntentId: intentId };
         })
+      );
+    } catch (error) {
+      setSettingsBackingState((current) =>
+        failSettingsDraftSave(
+          current,
+          error,
+          containerSettingsSaveFailureMessage(error)
+        )
       );
     } finally {
       setSettingsSavePending(false);
@@ -2813,11 +3026,15 @@ export function ContainerSettingsPane({
 
         {settingsCommitMode ? (
           <ContainerSettingsDraftFooter
+            backingResourceChanged={settingsBackingState.resourceChanged}
             canSave={canSaveSettings}
             dirty={panelDraftDirty}
             onCancel={resetSettingsDraft}
+            onKeepEditing={keepEditingSettingsDraft}
+            onReload={reloadSettingsDraft}
             onSave={handleSaveSettingsDraft}
             pending={settingsSavePending}
+            saveFailureMessage={settingsBackingState.saveFailureMessage}
           />
         ) : null}
       </div>
