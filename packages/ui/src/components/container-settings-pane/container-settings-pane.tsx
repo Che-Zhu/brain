@@ -1398,13 +1398,12 @@ function ReplicaScaleSlider({
   );
 }
 
-function ReadOnlyReplicaValue({
-  label,
-  value,
-}: {
+interface ReadOnlyReplicaValueProps {
   label: string;
   value: ReactNode;
-}) {
+}
+
+function ReadOnlyReplicaValue({ label, value }: ReadOnlyReplicaValueProps) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background/60 px-2.5 py-2">
       <span className="min-w-0 truncate text-muted-foreground text-xs">
@@ -1417,8 +1416,34 @@ function ReadOnlyReplicaValue({
   );
 }
 
-interface ReadOnlyReplicaStrategySummaryProps {
-  cpuTarget: number;
+function replicaStrategyDisplayName(strategyType: ReplicaStrategyType): string {
+  if (strategyType === "elastic") {
+    return "Elastic Scaling";
+  }
+  return "Fixed Replicas";
+}
+
+function elasticTargetMetricDisplayName(
+  targetMetric: ElasticTargetMetric
+): string {
+  if (targetMetric === "memory") {
+    return "Memory";
+  }
+  return "CPU";
+}
+
+function memoryTargetDisplayValue(
+  elastic: ContainerElasticReplicaSettings,
+  memoryTargetMib: number
+): string {
+  if (elastic.target.metric === "memory") {
+    return elastic.target.averageValue;
+  }
+  return `${memoryTargetMib}Mi`;
+}
+
+interface ReadOnlyReplicaStrategyRowsOptions {
+  cpuTargetPercent: number;
   elastic: ContainerElasticReplicaSettings;
   fixedReplicas: number;
   maxReplicas: number;
@@ -1428,8 +1453,8 @@ interface ReadOnlyReplicaStrategySummaryProps {
   targetMetric: ElasticTargetMetric;
 }
 
-function ReadOnlyReplicaStrategySummary({
-  cpuTarget,
+function readOnlyReplicaStrategyRows({
+  cpuTargetPercent,
   elastic,
   fixedReplicas,
   maxReplicas,
@@ -1437,6 +1462,49 @@ function ReadOnlyReplicaStrategySummary({
   minReplicas,
   strategyType,
   targetMetric,
+}: ReadOnlyReplicaStrategyRowsOptions): ReadOnlyReplicaValueProps[] {
+  const rows: ReadOnlyReplicaValueProps[] = [
+    {
+      label: "Strategy",
+      value: replicaStrategyDisplayName(strategyType),
+    },
+  ];
+
+  if (strategyType === "fixed") {
+    rows.push({ label: "Replica count", value: fixedReplicas });
+    return rows;
+  }
+
+  rows.push(
+    { label: "Minimum replicas", value: minReplicas },
+    { label: "Maximum replicas", value: maxReplicas },
+    {
+      label: "Scaling target",
+      value: elasticTargetMetricDisplayName(targetMetric),
+    }
+  );
+
+  if (targetMetric === "memory") {
+    rows.push({
+      label: "Memory average target",
+      value: memoryTargetDisplayValue(elastic, memoryTargetMib),
+    });
+    return rows;
+  }
+
+  rows.push({
+    label: "CPU utilization target",
+    value: `${cpuTargetPercent}%`,
+  });
+  return rows;
+}
+
+interface ReadOnlyReplicaStrategySummaryProps {
+  rows: readonly ReadOnlyReplicaValueProps[];
+}
+
+function ReadOnlyReplicaStrategySummary({
+  rows,
 }: ReadOnlyReplicaStrategySummaryProps) {
   return (
     <section className="flex flex-col gap-3">
@@ -1446,45 +1514,13 @@ function ReadOnlyReplicaStrategySummary({
         </SectionTitle>
       </div>
       <div className="grid min-w-0 gap-2 rounded-md border border-border bg-muted/20 p-2.5">
-        <ReadOnlyReplicaValue
-          label="Strategy"
-          value={
-            strategyType === "elastic" ? "Elastic Scaling" : "Fixed Replicas"
-          }
-        />
-        {strategyType === "fixed" ? (
-          <ReadOnlyReplicaValue label="Replica count" value={fixedReplicas} />
-        ) : (
-          <>
-            <ReadOnlyReplicaValue
-              label="Minimum replicas"
-              value={minReplicas}
-            />
-            <ReadOnlyReplicaValue
-              label="Maximum replicas"
-              value={maxReplicas}
-            />
-            <ReadOnlyReplicaValue
-              label="Scaling target"
-              value={targetMetric === "memory" ? "Memory" : "CPU"}
-            />
-            {targetMetric === "memory" ? (
-              <ReadOnlyReplicaValue
-                label="Memory average target"
-                value={
-                  elastic.target.metric === "memory"
-                    ? elastic.target.averageValue
-                    : `${memoryTargetMib}Mi`
-                }
-              />
-            ) : (
-              <ReadOnlyReplicaValue
-                label="CPU utilization target"
-                value={`${cpuTarget}%`}
-              />
-            )}
-          </>
-        )}
+        {rows.map((row) => (
+          <ReadOnlyReplicaValue
+            key={row.label}
+            label={row.label}
+            value={row.value}
+          />
+        ))}
       </div>
     </section>
   );
@@ -1508,11 +1544,11 @@ function ReplicaStrategySection({
     normalizeReplicaCount(elastic.maxReplicas)
   );
   const targetMetric = elastic.target.metric;
-  const cpuTarget =
+  const cpuTargetPercent =
     elastic.target.metric === "cpu"
       ? normalizeCpuUtilizationTarget(elastic.target.utilizationPercent)
       : DEFAULT_CPU_UTILIZATION_TARGET_PERCENT;
-  const memoryTarget =
+  const memoryTargetMib =
     elastic.target.metric === "memory"
       ? memoryAverageValueToMib(elastic.target.averageValue)
       : DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
@@ -1520,14 +1556,16 @@ function ReplicaStrategySection({
   if (readOnly) {
     return (
       <ReadOnlyReplicaStrategySummary
-        cpuTarget={cpuTarget}
-        elastic={elastic}
-        fixedReplicas={fixedReplicasSliderParts.replicasValue}
-        maxReplicas={maxReplicas}
-        memoryTargetMib={memoryTarget}
-        minReplicas={minReplicas}
-        strategyType={strategyType}
-        targetMetric={targetMetric}
+        rows={readOnlyReplicaStrategyRows({
+          cpuTargetPercent,
+          elastic,
+          fixedReplicas: fixedReplicasSliderParts.replicasValue,
+          maxReplicas,
+          memoryTargetMib,
+          minReplicas,
+          strategyType,
+          targetMetric,
+        })}
       />
     );
   }
@@ -1653,7 +1691,7 @@ function ReplicaStrategySection({
                 max={MEMORY_AVERAGE_TARGET_LIMITS.max}
                 min={MEMORY_AVERAGE_TARGET_LIMITS.min}
                 onValueChange={onElasticMemoryTargetChange}
-                value={memoryTarget}
+                value={memoryTargetMib}
               />
             ) : (
               <ReplicaScaleSlider
@@ -1664,7 +1702,7 @@ function ReplicaStrategySection({
                 max={CPU_UTILIZATION_TARGET_LIMITS.max}
                 min={CPU_UTILIZATION_TARGET_LIMITS.min}
                 onValueChange={onElasticCpuTargetChange}
-                value={cpuTarget}
+                value={cpuTargetPercent}
               />
             )}
           </div>
