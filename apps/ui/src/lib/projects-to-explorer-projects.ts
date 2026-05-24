@@ -21,12 +21,11 @@ export interface ProjectListItem {
   };
 }
 
-/** List envelope returned by the k8s get API for CRD lists. */
-export interface ProjectListEnvelope {
+interface ProjectListEnvelope {
   items?: ProjectListItem[];
 }
 
-function getProjectItems(
+export function projectItemsFromK8sGetResponse(
   data: K8sGetResponse | undefined
 ): ProjectListItem[] | undefined {
   if (data == null || typeof data !== "object") {
@@ -46,7 +45,7 @@ function getProjectItems(
   return undefined;
 }
 
-function projectExplorerDisplayName(item: ProjectListItem): string | undefined {
+export function projectDisplayName(item: ProjectListItem): string | undefined {
   const fromAnnotation =
     item.metadata?.annotations?.[PROJECT_DISPLAY_NAME_ANNOTATION_KEY]?.trim();
   if (fromAnnotation && fromAnnotation.length > 0) {
@@ -71,7 +70,7 @@ export function projectsListToExplorerProjects(
   data: K8sGetResponse | undefined,
   statusByProjectUid?: ReadonlyMap<string, VisualTone>
 ): ProjectExplorerProject[] {
-  const items = getProjectItems(data);
+  const items = projectItemsFromK8sGetResponse(data);
   if (!items) {
     return [];
   }
@@ -80,7 +79,7 @@ export function projectsListToExplorerProjects(
     const id = meta.uid ?? meta.name ?? `project-${index}`;
     const resourceName =
       typeof meta.name === "string" && meta.name !== "" ? meta.name : undefined;
-    const displayName = projectExplorerDisplayName(item);
+    const displayName = projectDisplayName(item);
     let name =
       displayName ??
       resourceName ??

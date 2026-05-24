@@ -20,10 +20,17 @@ import {
   PLATFORM_ADDRESS_ID_PATTERN,
 } from "../platform-addresses";
 import {
+  type ApReplicaStrategy,
+  canonicalApReplicaStrategy,
+  canonicalFixedReplicaStrategy,
+  validateApFixedReplicas,
+} from "./ap-replica-strategy";
+import {
   patchOpsForApInput,
   patchOpsForApResource,
   patchOpsFromEffectiveSnapshot,
   readApInput,
+  readApReplicaStrategy,
 } from "./ap-spec-access";
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
@@ -181,6 +188,21 @@ function buildEnvArray(
   });
 }
 
+function canonicalApReplicaStrategyForPatch(
+  spec: Record<string, unknown> | undefined,
+  replicaStrategy: ApReplicaStrategy
+): ApReplicaStrategy {
+  if (replicaStrategy.type === "elastic") {
+    return canonicalApReplicaStrategy(replicaStrategy);
+  }
+
+  const currentStrategy = readApReplicaStrategy(spec ?? {});
+  return canonicalFixedReplicaStrategy(
+    replicaStrategy.fixed.replicas,
+    replicaStrategy.elastic ?? currentStrategy.elastic
+  );
+}
+
 export async function applyApImage(
   kubeconfig: string,
   claim: Record<string, unknown>,
@@ -221,10 +243,61 @@ export async function applyApMemoryLimit(
 }
 
 /** One JSON Patch for CPU, memory, and/or replicas (avoids parallel PATCH races). */
+export function patchOpsForApResourceQuotaSettings(
+  spec: Record<string, unknown> | undefined,
+  next: {
+    cpuCores?: number;
+    memoryMib?: number;
+    replicaStrategy?: ApReplicaStrategy;
+    replicas?: number;
+  }
+): K8sJsonPatchOp[] {
+  const merge: Record<string, unknown> = {};
+  const limits: Record<string, unknown> = {};
+  if (next.cpuCores !== undefined) {
+    limits.cpu = coresToCpuLimit(next.cpuCores);
+  }
+  if (next.memoryMib !== undefined) {
+    limits.memory = mibToMemoryLimit(next.memoryMib);
+  }
+  if (Object.keys(limits).length > 0) {
+    merge.limits = limits;
+  }
+  if (next.replicaStrategy !== undefined) {
+    merge.replicaStrategy = canonicalApReplicaStrategyForPatch(
+      spec,
+      next.replicaStrategy
+    );
+    return patchOpsForApResource(spec, merge);
+  }
+  if (next.replicas !== undefined) {
+    const currentStrategy = readApReplicaStrategy(spec ?? {});
+    merge.replicaStrategy = canonicalFixedReplicaStrategy(
+      next.replicas,
+      currentStrategy.elastic
+    );
+  }
+  return patchOpsForApResource(spec, merge);
+}
+
+export function patchOpsForApReplicaStrategySettings(
+  spec: Record<string, unknown> | undefined,
+  replicaStrategy: ApReplicaStrategy
+): K8sJsonPatchOp[] {
+  return patchOpsForApResource(spec, {
+    replicaStrategy: canonicalApReplicaStrategyForPatch(spec, replicaStrategy),
+  });
+}
+
 export async function applyApResourceQuotas(
   kubeconfig: string,
   claim: Record<string, unknown>,
-  next: { cpuCores: number; memoryMib: number; replicas?: number },
+  next: {
+    cpuCores: number;
+    memoryMib: number;
+    replicaStrategy?: ApReplicaStrategy;
+    replicas?: number;
+  },
   previous: { cpuCores: number; memoryMib: number; replicas?: number }
 ): Promise<void> {
   const cpuChanged = Math.abs(next.cpuCores - previous.cpuCores) > 1e-9;
@@ -237,32 +310,25 @@ export async function applyApResourceQuotas(
     repNext !== undefined &&
     repPrev !== undefined &&
     Math.round(repNext) !== Math.round(repPrev);
+  const replicaStrategyChanged = next.replicaStrategy !== undefined;
 
-  if (!(cpuChanged || memChanged || replicasChanged)) {
+  if (
+    !(cpuChanged || memChanged || replicasChanged || replicaStrategyChanged)
+  ) {
     return;
   }
 
   const spec = asRecord(claim.spec);
-  const merge: Record<string, unknown> = {};
-  const limits: Record<string, unknown> = {};
-  if (cpuChanged) {
-    limits.cpu = coresToCpuLimit(next.cpuCores);
-  }
-  if (memChanged) {
-    limits.memory = mibToMemoryLimit(next.memoryMib);
-  }
-  if (Object.keys(limits).length > 0) {
-    merge.limits = limits;
-  }
-  if (replicasChanged && repNext !== undefined) {
-    const n = Math.round(Number(repNext));
-    if (!Number.isFinite(n) || n < 1 || n > 20) {
-      throw new Error("Replicas must be between 1 and 20.");
-    }
-    merge.replicas = n;
-  }
+  const patch = patchOpsForApResourceQuotaSettings(spec, {
+    ...(cpuChanged ? { cpuCores: next.cpuCores } : {}),
+    ...(memChanged ? { memoryMib: next.memoryMib } : {}),
+    ...(next.replicaStrategy === undefined
+      ? {}
+      : { replicaStrategy: next.replicaStrategy }),
+    ...(repNext === undefined ? {} : { replicas: repNext }),
+  });
 
-  await patchAp(kubeconfig, claim, patchOpsForApResource(spec, merge));
+  await patchAp(kubeconfig, claim, patch);
 }
 
 export function patchOpsForApEnvSettings(
@@ -373,15 +439,25 @@ export async function applyApReplicas(
   claim: Record<string, unknown>,
   replicas: number
 ): Promise<void> {
-  const n = Math.round(Number(replicas));
-  if (!Number.isFinite(n) || n < 1 || n > 20) {
-    throw new Error("Replicas must be between 1 and 20.");
-  }
+  const n = validateApFixedReplicas(replicas);
   const spec = asRecord(claim.spec);
   await patchAp(
     kubeconfig,
     claim,
-    patchOpsForApResource(spec, { replicas: n })
+    patchOpsForApReplicaStrategySettings(spec, canonicalFixedReplicaStrategy(n))
+  );
+}
+
+export async function applyApReplicaStrategy(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  replicaStrategy: ApReplicaStrategy
+): Promise<void> {
+  const spec = asRecord(claim.spec);
+  await patchAp(
+    kubeconfig,
+    claim,
+    patchOpsForApReplicaStrategySettings(spec, replicaStrategy)
   );
 }
 

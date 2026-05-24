@@ -1,6 +1,9 @@
 "use client";
 
-import { ContainerSettingsPane } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import {
+  type ContainerNetwork,
+  ContainerSettingsPane,
+} from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import { Preview, PreviewWrapper } from "@workspace/ui/components/preview";
 import { useState } from "react";
 
@@ -19,12 +22,40 @@ const DEMO_PORTS = [
   { port: 8443, protocol: "tcp" },
 ];
 
+const DEMO_NETWORK: ContainerNetwork = {
+  privateAddress: "http://api-gateway.default.svc:3000",
+  privatePort: 3000,
+  publicAddresses: [
+    {
+      host: "orders.demo.sealos.run",
+      port: 3000,
+      status: "accessible",
+      type: "platform",
+      url: "https://orders.demo.sealos.run",
+    },
+    {
+      host: "checkout.demo.sealos.run",
+      port: 3000,
+      status: "pending",
+      type: "platform",
+    },
+    {
+      host: "admin.demo.sealos.run",
+      port: 8443,
+      status: "accessible",
+      type: "platform",
+      url: "https://admin.demo.sealos.run",
+    },
+  ],
+};
+
 export default function ContainerSettingsPanePreview() {
   const [cpuCores, setCpuCores] = useState(2);
   const [memoryMib, setMemoryMib] = useState(2048);
   const [replicas, setReplicas] = useState(3);
   const [image, setImage] = useState(DEMO_IMAGE);
   const [env, setEnv] = useState(DEMO_ENV);
+  const [network, setNetwork] = useState(DEMO_NETWORK);
   const [ports, setPorts] = useState(DEMO_PORTS);
 
   return (
@@ -47,8 +78,10 @@ export default function ContainerSettingsPanePreview() {
             step: 128,
             value: memoryMib,
           }}
+          network={network}
           onEnvChange={setEnv}
           onImageChange={setImage}
+          onNetworkChange={setNetwork}
           onPortsChange={setPorts}
           ports={ports}
           replicasQuota={{

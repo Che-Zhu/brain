@@ -1,8 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { ContainerSettingsPane } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
 import { claimToContainerSettings } from "./claim-mapper";
 import { dbDsnReferenceSourcesFromDbsData } from "./db-dsn-reference-sources";
+
+const noop = () => {
+  /* test noop */
+};
+
+const REPLICA_STRATEGY_RE = /Replica Strategy/;
+const FIXED_REPLICAS_RE = /Fixed Replicas/;
+const ELASTIC_SCALING_RE = /Elastic Scaling/;
+const REPLICA_COUNT_RE = /Replica count/;
+const LEGACY_REPLICA_VALUE_RE = />3</;
+const BUTTON_RE = /<button/;
 
 test("AP claim settings reconstruct direct and non-direct environment rows", () => {
   const secretKeyRef = {
@@ -209,6 +224,218 @@ test("AP claim settings ignores invalid private-only network ports", () => {
   );
 
   assert.equal(settings.network, undefined);
+});
+
+test("AP claim settings maps canonical fixed replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            fixed: { replicas: 4 },
+            type: "fixed",
+          },
+          replicas: 2,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 4 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 4);
+});
+
+test("AP claim settings clamps displayed fixed replica strategy to AP bounds", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            fixed: { replicas: 42 },
+            type: "fixed",
+          },
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 20 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 20);
+});
+
+test("AP claim settings maps legacy replicas as fixed replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    fixed: { replicas: 3 },
+    type: "fixed",
+  });
+  assert.equal(settings.replicas, 3);
+});
+
+test("read-only AP settings renders legacy replicas as fixed replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  const html = renderToStaticMarkup(
+    createElement(ContainerSettingsPane, {
+      cpuQuota: { onValueChange: noop, value: settings.cpuCores },
+      env: settings.env,
+      image: settings.image,
+      memoryQuota: { onValueChange: noop, value: settings.memoryMib },
+      onEnvChange: noop,
+      onImageChange: noop,
+      onPortsChange: noop,
+      ports: settings.ports,
+      readOnly: true,
+      replicaStrategy: settings.replicaStrategy,
+      replicasQuota: { onValueChange: noop, value: settings.replicas },
+    })
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, FIXED_REPLICAS_RE);
+  assert.match(html, REPLICA_COUNT_RE);
+  assert.match(html, LEGACY_REPLICA_VALUE_RE);
+  assert.doesNotMatch(html, ELASTIC_SCALING_RE);
+  assert.doesNotMatch(html, BUTTON_RE);
+});
+
+test("AP claim settings maps canonical CPU elastic replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            elastic: {
+              maxReplicas: 8,
+              minReplicas: 2,
+              target: {
+                metric: "cpu",
+                type: "utilization",
+                utilizationPercent: 75,
+              },
+            },
+            fixed: { replicas: 4 },
+            type: "elastic",
+          },
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    elastic: {
+      maxReplicas: 8,
+      minReplicas: 2,
+      target: {
+        metric: "cpu",
+        type: "utilization",
+        utilizationPercent: 75,
+      },
+    },
+    fixed: { replicas: 4 },
+    type: "elastic",
+  });
+  assert.equal(settings.replicas, 4);
+});
+
+test("AP claim settings maps canonical Memory elastic replica strategy", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+        },
+        resource: {
+          replicaStrategy: {
+            elastic: {
+              maxReplicas: 8,
+              minReplicas: 2,
+              target: {
+                averageValue: "512Mi",
+                metric: "memory",
+                type: "averageValue",
+              },
+            },
+            fixed: { replicas: 4 },
+            type: "elastic",
+          },
+          replicas: 3,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.replicaStrategy, {
+    elastic: {
+      maxReplicas: 8,
+      minReplicas: 2,
+      target: {
+        averageValue: "512Mi",
+        metric: "memory",
+        type: "averageValue",
+      },
+    },
+    fixed: { replicas: 4 },
+    type: "elastic",
+  });
+  assert.equal(settings.replicas, 4);
 });
 
 test("AP claim settings reconstruct DB DSN references only from exact current DB connection strings", () => {

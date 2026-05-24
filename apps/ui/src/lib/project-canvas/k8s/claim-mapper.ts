@@ -17,12 +17,17 @@ import {
   platformAddressIdsFromRows,
 } from "../platform-addresses";
 import {
+  type ApReplicaStrategy,
+  defaultFixedReplicaStrategy,
+  normalizeApFixedReplicas,
+} from "./ap-replica-strategy";
+import {
   readApCpuLimit,
   readApEnv,
   readApImage,
   readApInput,
   readApMemoryLimit,
-  readApReplicas,
+  readApReplicaStrategy,
 } from "./ap-spec-access";
 
 export type WorkloadClaimKind = "AP" | "DB";
@@ -307,7 +312,8 @@ export interface ClaimContainerSettings {
   memoryMib: number;
   network?: ContainerNetwork;
   ports: ContainerPort[];
-  /** AP `spec.resource.replicas` (1–20 in UI); omitted meaning uses default for DB mapping. */
+  replicaStrategy: ApReplicaStrategy;
+  /** AP fixed replicas (1–20 in UI); legacy `spec.resource.replicas` is a fallback only. */
   replicas: number;
 }
 
@@ -315,20 +321,6 @@ const CPU_MIN = 0.25;
 const CPU_MAX = 16;
 const MEM_MIN = 512;
 const MEM_MAX = 8192;
-const REPLICAS_MIN = 1;
-const REPLICAS_MAX = 20;
-
-function clampReplicas(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) {
-    return 1;
-  }
-  const n = Math.round(raw);
-  if (n <= 0) {
-    return 1;
-  }
-  return clampScale(n, REPLICAS_MIN, REPLICAS_MAX);
-}
-
 export interface ClaimToContainerSettingsOptions {
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
 }
@@ -343,7 +335,8 @@ function mapApClaim(
   const memRaw = parseMemoryToMib(readApMemoryLimit(spec));
   const cpuCores = clampScale(cpuRaw ?? 1, CPU_MIN, CPU_MAX);
   const memoryMib = clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX);
-  const replicas = clampReplicas(readApReplicas(spec));
+  const replicaStrategy = readApReplicaStrategy(spec);
+  const replicas = normalizeApFixedReplicas(replicaStrategy.fixed.replicas);
   return {
     cpuCores,
     env: envFromSpecEnvList(readApEnv(spec), options?.dbDsnReferenceSources),
@@ -351,6 +344,7 @@ function mapApClaim(
     memoryMib,
     network: apNetworkFromSpecAndStatus(spec, status),
     ports: [],
+    replicaStrategy,
     replicas,
   };
 }
@@ -368,6 +362,7 @@ function mapDbSpec(spec: Record<string, unknown>): ClaimContainerSettings {
     image: engine,
     memoryMib: clampScale(memRaw ?? 512, MEM_MIN, MEM_MAX),
     ports: [],
+    replicaStrategy: defaultFixedReplicaStrategy(),
     replicas: 1,
   };
 }
@@ -384,6 +379,7 @@ export function claimToContainerSettings(
       image: "",
       memoryMib: 512,
       ports: [],
+      replicaStrategy: defaultFixedReplicaStrategy(),
       replicas: 1,
     };
   }

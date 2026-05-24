@@ -38,7 +38,10 @@ metadata:
           # Default model id (raw id, e.g. gpt-5.2 / claude-opus-4-6-20251101) (required)
           model: "claude-opus-4-6"
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

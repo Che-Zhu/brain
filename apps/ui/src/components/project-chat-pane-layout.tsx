@@ -1,17 +1,20 @@
 "use client";
 
 import { useChat as useAIChat } from "@ai-sdk/react";
+import { Button } from "@workspace/ui/components/button";
 import {
   Chat,
   downloadChatMessagesJson,
 } from "@workspace/ui/components/chat/chat";
 import type { ChatHeaderThreadHistory } from "@workspace/ui/components/chat/chat.types";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { parseAsString, useQueryState } from "nuqs";
 import {
@@ -24,6 +27,7 @@ import {
 } from "react";
 import { useSWRConfig } from "swr";
 import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
+import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
 import { useGithubDeployer } from "@/hooks/use-github-deployer";
 import {
   createAssistantThread,
@@ -48,10 +52,7 @@ import {
 } from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
-import {
-  rightPaneOpenAtom,
-  toggleRightPaneVisibility,
-} from "@/store/layout-store";
+import { rightPaneOpenAtom } from "@/store/layout-store";
 
 type AssistantClientToolSubmission =
   | {
@@ -86,7 +87,6 @@ function ProjectAssistantChatSession({
   threads,
   assistantNamespaceRaw,
   onAssistantStreamFinished,
-  onClosePane,
   onCreateThread,
   onSelectThread,
 }: {
@@ -95,7 +95,6 @@ function ProjectAssistantChatSession({
   threads: AssistantThreadDTO[];
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
-  onClosePane: () => void;
   onCreateThread: () => Promise<void>;
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
@@ -310,22 +309,23 @@ function ProjectAssistantChatSession({
 
   return (
     <Chat.Root>
-      <Chat className="h-full min-h-0 flex-1 border-0 shadow-none">
+      <Chat className="h-full min-h-0 flex-1 border-0 bg-[#101219] shadow-none">
         <Chat.Header
-          className="shrink-0"
+          className="shrink-0 py-2 pr-12"
           threadHistory={threadHistory}
           threadName={threadLabel}
         >
           <Chat.Export
+            className="size-9"
             disabled={messages.length === 0}
             onExport={exportTranscript}
           />
           <Chat.NewThread
             aria-label="Create thread"
+            className="size-9"
             creating={creatingThread}
             onNewThread={createThreadClicked}
           />
-          <Chat.ClosePane onClosePane={onClosePane} />
         </Chat.Header>
         <Chat.Transcript
           className="min-h-0 flex-1"
@@ -373,11 +373,7 @@ function ProjectAssistantChatSession({
   );
 }
 
-function ProjectAssistantChatPane({
-  onClosePane,
-}: {
-  onClosePane: () => void;
-}) {
+function ProjectAssistantChatPane() {
   const namespaceRaw = useAtomValue(namespaceAtom);
   const [creatingThread, setCreatingThread] = useState(false);
   const [session, setSession] = useState<AssistantSessionPayload | null>(null);
@@ -451,7 +447,7 @@ function ProjectAssistantChatPane({
   if (sessionError) {
     return (
       <div
-        className="flex h-full min-h-0 flex-1 items-center justify-center bg-muted/20 p-4 text-center text-muted-foreground text-sm"
+        className="flex h-full min-h-0 flex-1 items-center justify-center bg-[#101219] p-4 text-center text-muted-foreground text-sm"
         data-slot="assistant-chat-error"
       >
         Could not load assistant chat. Check DATABASE_URL and database
@@ -464,7 +460,7 @@ function ProjectAssistantChatPane({
     return (
       <div
         aria-busy
-        className="h-full min-h-0 flex-1 bg-muted/20"
+        className="h-full min-h-0 flex-1 bg-[#101219]"
         data-slot="assistant-chat-boot"
       />
     );
@@ -477,11 +473,43 @@ function ProjectAssistantChatPane({
       creatingThread={creatingThread}
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
-      onClosePane={onClosePane}
       onCreateThread={createThread}
       onSelectThread={selectThread}
       threads={session.threads}
     />
+  );
+}
+
+function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
+  const params = useParams<{ uid?: string }>();
+  const projectUid = decodeURIComponent(params.uid ?? "");
+  const kubeconfig = useAtomValue(kubeconfigAtom);
+  const namespace = useAtomValue(namespaceAtom);
+  const currentProject = useCurrentProjectDisplayName({
+    kubeconfig,
+    namespace,
+    projectUid,
+  });
+  const showProjectName = projectUid.trim() !== "";
+
+  return (
+    <header
+      className={cn(
+        "flex h-13 shrink-0 items-center gap-2 bg-background px-2",
+        !rightPaneOpen && "pr-12"
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        {showProjectName && currentProject.isLoading ? (
+          <Skeleton className="h-5 w-36 max-w-full" />
+        ) : null}
+        {showProjectName && !currentProject.isLoading ? (
+          <h1 className="truncate font-medium text-foreground text-sm">
+            {currentProject.displayName ?? "Project"}
+          </h1>
+        ) : null}
+      </div>
+    </header>
   );
 }
 
@@ -492,20 +520,53 @@ export default function ProjectChatPaneLayout({
   children: ReactNode;
 }) {
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
+  const setRightPaneOpen = useSetAtom(rightPaneOpenAtom);
+  const toggleRightPane = useCallback(() => {
+    setRightPaneOpen((open) => !open);
+  }, [setRightPaneOpen]);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
-      {children}
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
+      <section
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        data-slot="project-main-pane"
+      >
+        <ProjectRouteTopBar rightPaneOpen={rightPaneOpen} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
+      </section>
       <aside
         aria-hidden={!rightPaneOpen}
         className={cn(
-          "box-border flex min-h-0 w-[40%] min-w-[420px] shrink-0 flex-col overflow-hidden border-border border-l bg-background",
-          !rightPaneOpen && "hidden"
+          "box-border flex min-h-0 shrink-0 flex-col overflow-hidden border-l bg-[#101219] transition-[width,min-width,opacity,transform,border-color] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
+          rightPaneOpen
+            ? "w-104 min-w-104 translate-x-0 border-border opacity-100"
+            : "pointer-events-none w-0 min-w-0 translate-x-4 border-transparent opacity-0"
         )}
         data-slot="project-right-pane"
+        id="project-right-pane"
       >
-        <ProjectAssistantChatPane onClosePane={toggleRightPaneVisibility} />
+        <ProjectAssistantChatPane />
       </aside>
+      <Button
+        aria-controls="project-right-pane"
+        aria-expanded={rightPaneOpen}
+        aria-label={
+          rightPaneOpen ? "Close assistant panel" : "Open assistant panel"
+        }
+        className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
+        onClick={toggleRightPane}
+        size="icon-lg"
+        type="button"
+        variant="ghost"
+      >
+        {rightPaneOpen ? (
+          <PanelRightClose aria-hidden className="size-4" strokeWidth={2} />
+        ) : (
+          <PanelRightOpen aria-hidden className="size-4" strokeWidth={2} />
+        )}
+      </Button>
     </div>
   );
 }

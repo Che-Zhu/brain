@@ -1,3 +1,7 @@
+import {
+  type ApReplicaStrategy,
+  apReplicaStrategyFromResource,
+} from "./ap-replica-strategy";
 import type { K8sJsonPatchOp } from "./http/json-patch";
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
@@ -45,8 +49,25 @@ export function readApImage(spec: Record<string, unknown>): string | undefined {
 export function readApReplicas(
   spec: Record<string, unknown>
 ): number | undefined {
-  const r = readApResource(spec).replicas;
+  const resource = readApResource(spec);
+  const replicaStrategy = asRecord(resource.replicaStrategy);
+  const fixed = asRecord(replicaStrategy?.fixed);
+  const fixedReplicas = fixed?.replicas;
+  if (
+    replicaStrategy?.type === "fixed" &&
+    typeof fixedReplicas === "number" &&
+    Number.isFinite(fixedReplicas)
+  ) {
+    return fixedReplicas;
+  }
+  const r = resource.replicas;
   return typeof r === "number" && Number.isFinite(r) ? r : undefined;
+}
+
+export function readApReplicaStrategy(
+  spec: Record<string, unknown>
+): ApReplicaStrategy {
+  return apReplicaStrategyFromResource(readApResource(spec));
 }
 
 export function readApIsPaused(spec: Record<string, unknown>): boolean {

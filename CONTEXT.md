@@ -69,7 +69,11 @@ Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that repre
 
 ### DB Configuration Draft
 
-A local set of pending DB configuration changes that is submitted only when the user confirms the update.
+A DB-specific Settings Draft retained as legacy wording.
+
+### Settings Draft
+
+A local set of pending AP or DB settings changes that is submitted only when the user confirms the panel-level update.
 
 ### Database Binding
 
@@ -106,6 +110,10 @@ A normalized time-series representation of workload resource usage for AP and DB
 ### Project Aggregate Status
 
 A derived health tone for one Project row in the project list, computed from the phases of the Project's APs and DBs. It is not a field on the Project resource; it is computed in the UI from sibling workload lists. It expresses "are the workloads inside this project healthy", which is what users look at on the list, and is distinct from the Project composite's own `status.conditions[Ready]` (which only reflects whether the Project composition itself reconciled).
+
+### Project Display Name
+
+The human-facing Project name shown in navigation and project chrome, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name.
 
 ### Custom Domain Binding (future, not yet implemented)
 
@@ -328,9 +336,31 @@ Canvas Layout belongs to the application persistence layer, not the Crossplane r
 
 Canvas Layout is identified by the Project's namespace and Kubernetes `metadata.uid`. The Project name may be stored as a display snapshot, but it does not define ownership because a Project can be renamed or recreated.
 
+### Project chrome shows Project Display Name
+
+Project navigation and project-level chrome should show the Project Display Name, not the Project UID. If the display-name annotation and legacy title are absent, the Project's Kubernetes resource name is the human-facing fallback.
+
+The Project index route still uses the same project-level chrome, but it has no current Project and should leave the Project Display Name area empty.
+
 ### Canvas connections are resource-backed
 
 Users may freely drag lines between canvas nodes, but unsupported Connecting Edges are discarded after lightweight feedback. Established Canvas Connections are derived from AP, DB, and EntryPoint resource state rather than stored as separate App Postgres records.
+
+### Settings panels use panel-level explicit updates
+
+AP Settings and DB configuration collect editable changes locally and apply them only when the user confirms the panel-level Save. The submitted patch should include only changed fields, not a full replacement of resource desired state.
+
+No setting control inside AP Settings or DB configuration should mutate desired state on its own. Image edits, Environment rows, Resource quota changes, Private Address target port changes, and Public Address add/delete actions all belong to the same Settings Draft until the panel-level Save is confirmed.
+
+Settings panels should expose Save and Cancel at the panel level rather than in individual setting sections. Cancel discards the whole Settings Draft and returns the panel to the latest loaded desired state.
+
+When a user tries to close a settings panel or switch to another resource while the Settings Draft has unsaved changes, the UI should ask whether to save, discard, or stay on the current panel. Unsaved settings changes should not be silently discarded or automatically saved.
+
+Panel-level Save should apply each resource's Settings Draft as one resource patch. If AP Image, Environment, Resource quota, and Network settings are changed together, AP Settings should submit one AP patch so the save succeeds or fails as a single resource update. DB configuration should likewise submit one DB patch.
+
+If the backing AP or DB resource changes while a user has unsaved Settings Draft edits, the UI should not automatically replace the draft. It should indicate that the resource has changed and let the user reload from the latest desired state or keep editing. Save failures caused by stale state should keep the draft available for retry or discard.
+
+Panel-level settings save does not introduce a separate Settings API or App Postgres persistence model. AP Settings still patches AP desired state, DB configuration still patches DB desired state, and Database Binding remains represented through AP environment variables.
 
 ### AP replica strategy belongs to AP desired state
 

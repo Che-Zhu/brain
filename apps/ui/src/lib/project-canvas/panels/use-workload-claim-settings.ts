@@ -20,6 +20,10 @@ import {
   applyApResourceQuotas,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
 import {
+  type ApReplicaStrategy,
+  canonicalFixedReplicaStrategy,
+} from "@/lib/project-canvas/k8s/ap-replica-strategy";
+import {
   type ClaimContainerSettings,
   claimToContainerSettings,
   k8sGetClaimBody,
@@ -43,6 +47,49 @@ export interface UseWorkloadClaimSettingsOptions {
   readOnly?: boolean;
   shareToken?: string;
   workloadKind: WorkloadClaimKind;
+}
+
+interface ResourceQuotaCommitDraft {
+  cpu: number;
+  memory: number;
+  replicaStrategy?: ApReplicaStrategy;
+  replicas?: number;
+}
+
+function resourceQuotaReplicaOverride(
+  next: ResourceQuotaCommitDraft,
+  currentReplicaStrategy: ApReplicaStrategy
+): Partial<ClaimContainerSettings> {
+  if (next.replicaStrategy !== undefined) {
+    return {
+      replicaStrategy: next.replicaStrategy,
+      replicas: next.replicaStrategy.fixed.replicas,
+    };
+  }
+  if (next.replicas === undefined) {
+    return {};
+  }
+  const replicas = Math.round(next.replicas);
+  return {
+    replicaStrategy: canonicalFixedReplicaStrategy(
+      replicas,
+      currentReplicaStrategy.elastic
+    ),
+    replicas,
+  };
+}
+
+function resourceQuotaPatchDraft(next: ResourceQuotaCommitDraft): {
+  replicaStrategy?: ApReplicaStrategy;
+  replicas?: number;
+} {
+  if (next.replicaStrategy !== undefined) {
+    return { replicaStrategy: next.replicaStrategy };
+  }
+  if (next.replicas === undefined) {
+    return {};
+  }
+  return { replicas: Math.round(next.replicas) };
 }
 
 /**
@@ -231,7 +278,7 @@ export function useWorkloadClaimSettings(
   );
 
   const onResourceQuotasCommit = useCallback(
-    async (next: { cpu: number; memory: number; replicas?: number }) => {
+    async (next: ResourceQuotaCommitDraft) => {
       if (!isApWorkload || readOnly) {
         return;
       }
@@ -244,14 +291,17 @@ export function useWorkloadClaimSettings(
       const prevCpu = display.cpuCores;
       const prevMem = display.memoryMib;
       const prevReplicas = display.replicas;
-      const nextRep =
-        next.replicas === undefined ? undefined : Math.round(next.replicas);
+      const replicaOverride = resourceQuotaReplicaOverride(
+        next,
+        display.replicaStrategy
+      );
+      const replicaPatch = resourceQuotaPatchDraft(next);
 
       setLocalOverride((prev) => ({
         ...(prev ?? {}),
         cpuCores: next.cpu,
         memoryMib: next.memory,
-        ...(nextRep === undefined ? {} : { replicas: nextRep }),
+        ...replicaOverride,
       }));
       try {
         await applyApResourceQuotas(
@@ -260,12 +310,14 @@ export function useWorkloadClaimSettings(
           {
             cpuCores: next.cpu,
             memoryMib: next.memory,
-            ...(nextRep === undefined ? {} : { replicas: nextRep }),
+            ...replicaPatch,
           },
           {
             cpuCores: prevCpu,
             memoryMib: prevMem,
-            ...(nextRep === undefined ? {} : { replicas: prevReplicas }),
+            ...(replicaPatch.replicas === undefined
+              ? {}
+              : { replicas: prevReplicas }),
           }
         );
         toast.success("Resource quota applied.");
@@ -278,6 +330,7 @@ export function useWorkloadClaimSettings(
     [
       display.cpuCores,
       display.memoryMib,
+      display.replicaStrategy,
       display.replicas,
       isApWorkload,
       kubeconfig,

@@ -37,7 +37,10 @@ metadata:
           # Enable queue mode with Redis and workers for improved scalability and parallel execution (requires PostgreSQL)
           useQueueMode: "false"
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

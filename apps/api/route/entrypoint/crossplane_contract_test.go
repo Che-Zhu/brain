@@ -354,6 +354,355 @@ func TestAPCompositionRendersPrivateOnlyNetworkPath(t *testing.T) {
 	}
 }
 
+func TestAPCompositionRendersCanonicalFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "fixed",
+							"fixed": map[string]interface{}{
+								"replicas": 4,
+							},
+						},
+						"replicas": 2,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 4 {
+		t.Fatalf("Deployment replicas = %d, want canonical fixed replicas 4", got)
+	}
+	deploymentAnnotations := asMap(t, asMap(t, deployment["metadata"], "deployment.metadata")["annotations"], "deployment.metadata.annotations")
+	if got := deploymentAnnotations["deploy.cloud.sealos.io/minReplicas"]; got != "4" {
+		t.Fatalf("Deployment minReplicas annotation = %v, want 4", got)
+	}
+	if got := deploymentAnnotations["deploy.cloud.sealos.io/maxReplicas"]; got != "4" {
+		t.Fatalf("Deployment maxReplicas annotation = %v, want 4", got)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for fixed replica strategy", len(got))
+	}
+}
+
+func TestAPCompositionIgnoresInactiveElasticBranchForFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "fixed",
+							"fixed": map[string]interface{}{
+								"replicas": 5,
+							},
+							"elastic": map[string]interface{}{
+								"minReplicas": 2,
+								"maxReplicas": 9,
+								"target": map[string]interface{}{
+									"metric":             "cpu",
+									"type":               "utilization",
+									"utilizationPercent": 70,
+								},
+							},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 5 {
+		t.Fatalf("Deployment replicas = %d, want active fixed replicas 5", got)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for inactive elastic branch", len(got))
+	}
+	configMap := singleKindObject(t, out, "ConfigMap")
+	data := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := data["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+	}
+	if strings.Contains(configYaml, "minReplicas: 2") ||
+		strings.Contains(configYaml, "maxReplicas: 9") ||
+		strings.Contains(configYaml, "utilizationPercent: 70") {
+		t.Fatalf("effective config reconciled inactive elastic settings:\n%s", configYaml)
+	}
+}
+
+func TestAPCompositionRendersLegacyReplicasAsFixedReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicas": 3,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if got := numberAsInt(t, deploymentSpec["replicas"], "deployment.spec.replicas"); got != 3 {
+		t.Fatalf("Deployment replicas = %d, want legacy fixed replicas 3", got)
+	}
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	if got := status["phase"]; got != "Running" {
+		t.Fatalf("AP status.phase = %v, want Running", got)
+	}
+	configMap := singleKindObject(t, out, "ConfigMap")
+	data := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := data["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", data["config.yaml"])
+	}
+	if !strings.Contains(configYaml, "replicaStrategy:") ||
+		!strings.Contains(configYaml, "replicas: 3") ||
+		!strings.Contains(configYaml, "type: fixed") {
+		t.Fatalf("effective config did not include canonical fixed replica strategy:\n%s", configYaml)
+	}
+	if got := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "HorizontalPodAutoscaler"
+	}); len(got) != 0 {
+		t.Fatalf("HPA manifest count = %d, want 0 for legacy fixed replicas", len(got))
+	}
+}
+
+func TestAPCompositionRendersCPUElasticReplicaStrategy(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "elastic",
+							"fixed": map[string]interface{}{
+								"replicas": 4,
+							},
+							"elastic": map[string]interface{}{
+								"minReplicas": 2,
+								"maxReplicas": 8,
+								"target": map[string]interface{}{
+									"metric":             "cpu",
+									"type":               "utilization",
+									"utilizationPercent": 75,
+								},
+							},
+						},
+						"replicas": 3,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if _, ok := deploymentSpec["replicas"]; ok {
+		t.Fatal("Deployment spec.replicas should be omitted so the HPA controls elastic replicas")
+	}
+	deploymentAnnotations := asMap(t, asMap(t, deployment["metadata"], "deployment.metadata")["annotations"], "deployment.metadata.annotations")
+	if _, ok := deploymentAnnotations["deploy.cloud.sealos.io/minReplicas"]; ok {
+		t.Fatal("Deployment should not carry fixed minReplicas annotation in elastic mode")
+	}
+	if _, ok := deploymentAnnotations["deploy.cloud.sealos.io/maxReplicas"]; ok {
+		t.Fatal("Deployment should not carry fixed maxReplicas annotation in elastic mode")
+	}
+
+	hpa := singleKindObject(t, out, "HorizontalPodAutoscaler")
+	metadata := asMap(t, hpa["metadata"], "hpa.metadata")
+	if got := metadata["name"]; got != "web" {
+		t.Fatalf("HPA metadata.name = %v, want web", got)
+	}
+	annotations := asMap(t, metadata["annotations"], "hpa.metadata.annotations")
+	if got := annotations["gotemplating.fn.crossplane.io/composition-resource-name"]; got != "app-horizontal-pod-autoscaler" {
+		t.Fatalf("HPA composition resource name = %v, want app-horizontal-pod-autoscaler", got)
+	}
+	ownerReferences := asSlice(t, metadata["ownerReferences"], "hpa.metadata.ownerReferences")
+	owner := asMap(t, ownerReferences[0], "hpa.metadata.ownerReferences[0]")
+	if got := owner["kind"]; got != "AP" {
+		t.Fatalf("HPA owner kind = %v, want AP", got)
+	}
+
+	hpaSpec := asMap(t, hpa["spec"], "hpa.spec")
+	if got := numberAsInt(t, hpaSpec["minReplicas"], "hpa.spec.minReplicas"); got != 2 {
+		t.Fatalf("HPA minReplicas = %d, want 2", got)
+	}
+	if got := numberAsInt(t, hpaSpec["maxReplicas"], "hpa.spec.maxReplicas"); got != 8 {
+		t.Fatalf("HPA maxReplicas = %d, want 8", got)
+	}
+	scaleTargetRef := asMap(t, hpaSpec["scaleTargetRef"], "hpa.spec.scaleTargetRef")
+	if got := scaleTargetRef["kind"]; got != "Deployment" {
+		t.Fatalf("HPA scale target kind = %v, want Deployment", got)
+	}
+	if got := scaleTargetRef["name"]; got != "web" {
+		t.Fatalf("HPA scale target name = %v, want web", got)
+	}
+	metrics := asSlice(t, hpaSpec["metrics"], "hpa.spec.metrics")
+	metric := asMap(t, metrics[0], "hpa.spec.metrics[0]")
+	resourceMetric := asMap(t, metric["resource"], "hpa.spec.metrics[0].resource")
+	if got := resourceMetric["name"]; got != "cpu" {
+		t.Fatalf("HPA resource metric name = %v, want cpu", got)
+	}
+	target := asMap(t, resourceMetric["target"], "hpa.spec.metrics[0].resource.target")
+	if got := target["type"]; got != "Utilization" {
+		t.Fatalf("HPA target type = %v, want Utilization", got)
+	}
+	if got := numberAsInt(t, target["averageUtilization"], "hpa target averageUtilization"); got != 75 {
+		t.Fatalf("HPA averageUtilization = %d, want 75", got)
+	}
+
+	configMap := singleKindObject(t, out, "ConfigMap")
+	configData := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := configData["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", configData["config.yaml"])
+	}
+	if !strings.Contains(configYaml, "type: elastic") ||
+		!strings.Contains(configYaml, "replicas: 4") ||
+		!strings.Contains(configYaml, "minReplicas: 2") ||
+		!strings.Contains(configYaml, "maxReplicas: 8") ||
+		!strings.Contains(configYaml, "utilizationPercent: 75") {
+		t.Fatalf("effective config did not include canonical elastic replica strategy:\n%s", configYaml)
+	}
+}
+
+func TestAPCompositionRendersMemoryElasticReplicaStrategy(t *testing.T) {
+	data := map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"resource": map[string]interface{}{
+						"replicaStrategy": map[string]interface{}{
+							"type": "elastic",
+							"fixed": map[string]interface{}{
+								"replicas": 4,
+							},
+							"elastic": map[string]interface{}{
+								"minReplicas": 2,
+								"maxReplicas": 8,
+								"target": map[string]interface{}{
+									"metric":       "memory",
+									"type":         "averageValue",
+									"averageValue": "512Mi",
+								},
+							},
+						},
+						"replicas": 3,
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}
+	composed := map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	}
+	out := renderAPComposition(t, data, composed)
+
+	deployment := singleKindObject(t, out, "Deployment")
+	deploymentSpec := asMap(t, deployment["spec"], "deployment.spec")
+	if _, ok := deploymentSpec["replicas"]; ok {
+		t.Fatal("Deployment spec.replicas should be omitted so the HPA controls elastic replicas")
+	}
+
+	hpa := singleKindObject(t, out, "HorizontalPodAutoscaler")
+	hpaSpec := asMap(t, hpa["spec"], "hpa.spec")
+	if got := numberAsInt(t, hpaSpec["minReplicas"], "hpa.spec.minReplicas"); got != 2 {
+		t.Fatalf("HPA minReplicas = %d, want 2", got)
+	}
+	if got := numberAsInt(t, hpaSpec["maxReplicas"], "hpa.spec.maxReplicas"); got != 8 {
+		t.Fatalf("HPA maxReplicas = %d, want 8", got)
+	}
+	metrics := asSlice(t, hpaSpec["metrics"], "hpa.spec.metrics")
+	metric := asMap(t, metrics[0], "hpa.spec.metrics[0]")
+	resourceMetric := asMap(t, metric["resource"], "hpa.spec.metrics[0].resource")
+	if got := resourceMetric["name"]; got != "memory" {
+		t.Fatalf("HPA resource metric name = %v, want memory", got)
+	}
+	target := asMap(t, resourceMetric["target"], "hpa.spec.metrics[0].resource.target")
+	if got := target["type"]; got != "AverageValue" {
+		t.Fatalf("HPA target type = %v, want AverageValue", got)
+	}
+	if got := target["averageValue"]; got != "512Mi" {
+		t.Fatalf("HPA averageValue = %v, want 512Mi", got)
+	}
+	if _, ok := target["averageUtilization"]; ok {
+		t.Fatal("HPA memory target should not include averageUtilization")
+	}
+
+	configMap := singleKindObject(t, out, "ConfigMap")
+	configData := asMap(t, configMap["data"], "configmap.data")
+	configYaml, ok := configData["config.yaml"].(string)
+	if !ok {
+		t.Fatalf("config.yaml is %T, want string", configData["config.yaml"])
+	}
+	if !strings.Contains(configYaml, "type: elastic") ||
+		!strings.Contains(configYaml, "replicas: 4") ||
+		!strings.Contains(configYaml, "minReplicas: 2") ||
+		!strings.Contains(configYaml, "maxReplicas: 8") ||
+		!strings.Contains(configYaml, "metric: memory") ||
+		!strings.Contains(configYaml, "type: averageValue") ||
+		!strings.Contains(configYaml, "averageValue: 512Mi") {
+		t.Fatalf("effective config did not include canonical memory elastic replica strategy:\n%s", configYaml)
+	}
+
+	configHash := effectiveConfigHash(configYaml)
+	configMapMetadata := asMap(t, configMap["metadata"], "configmap.metadata")
+	configMapAnnotations := asMap(
+		t,
+		configMapMetadata["annotations"],
+		"configmap.metadata.annotations",
+	)
+	if got := configMapAnnotations["app.sealos.io/config-version-hash"]; got != configHash {
+		t.Fatalf("config map version hash = %v, want %s", got, configHash)
+	}
+
+	rbacOut := renderAPCompositionStep(t, data, composed, 1)
+	role := singleKindObject(t, rbacOut, "Role")
+	roleMetadata := asMap(t, role["metadata"], "snapshot role.metadata")
+	if got := roleMetadata["name"]; got != fmt.Sprintf("web-config-snapshot-%s", configHash) {
+		t.Fatalf("snapshot role name = %v, want hash %s", got, configHash)
+	}
+	jobOut := renderAPCompositionStep(t, data, composed, 2)
+	job := singleKindObject(t, jobOut, "Job")
+	jobMetadata := asMap(t, job["metadata"], "snapshot job.metadata")
+	if got := jobMetadata["name"]; got != fmt.Sprintf("web-config-snapshot-%s", configHash) {
+		t.Fatalf("snapshot job name = %v, want hash %s", got, configHash)
+	}
+}
+
 func TestAPCompositionRendersPublicAddressesFromNetworkContract(t *testing.T) {
 	apiHost := platformHost("project-a", "web", "ap-uid-1", "pa_abc123", "usw.sealos.app")
 	apiAltHost := platformHost("project-a", "web", "ap-uid-1", "pa_def456", "usw.sealos.app")
@@ -595,7 +944,21 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 
 func renderAPComposition(t *testing.T, data map[string]interface{}, composed map[string]map[string]interface{}) string {
 	t.Helper()
-	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"))
+	return renderAPCompositionStep(t, data, composed, 0)
+}
+
+func renderAPCompositionStep(
+	t *testing.T,
+	data map[string]interface{},
+	composed map[string]map[string]interface{},
+	stepIndex int,
+) string {
+	t.Helper()
+	templateText := compositionStepTemplate(
+		t,
+		filepath.Join(repoRoot(t), "packages/crossplane/public/service/ap/deployments/aps-deployment-ingress-go-templating.yaml"),
+		stepIndex,
+	)
 	funcs := sprig.TxtFuncMap()
 	funcs["getComposedResource"] = func(_ interface{}, name string) map[string]interface{} {
 		return composed[name]
@@ -877,6 +1240,15 @@ func platformHost(namespace string, name string, uid string, id string, domain s
 	return fmt.Sprintf("%s-%x.%s", name, sum[:5], domain)
 }
 
+func effectiveConfigHash(configYaml string) string {
+	configYaml = strings.TrimPrefix(configYaml, "\n")
+	if !strings.HasSuffix(configYaml, "\n") {
+		configYaml += "\n"
+	}
+	sum := sha256.Sum256([]byte(configYaml))
+	return fmt.Sprintf("%x", sum)[:12]
+}
+
 func numberAsInt(t *testing.T, value interface{}, path string) int {
 	t.Helper()
 	switch v := value.(type) {
@@ -919,6 +1291,11 @@ func xrdOpenAPIProperties(t *testing.T, doc map[string]interface{}) map[string]i
 
 func compositionTemplate(t *testing.T, path string) string {
 	t.Helper()
+	return compositionStepTemplate(t, path, 0)
+}
+
+func compositionStepTemplate(t *testing.T, path string, stepIndex int) string {
+	t.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read composition %s: %v", path, err)
@@ -932,12 +1309,27 @@ func compositionTemplate(t *testing.T, path string) string {
 	if len(pipeline) == 0 {
 		t.Fatal("spec.pipeline is empty")
 	}
-	step := asMap(t, pipeline[0], "spec.pipeline[0]")
-	input := asMap(t, step["input"], "spec.pipeline[0].input")
-	inline := asMap(t, input["inline"], "spec.pipeline[0].input.inline")
+	if stepIndex < 0 || stepIndex >= len(pipeline) {
+		t.Fatalf("spec.pipeline[%d] is out of range", stepIndex)
+	}
+	step := asMap(
+		t,
+		pipeline[stepIndex],
+		fmt.Sprintf("spec.pipeline[%d]", stepIndex),
+	)
+	input := asMap(
+		t,
+		step["input"],
+		fmt.Sprintf("spec.pipeline[%d].input", stepIndex),
+	)
+	inline := asMap(
+		t,
+		input["inline"],
+		fmt.Sprintf("spec.pipeline[%d].input.inline", stepIndex),
+	)
 	template, ok := inline["template"].(string)
 	if !ok {
-		t.Fatal("spec.pipeline[0].input.inline.template is not a string")
+		t.Fatalf("spec.pipeline[%d].input.inline.template is not a string", stepIndex)
 	}
 	return template
 }

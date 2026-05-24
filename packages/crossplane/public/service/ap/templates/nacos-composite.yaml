@@ -31,7 +31,10 @@ metadata:
           # JWT secret key for authentication (Base64 encoded, must be at least 32 characters)
           authToken: "VGhpc0lzTXlDdXN0b21TZWNyZXRLZXkwMTIzNDU2Nzg="
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

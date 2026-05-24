@@ -49,7 +49,10 @@ metadata:
           # Azure API 版本
           azureApiVersion: ""
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

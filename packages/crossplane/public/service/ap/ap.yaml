@@ -166,12 +166,96 @@ spec:
                   aps-deployment-ingress-go-templating for Deployment replicas and container
                   resources.requests/limits.
                 properties:
+                  replicaStrategy:
+                    type: object
+                    required:
+                      - type
+                    description: >
+                      Canonical AP replica behavior. Fixed Replicas pins the Deployment to
+                      replicaStrategy.fixed.replicas. Elastic Scaling creates an AP-owned
+                      HorizontalPodAutoscaler from replicaStrategy.elastic. Legacy resource.replicas
+                      remains a fixed fallback only when replicaStrategy is absent.
+                    x-kubernetes-validations:
+                      - rule: "self.type == 'fixed' ? has(self.fixed) : true"
+                        message: "fixed replica strategy requires fixed settings."
+                      - rule: "self.type == 'elastic' ? has(self.elastic) : true"
+                        message: "elastic replica strategy requires elastic settings."
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - fixed
+                          - elastic
+                      fixed:
+                        type: object
+                        required:
+                          - replicas
+                        properties:
+                          replicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Fixed Deployment replica count.
+                      elastic:
+                        type: object
+                        required:
+                          - minReplicas
+                          - maxReplicas
+                          - target
+                        description: >
+                          Elastic Scaling settings. CPU targets use utilization percentage;
+                          Memory targets use an absolute average value.
+                        x-kubernetes-validations:
+                          - rule: "self.minReplicas <= self.maxReplicas"
+                            message: "minReplicas must be less than or equal to maxReplicas."
+                        properties:
+                          minReplicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Minimum AP replicas for Elastic Scaling.
+                          maxReplicas:
+                            type: integer
+                            minimum: 1
+                            maximum: 20
+                            description: Maximum AP replicas for Elastic Scaling.
+                          target:
+                            type: object
+                            required:
+                              - metric
+                              - type
+                            description: Discriminated HorizontalPodAutoscaler resource metric target.
+                            x-kubernetes-validations:
+                              - rule: "self.metric == 'cpu' ? self.type == 'utilization' && has(self.utilizationPercent) && !has(self.averageValue) : true"
+                                message: "CPU elastic targets require utilizationPercent and must not set averageValue."
+                              - rule: "self.metric == 'memory' ? self.type == 'averageValue' && has(self.averageValue) && !has(self.utilizationPercent) : true"
+                                message: "Memory elastic targets require averageValue and must not set utilizationPercent."
+                            properties:
+                              metric:
+                                type: string
+                                enum:
+                                  - cpu
+                                  - memory
+                              type:
+                                type: string
+                                enum:
+                                  - utilization
+                                  - averageValue
+                              utilizationPercent:
+                                type: integer
+                                minimum: 1
+                                maximum: 100
+                                description: Target average CPU utilization percentage.
+                              averageValue:
+                                type: string
+                                pattern: ^[1-9][0-9]*(Mi|Gi)$
+                                description: Target average Memory usage as a Kubernetes quantity, for example 512Mi.
                   replicas:
                     type: integer
                     default: 1
                     minimum: 1
                     maximum: 20
-                    description: Desired Deployment replica count.
+                    description: Legacy Desired Deployment replica count. Used only when replicaStrategy is absent.
                   requests:
                     type: object
                     description: Container resources.requests
@@ -206,7 +290,8 @@ spec:
                 description: >
                   When true, scales the composed Deployment to 0 replicas and applies SealOS-style
                   pause annotations (compatible with workloads managed by SealOS Deploy). When false,
-                  the Deployment uses spec.resource.replicas (default 1).
+                  the Deployment uses spec.resource.replicaStrategy fixed replicas, falling back to
+                  legacy spec.resource.replicas (default 1) when replicaStrategy is absent.
               restartRequest:
                 type: integer
                 minimum: 0

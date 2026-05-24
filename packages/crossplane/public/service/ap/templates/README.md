@@ -69,10 +69,10 @@ spec:
 | Sealos Syntax | Crossplane Go Template |
 |---------------|------------------------|
 | `${{ defaults.app_name }}` | `{{ $name }}-{{ $suffix }}` |
-| `${{ defaults.app_host }}` | `{{ $host }}` (from `$spec.host`) |
-| `${{ inputs.PARAM_NAME }}` | `{{ $spec.paramName }}` |
+| `${{ defaults.app_host }}` | `{{ $host }}` (from `$input.host` when no region label is set) |
+| `${{ inputs.PARAM_NAME }}` | `{{ $input.paramName }}` |
 | `${{ SEALOS_NAMESPACE }}` | `{{ $ns }}` |
-| `${{ SEALOS_CLOUD_DOMAIN }}` | Part of `$spec.host` |
+| `${{ SEALOS_CLOUD_DOMAIN }}` | Part of `$input.host` when no region label is set |
 | `${{ SEALOS_CERT_SECRET_NAME }}` | `wildcard-cert` (hardcoded) |
 | `${{ random(8) }}` | `{{ $suffix }}` (from UID hash) |
 
@@ -192,9 +192,12 @@ spec:
     paramName: "value"
     host: myapp.example.com   # used when metadata.labels.region is omitted
 
-  # Scale and container resources (aps-deployment-ingress-go-templating)
+  # AP Replica Strategy and container resources (aps-deployment-ingress-go-templating)
   resource:
-    replicas: 1
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
     requests:
       cpu: "100m"
       memory: "128Mi"
@@ -202,6 +205,24 @@ spec:
       cpu: "1000m"
       memory: "1024Mi"
 ```
+
+### AP Replica Strategy examples
+
+`spec.resource.replicaStrategy` is the canonical AP Replica Strategy field for new AP Settings
+writes. Fixed Replicas pins the AP to a desired replica count. Elastic Scaling lets the AP
+Composition reconcile an AP-owned horizontal autoscaler from `minReplicas`, `maxReplicas`, and one
+CPU or Memory target. Legacy `spec.resource.replicas` remains accepted only as a Fixed Replicas
+fallback when `spec.resource.replicaStrategy` is absent.
+
+Use the representative examples in `packages/crossplane/public/example/ap/`:
+
+- `ap-legacy-fixed-example.yaml` shows the legacy fixed fallback.
+- `ap-fixed-replicas-example.yaml` shows canonical Fixed Replicas.
+- `ap-cpu-elastic-example.yaml` shows CPU Elastic Scaling.
+- `ap-memory-elastic-example.yaml` shows Memory Elastic Scaling.
+
+AP Settings must not create unmanaged autoscaler resources through the generic Kubernetes autoscale
+API; the AP Composition owns the horizontal autoscaler for Elastic Scaling.
 
 ## Required Annotations
 

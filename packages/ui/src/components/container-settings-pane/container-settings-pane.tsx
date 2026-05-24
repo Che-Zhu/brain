@@ -17,6 +17,10 @@ import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.u
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
 import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@workspace/ui/components/toggle-group";
+import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
   type ContainerEnvDbDsnFieldOption,
@@ -38,7 +42,9 @@ import {
   Copy,
   Cpu,
   Layers,
+  type LucideIcon,
   MemoryStick,
+  Network,
   Plus,
   Save,
   SquarePen,
@@ -51,24 +57,12 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
-
-function resourceQuotasDirty(
-  draftCpu: number,
-  draftMem: number,
-  committedCpu: number,
-  committedMem: number,
-  replicas?: { committed: number; draft: number }
-): boolean {
-  const cpuMemDirty =
-    Math.abs(draftCpu - committedCpu) > CPU_QUOTA_DIRTY_EPS ||
-    Math.round(draftMem) !== Math.round(committedMem);
-  if (replicas == null) {
-    return cpuMemDirty;
-  }
-  return (
-    cpuMemDirty || Math.round(replicas.draft) !== Math.round(replicas.committed)
-  );
-}
+const REPLICA_LIMITS = { max: 20, min: 1 } as const;
+const CPU_UTILIZATION_TARGET_LIMITS = { max: 100, min: 1 } as const;
+const MEMORY_AVERAGE_TARGET_LIMITS = { max: 8192, min: 128 } as const;
+const DEFAULT_CPU_UTILIZATION_TARGET_PERCENT = 80;
+const DEFAULT_MEMORY_AVERAGE_TARGET_MIB = 512;
+const MEMORY_AVERAGE_VALUE_RE = /^([1-9][0-9]*)(Mi|Gi)$/;
 
 /** Quota sliders are controlled: parent owns `value` and receives `onValueChange`. */
 export interface ContainerSettingsControlledQuotaProps {
@@ -111,6 +105,294 @@ export interface ContainerNetwork {
   privateAddress?: string;
   privatePort: number;
   publicAddresses: ContainerNetworkPublicAddress[];
+}
+
+export interface ContainerFixedReplicaStrategy {
+  elastic?: ContainerElasticReplicaSettings;
+  fixed: {
+    replicas: number;
+  };
+  type: "fixed";
+}
+
+export interface ContainerCpuElasticReplicaTarget {
+  metric: "cpu";
+  type: "utilization";
+  utilizationPercent: number;
+}
+
+export interface ContainerMemoryElasticReplicaTarget {
+  averageValue: string;
+  metric: "memory";
+  type: "averageValue";
+}
+
+export type ContainerElasticReplicaTarget =
+  | ContainerCpuElasticReplicaTarget
+  | ContainerMemoryElasticReplicaTarget;
+
+export interface ContainerElasticReplicaSettings {
+  maxReplicas: number;
+  minReplicas: number;
+  target: ContainerElasticReplicaTarget;
+}
+
+export interface ContainerElasticReplicaStrategy {
+  elastic: ContainerElasticReplicaSettings;
+  fixed: {
+    replicas: number;
+  };
+  type: "elastic";
+}
+
+export type ContainerReplicaStrategy =
+  | ContainerElasticReplicaStrategy
+  | ContainerFixedReplicaStrategy;
+
+type ReplicaStrategyType = ContainerReplicaStrategy["type"];
+type ElasticTargetMetric = ContainerElasticReplicaTarget["metric"];
+
+interface ResourceQuotasDirtyReplicaStrategy {
+  committed: ContainerReplicaStrategy;
+  draft: ContainerReplicaStrategy;
+}
+
+interface ResourceQuotaReplicaPatch {
+  replicaStrategy?: ContainerReplicaStrategy;
+}
+
+const DEFAULT_FIXED_REPLICAS: number = REPLICA_LIMITS.min;
+const DEFAULT_ELASTIC_REPLICA_SETTINGS: ContainerElasticReplicaSettings = {
+  maxReplicas: 10,
+  minReplicas: REPLICA_LIMITS.min,
+  target: {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: DEFAULT_CPU_UTILIZATION_TARGET_PERCENT,
+  },
+};
+
+function roundAndClamp(n: number, min: number, max: number): number {
+  return clampScale(Math.round(n), min, max);
+}
+
+function normalizeReplicaCount(replicas: number): number {
+  return roundAndClamp(replicas, REPLICA_LIMITS.min, REPLICA_LIMITS.max);
+}
+
+function normalizeCpuUtilizationTarget(utilizationPercent: number): number {
+  return roundAndClamp(
+    utilizationPercent,
+    CPU_UTILIZATION_TARGET_LIMITS.min,
+    CPU_UTILIZATION_TARGET_LIMITS.max
+  );
+}
+
+function memoryAverageValueToMib(averageValue: string | undefined): number {
+  const match = MEMORY_AVERAGE_VALUE_RE.exec(averageValue ?? "");
+  if (match == null) {
+    return DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+  }
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) {
+    return DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+  }
+  return match[2] === "Gi" ? value * 1024 : value;
+}
+
+function memoryAverageMibToValue(mib: number): string {
+  return `${roundAndClamp(
+    mib,
+    MEMORY_AVERAGE_TARGET_LIMITS.min,
+    MEMORY_AVERAGE_TARGET_LIMITS.max
+  )}Mi`;
+}
+
+function normalizeMemoryAverageTarget(
+  averageValue: string | undefined
+): string {
+  return memoryAverageMibToValue(memoryAverageValueToMib(averageValue));
+}
+
+function cpuElasticTarget(
+  utilizationPercent = DEFAULT_CPU_UTILIZATION_TARGET_PERCENT
+): ContainerCpuElasticReplicaTarget {
+  return {
+    metric: "cpu",
+    type: "utilization",
+    utilizationPercent: normalizeCpuUtilizationTarget(utilizationPercent),
+  };
+}
+
+function memoryElasticTarget(
+  averageValue = `${DEFAULT_MEMORY_AVERAGE_TARGET_MIB}Mi`
+): ContainerMemoryElasticReplicaTarget {
+  return {
+    averageValue: normalizeMemoryAverageTarget(averageValue),
+    metric: "memory",
+    type: "averageValue",
+  };
+}
+
+function defaultElasticTargetForMetric(
+  metric: ElasticTargetMetric
+): ContainerElasticReplicaTarget {
+  if (metric === "memory") {
+    return memoryElasticTarget();
+  }
+  return cpuElasticTarget();
+}
+
+function normalizeElasticTarget(
+  target: ContainerElasticReplicaSettings["target"] | undefined
+): ContainerElasticReplicaTarget {
+  if (target?.metric === "memory") {
+    return memoryElasticTarget(target.averageValue);
+  }
+  return cpuElasticTarget(target?.utilizationPercent);
+}
+
+function normalizeFixedReplicaSettings(replicas: number): { replicas: number } {
+  return { replicas: normalizeReplicaCount(replicas) };
+}
+
+function normalizeElasticReplicaSettings(
+  settings: ContainerElasticReplicaSettings | undefined
+): ContainerElasticReplicaSettings {
+  const minReplicas = normalizeReplicaCount(
+    settings?.minReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.minReplicas
+  );
+  const maxReplicas = Math.max(
+    minReplicas,
+    normalizeReplicaCount(
+      settings?.maxReplicas ?? DEFAULT_ELASTIC_REPLICA_SETTINGS.maxReplicas
+    )
+  );
+  return {
+    maxReplicas,
+    minReplicas,
+    target: normalizeElasticTarget(settings?.target),
+  };
+}
+
+function normalizeReplicaStrategy(
+  strategy: ContainerReplicaStrategy | undefined,
+  fixedReplicas = DEFAULT_FIXED_REPLICAS
+): ContainerReplicaStrategy {
+  const fixed = normalizeFixedReplicaSettings(
+    strategy?.fixed.replicas ?? fixedReplicas
+  );
+  if (strategy?.type === "elastic") {
+    return {
+      elastic: normalizeElasticReplicaSettings(strategy.elastic),
+      fixed,
+      type: "elastic",
+    };
+  }
+  return {
+    ...(strategy?.elastic == null
+      ? {}
+      : { elastic: normalizeElasticReplicaSettings(strategy.elastic) }),
+    fixed,
+    type: "fixed",
+  };
+}
+
+function elasticSettingsFromStrategy(
+  strategy: ContainerReplicaStrategy
+): ContainerElasticReplicaSettings {
+  if (strategy.type === "elastic") {
+    return strategy.elastic;
+  }
+  return strategy.elastic ?? DEFAULT_ELASTIC_REPLICA_SETTINGS;
+}
+
+function replicaStrategiesEqual(
+  a: ContainerReplicaStrategy,
+  b: ContainerReplicaStrategy
+): boolean {
+  if (a.type !== b.type) {
+    return false;
+  }
+  if (Math.round(a.fixed.replicas) !== Math.round(b.fixed.replicas)) {
+    return false;
+  }
+  const aElastic = elasticSettingsFromStrategy(a);
+  const bElastic = elasticSettingsFromStrategy(b);
+  return (
+    Math.round(aElastic.minReplicas) === Math.round(bElastic.minReplicas) &&
+    Math.round(aElastic.maxReplicas) === Math.round(bElastic.maxReplicas) &&
+    elasticTargetsEqual(aElastic.target, bElastic.target)
+  );
+}
+
+function elasticTargetsEqual(
+  a: ContainerElasticReplicaTarget,
+  b: ContainerElasticReplicaTarget
+): boolean {
+  if (a.metric !== b.metric) {
+    return false;
+  }
+
+  if (a.metric === "memory") {
+    return (
+      b.metric === "memory" &&
+      normalizeMemoryAverageTarget(a.averageValue) ===
+        normalizeMemoryAverageTarget(b.averageValue)
+    );
+  }
+
+  if (a.metric === "cpu") {
+    return (
+      b.metric === "cpu" &&
+      Math.round(a.utilizationPercent) === Math.round(b.utilizationPercent)
+    );
+  }
+
+  return false;
+}
+
+function replicaStrategyWithType(
+  current: ContainerReplicaStrategy,
+  type: ReplicaStrategyType
+): ContainerReplicaStrategy {
+  const elastic = normalizeElasticReplicaSettings(
+    elasticSettingsFromStrategy(current)
+  );
+  const fixed = normalizeFixedReplicaSettings(current.fixed.replicas);
+  if (type === "elastic") {
+    return { elastic, fixed, type: "elastic" };
+  }
+  return { elastic, fixed, type: "fixed" };
+}
+
+export function resourceQuotaReplicaPatchFromDraft(
+  hasReplicasQuota: boolean,
+  draftReplicaStrategy: ContainerReplicaStrategy
+): ResourceQuotaReplicaPatch {
+  if (!hasReplicasQuota) {
+    return {};
+  }
+  return { replicaStrategy: draftReplicaStrategy };
+}
+
+function resourceQuotasDirty(
+  draftCpu: number,
+  draftMem: number,
+  committedCpu: number,
+  committedMem: number,
+  replicaStrategy?: ResourceQuotasDirtyReplicaStrategy
+): boolean {
+  const cpuMemDirty =
+    Math.abs(draftCpu - committedCpu) > CPU_QUOTA_DIRTY_EPS ||
+    Math.round(draftMem) !== Math.round(committedMem);
+  if (replicaStrategy == null) {
+    return cpuMemDirty;
+  }
+  return (
+    cpuMemDirty ||
+    !replicaStrategiesEqual(replicaStrategy.draft, replicaStrategy.committed)
+  );
 }
 
 export interface ContainerSettingsPaneAddDbDsnReferenceIntent {
@@ -157,11 +439,12 @@ export interface ContainerSettingsPaneProps {
   /**
    * When set (and not `readOnly`), CPU/memory/replicas sliders keep local drafts until Save; Cancel reverts.
    * Omit for live slider updates via `cpuQuota` / `memoryQuota` / `replicasQuota` `onValueChange`.
-   * When `replicasQuota` is set, `replicas` is included on Save.
+   * When `replicasQuota` is set, the draft `replicaStrategy` is included on Save.
    */
   onResourceQuotasCommit?: (next: {
     cpu: number;
     memory: number;
+    replicaStrategy?: ContainerReplicaStrategy;
     replicas?: number;
   }) => void | Promise<void>;
   /** Exposed container ports + protocol labels. */
@@ -171,8 +454,10 @@ export interface ContainerSettingsPaneProps {
    * Host may pass no-op callbacks.
    */
   readOnly?: boolean;
+  /** AP replica behavior rendered as a mutually exclusive strategy control. */
+  replicaStrategy?: ContainerReplicaStrategy;
   /**
-   * Deployment replica count (AP `spec.replicas`). Omit to hide the control (e.g. DB workloads).
+   * Fixed AP replica count. Omit to hide the control (e.g. DB workloads).
    */
   replicasQuota?: ContainerSettingsControlledQuotaProps;
 }
@@ -610,8 +895,50 @@ interface NetworkSettingsSectionProps {
   readOnly: boolean;
 }
 
+const PUBLIC_ADDRESS_VISIBLE_COUNT = 2;
+
 function publicAddressValue(address: ContainerNetworkPublicAddress): string {
   return address.url?.trim() || address.host?.trim() || "";
+}
+
+function publicAddressStatusLabel(
+  address: ContainerNetworkPublicAddress
+): string {
+  return address.status?.trim() || "Pending";
+}
+
+function publicAddressStatusDotClass(
+  address: ContainerNetworkPublicAddress
+): string {
+  const status = address.status?.trim().toLowerCase();
+
+  if (
+    status === "accessible" ||
+    status === "available" ||
+    status === "ready" ||
+    status === "running"
+  ) {
+    return "bg-theme-green ring-theme-green/20";
+  }
+
+  if (
+    status === "progressing" ||
+    status === "pending" ||
+    status === "creating"
+  ) {
+    return "bg-theme-yellow ring-theme-yellow/20";
+  }
+
+  if (
+    status === "failed" ||
+    status === "error" ||
+    status === "inaccessible" ||
+    status === "unavailable"
+  ) {
+    return "bg-theme-red ring-theme-red/20";
+  }
+
+  return "bg-theme-gray ring-theme-gray/20";
 }
 
 function publicAddressKey(
@@ -672,46 +999,48 @@ function PublicAddressRow({
   };
 
   return (
-    <div className="grid min-w-0 gap-2 rounded-md border border-border bg-background/60 p-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1 truncate font-mono text-foreground text-xs">
-          {value}
-        </div>
-        {address.status == null || address.status === "" ? null : (
-          <Badge className="shrink-0 text-[10px]" variant="secondary">
-            {address.status}
-          </Badge>
+    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+      <span
+        aria-label={`Public Address status: ${publicAddressStatusLabel(address)}`}
+        className={cn(
+          "size-3 shrink-0 rounded-full ring-4",
+          publicAddressStatusDotClass(address)
         )}
+        role="img"
+      />
+      <div className="grid min-w-0 flex-1 gap-1">
+        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+          {value === "" ? "Pending domain" : value}
+        </div>
+        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+          {address.port}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
         <Button
           aria-label="Copy Public Address"
+          className="h-9 min-w-16 px-3 text-sm"
           disabled={value === ""}
           onClick={handleCopy}
-          size="icon-sm"
+          size="lg"
           type="button"
-          variant="ghost"
+          variant="secondary"
         >
-          <Copy aria-hidden />
+          CNAME
         </Button>
         {readOnly || onDelete == null ? null : (
           <Button
             aria-label="Delete Public Address"
+            className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
             disabled={pending}
             onClick={handleDelete}
-            size="icon-sm"
+            size="icon-lg"
             type="button"
             variant="ghost"
           >
             <Trash2 aria-hidden />
           </Button>
         )}
-      </div>
-      <div className="grid min-w-0 gap-1.5">
-        <Label>Public Address target port</Label>
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="h-8 max-w-32 rounded-md border border-border bg-muted/30 px-2.5 py-2 font-mono text-foreground text-xs">
-            {address.port}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -773,13 +1102,13 @@ function AddPublicAddressForm({
   };
 
   return (
-    <div className="grid min-w-0 gap-2 rounded-md border border-border border-dashed bg-background/60 p-2">
+    <div className="grid min-w-0 gap-3 rounded-md border border-border border-dashed bg-background/40 p-3">
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
         <Input
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className="h-8 max-w-32 font-mono text-xs"
+          className="h-9 max-w-32 font-mono text-sm"
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -797,18 +1126,18 @@ function AddPublicAddressForm({
       )}
       <div className="flex justify-end gap-1">
         <Button
-          className="h-7 px-2 text-xs"
           disabled={pending}
           onClick={onCancel}
+          size="sm"
           type="button"
           variant="ghost"
         >
           Cancel
         </Button>
         <Button
-          className="h-7 px-2 text-xs"
           disabled={pending || onSubmit == null}
           onClick={handleSubmit}
+          size="sm"
           type="button"
           variant="secondary"
         >
@@ -829,14 +1158,26 @@ function NetworkSettingsSection({
   const [addOpen, setAddOpen] = useState(false);
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
+  const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
   const canMutateNetwork = !readOnly && onNetworkChange != null;
+  const visiblePublicAddresses = showAllPublicAddresses
+    ? network.publicAddresses
+    : network.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+  const hiddenPublicAddressCount =
+    network.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
     setDraftPort(String(network.privatePort));
     setPortError(null);
   }, [network.privatePort]);
+
+  useEffect(() => {
+    if (network.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+      setShowAllPublicAddresses(false);
+    }
+  }, [network.publicAddresses.length]);
 
   const parsedPort = parsePortNumberDigits(draftPort.trim());
   const portDirty = draftPort.trim() !== String(network.privatePort);
@@ -928,7 +1269,7 @@ function NetworkSettingsSection({
         )}
       </div>
 
-      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-2.5">
+      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
         <div className="grid min-w-0 gap-1.5">
           <Label className="text-muted-foreground text-xs">
             Private Address
@@ -978,25 +1319,30 @@ function NetworkSettingsSection({
           )}
         </div>
 
-        <div className="grid min-w-0 gap-1.5">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <Label className="text-muted-foreground text-xs">
-              Public Addresses
+        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
+          <div className="flex min-w-0 items-center gap-2 px-0.5">
+            <Network
+              aria-hidden
+              className="size-4 shrink-0 text-muted-foreground"
+              strokeWidth={2}
+            />
+            <Label className="truncate text-foreground text-sm">
+              Domain List
             </Label>
-            {readOnly ? null : (
-              <Button
-                aria-label="Add Public Address"
-                className="h-7 px-2 text-xs"
-                disabled={addOpen || onNetworkChange == null}
-                onClick={() => setAddOpen(true)}
-                type="button"
-                variant="ghost"
-              >
-                <Plus aria-hidden />
-                Add
-              </Button>
-            )}
           </div>
+          {readOnly ? null : (
+            <Button
+              aria-label="Add Public Address"
+              className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+              disabled={addOpen || onNetworkChange == null}
+              onClick={() => setAddOpen(true)}
+              type="button"
+              variant="secondary"
+            >
+              <Plus aria-hidden className="text-primary" />
+              Add Domain
+            </Button>
+          )}
           {addOpen ? (
             <AddPublicAddressForm
               defaultPort={network.privatePort}
@@ -1007,12 +1353,12 @@ function NetworkSettingsSection({
             />
           ) : null}
           {network.publicAddresses.length === 0 ? (
-            <div className="rounded-md border border-border border-dashed px-2.5 py-2 text-muted-foreground text-xs">
-              No public addresses
+            <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
+              No domains yet
             </div>
           ) : (
             <div className="grid gap-2">
-              {network.publicAddresses.map((address, index) => (
+              {visiblePublicAddresses.map((address, index) => (
                 <PublicAddressRow
                   address={address}
                   key={publicAddressKey(address, index)}
@@ -1026,7 +1372,410 @@ function NetworkSettingsSection({
               ))}
             </div>
           )}
+          {hiddenPublicAddressCount > 0 ? (
+            <Button
+              className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+              onClick={() => setShowAllPublicAddresses(true)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              View All
+            </Button>
+          ) : null}
         </div>
+      </div>
+    </section>
+  );
+}
+
+interface ReplicaStrategySectionProps {
+  elastic: ContainerElasticReplicaSettings;
+  fixedReplicasSliderParts: {
+    onReplicasQuotaChange: (value: number) => void;
+    replicasValue: number;
+    rest: Omit<
+      ContainerSettingsControlledQuotaProps,
+      "onValueChange" | "value"
+    >;
+  };
+  onElasticCpuTargetChange: (value: number) => void;
+  onElasticMaxReplicasChange: (value: number) => void;
+  onElasticMemoryTargetChange: (value: number) => void;
+  onElasticMinReplicasChange: (value: number) => void;
+  onElasticTargetMetricChange: (metric: ElasticTargetMetric) => void;
+  onStrategyTypeChange: (type: ReplicaStrategyType) => void;
+  readOnly: boolean;
+  strategyType: ReplicaStrategyType;
+}
+
+interface ReplicaScaleSliderProps {
+  "aria-label": string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  max: number;
+  min: number;
+  onValueChange: (value: number) => void;
+  rest?: Omit<ContainerSettingsControlledQuotaProps, "onValueChange" | "value">;
+  value: number;
+}
+
+function ReplicaScaleSlider({
+  "aria-label": ariaLabel,
+  disabled,
+  icon,
+  label,
+  max,
+  min,
+  onValueChange,
+  rest,
+  value,
+}: ReplicaScaleSliderProps) {
+  return (
+    <ScaleSlider.Root
+      {...rest}
+      disabled={disabled ?? rest?.disabled}
+      max={max}
+      maxDecimals={0}
+      min={min}
+      onValueChange={onValueChange}
+      step={rest?.step ?? 1}
+      value={value}
+      valueDisplay="number"
+    >
+      <ScaleSlider.Stack className="w-full">
+        <ScaleSlider.Header className="min-h-6">
+          <ScaleSlider.Group className="min-w-0 gap-2">
+            <ScaleSlider.Icon className="shrink-0" icon={icon} />
+            <ScaleSlider.Label className="text-foreground">
+              {label}
+            </ScaleSlider.Label>
+          </ScaleSlider.Group>
+          <div className="flex h-6 min-w-0 items-center justify-end">
+            <ScaleSlider.Value />
+          </div>
+        </ScaleSlider.Header>
+        <ScaleSlider.Control aria-label={ariaLabel}>
+          <ScaleSlider.Track>
+            <ScaleSlider.Range />
+          </ScaleSlider.Track>
+          <ScaleSlider.Thumb />
+        </ScaleSlider.Control>
+      </ScaleSlider.Stack>
+    </ScaleSlider.Root>
+  );
+}
+
+interface ReadOnlyReplicaValueProps {
+  label: string;
+  value: ReactNode;
+}
+
+function ReadOnlyReplicaValue({ label, value }: ReadOnlyReplicaValueProps) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background/60 px-2.5 py-2">
+      <span className="min-w-0 truncate text-muted-foreground text-xs">
+        {label}
+      </span>
+      <span className="shrink-0 font-medium text-foreground text-xs tabular-nums">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function replicaStrategyDisplayName(strategyType: ReplicaStrategyType): string {
+  if (strategyType === "elastic") {
+    return "Elastic Scaling";
+  }
+  return "Fixed Replicas";
+}
+
+function elasticTargetMetricDisplayName(
+  targetMetric: ElasticTargetMetric
+): string {
+  if (targetMetric === "memory") {
+    return "Memory";
+  }
+  return "CPU";
+}
+
+function memoryTargetDisplayValue(
+  elastic: ContainerElasticReplicaSettings,
+  memoryTargetMib: number
+): string {
+  if (elastic.target.metric === "memory") {
+    return elastic.target.averageValue;
+  }
+  return `${memoryTargetMib}Mi`;
+}
+
+interface ReadOnlyReplicaStrategyRowsOptions {
+  cpuTargetPercent: number;
+  elastic: ContainerElasticReplicaSettings;
+  fixedReplicas: number;
+  maxReplicas: number;
+  memoryTargetMib: number;
+  minReplicas: number;
+  strategyType: ReplicaStrategyType;
+  targetMetric: ElasticTargetMetric;
+}
+
+function readOnlyReplicaStrategyRows({
+  cpuTargetPercent,
+  elastic,
+  fixedReplicas,
+  maxReplicas,
+  memoryTargetMib,
+  minReplicas,
+  strategyType,
+  targetMetric,
+}: ReadOnlyReplicaStrategyRowsOptions): ReadOnlyReplicaValueProps[] {
+  const rows: ReadOnlyReplicaValueProps[] = [
+    {
+      label: "Strategy",
+      value: replicaStrategyDisplayName(strategyType),
+    },
+  ];
+
+  if (strategyType === "fixed") {
+    rows.push({ label: "Replica count", value: fixedReplicas });
+    return rows;
+  }
+
+  rows.push(
+    { label: "Minimum replicas", value: minReplicas },
+    { label: "Maximum replicas", value: maxReplicas },
+    {
+      label: "Scaling target",
+      value: elasticTargetMetricDisplayName(targetMetric),
+    }
+  );
+
+  if (targetMetric === "memory") {
+    rows.push({
+      label: "Memory average target",
+      value: memoryTargetDisplayValue(elastic, memoryTargetMib),
+    });
+    return rows;
+  }
+
+  rows.push({
+    label: "CPU utilization target",
+    value: `${cpuTargetPercent}%`,
+  });
+  return rows;
+}
+
+interface ReadOnlyReplicaStrategySummaryProps {
+  rows: readonly ReadOnlyReplicaValueProps[];
+}
+
+function ReadOnlyReplicaStrategySummary({
+  rows,
+}: ReadOnlyReplicaStrategySummaryProps) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
+        <SectionTitle className="m-0 min-w-0 shrink leading-none">
+          Replica Strategy
+        </SectionTitle>
+      </div>
+      <div className="grid min-w-0 gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+        {rows.map((row) => (
+          <ReadOnlyReplicaValue
+            key={row.label}
+            label={row.label}
+            value={row.value}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReplicaStrategySection({
+  elastic,
+  fixedReplicasSliderParts,
+  onElasticCpuTargetChange,
+  onElasticMaxReplicasChange,
+  onElasticMemoryTargetChange,
+  onElasticMinReplicasChange,
+  onElasticTargetMetricChange,
+  onStrategyTypeChange,
+  readOnly,
+  strategyType,
+}: ReplicaStrategySectionProps) {
+  const minReplicas = normalizeReplicaCount(elastic.minReplicas);
+  const maxReplicas = Math.max(
+    minReplicas,
+    normalizeReplicaCount(elastic.maxReplicas)
+  );
+  const targetMetric = elastic.target.metric;
+  const cpuTargetPercent =
+    elastic.target.metric === "cpu"
+      ? normalizeCpuUtilizationTarget(elastic.target.utilizationPercent)
+      : DEFAULT_CPU_UTILIZATION_TARGET_PERCENT;
+  const memoryTargetMib =
+    elastic.target.metric === "memory"
+      ? memoryAverageValueToMib(elastic.target.averageValue)
+      : DEFAULT_MEMORY_AVERAGE_TARGET_MIB;
+
+  if (readOnly) {
+    return (
+      <ReadOnlyReplicaStrategySummary
+        rows={readOnlyReplicaStrategyRows({
+          cpuTargetPercent,
+          elastic,
+          fixedReplicas: fixedReplicasSliderParts.replicasValue,
+          maxReplicas,
+          memoryTargetMib,
+          minReplicas,
+          strategyType,
+          targetMetric,
+        })}
+      />
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
+        <SectionTitle className="m-0 min-w-0 shrink leading-none">
+          Replica Strategy
+        </SectionTitle>
+      </div>
+      <div className="grid min-w-0 gap-3">
+        <ToggleGroup
+          aria-label="Replica Strategy"
+          className="grid w-full grid-cols-2"
+          onValueChange={(value) => {
+            const next = value[0];
+            if (next === "fixed" || next === "elastic") {
+              onStrategyTypeChange(next);
+            }
+          }}
+          spacing={1}
+          value={[strategyType]}
+          variant="outline"
+        >
+          <ToggleGroupItem
+            aria-label="Fixed Replicas"
+            className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+            data-selected={strategyType === "fixed" ? "true" : undefined}
+            disabled={readOnly}
+            value="fixed"
+          >
+            Fixed Replicas
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            aria-label="Elastic Scaling"
+            className="h-8 min-w-0 text-xs"
+            data-selected={strategyType === "elastic" ? "true" : undefined}
+            disabled={readOnly}
+            value="elastic"
+          >
+            Elastic Scaling
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        {strategyType === "fixed" ? (
+          <ReplicaScaleSlider
+            aria-label="Replica count"
+            icon={Layers}
+            label="Replica count"
+            max={fixedReplicasSliderParts.rest.max ?? REPLICA_LIMITS.max}
+            min={fixedReplicasSliderParts.rest.min ?? REPLICA_LIMITS.min}
+            onValueChange={fixedReplicasSliderParts.onReplicasQuotaChange}
+            rest={fixedReplicasSliderParts.rest}
+            value={fixedReplicasSliderParts.replicasValue}
+          />
+        ) : (
+          <div className="flex flex-col gap-5">
+            <ReplicaScaleSlider
+              aria-label="Minimum replicas"
+              disabled={readOnly}
+              icon={Layers}
+              label="Minimum replicas"
+              max={REPLICA_LIMITS.max}
+              min={REPLICA_LIMITS.min}
+              onValueChange={onElasticMinReplicasChange}
+              value={minReplicas}
+            />
+
+            <ReplicaScaleSlider
+              aria-label="Maximum replicas"
+              disabled={readOnly}
+              icon={Layers}
+              label="Maximum replicas"
+              max={REPLICA_LIMITS.max}
+              min={REPLICA_LIMITS.min}
+              onValueChange={onElasticMaxReplicasChange}
+              value={maxReplicas}
+            />
+
+            <div className="grid min-w-0 gap-2">
+              <Label className="text-foreground text-xs">Scaling target</Label>
+              <ToggleGroup
+                aria-label="Scaling target"
+                className="grid w-full grid-cols-2"
+                onValueChange={(value) => {
+                  const next = value[0];
+                  if (next === "cpu" || next === "memory") {
+                    onElasticTargetMetricChange(next);
+                  }
+                }}
+                spacing={1}
+                value={[targetMetric]}
+                variant="outline"
+              >
+                <ToggleGroupItem
+                  aria-label="CPU utilization target"
+                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  data-selected={targetMetric === "cpu" ? "true" : undefined}
+                  disabled={readOnly}
+                  value="cpu"
+                >
+                  CPU utilization target
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  aria-label="Memory average target"
+                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  data-selected={targetMetric === "memory" ? "true" : undefined}
+                  disabled={readOnly}
+                  value="memory"
+                >
+                  Memory average target
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {targetMetric === "memory" ? (
+              <ReplicaScaleSlider
+                aria-label="Memory average target"
+                disabled={readOnly}
+                icon={MemoryStick}
+                label="Memory average target"
+                max={MEMORY_AVERAGE_TARGET_LIMITS.max}
+                min={MEMORY_AVERAGE_TARGET_LIMITS.min}
+                onValueChange={onElasticMemoryTargetChange}
+                value={memoryTargetMib}
+              />
+            ) : (
+              <ReplicaScaleSlider
+                aria-label="CPU utilization target"
+                disabled={readOnly}
+                icon={Cpu}
+                label="CPU utilization target"
+                max={CPU_UTILIZATION_TARGET_LIMITS.max}
+                min={CPU_UTILIZATION_TARGET_LIMITS.min}
+                onValueChange={onElasticCpuTargetChange}
+                value={cpuTargetPercent}
+              />
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -1050,6 +1799,7 @@ export function ContainerSettingsPane({
   env,
   network,
   replicasQuota,
+  replicaStrategy,
   onResourceQuotasCommit,
   readOnly = false,
   dbDsnReferenceSources = [],
@@ -1089,18 +1839,23 @@ export function ContainerSettingsPane({
 
   const [draftCpu, setDraftCpu] = useState(cpuQuota.value);
   const [draftMem, setDraftMem] = useState(memoryQuota.value);
-  const [draftReplicas, setDraftReplicas] = useState(
-    () => replicasQuota?.value ?? 1
+  const [draftReplicaStrategy, setDraftReplicaStrategy] = useState(() =>
+    normalizeReplicaStrategy(
+      replicaStrategy,
+      replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
+    )
   );
 
   useEffect(() => {
     setDraftCpu(cpuQuota.value);
     setDraftMem(memoryQuota.value);
-    if (replicasQuota == null) {
-      return;
-    }
-    setDraftReplicas(replicasQuota.value);
-  }, [cpuQuota.value, memoryQuota.value, replicasQuota]);
+    setDraftReplicaStrategy(
+      normalizeReplicaStrategy(
+        replicaStrategy,
+        replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
+      )
+    );
+  }, [cpuQuota.value, memoryQuota.value, replicaStrategy, replicasQuota]);
 
   useEffect(() => {
     if (containerEnvRowsModelEqual(env, syncedEnvRef.current)) {
@@ -1153,28 +1908,40 @@ export function ContainerSettingsPane({
     memoryQuota.value,
     replicasQuota == null
       ? undefined
-      : { committed: replicasQuota.value, draft: draftReplicas }
+      : {
+          committed: normalizeReplicaStrategy(
+            replicaStrategy,
+            replicasQuota.value
+          ),
+          draft: draftReplicaStrategy,
+        }
   );
 
   const handleQuotaCancel = () => {
     setDraftCpu(cpuQuota.value);
     setDraftMem(memoryQuota.value);
-    if (replicasQuota == null) {
-      return;
-    }
-    setDraftReplicas(replicasQuota.value);
+    setDraftReplicaStrategy(
+      normalizeReplicaStrategy(
+        replicaStrategy,
+        replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
+      )
+    );
   };
 
   const handleQuotaSave = async () => {
     if (onResourceQuotasCommit == null) {
       return;
     }
+    const replicaPatch = resourceQuotaReplicaPatchFromDraft(
+      replicasQuota != null,
+      draftReplicaStrategy
+    );
     setQuotaSavePending(true);
     try {
       await onResourceQuotasCommit({
         cpu: draftCpu,
         memory: draftMem,
-        ...(replicasQuota == null ? {} : { replicas: draftReplicas }),
+        ...replicaPatch,
       });
     } finally {
       setQuotaSavePending(false);
@@ -1238,8 +2005,8 @@ export function ContainerSettingsPane({
       return null;
     }
     const base = {
-      min: 1,
-      max: 20,
+      min: REPLICA_LIMITS.min,
+      max: REPLICA_LIMITS.max,
       step: 1,
       ...replicasQuota,
       ...(readOnly ? { disabled: true } : {}),
@@ -1247,12 +2014,22 @@ export function ContainerSettingsPane({
     if (quotaCommitMode) {
       return {
         ...base,
-        onValueChange: setDraftReplicas,
-        value: draftReplicas,
+        onValueChange: (value: number) => {
+          setDraftReplicaStrategy((current) => ({
+            ...current,
+            fixed: normalizeFixedReplicaSettings(value),
+          }));
+        },
+        value: draftReplicaStrategy.fixed.replicas,
       };
     }
     return base;
-  }, [draftReplicas, quotaCommitMode, readOnly, replicasQuota]);
+  }, [
+    draftReplicaStrategy.fixed.replicas,
+    quotaCommitMode,
+    readOnly,
+    replicasQuota,
+  ]);
 
   const replicasSliderParts = useMemo(() => {
     if (replicasSlider == null) {
@@ -1273,6 +2050,100 @@ export function ContainerSettingsPane({
       rest,
     };
   }, [replicasSlider]);
+  const handleReplicaStrategyTypeChange = (type: ReplicaStrategyType) => {
+    setDraftReplicaStrategy((current) => {
+      return replicaStrategyWithType(current, type);
+    });
+  };
+
+  const handleElasticMinReplicasChange = (value: number) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      const minReplicas = normalizeReplicaCount(value);
+      return {
+        elastic: {
+          ...elastic,
+          maxReplicas: Math.max(minReplicas, elastic.maxReplicas),
+          minReplicas,
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const handleElasticMaxReplicasChange = (value: number) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      const maxReplicas = normalizeReplicaCount(value);
+      return {
+        elastic: {
+          ...elastic,
+          maxReplicas,
+          minReplicas: Math.min(elastic.minReplicas, maxReplicas),
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const handleElasticCpuTargetChange = (value: number) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      return {
+        elastic: {
+          ...elastic,
+          target: cpuElasticTarget(value),
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const handleElasticMemoryTargetChange = (value: number) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      return {
+        elastic: {
+          ...elastic,
+          target: memoryElasticTarget(memoryAverageMibToValue(value)),
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const handleElasticTargetMetricChange = (metric: ElasticTargetMetric) => {
+    setDraftReplicaStrategy((current) => {
+      const elastic = normalizeElasticReplicaSettings(
+        elasticSettingsFromStrategy(current)
+      );
+      if (metric === elastic.target.metric) {
+        return { elastic, fixed: current.fixed, type: "elastic" };
+      }
+      return {
+        elastic: {
+          ...elastic,
+          target: defaultElasticTargetForMetric(metric),
+        },
+        fixed: current.fixed,
+        type: "elastic",
+      };
+    });
+  };
+
+  const replicaStrategyType = draftReplicaStrategy.type;
 
   const {
     value: cpuValueRaw,
@@ -1498,38 +2369,29 @@ export function ContainerSettingsPane({
                 </ScaleSlider.Control>
               </ScaleSlider.Stack>
             </ScaleSlider.Root>
-
-            {replicasSliderParts == null ? null : (
-              <ScaleSlider.Root
-                {...replicasSliderParts.rest}
-                maxDecimals={0}
-                onValueChange={replicasSliderParts.onReplicasQuotaChange}
-                value={replicasSliderParts.replicasValue}
-                valueDisplay="number"
-              >
-                <ScaleSlider.Stack className="w-full">
-                  <ScaleSlider.Header className="min-h-6">
-                    <ScaleSlider.Group className="min-w-0 gap-2">
-                      <ScaleSlider.Icon className="shrink-0" icon={Layers} />
-                      <ScaleSlider.Label className="text-foreground">
-                        Replicas
-                      </ScaleSlider.Label>
-                    </ScaleSlider.Group>
-                    <div className="flex h-6 min-w-0 items-center justify-end">
-                      <ScaleSlider.Value />
-                    </div>
-                  </ScaleSlider.Header>
-                  <ScaleSlider.Control aria-label="Replica count">
-                    <ScaleSlider.Track>
-                      <ScaleSlider.Range />
-                    </ScaleSlider.Track>
-                    <ScaleSlider.Thumb />
-                  </ScaleSlider.Control>
-                </ScaleSlider.Stack>
-              </ScaleSlider.Root>
-            )}
           </div>
         </section>
+
+        {replicasSliderParts == null ? null : (
+          <>
+            <Separator />
+
+            <ReplicaStrategySection
+              elastic={normalizeElasticReplicaSettings(
+                elasticSettingsFromStrategy(draftReplicaStrategy)
+              )}
+              fixedReplicasSliderParts={replicasSliderParts}
+              onElasticCpuTargetChange={handleElasticCpuTargetChange}
+              onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
+              onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
+              onElasticMinReplicasChange={handleElasticMinReplicasChange}
+              onElasticTargetMetricChange={handleElasticTargetMetricChange}
+              onStrategyTypeChange={handleReplicaStrategyTypeChange}
+              readOnly={readOnly}
+              strategyType={replicaStrategyType}
+            />
+          </>
+        )}
 
         <Separator />
 
