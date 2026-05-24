@@ -25,6 +25,8 @@ const CUSTOM_DOMAIN_PLATFORM_ADDRESS_MISSING_RE =
   /Custom Domain Binding must reference an existing Platform Address/;
 const CUSTOM_DOMAIN_PLATFORM_ADDRESS_UNIQUE_RE =
   /Platform Address can only be bound to one Custom Domain/;
+const CUSTOM_DOMAIN_DUPLICATE_RE =
+  /Custom Domain is already bound in this namespace/;
 
 function patchOpValue(op: K8sJsonPatchOp | undefined): unknown {
   if (op === undefined || op.op === "remove") {
@@ -396,6 +398,107 @@ test("AP network settings validate Custom Domain Binding references", () => {
       ),
     CUSTOM_DOMAIN_PLATFORM_ADDRESS_UNIQUE_RE
   );
+});
+
+test("AP network settings reject duplicate Custom Domains in the namespace routing scope", () => {
+  const network = {
+    customDomains: [
+      {
+        domain: "WWW.Example.COM.",
+        id: "cd_def456",
+        platformAddressId: "pa_abc123",
+      },
+    ],
+    privatePort: 8080,
+    publicAddresses: [{ id: "pa_abc123", port: 8080 }],
+  };
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings({ input: {} }, network, {
+        existingCustomDomains: [
+          {
+            apRef: "worker",
+            domain: "www.example.com",
+            namespace: "default",
+          },
+        ],
+        metadata: { name: "api", namespace: "default" },
+      }),
+    CUSTOM_DOMAIN_DUPLICATE_RE
+  );
+
+  assert.doesNotThrow(() =>
+    patchOpsForApNetworkSettings({ input: {} }, network, {
+      existingCustomDomains: [
+        {
+          apRef: "api",
+          domain: "www.example.com",
+          namespace: "default",
+        },
+      ],
+      metadata: { name: "api", namespace: "default" },
+    })
+  );
+});
+
+test("AP network settings keep bound Custom Domains following Platform Address port changes", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        network: {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+            },
+          ],
+          platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          privatePort: 8080,
+        },
+      },
+    },
+    {
+      customDomains: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_abc123",
+          status: "accessible",
+        },
+      ],
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api-7c6ad52581.apps.example.com",
+          id: "pa_abc123",
+          port: 9000,
+          status: "accessible",
+          type: "platform",
+          url: "https://api-7c6ad52581.apps.example.com/",
+        },
+      ],
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+          },
+        ],
+        platformAddresses: [{ id: "pa_abc123", port: 9000 }],
+        privatePort: 8080,
+      },
+    },
+  ]);
 });
 
 test("AP resource quota settings write canonical fixed replica strategy", () => {

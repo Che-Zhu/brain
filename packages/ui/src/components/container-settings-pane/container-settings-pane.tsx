@@ -126,11 +126,22 @@ export interface ContainerNetworkPublicAddress {
   url?: string;
 }
 
+export interface ContainerNetworkCustomDomainDetail {
+  message?: string;
+  reason?: string;
+  status?: string;
+}
+
 export interface ContainerNetworkCustomDomain {
+  certificate?: ContainerNetworkCustomDomainDetail;
+  cnameTarget?: string;
+  dns?: ContainerNetworkCustomDomainDetail;
   domain: string;
   id: string;
   platformAddressId: string;
+  routing?: ContainerNetworkCustomDomainDetail;
   status?: string;
+  targetPort?: number;
 }
 
 export interface ContainerNetwork {
@@ -1201,12 +1212,14 @@ function publicAddressStatusDotClass(
   if (
     status === "progressing" ||
     status === "pending" ||
+    status === "verifying" ||
     status === "creating"
   ) {
     return "bg-theme-yellow ring-theme-yellow/20";
   }
 
   if (
+    status === "blocked" ||
     status === "failed" ||
     status === "error" ||
     status === "inaccessible" ||
@@ -1374,27 +1387,113 @@ function PublicAddressRow({
 
 interface CustomDomainRowProps {
   domain: ContainerNetworkCustomDomain;
+  onUnbind?: () => void | Promise<void>;
+  readOnly: boolean;
 }
 
-function CustomDomainRow({ domain }: CustomDomainRowProps) {
+function lifecycleDetailLabel(
+  label: string,
+  detail: ContainerNetworkCustomDomainDetail | undefined
+): string {
+  const status = detail?.status?.trim().toLowerCase() || "unknown";
+  return `${label} ${status}`;
+}
+
+function lifecycleDetailText(
+  detail: ContainerNetworkCustomDomainDetail | undefined
+): string {
+  const reason = detail?.reason?.trim() ?? "";
+  const message = detail?.message?.trim() ?? "";
+  if (reason !== "" && message !== "") {
+    return `${reason}: ${message}`;
+  }
+  return reason || message;
+}
+
+function CustomDomainLifecycleDetail({
+  detail,
+  label,
+}: {
+  detail: ContainerNetworkCustomDomainDetail | undefined;
+  label: string;
+}) {
+  const text = lifecycleDetailText(detail);
   return (
-    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+    <div className="grid min-w-0 gap-0.5">
+      <Badge className="justify-self-start" variant="outline">
+        {lifecycleDetailLabel(label, detail)}
+      </Badge>
+      {text === "" ? null : (
+        <span className="min-w-0 truncate text-muted-foreground text-xs">
+          {text}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
+  const [pending, setPending] = useState(false);
+  const handleUnbind = async () => {
+    if (onUnbind == null) {
+      return;
+    }
+    setPending(true);
+    try {
+      await onUnbind();
+    } finally {
+      setPending(false);
+    }
+  };
+  const targetPort = domain.targetPort ?? undefined;
+  const targetText =
+    domain.cnameTarget == null || domain.cnameTarget.trim() === ""
+      ? domain.platformAddressId
+      : domain.cnameTarget.trim();
+
+  return (
+    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-muted/50 px-2.5 py-2">
       <span
         aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
         className={cn(
-          "size-3 shrink-0 rounded-full ring-4",
+          "mt-1 size-3 shrink-0 rounded-full ring-4",
           publicAddressStatusDotClass({ port: 1, status: domain.status })
         )}
         role="img"
       />
-      <div className="grid min-w-0 flex-1 gap-1">
+      <div className="grid min-w-0 flex-1 gap-2">
         <div className="min-w-0 truncate text-foreground text-sm leading-5">
           {domain.domain}
         </div>
         <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
-          {domain.platformAddressId}
+          {targetPort == null ? targetText : `${targetText} -> ${targetPort}`}
+        </div>
+        <div className="grid min-w-0 gap-1 sm:grid-cols-3">
+          <CustomDomainLifecycleDetail detail={domain.dns} label="DNS" />
+          <CustomDomainLifecycleDetail
+            detail={domain.certificate}
+            label="Certificate"
+          />
+          <CustomDomainLifecycleDetail
+            detail={domain.routing}
+            label="Routing"
+          />
         </div>
       </div>
+      {readOnly || onUnbind == null ? null : (
+        <Button
+          aria-label="Unbind Custom Domain"
+          className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={pending}
+          onClick={handleUnbind}
+          size="icon-lg"
+          title="Unbind Custom Domain"
+          type="button"
+          variant="ghost"
+        >
+          <X aria-hidden />
+        </Button>
+      )}
     </div>
   );
 }
@@ -1541,6 +1640,19 @@ function visibleDomainRows(network: ContainerNetwork): VisibleDomainRows {
     customDomains,
     publicAddresses: network.publicAddresses.filter(
       (address) => !boundPlatformAddressIds.has(address.id?.trim() ?? "")
+    ),
+  };
+}
+
+export function containerNetworkAfterUnbindCustomDomain(
+  network: ContainerNetwork,
+  target: Pick<ContainerNetworkCustomDomain, "id">
+): ContainerNetwork {
+  const targetId = target.id.trim();
+  return {
+    ...network,
+    customDomains: (network.customDomains ?? []).filter(
+      (domain) => domain.id.trim() !== targetId
     ),
   };
 }
@@ -1733,6 +1845,9 @@ interface DomainListSectionProps {
   onDeletePublicAddress: (index: number) => void | Promise<void>;
   onOpenAddPublicAddress: () => void;
   onShowAllPublicAddresses: () => void;
+  onUnbindCustomDomain: (
+    domain: ContainerNetworkCustomDomain
+  ) => void | Promise<void>;
   platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   readOnly: boolean;
   visibleDomainRows: VisibleDomainRows;
@@ -1750,6 +1865,7 @@ function DomainListSection({
   onDeletePublicAddress,
   onOpenAddPublicAddress,
   onShowAllPublicAddresses,
+  onUnbindCustomDomain,
   platformAddressDraftContext,
   readOnly,
   visibleDomainRows,
@@ -1800,6 +1916,12 @@ function DomainListSection({
             <CustomDomainRow
               domain={domain}
               key={customDomainKey(domain, index)}
+              onUnbind={
+                canMutateNetwork
+                  ? () => onUnbindCustomDomain(domain)
+                  : undefined
+              }
+              readOnly={readOnly}
             />
           ))}
           {visiblePublicAddresses.map((address, index) => (
@@ -1967,6 +2089,15 @@ function NetworkSettingsSection({
     );
   };
 
+  const handleUnbindCustomDomain = async (
+    domain: ContainerNetworkCustomDomain
+  ) => {
+    await commitNetworkChange(
+      containerNetworkAfterUnbindCustomDomain(network, domain),
+      { onNetworkChange, onNetworkDraftChange }
+    );
+  };
+
   return (
     <>
       <section className="flex min-w-0 flex-col gap-3">
@@ -2045,6 +2176,7 @@ function NetworkSettingsSection({
             onDeletePublicAddress={handleDeletePublicAddress}
             onOpenAddPublicAddress={() => setAddOpen(true)}
             onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+            onUnbindCustomDomain={handleUnbindCustomDomain}
             platformAddressDraftContext={platformAddressDraftContext}
             readOnly={readOnly}
             visibleDomainRows={visibleDomains}
