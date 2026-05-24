@@ -12,7 +12,11 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
+import {
+  ResourceSettingsInset,
+  ResourceSettingsSection,
+  ResourceSettingsSlider,
+} from "@workspace/ui/components/resource-settings/resource-settings";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -41,8 +45,6 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   Copy,
   Cpu,
-  Layers,
-  type LucideIcon,
   MemoryStick,
   Network,
   Plus,
@@ -635,6 +637,32 @@ function SectionTitle({
       {children}
     </h3>
   );
+}
+
+function formatPlainNumber(value: number, maximumFractionDigits: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits,
+  }).format(value);
+}
+
+function formatCpuCoresValue(cores: number) {
+  const rounded = Number(cores.toFixed(2));
+  return `${formatPlainNumber(rounded, 2)} ${rounded === 1 ? "Core" : "Cores"}`;
+}
+
+function formatMemoryMibValue(mib: number) {
+  const rounded = Math.round(mib);
+  if (Math.abs(rounded) >= 1024) {
+    return `${formatPlainNumber(rounded / 1024, 2)} Gi`;
+  }
+  return `${formatPlainNumber(rounded, 0)} Mi`;
+}
+
+function formatReplicaValue(replicas: number) {
+  const rounded = Math.round(replicas);
+  return `${formatPlainNumber(rounded, 0)} ${
+    rounded === 1 ? "Replica" : "Replicas"
+  }`;
 }
 
 const DB_REFERENCE_FIELD_LABELS: Record<ContainerEnvDbReferenceField, string> =
@@ -1600,6 +1628,7 @@ function NetworkSettingsSection({
 }
 
 interface ReplicaStrategySectionProps {
+  actions?: ReactNode;
   elastic: ContainerElasticReplicaSettings;
   fixedReplicasSliderParts: {
     onReplicasQuotaChange: (value: number) => void;
@@ -1617,64 +1646,6 @@ interface ReplicaStrategySectionProps {
   onStrategyTypeChange: (type: ReplicaStrategyType) => void;
   readOnly: boolean;
   strategyType: ReplicaStrategyType;
-}
-
-interface ReplicaScaleSliderProps {
-  "aria-label": string;
-  disabled?: boolean;
-  icon: LucideIcon;
-  label: string;
-  max: number;
-  min: number;
-  onValueChange: (value: number) => void;
-  rest?: Omit<ContainerSettingsControlledQuotaProps, "onValueChange" | "value">;
-  value: number;
-}
-
-function ReplicaScaleSlider({
-  "aria-label": ariaLabel,
-  disabled,
-  icon,
-  label,
-  max,
-  min,
-  onValueChange,
-  rest,
-  value,
-}: ReplicaScaleSliderProps) {
-  return (
-    <ScaleSlider.Root
-      {...rest}
-      disabled={disabled ?? rest?.disabled}
-      max={max}
-      maxDecimals={0}
-      min={min}
-      onValueChange={onValueChange}
-      step={rest?.step ?? 1}
-      value={value}
-      valueDisplay="number"
-    >
-      <ScaleSlider.Stack className="w-full">
-        <ScaleSlider.Header className="min-h-6">
-          <ScaleSlider.Group className="min-w-0 gap-2">
-            <ScaleSlider.Icon className="shrink-0" icon={icon} />
-            <ScaleSlider.Label className="text-foreground">
-              {label}
-            </ScaleSlider.Label>
-          </ScaleSlider.Group>
-          <div className="flex h-6 min-w-0 items-center justify-end">
-            <ScaleSlider.Value />
-          </div>
-        </ScaleSlider.Header>
-        <ScaleSlider.Control aria-label={ariaLabel}>
-          <ScaleSlider.Track>
-            <ScaleSlider.Range />
-          </ScaleSlider.Track>
-          <ScaleSlider.Thumb />
-        </ScaleSlider.Control>
-      </ScaleSlider.Stack>
-    </ScaleSlider.Root>
-  );
 }
 
 interface ReadOnlyReplicaValueProps {
@@ -1716,9 +1687,11 @@ function memoryTargetDisplayValue(
   memoryTargetMib: number
 ): string {
   if (elastic.target.metric === "memory") {
-    return elastic.target.averageValue;
+    return formatMemoryMibValue(
+      memoryAverageValueToMib(elastic.target.averageValue)
+    );
   }
-  return `${memoryTargetMib}Mi`;
+  return formatMemoryMibValue(memoryTargetMib);
 }
 
 interface ReadOnlyReplicaStrategyRowsOptions {
@@ -1750,13 +1723,16 @@ function readOnlyReplicaStrategyRows({
   ];
 
   if (strategyType === "fixed") {
-    rows.push({ label: "Replica count", value: fixedReplicas });
+    rows.push({
+      label: "Number of Replicas",
+      value: formatReplicaValue(fixedReplicas),
+    });
     return rows;
   }
 
   rows.push(
-    { label: "Minimum replicas", value: minReplicas },
-    { label: "Maximum replicas", value: maxReplicas },
+    { label: "Minimum replicas", value: formatReplicaValue(minReplicas) },
+    { label: "Maximum replicas", value: formatReplicaValue(maxReplicas) },
     {
       label: "Scaling target",
       value: elasticTargetMetricDisplayName(targetMetric),
@@ -1786,13 +1762,8 @@ function ReadOnlyReplicaStrategySummary({
   rows,
 }: ReadOnlyReplicaStrategySummaryProps) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-        <SectionTitle className="m-0 min-w-0 shrink leading-none">
-          Replica Strategy
-        </SectionTitle>
-      </div>
-      <div className="grid min-w-0 gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+    <ResourceSettingsSection title="Replica Strategy">
+      <div className="grid min-w-0 gap-2">
         {rows.map((row) => (
           <ReadOnlyReplicaValue
             key={row.label}
@@ -1801,11 +1772,12 @@ function ReadOnlyReplicaStrategySummary({
           />
         ))}
       </div>
-    </section>
+    </ResourceSettingsSection>
   );
 }
 
 function ReplicaStrategySection({
+  actions,
   elastic,
   fixedReplicasSliderParts,
   onElasticCpuTargetChange,
@@ -1850,16 +1822,11 @@ function ReplicaStrategySection({
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-        <SectionTitle className="m-0 min-w-0 shrink leading-none">
-          Replica Strategy
-        </SectionTitle>
-      </div>
+    <ResourceSettingsSection actions={actions} title="Replica Strategy">
       <div className="grid min-w-0 gap-3">
         <ToggleGroup
           aria-label="Replica Strategy"
-          className="grid w-full grid-cols-2"
+          className="grid h-9 w-full grid-cols-2 rounded-lg bg-muted/40 p-0.5"
           onValueChange={(value) => {
             const next = value[0];
             if (next === "fixed" || next === "elastic") {
@@ -1872,7 +1839,7 @@ function ReplicaStrategySection({
         >
           <ToggleGroupItem
             aria-label="Fixed Replicas"
-            className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+            className="h-8 min-w-0 rounded-md border-0 text-xs"
             data-selected={strategyType === "fixed" ? "true" : undefined}
             disabled={readOnly}
             value="fixed"
@@ -1881,7 +1848,7 @@ function ReplicaStrategySection({
           </ToggleGroupItem>
           <ToggleGroupItem
             aria-label="Elastic Scaling"
-            className="h-8 min-w-0 text-xs"
+            className="h-8 min-w-0 rounded-md border-0 text-xs"
             data-selected={strategyType === "elastic" ? "true" : undefined}
             disabled={readOnly}
             value="elastic"
@@ -1891,45 +1858,54 @@ function ReplicaStrategySection({
         </ToggleGroup>
 
         {strategyType === "fixed" ? (
-          <ReplicaScaleSlider
-            aria-label="Replica count"
-            icon={Layers}
-            label="Replica count"
+          <ResourceSettingsSlider
+            ariaLabel="Replica count"
+            disabled={readOnly || fixedReplicasSliderParts.rest.disabled}
+            formatBound={formatReplicaValue}
+            formatValue={formatReplicaValue}
+            label="Number of Replicas"
             max={fixedReplicasSliderParts.rest.max ?? REPLICA_LIMITS.max}
+            maxDecimals={0}
             min={fixedReplicasSliderParts.rest.min ?? REPLICA_LIMITS.min}
             onValueChange={fixedReplicasSliderParts.onReplicasQuotaChange}
-            rest={fixedReplicasSliderParts.rest}
+            step={fixedReplicasSliderParts.rest.step ?? 1}
             value={fixedReplicasSliderParts.replicasValue}
           />
         ) : (
           <div className="flex flex-col gap-5">
-            <ReplicaScaleSlider
-              aria-label="Minimum replicas"
+            <ResourceSettingsSlider
+              ariaLabel="Minimum replicas"
               disabled={readOnly}
-              icon={Layers}
+              formatBound={formatReplicaValue}
+              formatValue={formatReplicaValue}
               label="Minimum replicas"
               max={REPLICA_LIMITS.max}
+              maxDecimals={0}
               min={REPLICA_LIMITS.min}
               onValueChange={onElasticMinReplicasChange}
+              step={1}
               value={minReplicas}
             />
 
-            <ReplicaScaleSlider
-              aria-label="Maximum replicas"
+            <ResourceSettingsSlider
+              ariaLabel="Maximum replicas"
               disabled={readOnly}
-              icon={Layers}
+              formatBound={formatReplicaValue}
+              formatValue={formatReplicaValue}
               label="Maximum replicas"
               max={REPLICA_LIMITS.max}
+              maxDecimals={0}
               min={REPLICA_LIMITS.min}
               onValueChange={onElasticMaxReplicasChange}
+              step={1}
               value={maxReplicas}
             />
 
-            <div className="grid min-w-0 gap-2">
+            <ResourceSettingsInset>
               <Label className="text-foreground text-xs">Scaling target</Label>
               <ToggleGroup
                 aria-label="Scaling target"
-                className="grid w-full grid-cols-2"
+                className="grid h-9 w-full grid-cols-2 rounded-lg bg-background/40 p-0.5"
                 onValueChange={(value) => {
                   const next = value[0];
                   if (next === "cpu" || next === "memory") {
@@ -1942,7 +1918,7 @@ function ReplicaStrategySection({
               >
                 <ToggleGroupItem
                   aria-label="CPU utilization target"
-                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  className="h-8 min-w-0 rounded-md border-0 text-xs"
                   data-selected={targetMetric === "cpu" ? "true" : undefined}
                   disabled={readOnly}
                   value="cpu"
@@ -1951,7 +1927,7 @@ function ReplicaStrategySection({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   aria-label="Memory average target"
-                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  className="h-8 min-w-0 rounded-md border-0 text-xs"
                   data-selected={targetMetric === "memory" ? "true" : undefined}
                   disabled={readOnly}
                   value="memory"
@@ -1959,35 +1935,43 @@ function ReplicaStrategySection({
                   Memory average target
                 </ToggleGroupItem>
               </ToggleGroup>
-            </div>
+            </ResourceSettingsInset>
 
             {targetMetric === "memory" ? (
-              <ReplicaScaleSlider
-                aria-label="Memory average target"
+              <ResourceSettingsSlider
+                ariaLabel="Memory average target"
                 disabled={readOnly}
+                formatBound={formatMemoryMibValue}
+                formatValue={formatMemoryMibValue}
                 icon={MemoryStick}
                 label="Memory average target"
                 max={MEMORY_AVERAGE_TARGET_LIMITS.max}
+                maxDecimals={0}
                 min={MEMORY_AVERAGE_TARGET_LIMITS.min}
                 onValueChange={onElasticMemoryTargetChange}
+                step={1}
                 value={memoryTargetMib}
               />
             ) : (
-              <ReplicaScaleSlider
-                aria-label="CPU utilization target"
+              <ResourceSettingsSlider
+                ariaLabel="CPU utilization target"
                 disabled={readOnly}
+                formatBound={(next) => `${formatPlainNumber(next, 0)}%`}
+                formatValue={(next) => `${formatPlainNumber(next, 0)}%`}
                 icon={Cpu}
                 label="CPU utilization target"
                 max={CPU_UTILIZATION_TARGET_LIMITS.max}
+                maxDecimals={0}
                 min={CPU_UTILIZATION_TARGET_LIMITS.min}
                 onValueChange={onElasticCpuTargetChange}
+                step={1}
                 value={cpuTargetPercent}
               />
             )}
           </div>
         )}
       </div>
-    </section>
+    </ResourceSettingsSection>
   );
 }
 
@@ -2653,6 +2637,31 @@ export function ContainerSettingsPane({
     memorySlider.min,
     memorySlider.max
   );
+  const quotaActions =
+    quotaCommitMode && !settingsCommitMode && quotasDirty ? (
+      <>
+        <Button
+          className="h-7 px-2 text-xs"
+          disabled={quotaSavePending}
+          onClick={handleQuotaCancel}
+          type="button"
+          variant="ghost"
+        >
+          Cancel
+        </Button>
+        <Button
+          className="h-7 px-2 text-xs"
+          disabled={quotaSavePending}
+          onClick={async () => {
+            await handleQuotaSave();
+          }}
+          type="button"
+          variant="secondary"
+        >
+          Save
+        </Button>
+      </>
+    ) : null;
 
   const handleImageDialogChange = (open: boolean) => {
     setImageDialogOpen(open);
@@ -2893,100 +2902,10 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        <section className="flex flex-col gap-3">
-          <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-            <SectionTitle className="m-0 min-w-0 shrink leading-none">
-              Resource quota
-            </SectionTitle>
-            {quotaCommitMode && !settingsCommitMode && quotasDirty ? (
-              <div className="-mr-1 flex shrink-0 items-center gap-1">
-                <Button
-                  className="h-7 px-2 text-xs"
-                  disabled={quotaSavePending}
-                  onClick={handleQuotaCancel}
-                  type="button"
-                  variant="ghost"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="h-7 px-2 text-xs"
-                  disabled={quotaSavePending}
-                  onClick={async () => {
-                    await handleQuotaSave();
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  Save
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-5">
-            <ScaleSlider.Root
-              {...cpuSliderRest}
-              maxDecimals={cpuDecimals}
-              onValueChange={onCpuQuotaChange}
-              value={cpuValue}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={Cpu} />
-                    <ScaleSlider.Label className="text-foreground">
-                      CPU (cores)
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="CPU quota (cores)">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
-
-            <ScaleSlider.Root
-              {...memorySliderRest}
-              maxDecimals={memoryDecimals}
-              onValueChange={onMemoryQuotaChange}
-              value={memoryValue}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={MemoryStick} />
-                    <ScaleSlider.Label className="text-foreground">
-                      Memory (MiB)
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="Memory quota (MiB)">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
-          </div>
-        </section>
-
-        {replicasSliderParts == null ? null : (
-          <>
-            <Separator />
-
+        <div className="grid gap-3">
+          {replicasSliderParts == null ? null : (
             <ReplicaStrategySection
+              actions={quotaActions}
               elastic={normalizeElasticReplicaSettings(
                 elasticSettingsFromStrategy(draftReplicaStrategy)
               )}
@@ -3000,8 +2919,43 @@ export function ContainerSettingsPane({
               readOnly={readOnly}
               strategyType={replicaStrategyType}
             />
-          </>
-        )}
+          )}
+
+          <ResourceSettingsSection
+            actions={replicasSliderParts == null ? quotaActions : undefined}
+            title="CPU / Memory"
+          >
+            <ResourceSettingsSlider
+              ariaLabel="CPU quota (cores)"
+              disabled={cpuSliderRest.disabled}
+              formatBound={(next) => formatPlainNumber(next, 2)}
+              formatValue={formatCpuCoresValue}
+              icon={Cpu}
+              label="CPU"
+              max={cpuSlider.max}
+              maxDecimals={cpuDecimals}
+              min={cpuSlider.min}
+              onValueChange={onCpuQuotaChange}
+              step={cpuSliderRest.step}
+              value={cpuValue}
+            />
+
+            <ResourceSettingsSlider
+              ariaLabel="Memory quota (MiB)"
+              disabled={memorySliderRest.disabled}
+              formatBound={formatMemoryMibValue}
+              formatValue={formatMemoryMibValue}
+              icon={MemoryStick}
+              label="Memory"
+              max={memorySlider.max}
+              maxDecimals={memoryDecimals}
+              min={memorySlider.min}
+              onValueChange={onMemoryQuotaChange}
+              step={memorySliderRest.step}
+              value={memoryValue}
+            />
+          </ResourceSettingsSection>
+        </div>
 
         <Separator />
 

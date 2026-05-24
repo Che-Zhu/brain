@@ -59,19 +59,19 @@ const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 const REPLICA_STRATEGY_RE = /Replica Strategy/;
 const FIXED_REPLICAS_RE = /Fixed Replicas/;
 const ELASTIC_SCALING_RE = /Elastic Scaling/;
-const REPLICA_COUNT_RE = /Replica count/;
-const REPLICA_VALUE_RE = />4</;
+const REPLICA_COUNT_RE = /Number of Replicas/;
+const REPLICA_VALUE_RE = />4 Replicas</;
 const MIN_REPLICAS_RE = /Minimum replicas/;
-const MIN_REPLICA_VALUE_RE = />2</;
+const MIN_REPLICA_VALUE_RE = />2 Replicas</;
 const MAX_REPLICAS_RE = /Maximum replicas/;
-const MAX_REPLICA_VALUE_RE = />8</;
+const MAX_REPLICA_VALUE_RE = />8 Replicas</;
 const CPU_TARGET_RE = /CPU utilization target/;
-const CPU_TARGET_VALUE_RE = />75</;
+const CPU_TARGET_VALUE_RE = />75%/;
 const CPU_TARGET_PERCENT_RE = />75%</;
 const SCALING_TARGET_RE = /Scaling target/;
 const MEMORY_TARGET_RE = /Memory average target/;
-const MEMORY_TARGET_VALUE_RE = />512</;
-const MEMORY_TARGET_QUANTITY_RE = />512Mi</;
+const MEMORY_TARGET_VALUE_RE = />512 Mi</;
+const MEMORY_TARGET_QUANTITY_RE = />512 Mi</;
 const BUTTON_RE = /<button/;
 
 function renderPane(

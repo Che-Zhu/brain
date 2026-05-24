@@ -10,7 +10,10 @@ import {
   getDatabaseNodeConnectionKey,
   maskDatabaseConnectionString,
 } from "@workspace/ui/components/database-node/database-node";
-import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
+import {
+  ResourceSettingsSection,
+  ResourceSettingsSlider,
+} from "@workspace/ui/components/resource-settings/resource-settings";
 import { Switch } from "@workspace/ui/components/switch";
 import {
   applySettingsDraftBackingResult,
@@ -26,19 +29,12 @@ import {
   Cpu,
   Database,
   HardDrive,
-  type LucideIcon,
   MemoryStick,
   Network,
   Settings2,
   Upload,
 } from "lucide-react";
-import {
-  type ComponentPropsWithoutRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
@@ -47,7 +43,6 @@ import { CanvasResourcePane } from "./canvas-resource-pane";
 import {
   buildDbSettingsPatch,
   type DatabaseSettingsDraft,
-  type DatabaseSettingsNumberConstraint,
   type DatabaseSettingsPatch,
   DB_SETTINGS_CPU_LIMIT_CORES,
   DB_SETTINGS_MEMORY_LIMIT_GIB,
@@ -155,108 +150,6 @@ function DatabaseSettingsHeaderIcon({ iconUrl }: { iconUrl?: string }) {
     );
   }
   return <Database aria-hidden className="size-4 shrink-0 text-theme-blue" />;
-}
-
-function DatabaseSettingsSection({
-  children,
-  className,
-  icon: Icon,
-  title,
-  ...props
-}: ComponentPropsWithoutRef<"section"> & {
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-transparent",
-        className
-      )}
-      {...props}
-    >
-      <header className="flex h-11 shrink-0 items-center gap-1.5 border-border border-b px-2.5">
-        <Icon aria-hidden className="size-4 shrink-0 text-card-foreground" />
-        <h3 className="truncate font-medium text-card-foreground text-sm leading-5">
-          {title}
-        </h3>
-      </header>
-      <div className="flex min-w-0 flex-col gap-3 px-2.5 pb-3">{children}</div>
-    </section>
-  );
-}
-
-function DatabaseSettingsSlider({
-  ariaLabel,
-  constraint,
-  disabled,
-  formatBound,
-  formatValue,
-  icon,
-  label,
-  maxDecimals,
-  onValueChange,
-  value,
-}: {
-  ariaLabel: string;
-  constraint: DatabaseSettingsNumberConstraint;
-  disabled: boolean;
-  formatBound?: (value: number) => string;
-  formatValue: (value: number) => string;
-  icon?: LucideIcon;
-  label: string;
-  maxDecimals: number;
-  onValueChange: (value: number) => void;
-  value: number;
-}) {
-  const Icon = icon;
-  const boundFormatter = formatBound ?? String;
-
-  return (
-    <div className="rounded-lg bg-database-metrics-card p-2.5">
-      <ScaleSlider.Root
-        disabled={disabled}
-        max={constraint.max}
-        maxDecimals={maxDecimals}
-        min={constraint.min}
-        onValueChange={onValueChange}
-        step={constraint.step}
-        value={value}
-        valueDisplay="number"
-      >
-        <ScaleSlider.Stack className="w-full gap-1.5">
-          <ScaleSlider.Header className="mb-0.5 h-9">
-            <ScaleSlider.Group className="min-w-0 gap-1.5">
-              {Icon == null ? null : (
-                <Icon
-                  aria-hidden
-                  className="size-4 shrink-0 text-muted-foreground"
-                />
-              )}
-              <ScaleSlider.Label className="truncate text-muted-foreground text-sm leading-5">
-                {label}
-              </ScaleSlider.Label>
-            </ScaleSlider.Group>
-            <span className="shrink-0 text-primary text-sm leading-5">
-              {formatValue(value)}
-            </span>
-          </ScaleSlider.Header>
-          <ScaleSlider.Control aria-label={ariaLabel} className="h-2">
-            <ScaleSlider.Track className="h-2 bg-input/80">
-              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-theme-blue" />
-            </ScaleSlider.Track>
-            <ScaleSlider.Thumb className="size-4 border-2 border-primary bg-theme-blue shadow-none ring-0" />
-          </ScaleSlider.Control>
-          <div className="flex min-w-0 items-center justify-between gap-3 text-muted-foreground text-sm leading-5">
-            <span className="truncate">{boundFormatter(constraint.min)}</span>
-            <span className="truncate text-right">
-              {boundFormatter(constraint.max)}
-            </span>
-          </div>
-        </ScaleSlider.Stack>
-      </ScaleSlider.Root>
-    </div>
-  );
 }
 
 function DatabaseSettingsConnectionAddressRow({
@@ -718,78 +611,86 @@ export function DatabaseSettingsPaneContent({
       subtitle={subtitle}
       title={data.states.name}
     >
-      <DatabaseSettingsSection icon={Settings2} title="Replicas & Resources">
-        <DatabaseSettingsSlider
+      <ResourceSettingsSection icon={Settings2} title="Replicas & Resources">
+        <ResourceSettingsSlider
           ariaLabel="Database replica count"
-          constraint={DB_SETTINGS_REPLICA_COUNT}
           disabled={controlsDisabled}
           formatValue={formatReplicasValue}
           label="Number of Replicas"
+          max={DB_SETTINGS_REPLICA_COUNT.max}
           maxDecimals={0}
+          min={DB_SETTINGS_REPLICA_COUNT.min}
           onValueChange={(value) => {
             setDraft((current) => ({
               ...current,
               replicas: normalizeDbSettingsReplicas(value),
             }));
           }}
+          step={DB_SETTINGS_REPLICA_COUNT.step}
           value={draft.replicas}
         />
-        <DatabaseSettingsSlider
+        <ResourceSettingsSlider
           ariaLabel="Database CPU limit in cores"
-          constraint={DB_SETTINGS_CPU_LIMIT_CORES}
           disabled={controlsDisabled}
           formatValue={formatCpuValue}
           icon={Cpu}
           label="CPU"
+          max={DB_SETTINGS_CPU_LIMIT_CORES.max}
           maxDecimals={2}
+          min={DB_SETTINGS_CPU_LIMIT_CORES.min}
           onValueChange={(value) => {
             setDraft((current) => ({
               ...current,
               cpuLimitCores: normalizeDbSettingsCpuLimitCores(value),
             }));
           }}
+          step={DB_SETTINGS_CPU_LIMIT_CORES.step}
           value={draft.cpuLimitCores}
         />
-        <DatabaseSettingsSlider
+        <ResourceSettingsSlider
           ariaLabel="Database memory limit in Gi"
-          constraint={DB_SETTINGS_MEMORY_LIMIT_GIB}
           disabled={controlsDisabled}
           formatBound={formatGiValue}
           formatValue={formatGiValue}
           icon={MemoryStick}
           label="Memory"
+          max={DB_SETTINGS_MEMORY_LIMIT_GIB.max}
           maxDecimals={1}
+          min={DB_SETTINGS_MEMORY_LIMIT_GIB.min}
           onValueChange={(value) => {
             setDraft((current) => ({
               ...current,
               memoryLimitGi: normalizeDbSettingsMemoryLimitGi(value),
             }));
           }}
+          step={DB_SETTINGS_MEMORY_LIMIT_GIB.step}
           value={draft.memoryLimitGi}
         />
-      </DatabaseSettingsSection>
+      </ResourceSettingsSection>
 
-      <DatabaseSettingsSection icon={HardDrive} title="Storage">
-        <DatabaseSettingsSlider
+      <ResourceSettingsSection icon={HardDrive} title="Storage">
+        <ResourceSettingsSlider
           ariaLabel="Database storage size in Gi"
-          constraint={DB_SETTINGS_STORAGE_GIB}
           disabled={controlsDisabled}
           formatBound={formatGiValue}
           formatValue={formatGiValue}
           icon={HardDrive}
           label="Storage"
+          max={DB_SETTINGS_STORAGE_GIB.max}
           maxDecimals={0}
+          min={DB_SETTINGS_STORAGE_GIB.min}
           onValueChange={(value) => {
             setDraft((current) => ({
               ...current,
               storageSizeGi: normalizeDbSettingsStorageGi(value),
             }));
           }}
+          step={DB_SETTINGS_STORAGE_GIB.step}
           value={draft.storageSizeGi}
         />
-      </DatabaseSettingsSection>
+      </ResourceSettingsSection>
 
-      <DatabaseSettingsSection icon={Network} title="Connection Address">
+      <ResourceSettingsSection icon={Network} title="Connection Address">
         <DatabaseSettingsConnectionAddressList
           connections={data.connections}
           controlsDisabled={controlsDisabled}
@@ -801,7 +702,7 @@ export function DatabaseSettingsPaneContent({
           }}
           publicConnectionEnabled={draft.exposeNodePort}
         />
-      </DatabaseSettingsSection>
+      </ResourceSettingsSection>
 
       {readOnly ? null : (
         <DatabaseSettingsFooter
