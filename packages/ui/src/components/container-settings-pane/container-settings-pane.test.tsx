@@ -63,9 +63,12 @@ const MAX_REPLICAS_RE = /Maximum replicas/;
 const MAX_REPLICA_VALUE_RE = />8</;
 const CPU_TARGET_RE = /CPU utilization target/;
 const CPU_TARGET_VALUE_RE = />75</;
+const CPU_TARGET_PERCENT_RE = />75%</;
 const SCALING_TARGET_RE = /Scaling target/;
 const MEMORY_TARGET_RE = /Memory average target/;
 const MEMORY_TARGET_VALUE_RE = />512</;
+const MEMORY_TARGET_QUANTITY_RE = />512Mi</;
+const BUTTON_RE = /<button/;
 
 function renderPane(
   readOnly = false,
@@ -321,6 +324,116 @@ test("container settings pane fixed save payload preserves inactive elastic bran
   assert.deepEqual(resourceQuotaReplicaPatchFromDraft(true, draft), {
     replicaStrategy: draft,
   });
+});
+
+test("read-only container settings view renders fixed replica strategy without mutation controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+      readOnly
+      replicaStrategy={{
+        fixed: { replicas: 4 },
+        type: "fixed",
+      }}
+      replicasQuota={{ onValueChange: noop, value: 4 }}
+    />
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, FIXED_REPLICAS_RE);
+  assert.match(html, REPLICA_COUNT_RE);
+  assert.match(html, REPLICA_VALUE_RE);
+  assert.doesNotMatch(html, ELASTIC_SCALING_RE);
+  assert.doesNotMatch(html, BUTTON_RE);
+});
+
+test("read-only container settings view renders CPU elastic replica strategy without mutation controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+      readOnly
+      replicaStrategy={{
+        elastic: {
+          maxReplicas: 8,
+          minReplicas: 2,
+          target: {
+            metric: "cpu",
+            type: "utilization",
+            utilizationPercent: 75,
+          },
+        },
+        fixed: { replicas: 4 },
+        type: "elastic",
+      }}
+      replicasQuota={{ onValueChange: noop, value: 4 }}
+    />
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, ELASTIC_SCALING_RE);
+  assert.match(html, MIN_REPLICAS_RE);
+  assert.match(html, MIN_REPLICA_VALUE_RE);
+  assert.match(html, MAX_REPLICAS_RE);
+  assert.match(html, MAX_REPLICA_VALUE_RE);
+  assert.match(html, SCALING_TARGET_RE);
+  assert.match(html, CPU_TARGET_RE);
+  assert.match(html, CPU_TARGET_PERCENT_RE);
+  assert.doesNotMatch(html, FIXED_REPLICAS_RE);
+  assert.doesNotMatch(html, BUTTON_RE);
+});
+
+test("read-only container settings view renders Memory elastic replica strategy without mutation controls", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+      readOnly
+      replicaStrategy={{
+        elastic: {
+          maxReplicas: 8,
+          minReplicas: 2,
+          target: {
+            averageValue: "512Mi",
+            metric: "memory",
+            type: "averageValue",
+          },
+        },
+        fixed: { replicas: 4 },
+        type: "elastic",
+      }}
+      replicasQuota={{ onValueChange: noop, value: 4 }}
+    />
+  );
+
+  assert.match(html, REPLICA_STRATEGY_RE);
+  assert.match(html, ELASTIC_SCALING_RE);
+  assert.match(html, MIN_REPLICAS_RE);
+  assert.match(html, MAX_REPLICAS_RE);
+  assert.match(html, SCALING_TARGET_RE);
+  assert.match(html, MEMORY_TARGET_RE);
+  assert.match(html, MEMORY_TARGET_QUANTITY_RE);
+  assert.doesNotMatch(html, FIXED_REPLICAS_RE);
+  assert.doesNotMatch(html, BUTTON_RE);
 });
 
 test("read-only network view renders addresses without mutation controls", () => {
