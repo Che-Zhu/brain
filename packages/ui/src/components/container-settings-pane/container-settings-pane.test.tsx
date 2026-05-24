@@ -41,13 +41,15 @@ const PRIVATE_ADDRESS_DEFAULT_VALUE_RE =
 const PRIVATE_ADDRESS_VALUE_RE =
   /http:\/\/api-service-port-8080.default.svc:8080/;
 const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
-const PUBLIC_ADDRESSES_RE = /Public Addresses/;
-const NO_PUBLIC_ADDRESSES_RE = /No public addresses/;
+const DOMAIN_LIST_RE = /Domain List/;
+const NO_DOMAINS_RE = /No domains yet/;
 const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
-const PUBLIC_ADDRESS_TARGET_RE = /Public Address target port/;
+const PUBLIC_ADDRESS_STATUS_RE = /Public Address status: accessible/;
 const COPY_PUBLIC_ADDRESS_RE = /aria-label="Copy Public Address"/;
+const CNAME_RE = /CNAME/;
 const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
 const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
+const ADD_DOMAIN_RE = /Add Domain/;
 const PORTS_TABLE_RE = /data-slot="ports-table"/;
 const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 const REPLICA_STRATEGY_RE = /Replica Strategy/;
@@ -155,8 +157,8 @@ test("container settings pane renders Network instead of Ports for private-only 
   assert.match(html, PRIVATE_ADDRESS_TARGET_RE);
   assert.match(html, PRIVATE_PORT_VALUE_RE);
   assert.match(html, COPY_PRIVATE_ADDRESS_RE);
-  assert.match(html, PUBLIC_ADDRESSES_RE);
-  assert.match(html, NO_PUBLIC_ADDRESSES_RE);
+  assert.match(html, DOMAIN_LIST_RE);
+  assert.match(html, NO_DOMAINS_RE);
   assert.doesNotMatch(html, PORTS_TABLE_RE);
 });
 
@@ -188,13 +190,15 @@ test("container settings pane renders editable public address rows", () => {
     />
   );
 
-  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, DOMAIN_LIST_RE);
   assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
-  assert.match(html, PUBLIC_ADDRESS_TARGET_RE);
+  assert.match(html, PUBLIC_ADDRESS_STATUS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
+  assert.match(html, CNAME_RE);
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
-  assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
+  assert.match(html, ADD_DOMAIN_RE);
+  assert.doesNotMatch(html, NO_DOMAINS_RE);
 });
 
 test("container settings pane renders fixed replica strategy controls", () => {
@@ -351,7 +355,7 @@ test("read-only network view renders addresses without mutation controls", () =>
   assert.match(html, NETWORK_SECTION_RE);
   assert.match(html, PRIVATE_ADDRESS_RE);
   assert.match(html, PRIVATE_ADDRESS_DEFAULT_VALUE_RE);
-  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, DOMAIN_LIST_RE);
   assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
   assert.match(html, COPY_PRIVATE_ADDRESS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);

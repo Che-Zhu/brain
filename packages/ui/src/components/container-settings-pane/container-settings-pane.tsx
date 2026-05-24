@@ -44,6 +44,7 @@ import {
   Layers,
   type LucideIcon,
   MemoryStick,
+  Network,
   Plus,
   Save,
   SquarePen,
@@ -894,8 +895,50 @@ interface NetworkSettingsSectionProps {
   readOnly: boolean;
 }
 
+const PUBLIC_ADDRESS_VISIBLE_COUNT = 2;
+
 function publicAddressValue(address: ContainerNetworkPublicAddress): string {
   return address.url?.trim() || address.host?.trim() || "";
+}
+
+function publicAddressStatusLabel(
+  address: ContainerNetworkPublicAddress
+): string {
+  return address.status?.trim() || "Pending";
+}
+
+function publicAddressStatusDotClass(
+  address: ContainerNetworkPublicAddress
+): string {
+  const status = address.status?.trim().toLowerCase();
+
+  if (
+    status === "accessible" ||
+    status === "available" ||
+    status === "ready" ||
+    status === "running"
+  ) {
+    return "bg-theme-green ring-theme-green/20";
+  }
+
+  if (
+    status === "progressing" ||
+    status === "pending" ||
+    status === "creating"
+  ) {
+    return "bg-theme-yellow ring-theme-yellow/20";
+  }
+
+  if (
+    status === "failed" ||
+    status === "error" ||
+    status === "inaccessible" ||
+    status === "unavailable"
+  ) {
+    return "bg-theme-red ring-theme-red/20";
+  }
+
+  return "bg-theme-gray ring-theme-gray/20";
 }
 
 function publicAddressKey(
@@ -956,46 +999,48 @@ function PublicAddressRow({
   };
 
   return (
-    <div className="grid min-w-0 gap-2 rounded-md border border-border bg-background/60 p-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1 truncate font-mono text-foreground text-xs">
-          {value}
-        </div>
-        {address.status == null || address.status === "" ? null : (
-          <Badge className="shrink-0 text-[10px]" variant="secondary">
-            {address.status}
-          </Badge>
+    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+      <span
+        aria-label={`Public Address status: ${publicAddressStatusLabel(address)}`}
+        className={cn(
+          "size-3 shrink-0 rounded-full ring-4",
+          publicAddressStatusDotClass(address)
         )}
+        role="img"
+      />
+      <div className="grid min-w-0 flex-1 gap-1">
+        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+          {value === "" ? "Pending domain" : value}
+        </div>
+        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+          {address.port}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
         <Button
           aria-label="Copy Public Address"
+          className="h-9 min-w-16 px-3 text-sm"
           disabled={value === ""}
           onClick={handleCopy}
-          size="icon-sm"
+          size="lg"
           type="button"
-          variant="ghost"
+          variant="secondary"
         >
-          <Copy aria-hidden />
+          CNAME
         </Button>
         {readOnly || onDelete == null ? null : (
           <Button
             aria-label="Delete Public Address"
+            className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
             disabled={pending}
             onClick={handleDelete}
-            size="icon-sm"
+            size="icon-lg"
             type="button"
             variant="ghost"
           >
             <Trash2 aria-hidden />
           </Button>
         )}
-      </div>
-      <div className="grid min-w-0 gap-1.5">
-        <Label>Public Address target port</Label>
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="h-8 max-w-32 rounded-md border border-border bg-muted/30 px-2.5 py-2 font-mono text-foreground text-xs">
-            {address.port}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1057,13 +1102,13 @@ function AddPublicAddressForm({
   };
 
   return (
-    <div className="grid min-w-0 gap-2 rounded-md border border-border border-dashed bg-background/60 p-2">
+    <div className="grid min-w-0 gap-3 rounded-md border border-border border-dashed bg-background/40 p-3">
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
         <Input
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className="h-8 max-w-32 font-mono text-xs"
+          className="h-9 max-w-32 font-mono text-sm"
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -1081,18 +1126,18 @@ function AddPublicAddressForm({
       )}
       <div className="flex justify-end gap-1">
         <Button
-          className="h-7 px-2 text-xs"
           disabled={pending}
           onClick={onCancel}
+          size="sm"
           type="button"
           variant="ghost"
         >
           Cancel
         </Button>
         <Button
-          className="h-7 px-2 text-xs"
           disabled={pending || onSubmit == null}
           onClick={handleSubmit}
+          size="sm"
           type="button"
           variant="secondary"
         >
@@ -1113,14 +1158,26 @@ function NetworkSettingsSection({
   const [addOpen, setAddOpen] = useState(false);
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
+  const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
   const canMutateNetwork = !readOnly && onNetworkChange != null;
+  const visiblePublicAddresses = showAllPublicAddresses
+    ? network.publicAddresses
+    : network.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+  const hiddenPublicAddressCount =
+    network.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
     setDraftPort(String(network.privatePort));
     setPortError(null);
   }, [network.privatePort]);
+
+  useEffect(() => {
+    if (network.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+      setShowAllPublicAddresses(false);
+    }
+  }, [network.publicAddresses.length]);
 
   const parsedPort = parsePortNumberDigits(draftPort.trim());
   const portDirty = draftPort.trim() !== String(network.privatePort);
@@ -1212,7 +1269,7 @@ function NetworkSettingsSection({
         )}
       </div>
 
-      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-2.5">
+      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
         <div className="grid min-w-0 gap-1.5">
           <Label className="text-muted-foreground text-xs">
             Private Address
@@ -1262,25 +1319,30 @@ function NetworkSettingsSection({
           )}
         </div>
 
-        <div className="grid min-w-0 gap-1.5">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <Label className="text-muted-foreground text-xs">
-              Public Addresses
+        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
+          <div className="flex min-w-0 items-center gap-2 px-0.5">
+            <Network
+              aria-hidden
+              className="size-4 shrink-0 text-muted-foreground"
+              strokeWidth={2}
+            />
+            <Label className="truncate text-foreground text-sm">
+              Domain List
             </Label>
-            {readOnly ? null : (
-              <Button
-                aria-label="Add Public Address"
-                className="h-7 px-2 text-xs"
-                disabled={addOpen || onNetworkChange == null}
-                onClick={() => setAddOpen(true)}
-                type="button"
-                variant="ghost"
-              >
-                <Plus aria-hidden />
-                Add
-              </Button>
-            )}
           </div>
+          {readOnly ? null : (
+            <Button
+              aria-label="Add Public Address"
+              className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+              disabled={addOpen || onNetworkChange == null}
+              onClick={() => setAddOpen(true)}
+              type="button"
+              variant="secondary"
+            >
+              <Plus aria-hidden className="text-primary" />
+              Add Domain
+            </Button>
+          )}
           {addOpen ? (
             <AddPublicAddressForm
               defaultPort={network.privatePort}
@@ -1291,12 +1353,12 @@ function NetworkSettingsSection({
             />
           ) : null}
           {network.publicAddresses.length === 0 ? (
-            <div className="rounded-md border border-border border-dashed px-2.5 py-2 text-muted-foreground text-xs">
-              No public addresses
+            <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
+              No domains yet
             </div>
           ) : (
             <div className="grid gap-2">
-              {network.publicAddresses.map((address, index) => (
+              {visiblePublicAddresses.map((address, index) => (
                 <PublicAddressRow
                   address={address}
                   key={publicAddressKey(address, index)}
@@ -1310,6 +1372,17 @@ function NetworkSettingsSection({
               ))}
             </div>
           )}
+          {hiddenPublicAddressCount > 0 ? (
+            <Button
+              className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+              onClick={() => setShowAllPublicAddresses(true)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              View All
+            </Button>
+          ) : null}
         </div>
       </div>
     </section>
