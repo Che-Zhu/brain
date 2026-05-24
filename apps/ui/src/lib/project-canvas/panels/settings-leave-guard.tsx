@@ -51,29 +51,32 @@ export async function continueSettingsLeave({
   guard: SettingsLeaveGuardHandle;
   onContinue: () => Promise<void> | void;
 }): Promise<SettingsLeaveResult> {
-  if (decision === "stay") {
-    return { status: "stayed" };
-  }
-
-  if (decision === "discard") {
-    guard.discard();
-    await onContinue();
-    return { status: "continued" };
-  }
-
-  if (guard.canSave === false) {
-    return {
-      error: new Error("Settings draft cannot be saved yet."),
-      status: "blocked",
-    };
-  }
-
-  try {
-    await guard.save();
-    await onContinue();
-    return { status: "continued" };
-  } catch (error) {
-    return { error, status: "blocked" };
+  switch (decision) {
+    case "stay":
+      return { status: "stayed" };
+    case "discard":
+      guard.discard();
+      await onContinue();
+      return { status: "continued" };
+    case "save":
+      if (guard.canSave === false) {
+        return {
+          error: new Error("Settings draft cannot be saved yet."),
+          status: "blocked",
+        };
+      }
+      try {
+        await guard.save();
+        await onContinue();
+        return { status: "continued" };
+      } catch (error) {
+        return { error, status: "blocked" };
+      }
+    default:
+      return {
+        error: new Error("Unknown settings leave decision."),
+        status: "blocked",
+      };
   }
 }
 

@@ -571,6 +571,53 @@ function containerSettingsDraftBackingKey(draft: ContainerSettingsDraft) {
   return JSON.stringify(draft);
 }
 
+interface ContainerSettingsDraftValues {
+  cpuCores: number;
+  env: readonly ContainerEnvVar[];
+  image: string;
+  memoryMib: number;
+  network?: ContainerNetwork;
+  replicaStrategy?: ContainerReplicaStrategy;
+}
+
+function containerSettingsDraftFromValues({
+  cpuCores,
+  env,
+  image,
+  memoryMib,
+  network,
+  replicaStrategy,
+}: ContainerSettingsDraftValues): ContainerSettingsDraft {
+  return {
+    cpuCores,
+    env,
+    image,
+    memoryMib,
+    ...(network == null ? {} : { network }),
+    ...(replicaStrategy == null
+      ? {}
+      : {
+          replicaStrategy,
+          replicas: replicaStrategy.fixed.replicas,
+        }),
+  };
+}
+
+function networkWithDraftPrivatePort(
+  network: ContainerNetwork | undefined,
+  parsedPrivatePort: ReturnType<typeof parsePortNumberDigits> | null
+): ContainerNetwork | undefined {
+  if (network == null) {
+    return undefined;
+  }
+  return {
+    ...network,
+    privatePort: parsedPrivatePort?.ok
+      ? parsedPrivatePort.n
+      : network.privatePort,
+  };
+}
+
 function SectionTitle({
   children,
   className,
@@ -2276,14 +2323,7 @@ export function ContainerSettingsPane({
     : (draftNetwork ?? network);
   const settingsDraftNetwork = useMemo(
     () =>
-      activeDraftNetwork == null
-        ? undefined
-        : {
-            ...activeDraftNetwork,
-            privatePort: parsedNetworkPrivatePort?.ok
-              ? parsedNetworkPrivatePort.n
-              : activeDraftNetwork.privatePort,
-          },
+      networkWithDraftPrivatePort(activeDraftNetwork, parsedNetworkPrivatePort),
     [activeDraftNetwork, parsedNetworkPrivatePort]
   );
   const committedReplicaStrategy = useMemo(
@@ -2294,19 +2334,15 @@ export function ContainerSettingsPane({
     [replicaStrategy, replicasQuota]
   );
   const originalSettingsDraft = useMemo<ContainerSettingsDraft>(
-    () => ({
-      cpuCores: cpuQuota.value,
-      env,
-      image,
-      memoryMib: memoryQuota.value,
-      ...(network == null ? {} : { network }),
-      ...(committedReplicaStrategy == null
-        ? {}
-        : {
-            replicaStrategy: committedReplicaStrategy,
-            replicas: committedReplicaStrategy.fixed.replicas,
-          }),
-    }),
+    () =>
+      containerSettingsDraftFromValues({
+        cpuCores: cpuQuota.value,
+        env,
+        image,
+        memoryMib: memoryQuota.value,
+        network,
+        replicaStrategy: committedReplicaStrategy,
+      }),
     [
       committedReplicaStrategy,
       cpuQuota.value,
@@ -2321,21 +2357,16 @@ export function ContainerSettingsPane({
     [originalSettingsDraft]
   );
   const settingsDraft = useMemo<ContainerSettingsDraft>(
-    () => ({
-      cpuCores: draftCpu,
-      env: envDraft,
-      image: draftImage,
-      memoryMib: draftMem,
-      ...(settingsDraftNetwork == null
-        ? {}
-        : { network: settingsDraftNetwork }),
-      ...(replicasQuota == null
-        ? {}
-        : {
-            replicaStrategy: draftReplicaStrategy,
-            replicas: draftReplicaStrategy.fixed.replicas,
-          }),
-    }),
+    () =>
+      containerSettingsDraftFromValues({
+        cpuCores: draftCpu,
+        env: envDraft,
+        image: draftImage,
+        memoryMib: draftMem,
+        network: settingsDraftNetwork,
+        replicaStrategy:
+          replicasQuota == null ? undefined : draftReplicaStrategy,
+      }),
     [
       draftCpu,
       draftImage,

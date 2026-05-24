@@ -907,41 +907,18 @@ export function useProjectCanvas(
     workloadPane,
   ]);
 
-  const clearSelection = useMemo(
-    () => () => {
-      requestSettingsLeave("close", () => {
-        setSelectedEdge(null);
-        setServiceUid(null).catch(() => undefined);
-        setDatabasePane(null).catch(() => undefined);
-        setWorkloadPane(null).catch(() => undefined);
-      });
-    },
-    [
-      requestSettingsLeave,
-      setDatabasePane,
-      setSelectedEdge,
-      setServiceUid,
-      setWorkloadPane,
-    ]
-  );
+  const clearSelectedResource = useCallback(() => {
+    setSelectedEdge(null);
+    setServiceUid(null).catch(() => undefined);
+    setDatabasePane(null).catch(() => undefined);
+    setWorkloadPane(null).catch(() => undefined);
+  }, [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]);
 
-  const closeResourcePane = useMemo(
-    () => () => {
-      requestSettingsLeave("close", () => {
-        setSelectedEdge(null);
-        setServiceUid(null).catch(() => undefined);
-        setDatabasePane(null).catch(() => undefined);
-        setWorkloadPane(null).catch(() => undefined);
-      });
-    },
-    [
-      requestSettingsLeave,
-      setDatabasePane,
-      setSelectedEdge,
-      setServiceUid,
-      setWorkloadPane,
-    ]
-  );
+  const clearSelection = useCallback(() => {
+    requestSettingsLeave("close", clearSelectedResource);
+  }, [clearSelectedResource, requestSettingsLeave]);
+
+  const closeResourcePane = clearSelection;
 
   const meta = useMemo<CanvasMeta>(
     () => ({
