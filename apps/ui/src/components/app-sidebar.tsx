@@ -32,8 +32,8 @@ const DOCKER_AP_COMPOSITION_NAMES = new Set([
   "aps-deployment-ingress-go-templating",
 ]);
 const SIDEBAR_ICON_BUTTON_CLASS =
-  "flex size-9 items-center justify-center rounded-lg text-[#e5e5e5] transition-colors hover:bg-[#202733] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60A5FA]";
-const SIDEBAR_ICON_BUTTON_ACTIVE_CLASS = "bg-[#2b3340] shadow-sm";
+  "flex size-9 items-center justify-center rounded-lg text-neutral-200 transition-colors hover:bg-white/15 focus-visible:outline-none";
+const SIDEBAR_ICON_BUTTON_ACTIVE_CLASS = "bg-white/15";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value != null && typeof value === "object" && !Array.isArray(value)
@@ -326,7 +326,7 @@ export default function AppSidebar() {
 
   return (
     <aside
-      className="flex h-svh w-13 shrink-0 flex-col items-center border-[#e5e5e5]/15 border-r"
+      className="flex h-svh w-13 shrink-0 flex-col items-center border-white/10 border-r"
       data-slot="app-sidebar"
       style={{
         backgroundColor: "#101219",
