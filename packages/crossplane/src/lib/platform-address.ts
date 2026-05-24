@@ -6,9 +6,18 @@ export interface PlatformAddressHostInput {
   routingDomain: string;
 }
 
+export interface PlatformAddressEndpoint {
+  host: string;
+  url: string;
+}
+
 export const PLATFORM_ADDRESS_ID_PATTERN = "^pa_[a-z0-9]{6,32}$";
 export const PLATFORM_ADDRESS_ID_RE = new RegExp(PLATFORM_ADDRESS_ID_PATTERN);
 const PLATFORM_ADDRESS_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const PLATFORM_ADDRESS_ID_RANDOM_BYTES = 12;
+const PLATFORM_ADDRESS_DEFAULT_HOST_PREFIX = "ap";
+const PLATFORM_ADDRESS_HOST_HASH_LENGTH = 10;
+const PLATFORM_ADDRESS_HOST_PREFIX_MAX_LENGTH = 52;
 const SHA256_INITIAL_STATE = sha256Words(
   "6a09e667",
   "bb67ae85",
@@ -46,7 +55,7 @@ export function platformAddressIdsFromRows(
 }
 
 export function generatePlatformAddressId(): string {
-  const bytes = new Uint8Array(12);
+  const bytes = new Uint8Array(PLATFORM_ADDRESS_ID_RANDOM_BYTES);
   if (globalThis.crypto == null) {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(Math.random() * 256);
@@ -228,8 +237,10 @@ function platformAddressHostPrefix(appName: string): string {
     .toLowerCase()
     .replaceAll(/[^a-z0-9-]+/g, "-")
     .replaceAll(/^-+|-+$/g, "");
-  const prefix = safeName.slice(0, 52).replaceAll(/-+$/g, "");
-  return prefix || "ap";
+  const prefix = safeName
+    .slice(0, PLATFORM_ADDRESS_HOST_PREFIX_MAX_LENGTH)
+    .replaceAll(/-+$/g, "");
+  return prefix || PLATFORM_ADDRESS_DEFAULT_HOST_PREFIX;
 }
 
 export function platformAddressHost(
@@ -251,7 +262,20 @@ export function platformAddressHost(
 
   const slug = sha256Hex(`${namespace}/${appName}/${platformAddressId}`).slice(
     0,
-    10
+    PLATFORM_ADDRESS_HOST_HASH_LENGTH
   );
   return `${platformAddressHostPrefix(appName)}-${slug}.${routingDomain}`;
+}
+
+function platformAddressUrl(host: string): string {
+  return `https://${host}/`;
+}
+
+export function platformAddressEndpoint(
+  input: PlatformAddressHostInput
+): PlatformAddressEndpoint | undefined {
+  const host = platformAddressHost(input);
+  return host === undefined
+    ? undefined
+    : { host, url: platformAddressUrl(host) };
 }

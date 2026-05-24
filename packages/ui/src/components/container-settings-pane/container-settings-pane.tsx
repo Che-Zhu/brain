@@ -2,7 +2,7 @@
 
 import {
   generatePlatformAddressId,
-  platformAddressHost,
+  platformAddressEndpoint,
 } from "@workspace/crossplane/lib/platform-address";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -1166,16 +1166,24 @@ function publicAddressKey(
   );
 }
 
-function platformAddressDraftHost(
-  id: string,
-  context: ContainerNetworkPlatformAddressDraftContext | undefined
-): string | undefined {
-  return platformAddressHost({
-    appName: context?.appName ?? "",
-    namespace: context?.namespace ?? "",
+function platformAddressDraftFromPort(
+  port: number,
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext
+): PublicAddressDraft {
+  const id = generatePlatformAddressId();
+  const endpoint = platformAddressEndpoint({
+    appName: platformAddressDraftContext?.appName ?? "",
+    namespace: platformAddressDraftContext?.namespace ?? "",
     platformAddressId: id,
-    routingDomain: context?.routingDomain ?? "",
+    routingDomain: platformAddressDraftContext?.routingDomain ?? "",
   });
+  return {
+    ...(endpoint ?? {}),
+    id,
+    port,
+    status: "progressing",
+    type: "platform",
+  };
 }
 
 function isPublicAddressDeleteTarget(
@@ -1290,16 +1298,11 @@ function validatePublicAddressDraft(
     return { message: parsedPort.message, ok: false };
   }
 
-  const id = generatePlatformAddressId();
-  const host = platformAddressDraftHost(id, platformAddressDraftContext);
   return {
-    address: {
-      ...(host === undefined ? {} : { host, url: `https://${host}/` }),
-      id,
-      port: parsedPort.n,
-      status: "progressing",
-      type: "platform",
-    },
+    address: platformAddressDraftFromPort(
+      parsedPort.n,
+      platformAddressDraftContext
+    ),
     ok: true,
   };
 }

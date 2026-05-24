@@ -15,7 +15,9 @@ const APCompositeLabel = "crossplane.io/composite"
 // defaultIngressHostFromComposition is a placeholder from older generated templates.
 // It must not surface as a real connection URL.
 const defaultIngressHostFromComposition = "placeholder.example.com"
+const platformAddressHostPrefixMaxLength = 52
 
+var platformAddressHostUnsafeCharsPattern = regexp.MustCompile(`[^a-z0-9-]+`)
 var platformAddressIDPattern = regexp.MustCompile(`^pa_[a-z0-9]{6,32}$`)
 
 func isPlaceholderIngressHost(host string) bool {
@@ -279,10 +281,10 @@ func platformAddressHost(namespace string, name string, id string, domain string
 
 func platformAddressHostPrefix(name string) string {
 	prefix := strings.ToLower(strings.TrimSpace(name))
-	prefix = regexp.MustCompile(`[^a-z0-9-]+`).ReplaceAllString(prefix, "-")
+	prefix = platformAddressHostUnsafeCharsPattern.ReplaceAllString(prefix, "-")
 	prefix = strings.Trim(prefix, "-")
-	if len(prefix) > 52 {
-		prefix = prefix[:52]
+	if len(prefix) > platformAddressHostPrefixMaxLength {
+		prefix = prefix[:platformAddressHostPrefixMaxLength]
 		prefix = strings.TrimRight(prefix, "-")
 	}
 	if prefix == "" {

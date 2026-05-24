@@ -5,6 +5,7 @@ export {
   normalizePlatformAddressId,
   PLATFORM_ADDRESS_ID_PATTERN,
   PLATFORM_ADDRESS_ID_RE,
+  platformAddressEndpoint,
   platformAddressHost,
   platformAddressIdFromValue,
   platformAddressIdsFromRows,

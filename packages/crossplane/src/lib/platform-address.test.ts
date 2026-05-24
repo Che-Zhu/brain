@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { platformAddressHost } from "./platform-address";
+import {
+  platformAddressEndpoint,
+  platformAddressHost,
+} from "./platform-address";
 
 test("Platform Address host is deterministic from namespace, AP name, ID, and routing domain", () => {
   const host = platformAddressHost({
@@ -59,5 +62,20 @@ test("Platform Address host stays pending when required inputs are missing", () 
       routingDomain: "apps.example.com",
     }),
     undefined
+  );
+});
+
+test("Platform Address endpoint includes host and HTTPS URL", () => {
+  assert.deepEqual(
+    platformAddressEndpoint({
+      appName: "api",
+      namespace: "default",
+      platformAddressId: "pa_abc123",
+      routingDomain: "apps.example.com",
+    }),
+    {
+      host: "api-7c6ad52581.apps.example.com",
+      url: "https://api-7c6ad52581.apps.example.com/",
+    }
   );
 });

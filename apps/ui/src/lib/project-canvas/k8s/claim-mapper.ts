@@ -13,7 +13,7 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
-  platformAddressHost,
+  platformAddressEndpoint,
   platformAddressIdFromValue,
   platformAddressIdsFromRows,
 } from "../platform-addresses";
@@ -270,14 +270,14 @@ function normalizeDesiredPlatformAddresses(
     if (id === undefined || port == null) {
       continue;
     }
-    const host = platformAddressHost({
+    const endpoint = platformAddressEndpoint({
       appName,
       namespace,
       platformAddressId: id,
       routingDomain,
     });
     out.push({
-      ...(host === undefined ? {} : { host, url: `https://${host}/` }),
+      ...(endpoint ?? {}),
       id,
       port,
       status: "progressing",
