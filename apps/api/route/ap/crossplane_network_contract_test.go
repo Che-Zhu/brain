@@ -116,7 +116,7 @@ func TestAPXRDIncludesNetworkContract(t *testing.T) {
 	}
 	statusPublicAddressItem := asMap(t, statusPublicAddresses["items"], "status.network.publicAddresses.items")
 	statusPublicAddressProps := asMap(t, statusPublicAddressItem["properties"], "status.network.publicAddresses.items.properties")
-	for _, field := range []string{"id", "host", "url", "port", "type", "status"} {
+	for _, field := range []string{"id", "host", "url", "port", "type", "status", "platformAddressId", "cnameTarget"} {
 		if _, ok := statusPublicAddressProps[field]; !ok {
 			t.Fatalf("status.network.publicAddresses[].%s is missing", field)
 		}

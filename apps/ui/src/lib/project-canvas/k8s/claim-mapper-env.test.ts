@@ -214,6 +214,23 @@ test("AP claim settings maps desired Custom Domain Bindings into the network dra
           },
         },
       },
+      status: {
+        network: {
+          privatePort: 8080,
+          publicAddresses: [
+            {
+              cnameTarget: "api-7c6ad52581.apps.example.com",
+              host: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+              port: 8080,
+              status: "pending",
+              type: "custom",
+              url: "https://www.example.com/",
+            },
+          ],
+        },
+      },
     },
     "AP"
   );

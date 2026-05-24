@@ -407,7 +407,13 @@ spec:
                           description: Public Address host.
                         id:
                           type: string
-                          description: Stable opaque Platform Address ID.
+                          description: Stable opaque Platform Address or Custom Domain Binding ID.
+                        platformAddressId:
+                          type: string
+                          description: Referenced Platform Address ID when type is custom.
+                        cnameTarget:
+                          type: string
+                          description: Platform Address hostname used as the Custom Domain CNAME target.
                         url:
                           type: string
                           description: Render-ready public URL including scheme.

@@ -242,7 +242,7 @@ function apNetworkPublicAddresses(
   const observed = normalizeNetworkPublicAddresses(
     statusNetwork?.publicAddresses,
     true
-  );
+  ).filter((address) => address.type?.trim().toLowerCase() !== "custom");
   const desiredPending = normalizeDesiredPlatformAddresses(
     inputNetwork?.platformAddresses,
     metadata,

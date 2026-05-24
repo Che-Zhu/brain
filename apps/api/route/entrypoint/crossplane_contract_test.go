@@ -47,6 +47,17 @@ func TestEntryPointXRDIncludesPublicAccessContract(t *testing.T) {
 	if got := customDomains["type"]; got != "array" {
 		t.Fatalf("spec.customDomains type = %v, want array", got)
 	}
+	customDomainItem := asMap(t, customDomains["items"], "spec.customDomains.items")
+	customDomainRequired := asSlice(t, customDomainItem["required"], "spec.customDomains.items.required")
+	for _, field := range []string{"id", "domain", "platformAddressId", "targetPort", "cnameTarget"} {
+		assertStringSliceContains(t, customDomainRequired, field)
+	}
+	customDomainProps := asMap(t, customDomainItem["properties"], "spec.customDomains.items.properties")
+	for _, field := range []string{"id", "domain", "platformAddressId", "targetPort", "cnameTarget"} {
+		if _, ok := customDomainProps[field]; !ok {
+			t.Fatalf("spec.customDomains.items.%s is missing", field)
+		}
+	}
 
 	statusProps := xrdStatusProperties(t, doc)
 	phase := asMap(t, statusProps["phase"], "status.phase")
@@ -855,6 +866,54 @@ func TestAPCompositionRendersV1PlatformAddressesFromNetworkContract(t *testing.T
 	assertStatusPublicAddressByID(t, publicAddresses, "pa_admin9", adminHost, fmt.Sprintf("https://%s/", adminHost), 9000)
 }
 
+func TestAPCompositionPromotesCustomDomainsIntoEntryPointTasks(t *testing.T) {
+	apiHost := platformHost("project-a", "web", "pa_abc123", "usw.sealos.app")
+	adminHost := platformHost("project-a", "web", "pa_admin9", "usw.sealos.app")
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"input": map[string]interface{}{
+						"network": map[string]interface{}{
+							"privatePort": 8080,
+							"platformAddresses": []interface{}{
+								map[string]interface{}{"id": "pa_abc123", "port": 8080},
+								map[string]interface{}{"id": "pa_admin9", "port": 9000},
+							},
+							"customDomains": []interface{}{
+								map[string]interface{}{
+									"id":                "cd_def456",
+									"domain":            "www.example.com",
+									"platformAddressId": "pa_abc123",
+								},
+							},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+	})
+
+	entryPoint := manifestFromObject(t, singleEntryPointObject(t, out), "entrypoint object")
+	entryPointSpec := asMap(t, entryPoint["spec"], "entrypoint.spec")
+	targets := asSlice(t, entryPointSpec["targets"], "entrypoint.spec.targets")
+	assertEntryPointTargetByID(t, targets, "pa_abc123", apiHost, 8080)
+	assertEntryPointTargetByID(t, targets, "pa_admin9", adminHost, 9000)
+	customDomains := asSlice(t, entryPointSpec["customDomains"], "entrypoint.spec.customDomains")
+	assertEntryPointCustomDomainTask(t, customDomains, "cd_def456", "www.example.com", "pa_abc123", 8080, apiHost)
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	network := asMap(t, status["network"], "ap.status.network")
+	publicAddresses := asSlice(t, network["publicAddresses"], "ap.status.network.publicAddresses")
+	assertStatusCustomDomainAddress(t, publicAddresses, "cd_def456", "www.example.com", "pa_abc123", apiHost, 8080)
+	assertStatusPublicAddressByID(t, publicAddresses, "pa_admin9", adminHost, fmt.Sprintf("http://%s/", adminHost), 9000)
+	assertStatusPublicAddressIDMissing(t, publicAddresses, "pa_abc123")
+}
+
 func TestAPCompositionPlatformAddressHostIgnoresUIDAndTargetPort(t *testing.T) {
 	out := renderAPComposition(t, map[string]interface{}{
 		"observed": map[string]interface{}{
@@ -1231,6 +1290,30 @@ func assertEntryPointTargetByID(t *testing.T, targets []interface{}, id string, 
 	t.Fatalf("missing EntryPoint target for id %s", id)
 }
 
+func assertEntryPointCustomDomainTask(t *testing.T, tasks []interface{}, id string, domain string, platformAddressID string, targetPort int, cnameTarget string) {
+	t.Helper()
+	for i, task := range tasks {
+		taskMap := asMap(t, task, fmt.Sprintf("entrypoint.spec.customDomains[%d]", i))
+		if taskMap["id"] != id {
+			continue
+		}
+		if got := taskMap["domain"]; got != domain {
+			t.Fatalf("EntryPoint Custom Domain task %s domain = %v, want %s", id, got, domain)
+		}
+		if got := taskMap["platformAddressId"]; got != platformAddressID {
+			t.Fatalf("EntryPoint Custom Domain task %s platformAddressId = %v, want %s", id, got, platformAddressID)
+		}
+		if got := numberAsInt(t, taskMap["targetPort"], "entrypoint custom domain task targetPort"); got != targetPort {
+			t.Fatalf("EntryPoint Custom Domain task %s targetPort = %d, want %d", id, got, targetPort)
+		}
+		if got := taskMap["cnameTarget"]; got != cnameTarget {
+			t.Fatalf("EntryPoint Custom Domain task %s cnameTarget = %v, want %s", id, got, cnameTarget)
+		}
+		return
+	}
+	t.Fatalf("missing EntryPoint Custom Domain task for id %s", id)
+}
+
 func assertStatusPublicAddress(t *testing.T, addresses []interface{}, host string, url string, port int) {
 	t.Helper()
 	for i, address := range addresses {
@@ -1280,6 +1363,49 @@ func assertStatusPublicAddressByID(t *testing.T, addresses []interface{}, id str
 		return
 	}
 	t.Fatalf("missing status public address for id %s", id)
+}
+
+func assertStatusCustomDomainAddress(t *testing.T, addresses []interface{}, id string, domain string, platformAddressID string, cnameTarget string, port int) {
+	t.Helper()
+	for i, address := range addresses {
+		addressMap := asMap(t, address, fmt.Sprintf("ap.status.network.publicAddresses[%d]", i))
+		if addressMap["id"] != id {
+			continue
+		}
+		if got := addressMap["host"]; got != domain {
+			t.Fatalf("status custom domain %s host = %v, want %s", id, got, domain)
+		}
+		if got := addressMap["url"]; got != fmt.Sprintf("https://%s/", domain) {
+			t.Fatalf("status custom domain %s url = %v, want host URL", id, got)
+		}
+		if got := addressMap["platformAddressId"]; got != platformAddressID {
+			t.Fatalf("status custom domain %s platformAddressId = %v, want %s", id, got, platformAddressID)
+		}
+		if got := addressMap["cnameTarget"]; got != cnameTarget {
+			t.Fatalf("status custom domain %s cnameTarget = %v, want %s", id, got, cnameTarget)
+		}
+		if got := numberAsInt(t, addressMap["port"], "status custom domain port"); got != port {
+			t.Fatalf("status custom domain %s port = %d, want %d", id, got, port)
+		}
+		if got := addressMap["type"]; got != "custom" {
+			t.Fatalf("status custom domain %s type = %v, want custom", id, got)
+		}
+		if got := addressMap["status"]; got != "pending" {
+			t.Fatalf("status custom domain %s status = %v, want pending", id, got)
+		}
+		return
+	}
+	t.Fatalf("missing status custom domain for id %s", id)
+}
+
+func assertStatusPublicAddressIDMissing(t *testing.T, addresses []interface{}, id string) {
+	t.Helper()
+	for i, address := range addresses {
+		addressMap := asMap(t, address, fmt.Sprintf("ap.status.network.publicAddresses[%d]", i))
+		if addressMap["id"] == id {
+			t.Fatalf("status public address id %s should be hidden after Custom Domain promotion", id)
+		}
+	}
 }
 
 func platformHost(namespace string, name string, id string, domain string) string {
@@ -1402,4 +1528,14 @@ func asSlice(t *testing.T, value interface{}, path string) []interface{} {
 		t.Fatalf("%s is %T, want []interface{}", path, value)
 	}
 	return s
+}
+
+func assertStringSliceContains(t *testing.T, values []interface{}, want string) {
+	t.Helper()
+	for _, value := range values {
+		if value == want {
+			return
+		}
+	}
+	t.Fatalf("%v does not contain %q", values, want)
 }

@@ -563,8 +563,10 @@ interface EntryPointCanvasResource {
 }
 
 interface NetworkPublicAddress {
+  cnameTarget?: string;
   host?: string;
   id?: string;
+  platformAddressId?: string;
   port: number;
   status?: string;
   type?: string;
@@ -662,15 +664,41 @@ function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
     inputNetwork?.platformAddresses
   );
   if (statusAddresses.length > 0) {
-    const observedIds = platformAddressIdsFromRows(statusAddresses);
+    const observedIds = platformAddressIdsFromRows(
+      statusAddresses.filter(
+        (address) => address.type?.trim().toLowerCase() !== "custom"
+      )
+    );
+    const promotedPlatformAddressIds =
+      platformAddressIdsFromCustomRows(statusAddresses);
     return [
       ...statusAddresses,
       ...desiredPending.filter(
-        (address) => address.id === undefined || !observedIds.has(address.id)
+        (address) =>
+          address.id === undefined ||
+          !(
+            observedIds.has(address.id) ||
+            promotedPlatformAddressIds.has(address.id)
+          )
       ),
     ];
   }
   return desiredPending;
+}
+
+function platformAddressIdsFromCustomRows(
+  addresses: readonly NetworkPublicAddress[]
+): Set<string> {
+  const ids = new Set<string>();
+  for (const address of addresses) {
+    if (
+      address.type?.trim().toLowerCase() === "custom" &&
+      address.platformAddressId !== undefined
+    ) {
+      ids.add(address.platformAddressId);
+    }
+  }
+  return ids;
 }
 
 function normalizeDesiredPlatformAddresses(
@@ -739,6 +767,8 @@ function networkPublicAddressFromRecord(
   const status = nonEmptyString(record.status);
   const type = nonEmptyString(record.type);
   const url = nonEmptyString(record.url);
+  const platformAddressId = nonEmptyString(record.platformAddressId);
+  const cnameTarget = nonEmptyString(record.cnameTarget);
   if (status !== undefined) {
     address.status = status;
   }
@@ -747,6 +777,12 @@ function networkPublicAddressFromRecord(
   }
   if (url !== undefined) {
     address.url = url;
+  }
+  if (platformAddressId !== undefined) {
+    address.platformAddressId = platformAddressId;
+  }
+  if (cnameTarget !== undefined) {
+    address.cnameTarget = cnameTarget;
   }
   return address;
 }

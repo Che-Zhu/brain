@@ -19,6 +19,7 @@ const platformAddressHostPrefixMaxLength = 52
 
 var platformAddressHostUnsafeCharsPattern = regexp.MustCompile(`[^a-z0-9-]+`)
 var platformAddressIDPattern = regexp.MustCompile(`^pa_[a-z0-9]{6,32}$`)
+var customDomainBindingIDPattern = regexp.MustCompile(`^cd_[a-z0-9]{6,32}$`)
 
 func isPlaceholderIngressHost(host string) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
@@ -151,23 +152,50 @@ type platformAddressRequest struct {
 	port int
 }
 
+type customDomainRequest struct {
+	domain            string
+	id                string
+	platformAddressID string
+}
+
 func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]interface{}) {
 	addresses := apPlatformAddressRequests(ap)
 	if len(addresses) == 0 {
 		return
 	}
+	customDomains := apCustomDomainRequests(ap, addresses)
 	networkCopy := networkStatusCopy(status)
 	if _, exists := networkCopy["publicAddresses"]; exists {
 		publicAddresses := publicAddressRowsFromValue(networkCopy["publicAddresses"])
 		seenIDs := make(map[string]bool, len(publicAddresses))
+		promotedPlatformAddressIDs := make(map[string]bool)
 		for _, address := range publicAddresses {
 			id, _ := address["id"].(string)
 			if id != "" {
 				seenIDs[id] = true
 			}
+			platformAddressID, _ := address["platformAddressId"].(string)
+			platformAddressID = strings.TrimSpace(platformAddressID)
+			if platformAddressIDPattern.MatchString(platformAddressID) {
+				promotedPlatformAddressIDs[platformAddressID] = true
+			}
 		}
+		for _, customDomain := range customDomains {
+			if seenIDs[customDomain.id] {
+				promotedPlatformAddressIDs[customDomain.platformAddressID] = true
+				continue
+			}
+			row := pendingCustomDomainRow(ap, addresses, customDomain)
+			if row == nil {
+				continue
+			}
+			publicAddresses = append(publicAddresses, row)
+			seenIDs[customDomain.id] = true
+			promotedPlatformAddressIDs[customDomain.platformAddressID] = true
+		}
+		publicAddresses = hidePromotedPlatformAddressRows(publicAddresses, promotedPlatformAddressIDs)
 		for _, address := range addresses {
-			if seenIDs[address.id] {
+			if seenIDs[address.id] || promotedPlatformAddressIDs[address.id] {
 				continue
 			}
 			publicAddresses = append(publicAddresses, pendingPublicAddressRow(ap, address))
@@ -177,8 +205,20 @@ func mergePublicNetworkStatus(ap map[string]interface{}, status map[string]inter
 		return
 	}
 
-	publicAddresses := make([]map[string]interface{}, 0, len(addresses))
+	promotedPlatformAddressIDs := make(map[string]bool)
+	publicAddresses := make([]map[string]interface{}, 0, len(addresses)+len(customDomains))
+	for _, customDomain := range customDomains {
+		row := pendingCustomDomainRow(ap, addresses, customDomain)
+		if row == nil {
+			continue
+		}
+		publicAddresses = append(publicAddresses, row)
+		promotedPlatformAddressIDs[customDomain.platformAddressID] = true
+	}
 	for _, address := range addresses {
+		if promotedPlatformAddressIDs[address.id] {
+			continue
+		}
 		publicAddresses = append(publicAddresses, pendingPublicAddressRow(ap, address))
 	}
 	networkCopy["publicAddresses"] = publicAddresses
@@ -216,6 +256,22 @@ func copyPublicAddressRow(row map[string]interface{}) map[string]interface{} {
 	return rowCopy
 }
 
+func hidePromotedPlatformAddressRows(rows []map[string]interface{}, promotedPlatformAddressIDs map[string]bool) []map[string]interface{} {
+	if len(promotedPlatformAddressIDs) == 0 {
+		return rows
+	}
+	out := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		id, _ := row["id"].(string)
+		rowType, _ := row["type"].(string)
+		if promotedPlatformAddressIDs[id] && strings.ToLower(strings.TrimSpace(rowType)) != "custom" {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 func pendingPublicAddressRow(ap map[string]interface{}, address platformAddressRequest) map[string]interface{} {
 	row := map[string]interface{}{
 		"id":     address.id,
@@ -235,6 +291,41 @@ func pendingPublicAddressRow(ap map[string]interface{}, address platformAddressR
 	row["host"] = host
 	row["url"] = fmt.Sprintf("https://%s/", host)
 	return row
+}
+
+func pendingCustomDomainRow(ap map[string]interface{}, addresses []platformAddressRequest, customDomain customDomainRequest) map[string]interface{} {
+	target, ok := platformAddressRequestByID(addresses, customDomain.platformAddressID)
+	if !ok {
+		return nil
+	}
+	row := map[string]interface{}{
+		"host":              customDomain.domain,
+		"id":                customDomain.id,
+		"platformAddressId": customDomain.platformAddressID,
+		"port":              target.port,
+		"status":            "pending",
+		"type":              "custom",
+		"url":               fmt.Sprintf("https://%s/", customDomain.domain),
+	}
+	cnameTarget := platformAddressHost(
+		getString(ap, "metadata", "namespace"),
+		getString(ap, "metadata", "name"),
+		customDomain.platformAddressID,
+		apRoutingDomain(ap),
+	)
+	if cnameTarget != "" {
+		row["cnameTarget"] = cnameTarget
+	}
+	return row
+}
+
+func platformAddressRequestByID(addresses []platformAddressRequest, id string) (platformAddressRequest, bool) {
+	for _, address := range addresses {
+		if address.id == id {
+			return address, true
+		}
+	}
+	return platformAddressRequest{}, false
 }
 
 func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressRequest {
@@ -261,6 +352,43 @@ func apPlatformAddressRequests(ap map[string]interface{}) []platformAddressReque
 		addresses = append(addresses, platformAddressRequest{id: id, port: port})
 	}
 	return addresses
+}
+
+func apCustomDomainRequests(ap map[string]interface{}, addresses []platformAddressRequest) []customDomainRequest {
+	network := apInputNetwork(ap)
+	if network == nil {
+		return nil
+	}
+	raw, _ := network["customDomains"].([]interface{})
+	if len(raw) == 0 {
+		return nil
+	}
+	platformAddressIDs := make(map[string]bool, len(addresses))
+	for _, address := range addresses {
+		platformAddressIDs[address.id] = true
+	}
+	customDomains := make([]customDomainRequest, 0, len(raw))
+	for _, item := range raw {
+		customDomain, _ := item.(map[string]interface{})
+		if customDomain == nil {
+			continue
+		}
+		id, _ := customDomain["id"].(string)
+		id = strings.TrimSpace(id)
+		domain, _ := customDomain["domain"].(string)
+		domain = strings.Trim(strings.ToLower(strings.TrimSpace(domain)), ".")
+		platformAddressID, _ := customDomain["platformAddressId"].(string)
+		platformAddressID = strings.TrimSpace(platformAddressID)
+		if !customDomainBindingIDPattern.MatchString(id) || domain == "" || !platformAddressIDs[platformAddressID] {
+			continue
+		}
+		customDomains = append(customDomains, customDomainRequest{
+			domain:            domain,
+			id:                id,
+			platformAddressID: platformAddressID,
+		})
+	}
+	return customDomains
 }
 
 func apRoutingDomain(ap map[string]interface{}) string {

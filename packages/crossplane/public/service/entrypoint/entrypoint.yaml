@@ -53,16 +53,33 @@ spec:
                           - unknown
                 customDomains:
                   type: array
-                  description: Reserved for future user-configured custom domain bindings.
+                  description: Custom Domain Binding tasks derived by the AP Composition.
                   items:
                     type: object
+                    required:
+                      - id
+                      - domain
+                      - platformAddressId
+                      - targetPort
+                      - cnameTarget
                     properties:
+                      id:
+                        type: string
+                        pattern: ^cd_[a-z0-9]{6,32}$
+                        description: Stable Custom Domain Binding ID.
                       domain:
                         type: string
                         description: User-owned domain.
+                      platformAddressId:
+                        type: string
+                        pattern: ^pa_[a-z0-9]{6,32}$
+                        description: Platform Address ID this Custom Domain binds to.
                       targetPort:
                         type: integer
                         description: Target port this custom domain binds to.
+                      cnameTarget:
+                        type: string
+                        description: Platform Address hostname the Custom Domain CNAME points at.
             status:
               type: object
               properties:
