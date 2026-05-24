@@ -62,6 +62,7 @@ import {
 } from "react";
 
 import {
+  applySettingsDraftBackingResult,
   commitSettingsDraftBackingState,
   createSettingsDraftBackingState,
   failSettingsDraftSave,
@@ -566,13 +567,6 @@ export function containerSettingsDraftIsDirty(
 
 function containerSettingsDraftBackingKey(draft: ContainerSettingsDraft) {
   return JSON.stringify(draft);
-}
-
-function containerSettingsSaveFailureMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim() !== "") {
-    return `${error.message} Your draft is still available.`;
-  }
-  return "Could not save settings. Your draft is still available.";
 }
 
 function SectionTitle({
@@ -2396,10 +2390,10 @@ export function ContainerSettingsPane({
     if (synced.state === settingsBackingState && synced.draft === undefined) {
       return;
     }
-    setSettingsBackingState(synced.state);
-    if (synced.draft !== undefined) {
-      applySettingsDraftToLocalState(synced.draft);
-    }
+    applySettingsDraftBackingResult(synced, {
+      draft: applySettingsDraftToLocalState,
+      state: setSettingsBackingState,
+    });
   }, [
     applySettingsDraftToLocalState,
     originalSettingsDraft,
@@ -2715,11 +2709,13 @@ export function ContainerSettingsPane({
   };
 
   const reloadSettingsDraft = () => {
-    const reloaded = reloadSettingsDraftBackingState(settingsBackingState);
-    setSettingsBackingState(reloaded.state);
-    if (reloaded.draft !== undefined) {
-      applySettingsDraftToLocalState(reloaded.draft);
-    }
+    applySettingsDraftBackingResult(
+      reloadSettingsDraftBackingState(settingsBackingState),
+      {
+        draft: applySettingsDraftToLocalState,
+        state: setSettingsBackingState,
+      }
+    );
   };
 
   const keepEditingSettingsDraft = () => {
@@ -2765,11 +2761,7 @@ export function ContainerSettingsPane({
       );
     } catch (error) {
       setSettingsBackingState((current) =>
-        failSettingsDraftSave(
-          current,
-          error,
-          containerSettingsSaveFailureMessage(error)
-        )
+        failSettingsDraftSave(current, error, "Could not save settings.")
       );
     } finally {
       setSettingsSavePending(false);

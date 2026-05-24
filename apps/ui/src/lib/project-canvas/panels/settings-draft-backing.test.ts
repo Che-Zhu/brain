@@ -98,7 +98,7 @@ test("AP settings clean draft follows backing refresh while dirty draft preserve
   const failed = failSettingsDraftSave(
     dirtyRefresh.state,
     new Error("API 409: resource was modified"),
-    "Could not save settings. Your draft is still available."
+    "Could not save settings."
   );
   assert.equal(failed.resourceChanged, true);
   assert.deepEqual(failed.base, latest);

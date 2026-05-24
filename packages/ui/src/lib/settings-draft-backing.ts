@@ -12,6 +12,8 @@ export interface SettingsDraftBackingSyncResult<TDraft> {
   state: SettingsDraftBackingState<TDraft>;
 }
 
+const DRAFT_AVAILABLE_MESSAGE = "Your draft is still available.";
+
 export function createSettingsDraftBackingState<TDraft>(
   backing: TDraft,
   backingKey: string,
@@ -19,7 +21,7 @@ export function createSettingsDraftBackingState<TDraft>(
 ): SettingsDraftBackingState<TDraft> {
   return {
     base: backing,
-    ...(identityKey === undefined ? {} : { identityKey }),
+    identityKey,
     latest: backing,
     latestKey: backingKey,
     resourceChanged: false,
@@ -60,9 +62,7 @@ export function syncSettingsDraftBackingState<TDraft>(
     return {
       state: {
         ...state,
-        ...(options.identityKey === undefined
-          ? {}
-          : { identityKey: options.identityKey }),
+        identityKey: options.identityKey ?? state.identityKey,
         latest: options.backing,
         latestKey: options.backingKey,
         resourceChanged: true,
@@ -73,17 +73,25 @@ export function syncSettingsDraftBackingState<TDraft>(
 
   return {
     draft: options.backing,
-    state: {
-      base: options.backing,
-      ...(options.identityKey === undefined
-        ? {}
-        : { identityKey: options.identityKey }),
-      latest: options.backing,
-      latestKey: options.backingKey,
-      resourceChanged: false,
-      saveFailureMessage: null,
-    },
+    state: createSettingsDraftBackingState(
+      options.backing,
+      options.backingKey,
+      options.identityKey
+    ),
   };
+}
+
+export function applySettingsDraftBackingResult<TDraft>(
+  result: SettingsDraftBackingSyncResult<TDraft>,
+  apply: {
+    draft: (draft: TDraft) => void;
+    state: (state: SettingsDraftBackingState<TDraft>) => void;
+  }
+) {
+  apply.state(result.state);
+  if (result.draft !== undefined) {
+    apply.draft(result.draft);
+  }
 }
 
 export function reloadSettingsDraftBackingState<TDraft>(
@@ -122,6 +130,16 @@ export function commitSettingsDraftBackingState<TDraft>(
   };
 }
 
+export function settingsDraftSaveFailureMessage(
+  error: unknown,
+  fallbackMessage: string
+): string {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return `${error.message} ${DRAFT_AVAILABLE_MESSAGE}`;
+  }
+  return `${fallbackMessage} ${DRAFT_AVAILABLE_MESSAGE}`;
+}
+
 export function failSettingsDraftSave<TDraft>(
   state: SettingsDraftBackingState<TDraft>,
   error: unknown,
@@ -129,9 +147,6 @@ export function failSettingsDraftSave<TDraft>(
 ): SettingsDraftBackingState<TDraft> {
   return {
     ...state,
-    saveFailureMessage:
-      error instanceof Error && error.message.trim() !== ""
-        ? `${error.message} Your draft is still available.`
-        : fallbackMessage,
+    saveFailureMessage: settingsDraftSaveFailureMessage(error, fallbackMessage),
   };
 }

@@ -13,12 +13,12 @@ import {
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { Switch } from "@workspace/ui/components/switch";
 import {
+  applySettingsDraftBackingResult,
   commitSettingsDraftBackingState,
   createSettingsDraftBackingState,
   failSettingsDraftSave,
   keepEditingSettingsDraftBackingState,
   reloadSettingsDraftBackingState,
-  type SettingsDraftBackingSyncResult,
   syncSettingsDraftBackingState,
 } from "@workspace/ui/lib/settings-draft-backing";
 import { cn } from "@workspace/ui/lib/utils";
@@ -496,24 +496,6 @@ function databaseSettingsBackingKey(
   return JSON.stringify({ draft, identityKey });
 }
 
-function databaseSettingsSaveFailureMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim() !== "") {
-    return `${error.message} Your draft is still available.`;
-  }
-  return "Could not update database settings. Your draft is still available.";
-}
-
-function applyDatabaseSettingsBackingResult(
-  result: SettingsDraftBackingSyncResult<DatabaseSettingsDraft>,
-  setBackingState: (state: typeof result.state) => void,
-  setDraft: (draft: DatabaseSettingsDraft) => void
-) {
-  setBackingState(result.state);
-  if (result.draft !== undefined) {
-    setDraft(result.draft);
-  }
-}
-
 export function DatabaseSettingsPane({
   data,
   kubeconfig,
@@ -622,7 +604,10 @@ export function DatabaseSettingsPaneContent({
     if (synced.state === backingState && synced.draft === undefined) {
       return;
     }
-    applyDatabaseSettingsBackingResult(synced, setBackingState, setDraft);
+    applySettingsDraftBackingResult(synced, {
+      draft: setDraft,
+      state: setBackingState,
+    });
   }, [backingState, draft, originalState]);
 
   const pendingPatch = useMemo(
@@ -659,7 +644,7 @@ export function DatabaseSettingsPaneContent({
         failSettingsDraftSave(
           current,
           error,
-          databaseSettingsSaveFailureMessage(error)
+          "Could not update database settings."
         )
       );
       toast.error(
@@ -671,10 +656,12 @@ export function DatabaseSettingsPaneContent({
   }, [canEdit, draft, onSubmitPatch, onUpdated, pendingPatch]);
 
   const handleReloadDraft = useCallback(() => {
-    applyDatabaseSettingsBackingResult(
+    applySettingsDraftBackingResult(
       reloadSettingsDraftBackingState(backingState),
-      setBackingState,
-      setDraft
+      {
+        draft: setDraft,
+        state: setBackingState,
+      }
     );
   }, [backingState]);
 

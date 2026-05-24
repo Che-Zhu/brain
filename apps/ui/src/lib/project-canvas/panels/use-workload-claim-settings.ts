@@ -11,6 +11,7 @@ import type {
   ContainerSettingsPaneSettingsDraftCommitMeta,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type { ContainerEnvDbDsnSource } from "@workspace/ui/lib/container-env-rows";
+import { settingsDraftSaveFailureMessage } from "@workspace/ui/lib/settings-draft-backing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -378,11 +379,7 @@ export function useWorkloadClaimSettings(
         toast.success("Settings applied.");
         await revalidateAfterApMutation();
       } catch (e) {
-        toast.error(
-          e instanceof Error
-            ? `${e.message} Your draft is still available.`
-            : "Apply failed. Your draft is still available."
-        );
+        toast.error(settingsDraftSaveFailureMessage(e, "Apply failed."));
         throw e;
       } finally {
         clearPendingReferences?.();
