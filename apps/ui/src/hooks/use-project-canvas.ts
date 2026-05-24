@@ -63,6 +63,7 @@ import {
   databasePaneModeForNodeClick,
   shouldClearDatabasePaneMode,
 } from "@/lib/project-canvas/panels/database-panel-mode";
+import { useSettingsLeaveGuardController } from "@/lib/project-canvas/panels/settings-leave-guard";
 import {
   shouldClearWorkloadPaneMode,
   workloadPaneModeForNodeClick,
@@ -250,6 +251,11 @@ export function useProjectCanvas(
   >(() => new Map());
   const [pendingAddDbDsnReferenceIntent, setPendingAddDbDsnReferenceIntent] =
     useState<PendingAddDbDsnReferenceIntent | null>(null);
+  const {
+    registerSettingsLeaveGuard,
+    requestSettingsLeave,
+    settingsLeaveGuardDialog,
+  } = useSettingsLeaveGuardController();
 
   const {
     authReady: apAuthReady,
@@ -438,12 +444,14 @@ export function useProjectCanvas(
                 disabled: !hasUrlActions,
                 onClick: hasUrlActions
                   ? () => {
-                      setSelectedEdge(null);
-                      setServiceUid(uid).catch(() => undefined);
-                      setWorkloadPane(null).catch(() => undefined);
-                      setDatabasePane(DATABASE_PANE.metrics).catch(
-                        () => undefined
-                      );
+                      requestSettingsLeave("switch", () => {
+                        setSelectedEdge(null);
+                        setServiceUid(uid).catch(() => undefined);
+                        setWorkloadPane(null).catch(() => undefined);
+                        setDatabasePane(DATABASE_PANE.metrics).catch(
+                          () => undefined
+                        );
+                      });
                     }
                   : undefined,
               },
@@ -467,6 +475,7 @@ export function useProjectCanvas(
       restartDbWorkload,
       runMutationThenRefresh,
       readOnly,
+      requestSettingsLeave,
       routingDomain,
       setDatabasePane,
       setWorkloadPane,
@@ -521,10 +530,12 @@ export function useProjectCanvas(
       }
 
       const select = (pane: string) => {
-        setSelectedEdge(null);
-        setDatabasePane(null).catch(() => undefined);
-        setServiceUid(uid ?? "").catch(() => undefined);
-        setWorkloadPane(pane).catch(() => undefined);
+        requestSettingsLeave("switch", () => {
+          setSelectedEdge(null);
+          setDatabasePane(null).catch(() => undefined);
+          setServiceUid(uid ?? "").catch(() => undefined);
+          setWorkloadPane(pane).catch(() => undefined);
+        });
       };
 
       const ref = { name: states.name, namespace: ns };
@@ -612,6 +623,7 @@ export function useProjectCanvas(
       pendingAddDbDsnReferenceIntent,
       pauseWorkload,
       readOnly,
+      requestSettingsLeave,
       restartWorkload,
       runMutationThenRefresh,
       setDatabasePane,
@@ -749,26 +761,30 @@ export function useProjectCanvas(
         return;
       }
 
-      if (command.ap.uid == null || command.ap.uid === "") {
+      const apUid = command.ap.uid;
+      if (apUid == null || apUid === "") {
         toast.error("Could not open AP settings for this connection.");
         return;
       }
 
-      addDbDsnReferenceIntentCounter.current += 1;
-      setPendingAddDbDsnReferenceIntent({
-        apNodeId: command.ap.nodeId,
-        dbName: command.db.name,
-        dbNamespace: command.db.namespace,
-        id: `ap-db-${addDbDsnReferenceIntentCounter.current}`,
+      requestSettingsLeave("switch", () => {
+        addDbDsnReferenceIntentCounter.current += 1;
+        setPendingAddDbDsnReferenceIntent({
+          apNodeId: command.ap.nodeId,
+          dbName: command.db.name,
+          dbNamespace: command.db.namespace,
+          id: `ap-db-${addDbDsnReferenceIntentCounter.current}`,
+        });
+        setSelectedEdge(null);
+        setDatabasePane(null).catch(() => undefined);
+        setServiceUid(apUid).catch(() => undefined);
+        setWorkloadPane(WORKLOAD_PANE.settings).catch(() => undefined);
       });
-      setSelectedEdge(null);
-      setDatabasePane(null).catch(() => undefined);
-      setServiceUid(command.ap.uid).catch(() => undefined);
-      setWorkloadPane(WORKLOAD_PANE.settings).catch(() => undefined);
     },
     [
       nodes,
       readOnly,
+      requestSettingsLeave,
       setDatabasePane,
       setSelectedEdge,
       setServiceUid,
@@ -893,22 +909,38 @@ export function useProjectCanvas(
 
   const clearSelection = useMemo(
     () => () => {
-      setSelectedEdge(null);
-      setServiceUid(null).catch(() => undefined);
-      setDatabasePane(null).catch(() => undefined);
-      setWorkloadPane(null).catch(() => undefined);
+      requestSettingsLeave("close", () => {
+        setSelectedEdge(null);
+        setServiceUid(null).catch(() => undefined);
+        setDatabasePane(null).catch(() => undefined);
+        setWorkloadPane(null).catch(() => undefined);
+      });
     },
-    [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]
+    [
+      requestSettingsLeave,
+      setDatabasePane,
+      setSelectedEdge,
+      setServiceUid,
+      setWorkloadPane,
+    ]
   );
 
   const closeResourcePane = useMemo(
     () => () => {
-      setSelectedEdge(null);
-      setServiceUid(null).catch(() => undefined);
-      setDatabasePane(null).catch(() => undefined);
-      setWorkloadPane(null).catch(() => undefined);
+      requestSettingsLeave("close", () => {
+        setSelectedEdge(null);
+        setServiceUid(null).catch(() => undefined);
+        setDatabasePane(null).catch(() => undefined);
+        setWorkloadPane(null).catch(() => undefined);
+      });
     },
-    [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]
+    [
+      requestSettingsLeave,
+      setDatabasePane,
+      setSelectedEdge,
+      setServiceUid,
+      setWorkloadPane,
+    ]
   );
 
   const meta = useMemo<CanvasMeta>(
@@ -941,26 +973,38 @@ export function useProjectCanvas(
           ? undefined
           : projectCanvasConnectionLine,
         onNodeClick: (_, node: Node) => {
-          frontCanvasNode(node);
-          setSelectedEdge(null);
-          setWorkloadPane(workloadPaneModeForNodeClick(node)).catch(
-            () => undefined
-          );
-          setDatabasePane(databasePaneModeForNodeClick(node)).catch(
-            () => undefined
-          );
-          setServiceUid(projectCanvasNodeServiceUid(node)).catch(
-            () => undefined
-          );
+          const nextWorkloadPane = workloadPaneModeForNodeClick(node);
+          const nextDatabasePane = databasePaneModeForNodeClick(node);
+          const nextServiceUid = projectCanvasNodeServiceUid(node);
+          const selectNode = () => {
+            frontCanvasNode(node);
+            setSelectedEdge(null);
+            setWorkloadPane(nextWorkloadPane).catch(() => undefined);
+            setDatabasePane(nextDatabasePane).catch(() => undefined);
+            setServiceUid(nextServiceUid).catch(() => undefined);
+          };
+
+          if (
+            nextServiceUid === serviceUid &&
+            nextWorkloadPane === workloadPane &&
+            nextDatabasePane === databasePane
+          ) {
+            selectNode();
+            return;
+          }
+
+          requestSettingsLeave("switch", selectNode);
         },
         onNodeDragStart: (_, node: Node) => {
           frontCanvasNode(node);
         },
         onEdgeClick: (_, edge: Edge) => {
-          setSelectedEdge(edge);
-          setServiceUid(null).catch(() => undefined);
-          setDatabasePane(null).catch(() => undefined);
-          setWorkloadPane(null).catch(() => undefined);
+          requestSettingsLeave("switch", () => {
+            setSelectedEdge(edge);
+            setServiceUid(null).catch(() => undefined);
+            setDatabasePane(null).catch(() => undefined);
+            setWorkloadPane(null).catch(() => undefined);
+          });
         },
         onNodeDragStop: (_, node: Node) => {
           if (!readOnly) {
@@ -973,6 +1017,7 @@ export function useProjectCanvas(
     [
       clearSelection,
       connectionGestureActive,
+      databasePane,
       frontCanvasNode,
       handleConnect,
       handleConnectEnd,
@@ -981,10 +1026,13 @@ export function useProjectCanvas(
       onNodePositionChange,
       projectCanvasConnectionLine,
       readOnly,
+      requestSettingsLeave,
+      serviceUid,
       setDatabasePane,
       setSelectedEdge,
       setServiceUid,
       setWorkloadPane,
+      workloadPane,
     ]
   );
 
@@ -995,8 +1043,10 @@ export function useProjectCanvas(
     databasePane,
     meta,
     nodes,
+    registerSettingsLeaveGuard,
     selectedEdge,
     selectedNode,
+    settingsLeaveGuardDialog,
     workloadPane,
   };
 }

@@ -60,11 +60,13 @@ import {
   normalizeDbSettingsReplicas,
   normalizeDbSettingsStorageGi,
 } from "./database-settings-draft";
+import type { SettingsLeaveGuardRegistration } from "./settings-leave-guard";
 
 interface DatabaseSettingsPaneProps {
   data: CanvasDatabaseNodeData;
   kubeconfig?: string;
   onClose: () => void;
+  onSettingsLeaveGuardChange?: SettingsLeaveGuardRegistration;
   onUpdated?: () => Promise<unknown>;
 }
 
@@ -72,6 +74,7 @@ interface DatabaseSettingsPaneContentProps {
   data: CanvasDatabaseNodeData;
   editable?: boolean;
   onClose: () => void;
+  onSettingsLeaveGuardChange?: SettingsLeaveGuardRegistration;
   onSubmitPatch?: (patch: DatabaseSettingsPatch) => Promise<unknown> | unknown;
   onUpdated?: () => Promise<unknown>;
   routingDomain?: string;
@@ -500,6 +503,7 @@ export function DatabaseSettingsPane({
   data,
   kubeconfig,
   onClose,
+  onSettingsLeaveGuardChange,
   onUpdated,
 }: DatabaseSettingsPaneProps) {
   const readOnly = data.settingsAccess?.readOnly === true;
@@ -525,6 +529,7 @@ export function DatabaseSettingsPane({
       data={data}
       editable={!readOnly && authReady}
       onClose={onClose}
+      onSettingsLeaveGuardChange={onSettingsLeaveGuardChange}
       onSubmitPatch={!readOnly && authReady ? handleSubmitPatch : undefined}
       onUpdated={onUpdated}
       routingDomain={routingDomain}
@@ -537,6 +542,7 @@ export function DatabaseSettingsPaneContent({
   data,
   editable = true,
   onClose,
+  onSettingsLeaveGuardChange,
   onSubmitPatch,
   onUpdated,
   routingDomain,
@@ -626,10 +632,10 @@ export function DatabaseSettingsPaneContent({
   const subtitle = databaseHeaderSubtitle(data.states);
   const controlsDisabled = !canEdit || updating;
 
-  const handleUpdate = useCallback(async () => {
+  const saveSettingsDraft = useCallback(async () => {
     const patch = pendingPatch;
     if (!canEdit || patch === null || onSubmitPatch == null) {
-      return;
+      throw new Error("Database settings draft cannot be saved yet.");
     }
     setBackingState((current) => ({ ...current, saveFailureMessage: null }));
     try {
@@ -652,8 +658,15 @@ export function DatabaseSettingsPaneContent({
           ? error.message
           : "Could not update database settings."
       );
+      throw error;
     }
   }, [canEdit, draft, onSubmitPatch, onUpdated, pendingPatch]);
+
+  const handleUpdate = useCallback(() => {
+    saveSettingsDraft().catch(() => {
+      /* Keep the user on the settings draft; panel state already shows failure. */
+    });
+  }, [saveSettingsDraft]);
 
   const handleReloadDraft = useCallback(() => {
     applySettingsDraftBackingResult(
@@ -668,6 +681,35 @@ export function DatabaseSettingsPaneContent({
   const handleKeepEditingDraft = useCallback(() => {
     setBackingState((current) => keepEditingSettingsDraftBackingState(current));
   }, []);
+
+  useEffect(() => {
+    if (!canEdit || onSettingsLeaveGuardChange == null) {
+      return;
+    }
+
+    onSettingsLeaveGuardChange(
+      dirty
+        ? {
+            canSave: canUpdate,
+            dirty: true,
+            discard: handleReloadDraft,
+            save: saveSettingsDraft,
+            scope: "database",
+          }
+        : null
+    );
+
+    return () => {
+      onSettingsLeaveGuardChange(null);
+    };
+  }, [
+    canEdit,
+    canUpdate,
+    dirty,
+    handleReloadDraft,
+    onSettingsLeaveGuardChange,
+    saveSettingsDraft,
+  ]);
 
   return (
     <CanvasResourcePane

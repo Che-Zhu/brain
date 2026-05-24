@@ -19,6 +19,7 @@ import {
   CanvasResourcePane,
   type CanvasResourcePaneProps,
 } from "./canvas-resource-pane";
+import type { SettingsLeaveGuardRegistration } from "./settings-leave-guard";
 
 function workloadSettingsSubtitle({
   image,
@@ -65,9 +66,11 @@ function WorkloadSettingsShell({
 export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
   node,
   onClose,
+  onSettingsLeaveGuardChange,
 }: {
   node: Node;
   onClose: () => void;
+  onSettingsLeaveGuardChange?: SettingsLeaveGuardRegistration;
 }) {
   const kubeconfig = useAtomValue(kubeconfigAtom);
   const namespaceFallback = useAtomValue(namespaceAtom).trim();
@@ -199,6 +202,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         onPortsChange={ignorePorts}
         onResourceQuotasCommit={canEditAp ? onResourceQuotasCommit : undefined}
         onSettingsDraftCommit={canEditAp ? onSettingsDraftCommit : undefined}
+        onSettingsDraftLeaveGuardChange={onSettingsLeaveGuardChange}
         ports={display.ports}
         readOnly={!isApWorkload || settingsReadOnly}
         replicaStrategy={display.replicaStrategy}

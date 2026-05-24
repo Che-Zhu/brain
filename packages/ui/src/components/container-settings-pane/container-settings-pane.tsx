@@ -70,6 +70,7 @@ import {
   reloadSettingsDraftBackingState,
   syncSettingsDraftBackingState,
 } from "../../lib/settings-draft-backing";
+import type { SettingsLeaveGuardRegistration } from "../../lib/settings-leave-guard";
 import { parsePortNumberDigits } from "../ports-table/ports-table.helpers";
 
 const CPU_QUOTA_DIRTY_EPS = 1e-9;
@@ -483,6 +484,7 @@ export interface ContainerSettingsPaneProps {
     draft: ContainerSettingsDraft,
     meta?: ContainerSettingsPaneSettingsDraftCommitMeta
   ) => void | Promise<void>;
+  onSettingsDraftLeaveGuardChange?: SettingsLeaveGuardRegistration;
   /** Exposed container ports + protocol labels. */
   ports: ContainerPort[];
   /**
@@ -2060,6 +2062,7 @@ export function ContainerSettingsPane({
   replicaStrategy,
   onResourceQuotasCommit,
   onSettingsDraftCommit,
+  onSettingsDraftLeaveGuardChange,
   readOnly = false,
   dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
@@ -2699,16 +2702,16 @@ export function ContainerSettingsPane({
     setEnvDraft((rows) => updateContainerEnvRow(rows, index, patch));
   };
 
-  const resetSettingsDraft = () => {
+  const resetSettingsDraft = useCallback(() => {
     applySettingsDraftToLocalState(settingsBaseDraft);
     setImageDialogOpen(false);
     setSettingsBackingState((current) => ({
       ...current,
       saveFailureMessage: null,
     }));
-  };
+  }, [applySettingsDraftToLocalState, settingsBaseDraft]);
 
-  const reloadSettingsDraft = () => {
+  const reloadSettingsDraft = useCallback(() => {
     applySettingsDraftBackingResult(
       reloadSettingsDraftBackingState(settingsBackingState),
       {
@@ -2716,17 +2719,17 @@ export function ContainerSettingsPane({
         state: setSettingsBackingState,
       }
     );
-  };
+  }, [applySettingsDraftToLocalState, settingsBackingState]);
 
-  const keepEditingSettingsDraft = () => {
+  const keepEditingSettingsDraft = useCallback(() => {
     setSettingsBackingState((current) =>
       keepEditingSettingsDraftBackingState(current)
     );
-  };
+  }, []);
 
-  const handleSaveSettingsDraft = async () => {
+  const saveSettingsDraft = useCallback(async () => {
     if (!canSaveSettings || onSettingsDraftCommit == null) {
-      return;
+      throw new Error("Settings draft cannot be saved yet.");
     }
     const normalizedEnv = normalizeContainerEnvRowsForSave(envDraft);
     const confirmedAddDbDsnReferences =
@@ -2763,10 +2766,54 @@ export function ContainerSettingsPane({
       setSettingsBackingState((current) =>
         failSettingsDraftSave(current, error, "Could not save settings.")
       );
+      throw error;
     } finally {
       setSettingsSavePending(false);
     }
-  };
+  }, [
+    canSaveSettings,
+    envDraft,
+    onSettingsDraftCommit,
+    settingsBaseDraft,
+    settingsDraft,
+  ]);
+
+  const handleSaveSettingsDraft = useCallback(async () => {
+    try {
+      await saveSettingsDraft();
+    } catch {
+      // The footer keeps the user on the draft and shows the panel-level failure.
+    }
+  }, [saveSettingsDraft]);
+
+  useEffect(() => {
+    if (!settingsCommitMode || onSettingsDraftLeaveGuardChange == null) {
+      return;
+    }
+
+    onSettingsDraftLeaveGuardChange(
+      panelDraftDirty
+        ? {
+            canSave: canSaveSettings,
+            dirty: true,
+            discard: resetSettingsDraft,
+            save: saveSettingsDraft,
+            scope: "ap",
+          }
+        : null
+    );
+
+    return () => {
+      onSettingsDraftLeaveGuardChange(null);
+    };
+  }, [
+    canSaveSettings,
+    onSettingsDraftLeaveGuardChange,
+    panelDraftDirty,
+    resetSettingsDraft,
+    saveSettingsDraft,
+    settingsCommitMode,
+  ]);
 
   const displayImage = settingsCommitMode ? draftImage : image;
   const networkForRender = settingsCommitMode ? activeDraftNetwork : network;

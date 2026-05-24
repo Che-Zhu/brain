@@ -154,8 +154,10 @@ export default function PreviewProjectPage() {
     databasePane,
     meta,
     nodes,
+    registerSettingsLeaveGuard,
     selectedEdge,
     selectedNode,
+    settingsLeaveGuardDialog,
     workloadPane,
   } = useProjectCanvas(canvasState.nodes, {
     readOnly: true,
@@ -198,6 +200,7 @@ export default function PreviewProjectPage() {
               mode={workloadPane}
               node={selectedNode}
               onClose={closeResourcePane}
+              onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
             />
             <DatabaseMetricsPane
               node={selectedNode}
@@ -209,9 +212,11 @@ export default function PreviewProjectPage() {
               <DatabaseSettingsPane
                 data={selectedDatabaseData}
                 onClose={closeResourcePane}
+                onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
                 onUpdated={refreshWorkloadLists}
               />
             ) : null}
+            {settingsLeaveGuardDialog}
           </Canvas.Flow>
         </Canvas.Root>
       </div>
