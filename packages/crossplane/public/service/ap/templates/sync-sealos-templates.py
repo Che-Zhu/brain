@@ -427,7 +427,10 @@ def build_template_instance(name: str, meta: dict[str, Any]) -> str:
     lines.extend(
         [
             "  resource:",
-            "    replicas: 1",
+            "    replicaStrategy:",
+            "      type: fixed",
+            "      fixed:",
+            "        replicas: 1",
             "    requests:",
             '      cpu: "100m"',
             '      memory: "102Mi"',

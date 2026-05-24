@@ -69,10 +69,10 @@ spec:
 | Sealos Syntax | Crossplane Go Template |
 |---------------|------------------------|
 | `${{ defaults.app_name }}` | `{{ $name }}-{{ $suffix }}` |
-| `${{ defaults.app_host }}` | `{{ $host }}` (from `$spec.host`) |
-| `${{ inputs.PARAM_NAME }}` | `{{ $spec.paramName }}` |
+| `${{ defaults.app_host }}` | `{{ $host }}` (from `$input.host` when no region label is set) |
+| `${{ inputs.PARAM_NAME }}` | `{{ $input.paramName }}` |
 | `${{ SEALOS_NAMESPACE }}` | `{{ $ns }}` |
-| `${{ SEALOS_CLOUD_DOMAIN }}` | Part of `$spec.host` |
+| `${{ SEALOS_CLOUD_DOMAIN }}` | Part of `$input.host` when no region label is set |
 | `${{ SEALOS_CERT_SECRET_NAME }}` | `wildcard-cert` (hardcoded) |
 | `${{ random(8) }}` | `{{ $suffix }}` (from UID hash) |
 

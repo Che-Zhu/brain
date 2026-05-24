@@ -39,7 +39,10 @@ metadata:
           # the domain of laf (required)
           domain: "laf-${{ random(8) }}"
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

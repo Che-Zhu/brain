@@ -184,24 +184,31 @@ spec:
 
   template: lobe-chat
   name: my-lobe-chat
-  host: lobe.mydomain.com
 
-  # OpenAI configuration
-  openaiApiKey: "sk-your-api-key"
-  openaiProxyUrl: "https://api.openai.com/v1"
+  input:
+    host: lobe.mydomain.com
 
-  # Access control
-  accessCode: "password1,password2,password3"  # Multiple passwords
+    # OpenAI configuration
+    openaiApiKey: "sk-your-api-key"
+    openaiProxyUrl: "https://api.openai.com/v1"
 
-  # Model configuration
-  openaiModelList: "+gpt-4-vision-preview,-gpt-3.5-turbo"
+    # Access control
+    accessCode: "password1,password2,password3"  # Multiple passwords
 
-  # Resources
-  replicas: 2
-  cpuRequest: "100m"
-  memoryRequest: "256Mi"
-  cpuLimit: "2000m"
-  memoryLimit: "2048Mi"
+    # Model configuration
+    openaiModelList: "+gpt-4-vision-preview,-gpt-3.5-turbo"
+
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 2
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
 ```
 
 ## Example 3: Deploy Memos (StatefulSet with Storage)
@@ -220,16 +227,22 @@ spec:
 
   template: memos
   name: my-memos
-  host: memos.mydomain.com
 
-  # Storage configuration
-  storageSize: "10Gi"  # Persistent storage for notes
+  input:
+    host: memos.mydomain.com
+    storageSize: "10Gi"  # Persistent storage for notes
 
-  # Resources (lightweight app)
-  cpuRequest: "50m"
-  memoryRequest: "64Mi"
-  cpuLimit: "500m"
-  memoryLimit: "512Mi"
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
 ```
 
 ## Example 4: Deploy Code Server (VS Code in Browser)
@@ -248,22 +261,30 @@ spec:
 
   template: code-server
   name: dev-workspace
-  host: code.mydomain.com
 
-  # Authentication
-  password: "my-secure-development-password"
+  input:
+    host: code.mydomain.com
 
-  # Timezone
-  timeZone: "America/New_York"
+    # Authentication
+    password: "my-secure-development-password"
 
-  # Storage for development environment
-  storageSize: "50Gi"
+    # Timezone
+    timeZone: "America/New_York"
 
-  # Resources (development needs more power)
-  cpuRequest: "500m"
-  memoryRequest: "1024Mi"
-  cpuLimit: "4000m"
-  memoryLimit: "8192Mi"
+    # Storage for development environment
+    storageSize: "50Gi"
+
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+    limits:
+      cpu: "4000m"
+      memory: "8192Mi"
 ```
 
 ## Example 5: Deploy Metabase (with External Database)
@@ -284,23 +305,31 @@ spec:
 
   template: metabase
   name: analytics
-  host: metabase.mydomain.com
 
-  # External PostgreSQL database connection
-  dbHost: "postgres.database.svc.cluster.local"
-  dbPort: "5432"
-  dbUser: "metabase"
-  dbPassword: "secure-db-password"
-  dbName: "metabase"
+  input:
+    host: metabase.mydomain.com
 
-  # Storage for plugins
-  storageSize: "1Gi"
+    # External PostgreSQL database connection
+    dbHost: "postgres.database.svc.cluster.local"
+    dbPort: "5432"
+    dbUser: "metabase"
+    dbPassword: "secure-db-password"
+    dbName: "metabase"
 
-  # Resources
-  cpuRequest: "500m"
-  memoryRequest: "512Mi"
-  cpuLimit: "2000m"
-  memoryLimit: "2048Mi"
+    # Storage for plugins
+    storageSize: "1Gi"
+
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
 ```
 
 Setup PostgreSQL first:
@@ -314,10 +343,7 @@ metadata:
   namespace: default
 spec:
   engine: postgresql
-  replicas: 1
-  storageSize: "10Gi"
-  cpuRequest: "100m"
-  memoryRequest: "256Mi"
+  quota: xs
 EOF
 ```
 
@@ -337,19 +363,26 @@ spec:
 
   template: perplexica
   name: search-ai
-  host: search.mydomain.com
 
-  # OpenAI-compatible API configuration
-  apiKey: "sk-your-api-key"
-  apiUrl: "https://api.openai.com/v1"
-  modelName: "gpt-4-turbo-preview"
+  input:
+    host: search.mydomain.com
 
-  # Resources
-  replicas: 1
-  cpuRequest: "100m"
-  memoryRequest: "256Mi"
-  cpuLimit: "1000m"
-  memoryLimit: "1024Mi"
+    # OpenAI-compatible API configuration
+    apiKey: "sk-your-api-key"
+    apiUrl: "https://api.openai.com/v1"
+    modelName: "gpt-4-turbo-preview"
+
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
 ```
 
 ## Common Patterns
@@ -359,23 +392,37 @@ spec:
 **Development**:
 ```yaml
 spec:
-  replicas: 1
-  cpuRequest: "50m"
-  memoryRequest: "64Mi"
-  cpuLimit: "500m"
-  memoryLimit: "512Mi"
-  storageSize: "5Gi"
+  input:
+    storageSize: "5Gi"
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 1
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
 ```
 
 **Production**:
 ```yaml
 spec:
-  replicas: 3
-  cpuRequest: "500m"
-  memoryRequest: "512Mi"
-  cpuLimit: "2000m"
-  memoryLimit: "2048Mi"
-  storageSize: "50Gi"
+  input:
+    storageSize: "50Gi"
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 3
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
 ```
 
 ### Pattern 2: Multiple Platform Addresses
@@ -465,9 +512,13 @@ kubectl logs -n crossplane-system <pod-name>
 # Edit the AP resource
 kubectl edit ap my-app
 
-# Change replicas
+# Change Fixed Replicas
 spec:
-  replicas: 5
+  resource:
+    replicaStrategy:
+      type: fixed
+      fixed:
+        replicas: 5
 ```
 
 ### Vertical Scaling
@@ -477,8 +528,10 @@ kubectl edit ap my-app
 
 # Increase resources
 spec:
-  cpuLimit: "4000m"
-  memoryLimit: "8192Mi"
+  resource:
+    limits:
+      cpu: "4000m"
+      memory: "8192Mi"
 ```
 
 ### Storage Scaling

@@ -33,7 +33,10 @@ metadata:
           # AI 模型令牌 (required)
           llmApiKey: "asktable-xxxxxxx=xxx（登录 AskTable.com 获取）"
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

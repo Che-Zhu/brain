@@ -31,7 +31,10 @@ metadata:
           # appSuffix: auto-generated if omitted
           # cookieSecret: auto-generated if omitted
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

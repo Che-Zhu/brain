@@ -47,7 +47,10 @@ metadata:
           # GID of the user used to run paperless in the container
           usermapGid: "1000"
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

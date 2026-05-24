@@ -33,7 +33,10 @@ metadata:
           # 给微信分配的存储空间大小(单位:GB) (required)
           storageSize: ""
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

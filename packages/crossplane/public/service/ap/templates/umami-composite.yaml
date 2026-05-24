@@ -33,7 +33,10 @@ metadata:
           # Allows you to assign a custom name to the tracker script different from the default script.js. This is to help you avoid some ad-blockers.
           trackerScriptName: ""
         resource:
-          replicas: 1
+          replicaStrategy:
+            type: fixed
+            fixed:
+              replicas: 1
           requests:
             cpu: "100m"
             memory: "102Mi"

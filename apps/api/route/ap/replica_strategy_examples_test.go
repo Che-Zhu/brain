@@ -51,12 +51,7 @@ func TestAPReplicaStrategyExamplesCoverFixedFallbackAndElasticTargets(t *testing
 			assert: func(t *testing.T, resource map[string]interface{}) {
 				t.Helper()
 				elastic := elasticReplicaStrategy(t, resource)
-				if got := elastic["minReplicas"]; got != float64(2) {
-					t.Fatalf("minReplicas = %v, want 2", got)
-				}
-				if got := elastic["maxReplicas"]; got != float64(8) {
-					t.Fatalf("maxReplicas = %v, want 8", got)
-				}
+				assertElasticReplicaBounds(t, elastic, 2, 8)
 				target := asMap(t, elastic["target"], "spec.resource.replicaStrategy.elastic.target")
 				if got := target["metric"]; got != "cpu" {
 					t.Fatalf("target.metric = %v, want cpu", got)
@@ -78,6 +73,7 @@ func TestAPReplicaStrategyExamplesCoverFixedFallbackAndElasticTargets(t *testing
 			assert: func(t *testing.T, resource map[string]interface{}) {
 				t.Helper()
 				elastic := elasticReplicaStrategy(t, resource)
+				assertElasticReplicaBounds(t, elastic, 2, 8)
 				target := asMap(t, elastic["target"], "spec.resource.replicaStrategy.elastic.target")
 				if got := target["metric"]; got != "memory" {
 					t.Fatalf("target.metric = %v, want memory", got)
@@ -138,4 +134,14 @@ func elasticReplicaStrategy(t *testing.T, resource map[string]interface{}) map[s
 		t.Fatal("Elastic Scaling example should not use legacy resource.replicas")
 	}
 	return asMap(t, strategy["elastic"], "spec.resource.replicaStrategy.elastic")
+}
+
+func assertElasticReplicaBounds(t *testing.T, elastic map[string]interface{}, minReplicas, maxReplicas float64) {
+	t.Helper()
+	if got := elastic["minReplicas"]; got != minReplicas {
+		t.Fatalf("minReplicas = %v, want %v", got, minReplicas)
+	}
+	if got := elastic["maxReplicas"]; got != maxReplicas {
+		t.Fatalf("maxReplicas = %v, want %v", got, maxReplicas)
+	}
 }
