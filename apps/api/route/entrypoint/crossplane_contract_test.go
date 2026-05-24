@@ -68,6 +68,49 @@ func TestEntryPointXRDIncludesPublicAccessContract(t *testing.T) {
 	if got := statusTargets["type"]; got != "array" {
 		t.Fatalf("status.targets type = %v, want array", got)
 	}
+	statusCustomDomains := asMap(t, statusProps["customDomains"], "status.customDomains")
+	if got := statusCustomDomains["type"]; got != "array" {
+		t.Fatalf("status.customDomains type = %v, want array", got)
+	}
+	statusCustomDomainProps := asMap(
+		t,
+		asMap(t, statusCustomDomains["items"], "status.customDomains.items")["properties"],
+		"status.customDomains.items.properties",
+	)
+	for _, field := range []string{
+		"id",
+		"domain",
+		"platformAddressId",
+		"targetPort",
+		"cnameTarget",
+		"status",
+		"dns",
+		"certificate",
+		"routing",
+	} {
+		if _, ok := statusCustomDomainProps[field]; !ok {
+			t.Fatalf("status.customDomains.items.%s is missing", field)
+		}
+	}
+	statusEnum := asSlice(t, asMap(t, statusCustomDomainProps["status"], "status.customDomains.items.status")["enum"], "status.customDomains.items.status.enum")
+	for _, value := range []string{"pending", "verifying", "accessible", "blocked"} {
+		assertStringSliceContains(t, statusEnum, value)
+	}
+	dnsProps := asMap(t, asMap(t, statusCustomDomainProps["dns"], "status.customDomains.items.dns")["properties"], "status.customDomains.items.dns.properties")
+	dnsStatusEnum := asSlice(t, asMap(t, dnsProps["status"], "status.customDomains.items.dns.status")["enum"], "status.customDomains.items.dns.status.enum")
+	for _, value := range []string{"pending", "verified", "unknown", "blocked"} {
+		assertStringSliceContains(t, dnsStatusEnum, value)
+	}
+	certificateProps := asMap(t, asMap(t, statusCustomDomainProps["certificate"], "status.customDomains.items.certificate")["properties"], "status.customDomains.items.certificate.properties")
+	certificateStatusEnum := asSlice(t, asMap(t, certificateProps["status"], "status.customDomains.items.certificate.status")["enum"], "status.customDomains.items.certificate.status.enum")
+	for _, value := range []string{"pending", "ready", "failed", "unknown"} {
+		assertStringSliceContains(t, certificateStatusEnum, value)
+	}
+	routingProps := asMap(t, asMap(t, statusCustomDomainProps["routing"], "status.customDomains.items.routing")["properties"], "status.customDomains.items.routing.properties")
+	routingStatusEnum := asSlice(t, asMap(t, routingProps["status"], "status.customDomains.items.routing.status")["enum"], "status.customDomains.items.routing.status.enum")
+	for _, value := range []string{"pending", "configured", "blocked"} {
+		assertStringSliceContains(t, routingStatusEnum, value)
+	}
 }
 
 func TestEntryPointMinimalCompositionSurfacesAggregateStatus(t *testing.T) {
@@ -88,8 +131,237 @@ func TestEntryPointMinimalCompositionSurfacesAggregateStatus(t *testing.T) {
 		}
 	}
 
-	if _, err := template.New("entrypoints-minimal").Funcs(sprig.TxtFuncMap()).Parse(templateText); err != nil {
+	funcs := sprig.TxtFuncMap()
+	funcs["getComposedResource"] = func(interface{}, string) map[string]interface{} {
+		return nil
+	}
+	if _, err := template.New("entrypoints-minimal").Funcs(funcs).Parse(templateText); err != nil {
 		t.Fatalf("parse EntryPoint composition template: %v", err)
+	}
+}
+
+func TestEntryPointCompositionRendersCustomDomainRoutingAndTLS(t *testing.T) {
+	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
+		"apRef": "web",
+		"targets": []interface{}{
+			map[string]interface{}{
+				"id":             "pa_abc123",
+				"port":           8080,
+				"platformDomain": "web.example.platform",
+				"status":         "accessible",
+			},
+		},
+		"customDomains": []interface{}{
+			map[string]interface{}{
+				"id":                "cd_def456",
+				"domain":            "www.example.com",
+				"platformAddressId": "pa_abc123",
+				"targetPort":        8080,
+				"cnameTarget":       "web.example.platform",
+			},
+			map[string]interface{}{
+				"id":                "cd_admin9",
+				"domain":            "admin.example.com",
+				"platformAddressId": "pa_admin9",
+				"targetPort":        9000,
+				"cnameTarget":       "admin.example.platform",
+			},
+		},
+	}), nil)
+
+	ingresses := ingressObjects(t, out)
+	if got := len(ingresses); got != 2 {
+		t.Fatalf("Custom Domain Ingress count = %d, want 2", got)
+	}
+	issuers := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "Issuer"
+	})
+	if got := len(issuers); got != 2 {
+		t.Fatalf("Custom Domain Issuer count = %d, want 2", got)
+	}
+	certificates := kindObjects(t, out, func(obj map[string]interface{}) bool {
+		return obj["kind"] == "Certificate"
+	})
+	if got := len(certificates); got != 2 {
+		t.Fatalf("Custom Domain Certificate count = %d, want 2", got)
+	}
+
+	ingress := objectByName(t, ingresses, "web-cd-def456")
+	ingressSpec := asMap(t, ingress["spec"], "custom domain ingress.spec")
+	assertIngressBackend(t, asSlice(t, ingressSpec["rules"], "custom domain ingress.spec.rules"), "www.example.com", "web-service", 8080)
+	tls := asMap(t, asSlice(t, ingressSpec["tls"], "custom domain ingress.spec.tls")[0], "custom domain ingress.spec.tls[0]")
+	assertStringSliceContains(t, asSlice(t, tls["hosts"], "custom domain ingress.spec.tls[0].hosts"), "www.example.com")
+	if got := tls["secretName"]; got != "web-cd-def456-tls" {
+		t.Fatalf("custom domain ingress tls secretName = %v, want web-cd-def456-tls", got)
+	}
+
+	issuer := objectByName(t, issuers, "web-cd-def456")
+	issuerSpec := asMap(t, issuer["spec"], "custom domain issuer.spec")
+	acme := asMap(t, issuerSpec["acme"], "custom domain issuer.spec.acme")
+	if got := acme["server"]; got != "https://acme-v02.api.letsencrypt.org/directory" {
+		t.Fatalf("custom domain issuer ACME server = %v, want Let's Encrypt production", got)
+	}
+
+	certificate := objectByName(t, certificates, "web-cd-def456")
+	certificateSpec := asMap(t, certificate["spec"], "custom domain certificate.spec")
+	if got := certificateSpec["secretName"]; got != "web-cd-def456-tls" {
+		t.Fatalf("custom domain certificate secretName = %v, want web-cd-def456-tls", got)
+	}
+	assertStringSliceContains(t, asSlice(t, certificateSpec["dnsNames"], "custom domain certificate.spec.dnsNames"), "www.example.com")
+	issuerRef := asMap(t, certificateSpec["issuerRef"], "custom domain certificate.spec.issuerRef")
+	if got := issuerRef["name"]; got != "web-cd-def456" {
+		t.Fatalf("custom domain certificate issuerRef.name = %v, want web-cd-def456", got)
+	}
+}
+
+func TestEntryPointCompositionProjectsCustomDomainHealthFromCertificateAndIngress(t *testing.T) {
+	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
+		"apRef": "web",
+		"targets": []interface{}{
+			map[string]interface{}{
+				"id":             "pa_abc123",
+				"port":           8080,
+				"platformDomain": "web.example.platform",
+				"status":         "accessible",
+			},
+		},
+		"customDomains": []interface{}{
+			map[string]interface{}{
+				"id":                "cd_def456",
+				"domain":            "www.example.com",
+				"platformAddressId": "pa_abc123",
+				"targetPort":        8080,
+				"cnameTarget":       "web.example.platform",
+			},
+		},
+	}), map[string]map[string]interface{}{
+		"custom-domain-ingress-cd-def456": observedIngress("www.example.com", "web-service", 8080, "web-cd-def456-tls"),
+		"custom-domain-certificate-cd-def456": observedCertificate(
+			"web-cd-def456-tls",
+			"www.example.com",
+			"IssuerReady",
+			"Certificate is up to date and has not expired",
+			"True",
+		),
+	})
+
+	status := asMap(t, singleKindObject(t, out, "EntryPoint")["status"], "entrypoint.status")
+	if got := status["phase"]; got != "Accessible" {
+		t.Fatalf("EntryPoint phase = %v, want Accessible", got)
+	}
+	customDomains := asSlice(t, status["customDomains"], "entrypoint.status.customDomains")
+	binding := customDomainStatusByID(t, customDomains, "cd_def456")
+	if got := binding["status"]; got != "accessible" {
+		t.Fatalf("custom domain status = %v, want accessible", got)
+	}
+	dns := asMap(t, binding["dns"], "custom domain dns detail")
+	if got := dns["status"]; got != "verified" {
+		t.Fatalf("custom domain dns status = %v, want verified", got)
+	}
+	if got := dns["reason"]; got != "SubmitVerified" {
+		t.Fatalf("custom domain dns reason = %v, want SubmitVerified", got)
+	}
+	certificate := asMap(t, binding["certificate"], "custom domain certificate detail")
+	if got := certificate["status"]; got != "ready" {
+		t.Fatalf("custom domain certificate status = %v, want ready", got)
+	}
+	if got := certificate["reason"]; got != "IssuerReady" {
+		t.Fatalf("custom domain certificate reason = %v, want cert-manager reason", got)
+	}
+	routing := asMap(t, binding["routing"], "custom domain routing detail")
+	if got := routing["status"]; got != "configured" {
+		t.Fatalf("custom domain routing status = %v, want configured", got)
+	}
+	if got := routing["reason"]; got != "IngressConfigured" {
+		t.Fatalf("custom domain routing reason = %v, want IngressConfigured", got)
+	}
+}
+
+func TestEntryPointCompositionKeepsCustomDomainPendingUntilRoutingObserved(t *testing.T) {
+	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
+		"apRef": "web",
+		"targets": []interface{}{
+			map[string]interface{}{
+				"id":             "pa_abc123",
+				"port":           8080,
+				"platformDomain": "web.example.platform",
+				"status":         "accessible",
+			},
+		},
+		"customDomains": []interface{}{
+			map[string]interface{}{
+				"id":                "cd_def456",
+				"domain":            "www.example.com",
+				"platformAddressId": "pa_abc123",
+				"targetPort":        8080,
+				"cnameTarget":       "web.example.platform",
+			},
+		},
+	}), nil)
+
+	status := asMap(t, singleKindObject(t, out, "EntryPoint")["status"], "entrypoint.status")
+	if got := status["phase"]; got != "Progressing" {
+		t.Fatalf("EntryPoint phase = %v, want Progressing while Custom Domain Binding is pending", got)
+	}
+	binding := customDomainStatusByID(t, asSlice(t, status["customDomains"], "entrypoint.status.customDomains"), "cd_def456")
+	if got := binding["status"]; got != "pending" {
+		t.Fatalf("custom domain status = %v, want pending", got)
+	}
+	routing := asMap(t, binding["routing"], "custom domain routing detail")
+	if got := routing["status"]; got != "pending" {
+		t.Fatalf("custom domain routing status = %v, want pending", got)
+	}
+}
+
+func TestEntryPointCompositionBlocksCustomDomainOnCertificateFailure(t *testing.T) {
+	out := renderEntryPointComposition(t, entryPointResource(map[string]interface{}{
+		"apRef": "web",
+		"targets": []interface{}{
+			map[string]interface{}{
+				"id":             "pa_abc123",
+				"port":           8080,
+				"platformDomain": "web.example.platform",
+				"status":         "accessible",
+			},
+		},
+		"customDomains": []interface{}{
+			map[string]interface{}{
+				"id":                "cd_def456",
+				"domain":            "www.example.com",
+				"platformAddressId": "pa_abc123",
+				"targetPort":        8080,
+				"cnameTarget":       "web.example.platform",
+			},
+		},
+	}), map[string]map[string]interface{}{
+		"custom-domain-ingress-cd-def456": observedIngress("www.example.com", "web-service", 8080, "web-cd-def456-tls"),
+		"custom-domain-certificate-cd-def456": observedCertificate(
+			"web-cd-def456-tls",
+			"www.example.com",
+			"Failed",
+			"DNS name is not allowed",
+			"False",
+		),
+	})
+
+	status := asMap(t, singleKindObject(t, out, "EntryPoint")["status"], "entrypoint.status")
+	if got := status["phase"]; got != "Inaccessible" {
+		t.Fatalf("EntryPoint phase = %v, want Inaccessible", got)
+	}
+	binding := customDomainStatusByID(t, asSlice(t, status["customDomains"], "entrypoint.status.customDomains"), "cd_def456")
+	if got := binding["status"]; got != "blocked" {
+		t.Fatalf("custom domain status = %v, want blocked", got)
+	}
+	certificate := asMap(t, binding["certificate"], "custom domain certificate detail")
+	if got := certificate["status"]; got != "failed" {
+		t.Fatalf("custom domain certificate status = %v, want failed", got)
+	}
+	if got := certificate["reason"]; got != "Failed" {
+		t.Fatalf("custom domain certificate reason = %v, want Failed", got)
+	}
+	routing := asMap(t, binding["routing"], "custom domain routing detail")
+	if got := routing["status"]; got != "configured" {
+		t.Fatalf("custom domain routing status = %v, want configured", got)
 	}
 }
 
@@ -914,6 +1186,59 @@ func TestAPCompositionPromotesCustomDomainsIntoEntryPointTasks(t *testing.T) {
 	assertStatusPublicAddressIDMissing(t, publicAddresses, "pa_abc123")
 }
 
+func TestAPWorkloadPhaseIgnoresEntryPointCustomDomainFailures(t *testing.T) {
+	out := renderAPComposition(t, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": apResource(map[string]interface{}{
+					"input": map[string]interface{}{
+						"network": map[string]interface{}{
+							"privatePort": 8080,
+							"platformAddresses": []interface{}{
+								map[string]interface{}{"id": "pa_abc123", "port": 8080},
+							},
+							"customDomains": []interface{}{
+								map[string]interface{}{
+									"id":                "cd_def456",
+									"domain":            "www.example.com",
+									"platformAddressId": "pa_abc123",
+								},
+							},
+						},
+					},
+				}, map[string]interface{}{
+					"region": "usw.sealos.app",
+				}),
+			},
+		},
+	}, map[string]map[string]interface{}{
+		"app-deployment": runningDeployment(),
+		"app-entrypoint": {
+			"status": map[string]interface{}{
+				"customDomains": []interface{}{
+					map[string]interface{}{
+						"id":     "cd_def456",
+						"status": "blocked",
+						"certificate": map[string]interface{}{
+							"status": "failed",
+							"reason": "Failed",
+						},
+						"routing": map[string]interface{}{
+							"status": "blocked",
+							"reason": "IngressMisconfigured",
+						},
+					},
+				},
+			},
+		},
+	})
+
+	status := asMap(t, singleKindObject(t, out, "AP")["status"], "ap.status")
+	if got := status["phase"]; got != "Running" {
+		t.Fatalf("AP status.phase = %v, want Running despite blocked Custom Domain Binding", got)
+	}
+}
+
 func TestAPCompositionPlatformAddressHostIgnoresUIDAndTargetPort(t *testing.T) {
 	out := renderAPComposition(t, map[string]interface{}{
 		"observed": map[string]interface{}{
@@ -1048,6 +1373,83 @@ func apResource(spec map[string]interface{}, labels map[string]interface{}) map[
 	}
 }
 
+func entryPointResource(spec map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"name":      "web",
+			"namespace": "project-a",
+			"uid":       "entrypoint-uid-1",
+		},
+		"spec": spec,
+	}
+}
+
+func renderEntryPointComposition(
+	t *testing.T,
+	entryPoint map[string]interface{},
+	composed map[string]map[string]interface{},
+) string {
+	t.Helper()
+	if composed == nil {
+		composed = map[string]map[string]interface{}{}
+	}
+	templateText := compositionTemplate(t, filepath.Join(repoRoot(t), "packages/crossplane/public/service/entrypoint/entrypoints-minimal-composition.yaml"))
+	funcs := sprig.TxtFuncMap()
+	funcs["getComposedResource"] = func(_ interface{}, name string) map[string]interface{} {
+		return composed[name]
+	}
+	tpl, err := template.New("entrypoints-minimal").Funcs(funcs).Parse(templateText)
+	if err != nil {
+		t.Fatalf("parse EntryPoint composition template: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, map[string]interface{}{
+		"observed": map[string]interface{}{
+			"composite": map[string]interface{}{
+				"resource": entryPoint,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("execute EntryPoint composition template: %v", err)
+	}
+	return buf.String()
+}
+
+func observedIngress(host string, serviceName string, port int, secretName string) map[string]interface{} {
+	return map[string]interface{}{
+		"spec": map[string]interface{}{
+			"rules": []interface{}{
+				ingressRule(host, serviceName, port),
+			},
+			"tls": []interface{}{
+				map[string]interface{}{
+					"hosts":      []interface{}{host},
+					"secretName": secretName,
+				},
+			},
+		},
+	}
+}
+
+func observedCertificate(secretName string, dnsName string, reason string, message string, readyStatus string) map[string]interface{} {
+	return map[string]interface{}{
+		"spec": map[string]interface{}{
+			"secretName": secretName,
+			"dnsNames":   []interface{}{dnsName},
+		},
+		"status": map[string]interface{}{
+			"conditions": []interface{}{
+				map[string]interface{}{
+					"type":    "Ready",
+					"status":  readyStatus,
+					"reason":  reason,
+					"message": message,
+				},
+			},
+		},
+	}
+}
+
 func renderAPComposition(t *testing.T, data map[string]interface{}, composed map[string]map[string]interface{}) string {
 	t.Helper()
 	return renderAPCompositionStep(t, data, composed, 0)
@@ -1151,6 +1553,18 @@ func serviceObjects(t *testing.T, output string) []map[string]interface{} {
 	return kindObjects(t, output, func(obj map[string]interface{}) bool {
 		return obj["kind"] == "Service"
 	})
+}
+
+func objectByName(t *testing.T, objects []map[string]interface{}, name string) map[string]interface{} {
+	t.Helper()
+	for _, obj := range objects {
+		metadata := asMap(t, obj["metadata"], fmt.Sprintf("%s.metadata", obj["kind"]))
+		if metadata["name"] == name {
+			return obj
+		}
+	}
+	t.Fatalf("missing object named %s", name)
+	return nil
 }
 
 func singleKindObject(t *testing.T, output string, kind string) map[string]interface{} {
@@ -1312,6 +1726,18 @@ func assertEntryPointCustomDomainTask(t *testing.T, tasks []interface{}, id stri
 		return
 	}
 	t.Fatalf("missing EntryPoint Custom Domain task for id %s", id)
+}
+
+func customDomainStatusByID(t *testing.T, statuses []interface{}, id string) map[string]interface{} {
+	t.Helper()
+	for i, status := range statuses {
+		statusMap := asMap(t, status, fmt.Sprintf("entrypoint.status.customDomains[%d]", i))
+		if statusMap["id"] == id {
+			return statusMap
+		}
+	}
+	t.Fatalf("missing EntryPoint Custom Domain status for id %s", id)
+	return nil
 }
 
 func assertStatusPublicAddress(t *testing.T, addresses []interface{}, host string, url string, port int) {

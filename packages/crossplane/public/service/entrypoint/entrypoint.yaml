@@ -106,3 +106,78 @@ spec:
                         type: string
                       status:
                         type: string
+                customDomains:
+                  type: array
+                  description: Custom Domain Binding health projected by EntryPoint from DNS submission state, cert-manager, and Ingress configuration.
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^cd_[a-z0-9]{6,32}$
+                        description: Stable Custom Domain Binding ID.
+                      domain:
+                        type: string
+                        description: User-owned domain.
+                      platformAddressId:
+                        type: string
+                        pattern: ^pa_[a-z0-9]{6,32}$
+                        description: Platform Address ID this Custom Domain binds to.
+                      targetPort:
+                        type: integer
+                        description: Target port this custom domain binds to.
+                      cnameTarget:
+                        type: string
+                        description: Platform Address hostname the Custom Domain CNAME points at.
+                      status:
+                        type: string
+                        description: Top-level Custom Domain Binding health.
+                        enum:
+                          - pending
+                          - verifying
+                          - accessible
+                          - blocked
+                      dns:
+                        type: object
+                        description: Submit-time DNS verification detail; v1 does not continuously poll DNS after save.
+                        properties:
+                          status:
+                            type: string
+                            enum:
+                              - pending
+                              - verified
+                              - unknown
+                              - blocked
+                          reason:
+                            type: string
+                          message:
+                            type: string
+                      certificate:
+                        type: object
+                        description: Certificate detail projected from cert-manager Certificate Ready conditions.
+                        properties:
+                          status:
+                            type: string
+                            enum:
+                              - pending
+                              - ready
+                              - failed
+                              - unknown
+                          reason:
+                            type: string
+                          message:
+                            type: string
+                      routing:
+                        type: object
+                        description: Routing detail projected from the Custom Domain Ingress configuration.
+                        properties:
+                          status:
+                            type: string
+                            enum:
+                              - pending
+                              - configured
+                              - blocked
+                          reason:
+                            type: string
+                          message:
+                            type: string
