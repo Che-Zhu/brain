@@ -4,6 +4,7 @@ import type {
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import {
   CONTAINER_ENV_VALUE_FROM_PLACEHOLDER,
+  containerEnvRowsEqual,
   normalizeContainerEnvRowsForSave,
   validateContainerEnvRows,
 } from "@workspace/ui/lib/container-env-rows";
@@ -23,6 +24,9 @@ import {
   type ApReplicaStrategy,
   canonicalApReplicaStrategy,
   canonicalFixedReplicaStrategy,
+  DEFAULT_AP_ELASTIC_CPU_UTILIZATION_PERCENT,
+  DEFAULT_AP_ELASTIC_MAX_REPLICAS,
+  DEFAULT_AP_ELASTIC_MIN_REPLICAS,
   validateApFixedReplicas,
 } from "./ap-replica-strategy";
 import {
@@ -43,6 +47,16 @@ type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
 interface ApNetworkSettingsPatchOptions {
   metadata?: Record<string, unknown>;
   routingDomain?: string;
+}
+
+export interface ApSettingsDraftPatch {
+  cpuCores?: number;
+  env?: readonly ContainerEnvVar[];
+  image?: string;
+  memoryMib?: number;
+  network?: ApNetworkSettingsPatch;
+  replicaStrategy?: ApReplicaStrategy;
+  replicas?: number;
 }
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
@@ -201,6 +215,122 @@ function canonicalApReplicaStrategyForPatch(
     replicaStrategy.fixed.replicas,
     replicaStrategy.elastic ?? currentStrategy.elastic
   );
+}
+
+function defaultApElasticSettings() {
+  return {
+    maxReplicas: DEFAULT_AP_ELASTIC_MAX_REPLICAS,
+    minReplicas: DEFAULT_AP_ELASTIC_MIN_REPLICAS,
+    target: {
+      metric: "cpu",
+      type: "utilization",
+      utilizationPercent: DEFAULT_AP_ELASTIC_CPU_UTILIZATION_PERCENT,
+    },
+  } as const;
+}
+
+function apElasticSettingsForCompare(strategy: ApReplicaStrategy) {
+  if (strategy.type === "elastic") {
+    return strategy.elastic;
+  }
+  return strategy.elastic ?? defaultApElasticSettings();
+}
+
+function apElasticTargetsEqual(
+  a: ReturnType<typeof apElasticSettingsForCompare>["target"],
+  b: ReturnType<typeof apElasticSettingsForCompare>["target"]
+): boolean {
+  if (a.metric !== b.metric) {
+    return false;
+  }
+  if (a.metric === "memory") {
+    return b.metric === "memory" && a.averageValue === b.averageValue;
+  }
+  return (
+    b.metric === "cpu" &&
+    Math.round(a.utilizationPercent) === Math.round(b.utilizationPercent)
+  );
+}
+
+function apReplicaStrategiesEqual(
+  a: ApReplicaStrategy | undefined,
+  b: ApReplicaStrategy | undefined
+): boolean {
+  if (a == null || b == null) {
+    return a == null && b == null;
+  }
+  if (a.type !== b.type) {
+    return false;
+  }
+  if (Math.round(a.fixed.replicas) !== Math.round(b.fixed.replicas)) {
+    return false;
+  }
+  const aElastic = apElasticSettingsForCompare(a);
+  const bElastic = apElasticSettingsForCompare(b);
+  return (
+    Math.round(aElastic.minReplicas) === Math.round(bElastic.minReplicas) &&
+    Math.round(aElastic.maxReplicas) === Math.round(bElastic.maxReplicas) &&
+    apElasticTargetsEqual(aElastic.target, bElastic.target)
+  );
+}
+
+function publicAddressesEqual(
+  a: readonly ContainerNetwork["publicAddresses"][number][] | undefined,
+  b: readonly ContainerNetwork["publicAddresses"][number][] | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((address, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      normalizePlatformAddressId(address.id) ===
+        normalizePlatformAddressId(other.id) &&
+      Math.round(address.port) === Math.round(other.port)
+    );
+  });
+}
+
+function apNetworksEqual(
+  a: ApNetworkSettingsPatch | undefined,
+  b: ApNetworkSettingsPatch | undefined
+): boolean {
+  if (a == null || b == null) {
+    return a == null && b == null;
+  }
+  return (
+    Math.round(a.privatePort) === Math.round(b.privatePort) &&
+    publicAddressesEqual(a.publicAddresses, b.publicAddresses)
+  );
+}
+
+function apSettingsImageChanged(
+  next: string | undefined,
+  previous: string | undefined
+): boolean {
+  return next !== undefined && next.trim() !== (previous ?? "").trim();
+}
+
+function buildApNetworkInput(network: ApNetworkSettingsPatch): {
+  hasPublicAddresses: boolean;
+  networkInput: Record<string, unknown>;
+} {
+  const privatePort = validatedNetworkPort(
+    network.privatePort,
+    "Private Address target port"
+  );
+  const platformAddresses = validatedPlatformAddresses(network.publicAddresses);
+  const networkInput: Record<string, unknown> = { privatePort };
+  if (platformAddresses != null && platformAddresses.length > 0) {
+    networkInput.platformAddresses = platformAddresses;
+  }
+  return {
+    hasPublicAddresses: (platformAddresses?.length ?? 0) > 0,
+    networkInput,
+  };
 }
 
 export async function applyApImage(
@@ -388,25 +518,140 @@ export function patchOpsForApNetworkSettings(
   network: ApNetworkSettingsPatch,
   options: ApNetworkSettingsPatchOptions = {}
 ): K8sJsonPatchOp[] {
-  const privatePort = validatedNetworkPort(
-    network.privatePort,
-    "Private Address target port"
-  );
-  const platformAddresses = validatedPlatformAddresses(network.publicAddresses);
+  const { hasPublicAddresses, networkInput } = buildApNetworkInput(network);
   const input = asRecord(spec?.input);
-  const networkInput: Record<string, unknown> = { privatePort };
-  if (platformAddresses != null && platformAddresses.length > 0) {
-    networkInput.platformAddresses = platformAddresses;
-  }
   const ops = patchOpsForApInput(spec, { network: networkInput });
   removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
   appendRoutingDomainPatch(
     ops,
     options.metadata,
     options.routingDomain ?? "",
-    (platformAddresses?.length ?? 0) > 0
+    hasPublicAddresses
   );
   return ops;
+}
+
+function patchOpsForApSettingsDraftInput(
+  spec: Record<string, unknown> | undefined,
+  next: ApSettingsDraftPatch,
+  previous: ApSettingsDraftPatch,
+  options: ApNetworkSettingsPatchOptions = {}
+): K8sJsonPatchOp[] {
+  const ops: K8sJsonPatchOp[] = [];
+  const inputPatch: Record<string, unknown> = {};
+  const input = asRecord(spec?.input);
+  let networkHasPublicAddresses = false;
+  let networkChanged = false;
+
+  if (apSettingsImageChanged(next.image, previous.image)) {
+    const image = next.image?.trim() ?? "";
+    if (image === "") {
+      throw new Error("Image reference is empty.");
+    }
+    inputPatch.image = image;
+  }
+
+  if (
+    next.env !== undefined &&
+    !containerEnvRowsEqual([...next.env], [...(previous.env ?? [])])
+  ) {
+    const normalized = normalizeContainerEnvRowsForSave([...next.env]);
+    const validation = validateContainerEnvRows(normalized);
+    if (!validation.valid) {
+      throw new Error(validation.errors[0]?.message ?? "Invalid environment.");
+    }
+    inputPatch.env = buildEnvArray(readApInput(spec ?? {}).env, normalized);
+  }
+
+  if (
+    next.network !== undefined &&
+    !apNetworksEqual(next.network, previous.network)
+  ) {
+    const { hasPublicAddresses, networkInput } = buildApNetworkInput(
+      next.network
+    );
+    inputPatch.network = networkInput;
+    networkHasPublicAddresses = hasPublicAddresses;
+    networkChanged = true;
+  }
+
+  if (Object.keys(inputPatch).length > 0) {
+    ops.push(...patchOpsForApInput(spec, inputPatch));
+  }
+  if (networkChanged) {
+    removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
+    appendRoutingDomainPatch(
+      ops,
+      options.metadata,
+      options.routingDomain ?? "",
+      networkHasPublicAddresses
+    );
+  }
+  return ops;
+}
+
+function apSettingsDraftResourcePatch(
+  next: ApSettingsDraftPatch,
+  previous: ApSettingsDraftPatch
+): Pick<
+  ApSettingsDraftPatch,
+  "cpuCores" | "memoryMib" | "replicaStrategy" | "replicas"
+> {
+  const resourcePatch: Pick<
+    ApSettingsDraftPatch,
+    "cpuCores" | "memoryMib" | "replicaStrategy" | "replicas"
+  > = {};
+  if (
+    next.cpuCores !== undefined &&
+    (previous.cpuCores === undefined ||
+      Math.abs(next.cpuCores - previous.cpuCores) > 1e-9)
+  ) {
+    resourcePatch.cpuCores = next.cpuCores;
+  }
+  if (
+    next.memoryMib !== undefined &&
+    (previous.memoryMib === undefined ||
+      Math.round(next.memoryMib) !== Math.round(previous.memoryMib))
+  ) {
+    resourcePatch.memoryMib = next.memoryMib;
+  }
+  if (
+    next.replicaStrategy !== undefined &&
+    !apReplicaStrategiesEqual(next.replicaStrategy, previous.replicaStrategy)
+  ) {
+    resourcePatch.replicaStrategy = next.replicaStrategy;
+  } else if (
+    next.replicas !== undefined &&
+    (previous.replicas === undefined ||
+      Math.round(next.replicas) !== Math.round(previous.replicas))
+  ) {
+    resourcePatch.replicas = next.replicas;
+  }
+  return resourcePatch;
+}
+
+function patchOpsForApSettingsDraftResource(
+  spec: Record<string, unknown> | undefined,
+  next: ApSettingsDraftPatch,
+  previous: ApSettingsDraftPatch
+): K8sJsonPatchOp[] {
+  const resourcePatch = apSettingsDraftResourcePatch(next, previous);
+  if (Object.keys(resourcePatch).length > 0) {
+    return patchOpsForApResourceQuotaSettings(spec, resourcePatch);
+  }
+  return [];
+}
+
+export function patchOpsForApSettingsDraft(
+  spec: Record<string, unknown> | undefined,
+  next: ApSettingsDraftPatch,
+  previous: ApSettingsDraftPatch,
+  options: ApNetworkSettingsPatchOptions = {}
+): K8sJsonPatchOp[] {
+  return [
+    ...patchOpsForApSettingsDraftInput(spec, next, previous, options),
+    ...patchOpsForApSettingsDraftResource(spec, next, previous),
+  ];
 }
 
 export async function applyApEnv(
@@ -432,6 +677,23 @@ export async function applyApNetwork(
       routingDomain: routingDomainFromKubeconfig(kubeconfig),
     })
   );
+}
+
+export async function applyApSettingsDraft(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  next: ApSettingsDraftPatch,
+  previous: ApSettingsDraftPatch
+): Promise<void> {
+  const spec = asRecord(claim.spec);
+  const patch = patchOpsForApSettingsDraft(spec, next, previous, {
+    metadata: asRecord(claim.metadata),
+    routingDomain: routingDomainFromKubeconfig(kubeconfig),
+  });
+  if (patch.length === 0) {
+    return;
+  }
+  await patchAp(kubeconfig, claim, patch);
 }
 
 export async function applyApReplicas(

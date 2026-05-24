@@ -411,6 +411,16 @@ export interface ContainerSettingsPaneEnvChangeMeta {
   confirmedAddDbDsnReferences: ContainerSettingsPaneConfirmedAddDbDsnReference[];
 }
 
+export interface ContainerSettingsDraft {
+  cpuCores: number;
+  env: readonly ContainerEnvVar[];
+  image: string;
+  memoryMib: number;
+  network?: ContainerNetwork;
+  replicaStrategy?: ContainerReplicaStrategy;
+  replicas?: number;
+}
+
 export interface ContainerSettingsPaneProps {
   /**
    * One-shot request from a Canvas Connecting Edge to append an Add Reference row
@@ -447,6 +457,11 @@ export interface ContainerSettingsPaneProps {
     replicaStrategy?: ContainerReplicaStrategy;
     replicas?: number;
   }) => void | Promise<void>;
+  /** Panel-level AP Settings Draft commit. When set, all editable controls save through one draft update. */
+  onSettingsDraftCommit?: (
+    draft: ContainerSettingsDraft,
+    meta?: ContainerSettingsPaneEnvChangeMeta
+  ) => void | Promise<void>;
   /** Exposed container ports + protocol labels. */
   ports: ContainerPort[];
   /**
@@ -467,6 +482,67 @@ interface AddDbDsnReferenceIntentDraftMetadata {
 }
 
 type EnvDraftRow = ContainerEnvVar & AddDbDsnReferenceIntentDraftMetadata;
+
+function publicAddressDraftsEqual(
+  a: readonly ContainerNetworkPublicAddress[],
+  b: readonly ContainerNetworkPublicAddress[]
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((address, index) => {
+    const other = b[index];
+    return (
+      other != null &&
+      (address.id?.trim() ?? "") === (other.id?.trim() ?? "") &&
+      Math.round(address.port) === Math.round(other.port)
+    );
+  });
+}
+
+function containerNetworksEqual(
+  a: ContainerNetwork | undefined,
+  b: ContainerNetwork | undefined
+): boolean {
+  if (a == null || b == null) {
+    return a == null && b == null;
+  }
+  return (
+    Math.round(a.privatePort) === Math.round(b.privatePort) &&
+    publicAddressDraftsEqual(a.publicAddresses, b.publicAddresses)
+  );
+}
+
+function containerDraftResourcesDirty(
+  original: ContainerSettingsDraft,
+  draft: ContainerSettingsDraft
+): boolean {
+  const cpuMemDirty =
+    Math.abs(draft.cpuCores - original.cpuCores) > CPU_QUOTA_DIRTY_EPS ||
+    Math.round(draft.memoryMib) !== Math.round(original.memoryMib);
+  if (cpuMemDirty) {
+    return true;
+  }
+  if (original.replicaStrategy == null || draft.replicaStrategy == null) {
+    return original.replicaStrategy !== draft.replicaStrategy;
+  }
+  return !replicaStrategiesEqual(
+    draft.replicaStrategy,
+    original.replicaStrategy
+  );
+}
+
+export function containerSettingsDraftIsDirty(
+  original: ContainerSettingsDraft,
+  draft: ContainerSettingsDraft
+): boolean {
+  return (
+    draft.image.trim() !== original.image.trim() ||
+    !containerEnvRowsEqual([...draft.env], [...original.env]) ||
+    containerDraftResourcesDirty(original, draft) ||
+    !containerNetworksEqual(original.network, draft.network)
+  );
+}
 
 function SectionTitle({
   children,
@@ -892,10 +968,34 @@ function EditableEnvRows({
 interface NetworkSettingsSectionProps {
   network: ContainerNetwork;
   onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
+  onNetworkDraftChange?: (network: ContainerNetwork) => void;
+  onPrivatePortDraftChange?: (value: string) => void;
+  privatePortDraft?: string;
   readOnly: boolean;
 }
 
 const PUBLIC_ADDRESS_VISIBLE_COUNT = 2;
+
+function hasNetworkPanelDraftControls({
+  onNetworkDraftChange,
+  onPrivatePortDraftChange,
+}: Pick<
+  NetworkSettingsSectionProps,
+  "onNetworkDraftChange" | "onPrivatePortDraftChange"
+>): boolean {
+  return onNetworkDraftChange != null || onPrivatePortDraftChange != null;
+}
+
+function canMutateNetworkDraft({
+  onNetworkChange,
+  onNetworkDraftChange,
+  readOnly,
+}: Pick<
+  NetworkSettingsSectionProps,
+  "onNetworkChange" | "onNetworkDraftChange" | "readOnly"
+>): boolean {
+  return !readOnly && (onNetworkDraftChange != null || onNetworkChange != null);
+}
 
 function publicAddressValue(address: ContainerNetworkPublicAddress): string {
   return address.url?.trim() || address.host?.trim() || "";
@@ -1150,7 +1250,10 @@ function AddPublicAddressForm({
 
 function NetworkSettingsSection({
   network,
+  onNetworkDraftChange,
   onNetworkChange,
+  onPrivatePortDraftChange,
+  privatePortDraft,
   readOnly,
 }: NetworkSettingsSectionProps) {
   const networkInputId = useId();
@@ -1159,9 +1262,18 @@ function NetworkSettingsSection({
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
+  const portDraft = privatePortDraft ?? draftPort;
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
-  const canMutateNetwork = !readOnly && onNetworkChange != null;
+  const usesPanelDraft = hasNetworkPanelDraftControls({
+    onNetworkDraftChange,
+    onPrivatePortDraftChange,
+  });
+  const canMutateNetwork = canMutateNetworkDraft({
+    onNetworkChange,
+    onNetworkDraftChange,
+    readOnly,
+  });
   const visiblePublicAddresses = showAllPublicAddresses
     ? network.publicAddresses
     : network.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
@@ -1169,9 +1281,11 @@ function NetworkSettingsSection({
     network.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
-    setDraftPort(String(network.privatePort));
+    if (privatePortDraft == null) {
+      setDraftPort(String(network.privatePort));
+    }
     setPortError(null);
-  }, [network.privatePort]);
+  }, [network.privatePort, privatePortDraft]);
 
   useEffect(() => {
     if (network.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
@@ -1179,13 +1293,23 @@ function NetworkSettingsSection({
     }
   }, [network.publicAddresses.length]);
 
-  const parsedPort = parsePortNumberDigits(draftPort.trim());
-  const portDirty = draftPort.trim() !== String(network.privatePort);
+  const parsedPort = parsePortNumberDigits(portDraft.trim());
+  const effectivePortError =
+    usesPanelDraft && !parsedPort.ok ? parsedPort.message : portError;
+  const portDirty = portDraft.trim() !== String(network.privatePort);
   const canSave =
-    onNetworkChange != null && portDirty && parsedPort.ok && !savePending;
+    !usesPanelDraft &&
+    onNetworkChange != null &&
+    portDirty &&
+    parsedPort.ok &&
+    !savePending;
 
   const handleCancel = () => {
-    setDraftPort(String(network.privatePort));
+    if (onPrivatePortDraftChange == null) {
+      setDraftPort(String(network.privatePort));
+    } else {
+      onPrivatePortDraftChange(String(network.privatePort));
+    }
     setPortError(null);
   };
 
@@ -1193,7 +1317,7 @@ function NetworkSettingsSection({
     if (onNetworkChange == null) {
       return;
     }
-    const parsed = parsePortNumberDigits(draftPort.trim());
+    const parsed = parsePortNumberDigits(portDraft.trim());
     if (!parsed.ok) {
       setPortError(parsed.message);
       return;
@@ -1218,32 +1342,42 @@ function NetworkSettingsSection({
   };
 
   const handleAddPublicAddress = async (address: PublicAddressDraft) => {
+    const nextNetwork = {
+      ...network,
+      publicAddresses: [...network.publicAddresses, address],
+    };
+    if (onNetworkDraftChange != null) {
+      onNetworkDraftChange(nextNetwork);
+      return;
+    }
     if (onNetworkChange == null) {
       return;
     }
-    await onNetworkChange({
-      ...network,
-      publicAddresses: [...network.publicAddresses, address],
-    });
+    await onNetworkChange(nextNetwork);
   };
 
   const handleDeletePublicAddress = async (index: number) => {
-    if (onNetworkChange == null) {
-      return;
-    }
     const target = network.publicAddresses[index];
     const publicAddresses = network.publicAddresses.filter(
       (address, itemIndex) =>
         !isPublicAddressDeleteTarget(address, itemIndex, target, index)
     );
-    await onNetworkChange({ ...network, publicAddresses });
+    const nextNetwork = { ...network, publicAddresses };
+    if (onNetworkDraftChange != null) {
+      onNetworkDraftChange(nextNetwork);
+      return;
+    }
+    if (onNetworkChange == null) {
+      return;
+    }
+    await onNetworkChange(nextNetwork);
   };
 
   return (
     <section className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 items-center justify-between gap-2">
         <SectionTitle>Network</SectionTitle>
-        {readOnly || !portDirty ? null : (
+        {readOnly || usesPanelDraft || !portDirty ? null : (
           <div className="flex shrink-0 items-center gap-1">
             <Button
               className="h-7 px-2 text-xs"
@@ -1295,26 +1429,30 @@ function NetworkSettingsSection({
           <Label htmlFor={networkInputId}>Private Address target port</Label>
           <Input
             aria-describedby={
-              portError == null ? undefined : `${networkInputId}-error`
+              effectivePortError == null ? undefined : `${networkInputId}-error`
             }
-            aria-invalid={portError != null}
+            aria-invalid={effectivePortError != null}
             className="h-8 max-w-32 font-mono text-xs"
             disabled={readOnly}
             id={networkInputId}
             inputMode="numeric"
             onChange={(event) => {
-              setDraftPort(event.target.value);
+              if (onPrivatePortDraftChange == null) {
+                setDraftPort(event.target.value);
+              } else {
+                onPrivatePortDraftChange(event.target.value);
+              }
               setPortError(null);
             }}
-            value={draftPort}
+            value={portDraft}
           />
-          {portError == null ? null : (
+          {effectivePortError == null ? null : (
             <p
               className="text-destructive text-xs"
               id={`${networkInputId}-error`}
               role="alert"
             >
-              {portError}
+              {effectivePortError}
             </p>
           )}
         </div>
@@ -1334,7 +1472,7 @@ function NetworkSettingsSection({
             <Button
               aria-label="Add Public Address"
               className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
-              disabled={addOpen || onNetworkChange == null}
+              disabled={addOpen || !canMutateNetwork}
               onClick={() => setAddOpen(true)}
               type="button"
               variant="secondary"
@@ -1345,11 +1483,9 @@ function NetworkSettingsSection({
           )}
           {addOpen ? (
             <AddPublicAddressForm
-              defaultPort={network.privatePort}
+              defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
               onCancel={handleCancelAddPublicAddress}
-              onSubmit={
-                onNetworkChange == null ? undefined : handleAddPublicAddress
-              }
+              onSubmit={canMutateNetwork ? handleAddPublicAddress : undefined}
             />
           ) : null}
           {network.publicAddresses.length === 0 ? (
@@ -1781,11 +1917,67 @@ function ReplicaStrategySection({
   );
 }
 
+function ContainerSettingsDraftFooter({
+  canSave,
+  dirty,
+  onCancel,
+  onSave,
+  pending,
+}: {
+  canSave: boolean;
+  dirty: boolean;
+  onCancel: () => void;
+  onSave: () => void | Promise<void>;
+  pending: boolean;
+}) {
+  return (
+    <footer
+      className="flex shrink-0 items-center justify-between gap-3 border-border border-t pt-3"
+      data-slot="container-settings-draft-actions"
+    >
+      <p
+        className={cn(
+          "min-w-0 truncate text-theme-yellow text-xs leading-4",
+          !dirty && "invisible"
+        )}
+      >
+        Unsaved settings changes.
+      </p>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Button
+          aria-label="Cancel settings changes"
+          className="h-8 px-3 text-xs"
+          disabled={!dirty || pending}
+          onClick={onCancel}
+          type="button"
+          variant="ghost"
+        >
+          Cancel
+        </Button>
+        <Button
+          aria-label="Save settings"
+          className="h-8 px-3 text-xs"
+          disabled={!canSave}
+          onClick={async () => {
+            await onSave();
+          }}
+          type="button"
+          variant="secondary"
+        >
+          <Save aria-hidden data-icon="inline-start" />
+          {pending ? "Saving" : "Save"}
+        </Button>
+      </div>
+    </footer>
+  );
+}
+
 /**
  * Structured readout for workload settings: container image, CPU/memory quota sliders,
  * optional replica count, environment variables, and AP Network settings.
  * All fields are controlled by the host.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: coordinates several controlled AP settings sections plus legacy section commit props.
 export function ContainerSettingsPane({
   addDbDsnReferenceIntent,
   className,
@@ -1801,12 +1993,21 @@ export function ContainerSettingsPane({
   replicasQuota,
   replicaStrategy,
   onResourceQuotasCommit,
+  onSettingsDraftCommit,
   readOnly = false,
   dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
-  const [imageDraft, setImageDraft] = useState(image);
+  const [draftImage, setDraftImage] = useState(image);
+  const [imageDialogDraft, setImageDialogDraft] = useState(image);
   const [quotaSavePending, setQuotaSavePending] = useState(false);
+  const [settingsSavePending, setSettingsSavePending] = useState(false);
+  const [draftNetwork, setDraftNetwork] = useState<
+    ContainerNetwork | undefined
+  >(network);
+  const [networkPrivatePortDraft, setNetworkPrivatePortDraft] = useState(() =>
+    network == null ? "" : String(network.privatePort)
+  );
   const inputId = useId();
   const envDraftKeyPrefix = useId();
   const envDraftKeyCounter = useRef(0);
@@ -1835,7 +2036,9 @@ export function ContainerSettingsPane({
     )
   );
 
+  const settingsCommitMode = onSettingsDraftCommit != null && readOnly !== true;
   const quotaCommitMode = onResourceQuotasCommit != null && readOnly !== true;
+  const quotaDraftMode = settingsCommitMode || quotaCommitMode;
 
   const [draftCpu, setDraftCpu] = useState(cpuQuota.value);
   const [draftMem, setDraftMem] = useState(memoryQuota.value);
@@ -1845,6 +2048,18 @@ export function ContainerSettingsPane({
       replicasQuota?.value ?? DEFAULT_FIXED_REPLICAS
     )
   );
+
+  useEffect(() => {
+    setDraftImage(image);
+    setImageDialogDraft(image);
+  }, [image]);
+
+  useEffect(() => {
+    setDraftNetwork(network);
+    setNetworkPrivatePortDraft(
+      network == null ? "" : String(network.privatePort)
+    );
+  }, [network]);
 
   useEffect(() => {
     setDraftCpu(cpuQuota.value);
@@ -1963,6 +2178,66 @@ export function ContainerSettingsPane({
   }, [envValidation]);
   const envDirty = !containerEnvRowsEqual(envDraft, env);
   const canSaveEnv = envDirty && envValidation.valid;
+  const parsedNetworkPrivatePort =
+    network == null
+      ? null
+      : parsePortNumberDigits(networkPrivatePortDraft.trim());
+  const networkPrivatePortValid =
+    parsedNetworkPrivatePort == null || parsedNetworkPrivatePort.ok;
+  const activeDraftNetwork = draftNetwork ?? network;
+  const settingsDraftNetwork =
+    activeDraftNetwork == null
+      ? undefined
+      : {
+          ...activeDraftNetwork,
+          privatePort: parsedNetworkPrivatePort?.ok
+            ? parsedNetworkPrivatePort.n
+            : activeDraftNetwork.privatePort,
+        };
+  const committedReplicaStrategy =
+    replicasQuota == null
+      ? undefined
+      : normalizeReplicaStrategy(replicaStrategy, replicasQuota.value);
+  const originalSettingsDraft: ContainerSettingsDraft = {
+    cpuCores: cpuQuota.value,
+    env,
+    image,
+    memoryMib: memoryQuota.value,
+    ...(network == null ? {} : { network }),
+    ...(committedReplicaStrategy == null
+      ? {}
+      : {
+          replicaStrategy: committedReplicaStrategy,
+          replicas: committedReplicaStrategy.fixed.replicas,
+        }),
+  };
+  const settingsDraft: ContainerSettingsDraft = {
+    cpuCores: draftCpu,
+    env: envDraft,
+    image: draftImage,
+    memoryMib: draftMem,
+    ...(settingsDraftNetwork == null ? {} : { network: settingsDraftNetwork }),
+    ...(replicasQuota == null
+      ? {}
+      : {
+          replicaStrategy: draftReplicaStrategy,
+          replicas: draftReplicaStrategy.fixed.replicas,
+        }),
+  };
+  const settingsDirty = containerSettingsDraftIsDirty(
+    originalSettingsDraft,
+    settingsDraft
+  );
+  const networkPrivatePortDirty =
+    network != null &&
+    networkPrivatePortDraft.trim() !== String(network.privatePort);
+  const panelDraftDirty = settingsDirty || networkPrivatePortDirty;
+  const canSaveSettings =
+    settingsCommitMode &&
+    panelDraftDirty &&
+    envValidation.valid &&
+    networkPrivatePortValid &&
+    !settingsSavePending;
 
   const cpuSlider = useMemo(() => {
     const base = {
@@ -1972,7 +2247,7 @@ export function ContainerSettingsPane({
       ...cpuQuota,
       ...(readOnly ? { disabled: true } : {}),
     };
-    if (quotaCommitMode) {
+    if (quotaDraftMode) {
       return {
         ...base,
         onValueChange: setDraftCpu,
@@ -1980,7 +2255,7 @@ export function ContainerSettingsPane({
       };
     }
     return base;
-  }, [cpuQuota, draftCpu, quotaCommitMode, readOnly]);
+  }, [cpuQuota, draftCpu, quotaDraftMode, readOnly]);
 
   const memorySlider = useMemo(() => {
     const base = {
@@ -1990,7 +2265,7 @@ export function ContainerSettingsPane({
       ...memoryQuota,
       ...(readOnly ? { disabled: true } : {}),
     };
-    if (quotaCommitMode) {
+    if (quotaDraftMode) {
       return {
         ...base,
         onValueChange: setDraftMem,
@@ -1998,7 +2273,7 @@ export function ContainerSettingsPane({
       };
     }
     return base;
-  }, [draftMem, memoryQuota, quotaCommitMode, readOnly]);
+  }, [draftMem, memoryQuota, quotaDraftMode, readOnly]);
 
   const replicasSlider = useMemo(() => {
     if (replicasQuota == null) {
@@ -2011,7 +2286,7 @@ export function ContainerSettingsPane({
       ...replicasQuota,
       ...(readOnly ? { disabled: true } : {}),
     };
-    if (quotaCommitMode) {
+    if (quotaDraftMode) {
       return {
         ...base,
         onValueChange: (value: number) => {
@@ -2026,7 +2301,7 @@ export function ContainerSettingsPane({
     return base;
   }, [
     draftReplicaStrategy.fixed.replicas,
-    quotaCommitMode,
+    quotaDraftMode,
     readOnly,
     replicasQuota,
   ]);
@@ -2168,12 +2443,17 @@ export function ContainerSettingsPane({
   const handleImageDialogChange = (open: boolean) => {
     setImageDialogOpen(open);
     if (open) {
-      setImageDraft(image);
+      setImageDialogDraft(settingsCommitMode ? draftImage : image);
     }
   };
 
   const handleSaveImage = () => {
-    onImageChange(imageDraft.trim());
+    const nextImage = imageDialogDraft.trim();
+    if (settingsCommitMode) {
+      setDraftImage(nextImage);
+    } else {
+      onImageChange(nextImage);
+    }
     setImageDialogOpen(false);
   };
 
@@ -2239,6 +2519,53 @@ export function ContainerSettingsPane({
     setEnvDraft((rows) => updateContainerEnvRow(rows, index, patch));
   };
 
+  const resetSettingsDraft = () => {
+    setDraftImage(image);
+    setImageDialogDraft(image);
+    setImageDialogOpen(false);
+    handleQuotaCancel();
+    handleCancelEnvRows();
+    setDraftNetwork(network);
+    setNetworkPrivatePortDraft(
+      network == null ? "" : String(network.privatePort)
+    );
+  };
+
+  const handleSaveSettingsDraft = async () => {
+    if (!canSaveSettings || onSettingsDraftCommit == null) {
+      return;
+    }
+    const normalizedEnv = normalizeContainerEnvRowsForSave(envDraft);
+    const confirmedAddDbDsnReferences =
+      confirmedAddDbDsnReferencesFromEnvDraft(envDraft);
+    const draft: ContainerSettingsDraft = {
+      ...settingsDraft,
+      env: normalizedEnv,
+    };
+    setSettingsSavePending(true);
+    try {
+      await onSettingsDraftCommit(
+        draft,
+        confirmedAddDbDsnReferences.length === 0
+          ? undefined
+          : { confirmedAddDbDsnReferences }
+      );
+      setEnvDraft(
+        normalizedEnv.map((row, index) => {
+          const intentId = envDraft[index]?.canvasAddDbDsnReferenceIntentId;
+          return intentId == null
+            ? row
+            : { ...row, canvasAddDbDsnReferenceIntentId: intentId };
+        })
+      );
+    } finally {
+      setSettingsSavePending(false);
+    }
+  };
+
+  const displayImage = settingsCommitMode ? draftImage : image;
+  const networkForRender = settingsCommitMode ? activeDraftNetwork : network;
+
   return (
     <>
       <div
@@ -2258,7 +2585,7 @@ export function ContainerSettingsPane({
                 "flex min-w-0 items-start break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm leading-snug"
               )}
             >
-              {image}
+              {displayImage}
             </div>
           ) : (
             <button
@@ -2271,7 +2598,7 @@ export function ContainerSettingsPane({
               onClick={() => handleImageDialogChange(true)}
               type="button"
             >
-              {image}
+              {displayImage}
               <SquarePen
                 aria-hidden
                 className="size-3.5 shrink-0 text-muted-foreground"
@@ -2288,7 +2615,7 @@ export function ContainerSettingsPane({
             <SectionTitle className="m-0 min-w-0 shrink leading-none">
               Resource quota
             </SectionTitle>
-            {quotaCommitMode && quotasDirty ? (
+            {quotaCommitMode && !settingsCommitMode && quotasDirty ? (
               <div className="-mr-1 flex shrink-0 items-center gap-1">
                 <Button
                   className="h-7 px-2 text-xs"
@@ -2400,7 +2727,7 @@ export function ContainerSettingsPane({
             <SectionTitle>Environment</SectionTitle>
             {readOnly ? null : (
               <div className="flex shrink-0 items-center gap-1">
-                {envDirty ? (
+                {!settingsCommitMode && envDirty ? (
                   <>
                     <Button
                       aria-label="Cancel environment changes"
@@ -2467,13 +2794,32 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        {network == null ? null : (
+        {networkForRender == null ? null : (
           <NetworkSettingsSection
-            network={network}
-            onNetworkChange={onNetworkChange}
+            network={networkForRender}
+            onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
+            onNetworkDraftChange={
+              settingsCommitMode ? setDraftNetwork : undefined
+            }
+            onPrivatePortDraftChange={
+              settingsCommitMode ? setNetworkPrivatePortDraft : undefined
+            }
+            privatePortDraft={
+              settingsCommitMode ? networkPrivatePortDraft : undefined
+            }
             readOnly={readOnly}
           />
         )}
+
+        {settingsCommitMode ? (
+          <ContainerSettingsDraftFooter
+            canSave={canSaveSettings}
+            dirty={panelDraftDirty}
+            onCancel={resetSettingsDraft}
+            onSave={handleSaveSettingsDraft}
+            pending={settingsSavePending}
+          />
+        ) : null}
       </div>
 
       {readOnly ? null : (
@@ -2490,9 +2836,9 @@ export function ContainerSettingsPane({
               <Textarea
                 className="min-h-24 font-mono text-sm"
                 id={inputId}
-                onChange={(e) => setImageDraft(e.target.value)}
+                onChange={(e) => setImageDialogDraft(e.target.value)}
                 placeholder="e.g. ghcr.io/org/app:1.0.0"
-                value={imageDraft}
+                value={imageDialogDraft}
               />
             </div>
             <DialogFooter>
@@ -2501,10 +2847,10 @@ export function ContainerSettingsPane({
                 type="button"
                 variant="outline"
               >
-                Cancel
+                {settingsCommitMode ? "Discard" : "Cancel"}
               </Button>
               <Button onClick={handleSaveImage} type="button">
-                Save
+                {settingsCommitMode ? "Apply to draft" : "Save"}
               </Button>
             </DialogFooter>
           </DialogContent>

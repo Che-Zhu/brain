@@ -5,6 +5,7 @@ import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
   ContainerPort,
+  ContainerSettingsDraft,
   ContainerSettingsPaneConfirmedAddDbDsnReference,
   ContainerSettingsPaneEnvChangeMeta,
 } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
@@ -18,6 +19,7 @@ import {
   applyApImage,
   applyApNetwork,
   applyApResourceQuotas,
+  applyApSettingsDraft,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
 import {
   type ApReplicaStrategy,
@@ -339,6 +341,78 @@ export function useWorkloadClaimSettings(
     ]
   );
 
+  const onSettingsDraftCommit = useCallback(
+    async (
+      draft: ContainerSettingsDraft,
+      meta?: ContainerSettingsPaneEnvChangeMeta
+    ) => {
+      if (!isApWorkload || readOnly) {
+        return;
+      }
+      const body = claimBodyRef.current;
+      const kc = kubeconfig.trim();
+      if (body == null || kc === "") {
+        toast.error("Claim or kubeconfig missing.");
+        return;
+      }
+
+      const previous: ContainerSettingsDraft = {
+        cpuCores: display.cpuCores,
+        env: display.env,
+        image: display.image,
+        memoryMib: display.memoryMib,
+        ...(display.network == null ? {} : { network: display.network }),
+        replicaStrategy: display.replicaStrategy,
+        replicas: display.replicas,
+      };
+      const confirmedReferences = meta?.confirmedAddDbDsnReferences ?? [];
+      const clearPendingReferences =
+        confirmedReferences.length === 0
+          ? undefined
+          : onAddDbDsnReferenceMutationStart?.(confirmedReferences);
+
+      setLocalOverride((prev) => ({
+        ...(prev ?? {}),
+        cpuCores: draft.cpuCores,
+        env: [...draft.env],
+        image: draft.image,
+        memoryMib: draft.memoryMib,
+        ...(draft.network == null ? {} : { network: draft.network }),
+        ...(draft.replicaStrategy == null
+          ? {}
+          : {
+              replicaStrategy: draft.replicaStrategy,
+              replicas: draft.replicaStrategy.fixed.replicas,
+            }),
+      }));
+
+      try {
+        await applyApSettingsDraft(kc, body, draft, previous);
+        toast.success("Settings applied.");
+        await revalidateAfterApMutation();
+      } catch (e) {
+        setLocalOverride(null);
+        toast.error(e instanceof Error ? e.message : "Apply failed");
+      } finally {
+        clearPendingReferences?.();
+      }
+    },
+    [
+      display.cpuCores,
+      display.env,
+      display.image,
+      display.memoryMib,
+      display.network,
+      display.replicaStrategy,
+      display.replicas,
+      isApWorkload,
+      kubeconfig,
+      onAddDbDsnReferenceMutationStart,
+      readOnly,
+      revalidateAfterApMutation,
+    ]
+  );
+
   return {
     claimPayload: claimPayload as K8sGetResponse | undefined,
     display,
@@ -355,6 +429,7 @@ export function useWorkloadClaimSettings(
     onImageChange,
     onNetworkChange,
     onResourceQuotasCommit,
+    onSettingsDraftCommit,
     revalidateClaim,
   };
 }

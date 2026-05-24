@@ -104,6 +104,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     onImageChange,
     onNetworkChange,
     onResourceQuotasCommit,
+    onSettingsDraftCommit,
     claimPayload,
   } = useWorkloadClaimSettings({
     dbDsnReferenceSources: data?.dbDsnReferenceSources,
@@ -197,6 +198,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         onNetworkChange={canEditAp ? onNetworkChange : ignoreNetwork}
         onPortsChange={ignorePorts}
         onResourceQuotasCommit={canEditAp ? onResourceQuotasCommit : undefined}
+        onSettingsDraftCommit={canEditAp ? onSettingsDraftCommit : undefined}
         ports={display.ports}
         readOnly={!isApWorkload || settingsReadOnly}
         replicaStrategy={display.replicaStrategy}

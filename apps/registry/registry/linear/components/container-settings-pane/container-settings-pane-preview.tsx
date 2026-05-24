@@ -83,6 +83,18 @@ export default function ContainerSettingsPanePreview() {
           onImageChange={setImage}
           onNetworkChange={setNetwork}
           onPortsChange={setPorts}
+          onSettingsDraftCommit={(draft) => {
+            setCpuCores(draft.cpuCores);
+            setEnv([...draft.env]);
+            setImage(draft.image);
+            setMemoryMib(draft.memoryMib);
+            if (draft.network != null) {
+              setNetwork(draft.network);
+            }
+            if (draft.replicaStrategy != null) {
+              setReplicas(draft.replicaStrategy.fixed.replicas);
+            }
+          }}
           ports={ports}
           replicasQuota={{
             max: 20,
