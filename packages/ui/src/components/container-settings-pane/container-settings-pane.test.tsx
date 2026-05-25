@@ -40,7 +40,6 @@ const IMAGE_INPUT_RE = /aria-label="Container image"/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
 const MYSQL_OPTION_SELECTED_RE =
   /<option value="default\/mysql" selected="">mysql/;
-const NETWORK_SECTION_RE = /Network/;
 const PRIVATE_ADDRESS_RE = /Private Address/;
 const PRIVATE_ADDRESS_TARGET_RE = /Private Address target port/;
 const PRIVATE_ADDRESS_DEFAULT_VALUE_RE =
@@ -48,8 +47,8 @@ const PRIVATE_ADDRESS_DEFAULT_VALUE_RE =
 const PRIVATE_ADDRESS_VALUE_RE =
   /http:\/\/api-service-port-8080.default.svc:8080/;
 const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
-const DOMAIN_LIST_RE = /Domain List/;
-const NO_DOMAINS_RE = /No domains yet/;
+const PUBLIC_ADDRESSES_RE = /Public Addresses/;
+const NO_PUBLIC_ADDRESSES_RE = /No public addresses yet/;
 const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
 const DRAFT_PUBLIC_ADDRESS_VALUE_RE =
   /https:\/\/api-58b271f360.apps.example.com\//;
@@ -68,7 +67,7 @@ const CNAME_RE = /CNAME/;
 const BIND_CUSTOM_DOMAIN_RE = /aria-label="Bind Custom Domain"/;
 const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
 const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
-const ADD_DOMAIN_RE = /Add Domain/;
+const ADD_PUBLIC_ADDRESS_LABEL_RE = /Add Public Address/;
 const PORTS_TABLE_RE = /data-slot="ports-table"/;
 const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 const REPLICA_STRATEGY_RE = /Replica Strategy/;
@@ -163,7 +162,7 @@ test("container settings pane shows no AP networking surface without Network dat
   assert.doesNotMatch(html, PORTS_TABLE_RE);
 });
 
-test("container settings pane renders Network instead of Ports for private-only APs", () => {
+test("container settings pane renders address settings instead of Ports for private-only APs", () => {
   const html = renderToStaticMarkup(
     <ContainerSettingsPane
       cpuQuota={{ onValueChange: noop, value: 1 }}
@@ -183,14 +182,13 @@ test("container settings pane renders Network instead of Ports for private-only 
     />
   );
 
-  assert.match(html, NETWORK_SECTION_RE);
   assert.match(html, PRIVATE_ADDRESS_RE);
   assert.match(html, PRIVATE_ADDRESS_VALUE_RE);
   assert.match(html, PRIVATE_ADDRESS_TARGET_RE);
   assert.match(html, PRIVATE_PORT_VALUE_RE);
   assert.match(html, COPY_PRIVATE_ADDRESS_RE);
-  assert.match(html, DOMAIN_LIST_RE);
-  assert.match(html, NO_DOMAINS_RE);
+  assert.match(html, PUBLIC_ADDRESSES_RE);
+  assert.match(html, NO_PUBLIC_ADDRESSES_RE);
   assert.doesNotMatch(html, PORTS_TABLE_RE);
 });
 
@@ -222,7 +220,7 @@ test("container settings pane renders editable public address rows", () => {
     />
   );
 
-  assert.match(html, DOMAIN_LIST_RE);
+  assert.match(html, PUBLIC_ADDRESSES_RE);
   assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
   assert.match(html, PUBLIC_ADDRESS_STATUS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
@@ -230,8 +228,8 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, BIND_CUSTOM_DOMAIN_RE);
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
-  assert.match(html, ADD_DOMAIN_RE);
-  assert.doesNotMatch(html, NO_DOMAINS_RE);
+  assert.match(html, ADD_PUBLIC_ADDRESS_LABEL_RE);
+  assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
 });
 
 test("container settings pane renders draft-visible Platform Address hosts", () => {
@@ -271,7 +269,7 @@ test("container settings pane renders draft-visible Platform Address hosts", () 
   assert.match(html, DRAFT_PUBLIC_ADDRESS_VALUE_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
   assert.match(html, CNAME_RE);
-  assert.doesNotMatch(html, NO_DOMAINS_RE);
+  assert.doesNotMatch(html, NO_PUBLIC_ADDRESSES_RE);
 });
 
 test("container settings pane shows Custom Domain rows instead of bound Platform Addresses", () => {
@@ -692,10 +690,9 @@ test("read-only network view renders addresses without mutation controls", () =>
     />
   );
 
-  assert.match(html, NETWORK_SECTION_RE);
   assert.match(html, PRIVATE_ADDRESS_RE);
   assert.match(html, PRIVATE_ADDRESS_DEFAULT_VALUE_RE);
-  assert.match(html, DOMAIN_LIST_RE);
+  assert.match(html, PUBLIC_ADDRESSES_RE);
   assert.match(html, PUBLIC_ADDRESS_VALUE_RE);
   assert.match(html, COPY_PRIVATE_ADDRESS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);

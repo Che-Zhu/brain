@@ -22,16 +22,13 @@ import {
   ResourceSettingsSection,
   ResourceSettingsSlider,
 } from "@workspace/ui/components/resource-settings/resource-settings";
+import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
 import {
   SlidingToggle,
   type SlidingToggleOption,
 } from "@workspace/ui/components/sliding-toggle";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@workspace/ui/components/toggle-group";
 import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
@@ -228,6 +225,29 @@ const REPLICA_STRATEGY_TOGGLE_OPTIONS = [
     value: "elastic",
   },
 ] as const satisfies readonly SlidingToggleOption<ReplicaStrategyType>[];
+
+const SCALING_TARGET_TOGGLE_OPTIONS = [
+  {
+    ariaLabel: "CPU utilization target",
+    label: (
+      <span className="inline-flex items-center gap-1.5">
+        <Cpu aria-hidden className="size-3.5" />
+        Target CPU
+      </span>
+    ),
+    value: "cpu",
+  },
+  {
+    ariaLabel: "Memory average target",
+    label: (
+      <span className="inline-flex items-center gap-1.5">
+        <MemoryStick aria-hidden className="size-3.5" />
+        Target Memory
+      </span>
+    ),
+    value: "memory",
+  },
+] as const satisfies readonly SlidingToggleOption<ElasticTargetMetric>[];
 
 interface ResourceQuotasDirtyReplicaStrategy {
   committed: ContainerReplicaStrategy;
@@ -700,25 +720,6 @@ function networkWithDraftPrivatePort(
       ? parsedPrivatePort.n
       : network.privatePort,
   };
-}
-
-function SectionTitle({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <h3
-      className={cn(
-        "font-medium text-foreground text-sm",
-        className ?? "leading-snug"
-      )}
-    >
-      {children}
-    </h3>
-  );
 }
 
 function formatPlainNumber(value: number, maximumFractionDigits: number) {
@@ -1701,48 +1702,68 @@ async function commitNetworkChange(
   }
 }
 
-interface NetworkSettingsHeaderProps {
+interface NetworkSectionActionsProps {
   canSave: boolean;
   onCancel: () => void;
   onSave: () => void | Promise<void>;
   pending: boolean;
-  showActions: boolean;
 }
 
-function NetworkSettingsHeader({
+function NetworkSectionActions({
   canSave,
   onCancel,
   onSave,
   pending,
-  showActions,
-}: NetworkSettingsHeaderProps) {
+}: NetworkSectionActionsProps) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      <SectionTitle>Network</SectionTitle>
-      {showActions ? (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            className="h-7 px-2 text-xs"
-            disabled={pending}
-            onClick={onCancel}
-            type="button"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="h-7 px-2 text-xs"
-            disabled={!canSave}
-            onClick={async () => {
-              await onSave();
-            }}
-            type="button"
-            variant="secondary"
-          >
-            Save
-          </Button>
-        </div>
-      ) : null}
+    <div className="flex shrink-0 items-center gap-1">
+      <Button
+        className="h-7 px-2 text-xs"
+        disabled={pending}
+        onClick={onCancel}
+        type="button"
+        variant="ghost"
+      >
+        Cancel
+      </Button>
+      <Button
+        className="h-7 px-2 text-xs"
+        disabled={!canSave}
+        onClick={async () => {
+          await onSave();
+        }}
+        type="button"
+        variant="secondary"
+      >
+        Save
+      </Button>
+    </div>
+  );
+}
+
+interface NetworkCardProps {
+  actions?: ReactNode;
+  children: ReactNode;
+  title: string;
+}
+
+function NetworkCard({ actions, children, title }: NetworkCardProps) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border">
+      <div className="flex h-11 min-w-0 items-center gap-1.5 border-border border-b px-2.5">
+        <Network
+          aria-hidden
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={2}
+        />
+        <Label className="min-w-0 truncate font-medium text-foreground text-sm">
+          {title}
+        </Label>
+        {actions == null ? null : (
+          <div className="ml-auto flex shrink-0 items-center">{actions}</div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 px-2.5 pb-3">{children}</div>
     </div>
   );
 }
@@ -1904,15 +1925,7 @@ function DomainListSection({
     visibleDomainRows.customDomains.length === 0;
 
   return (
-    <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
-      <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <Network
-          aria-hidden
-          className="size-4 shrink-0 text-muted-foreground"
-          strokeWidth={2}
-        />
-        <Label className="truncate text-foreground text-sm">Domain List</Label>
-      </div>
+    <NetworkCard title="Public Addresses">
       {readOnly ? null : (
         <Button
           aria-label="Add Public Address"
@@ -1923,7 +1936,7 @@ function DomainListSection({
           variant="secondary"
         >
           <Plus aria-hidden className="text-primary" />
-          Add Domain
+          Add Public Address
         </Button>
       )}
       {addOpen ? (
@@ -1936,7 +1949,7 @@ function DomainListSection({
       ) : null}
       {noDomains ? (
         <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
-          No domains yet
+          No public addresses yet
         </div>
       ) : (
         <div className="grid gap-2">
@@ -1980,7 +1993,7 @@ function DomainListSection({
           View All
         </Button>
       ) : null}
-    </div>
+    </NetworkCard>
   );
 }
 
@@ -2129,38 +2142,43 @@ function NetworkSettingsSection({
   return (
     <>
       <section className="flex min-w-0 flex-col gap-3">
-        <NetworkSettingsHeader
-          canSave={canSave}
-          onCancel={handleCancel}
-          onSave={handleSave}
-          pending={savePending}
-          showActions={!(readOnly || usesPanelDraft) && portDirty}
-        />
-
-        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
-          <div className="grid min-w-0 gap-1.5">
-            <Label className="text-muted-foreground text-xs">
-              Private Address
-            </Label>
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
-                {hasPrivateAddress ? privateAddress : "Pending"}
-              </div>
-              <Button
-                aria-label="Copy Private Address"
-                disabled={!hasPrivateAddress}
-                onClick={handleCopyPrivateAddress}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <Copy aria-hidden />
-              </Button>
+        <NetworkCard
+          actions={
+            readOnly || usesPanelDraft || !portDirty ? null : (
+              <NetworkSectionActions
+                canSave={canSave}
+                onCancel={handleCancel}
+                onSave={handleSave}
+                pending={savePending}
+              />
+            )
+          }
+          title="Private Address"
+        >
+          <button
+            aria-label="Copy Private Address"
+            className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-muted/50"
+            disabled={!hasPrivateAddress}
+            onClick={handleCopyPrivateAddress}
+            title="Copy Private Address"
+            type="button"
+          >
+            <div className="min-w-0 flex-1 truncate font-mono text-foreground text-sm leading-5">
+              {hasPrivateAddress ? privateAddress : "Pending"}
             </div>
-          </div>
+            <Copy
+              aria-hidden
+              className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            />
+          </button>
 
           <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor={networkInputId}>Private Address target port</Label>
+            <Label
+              className="text-muted-foreground text-sm leading-5"
+              htmlFor={networkInputId}
+            >
+              Private Address target port
+            </Label>
             <Input
               aria-describedby={
                 effectivePortError == null
@@ -2192,25 +2210,25 @@ function NetworkSettingsSection({
               </p>
             )}
           </div>
+        </NetworkCard>
 
-          <DomainListSection
-            addOpen={addOpen}
-            canMutateNetwork={canMutateNetwork}
-            defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-            hiddenPublicAddressCount={hiddenPublicAddressCount}
-            onAddPublicAddress={handleAddPublicAddress}
-            onBindAddress={setCnameAddress}
-            onCancelAddPublicAddress={handleCancelAddPublicAddress}
-            onDeletePublicAddress={handleDeletePublicAddress}
-            onOpenAddPublicAddress={() => setAddOpen(true)}
-            onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
-            onUnbindCustomDomain={handleUnbindCustomDomain}
-            platformAddressDraftContext={platformAddressDraftContext}
-            readOnly={readOnly}
-            visibleDomainRows={visibleDomains}
-            visiblePublicAddresses={visiblePublicAddresses}
-          />
-        </div>
+        <DomainListSection
+          addOpen={addOpen}
+          canMutateNetwork={canMutateNetwork}
+          defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
+          hiddenPublicAddressCount={hiddenPublicAddressCount}
+          onAddPublicAddress={handleAddPublicAddress}
+          onBindAddress={setCnameAddress}
+          onCancelAddPublicAddress={handleCancelAddPublicAddress}
+          onDeletePublicAddress={handleDeletePublicAddress}
+          onOpenAddPublicAddress={() => setAddOpen(true)}
+          onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+          onUnbindCustomDomain={handleUnbindCustomDomain}
+          platformAddressDraftContext={platformAddressDraftContext}
+          readOnly={readOnly}
+          visibleDomainRows={visibleDomains}
+          visiblePublicAddresses={visiblePublicAddresses}
+        />
       </section>
       <CnameBindingDialog
         address={cnameAddress}
@@ -2376,6 +2394,88 @@ function ReadOnlyReplicaStrategySummary({
   );
 }
 
+function ScalingTargetSlider({
+  cpuTargetPercent,
+  disabled,
+  memoryTargetMib,
+  onCpuTargetChange,
+  onMemoryTargetChange,
+  onTargetMetricChange,
+  targetMetric,
+}: {
+  cpuTargetPercent: number;
+  disabled: boolean;
+  memoryTargetMib: number;
+  onCpuTargetChange: (value: number) => void;
+  onMemoryTargetChange: (value: number) => void;
+  onTargetMetricChange: (metric: ElasticTargetMetric) => void;
+  targetMetric: ElasticTargetMetric;
+}) {
+  const config =
+    targetMetric === "memory"
+      ? {
+          ariaLabel: "Memory average target",
+          format: formatMemoryMibValue,
+          max: MEMORY_AVERAGE_TARGET_LIMITS.max,
+          min: MEMORY_AVERAGE_TARGET_LIMITS.min,
+          onChange: onMemoryTargetChange,
+          value: memoryTargetMib,
+        }
+      : {
+          ariaLabel: "CPU utilization target",
+          format: (next: number) => `${formatPlainNumber(next, 0)}%`,
+          max: CPU_UTILIZATION_TARGET_LIMITS.max,
+          min: CPU_UTILIZATION_TARGET_LIMITS.min,
+          onChange: onCpuTargetChange,
+          value: cpuTargetPercent,
+        };
+
+  return (
+    <ResourceSettingsInset>
+      <ScaleSlider.Root
+        disabled={disabled}
+        max={config.max}
+        maxDecimals={0}
+        min={config.min}
+        onValueChange={config.onChange}
+        step={1}
+        value={config.value}
+        valueDisplay="number"
+      >
+        <ScaleSlider.Stack className="w-full gap-1.5">
+          <ScaleSlider.Header className="mb-0.5 h-9">
+            <SlidingToggle
+              ariaLabel="Scaling target"
+              className="h-8 w-auto"
+              disabled={disabled}
+              indicatorClassName="rounded-md bg-input"
+              itemClassName="!rounded-md h-8 min-w-0 px-3 text-xs data-[state=on]:text-foreground text-muted-foreground"
+              onValueChange={onTargetMetricChange}
+              options={SCALING_TARGET_TOGGLE_OPTIONS}
+              value={targetMetric}
+            />
+            <span className="shrink-0 text-primary text-sm leading-5">
+              {config.format(config.value)}
+            </span>
+          </ScaleSlider.Header>
+          <ScaleSlider.Control aria-label={config.ariaLabel} className="h-2">
+            <ScaleSlider.Track className="h-2 bg-input/80">
+              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-theme-blue" />
+            </ScaleSlider.Track>
+            <ScaleSlider.Thumb className="size-4 border-2 border-primary bg-theme-blue shadow-none ring-0" />
+          </ScaleSlider.Control>
+          <div className="flex min-w-0 items-center justify-between gap-3 text-muted-foreground text-sm leading-5">
+            <span className="truncate">{config.format(config.min)}</span>
+            <span className="truncate text-right">
+              {config.format(config.max)}
+            </span>
+          </div>
+        </ScaleSlider.Stack>
+      </ScaleSlider.Root>
+    </ResourceSettingsInset>
+  );
+}
+
 function ReplicaStrategySection({
   actions,
   elastic,
@@ -2476,73 +2576,15 @@ function ReplicaStrategySection({
               value={maxReplicas}
             />
 
-            <ResourceSettingsInset>
-              <Label className="text-foreground text-xs">Scaling target</Label>
-              <ToggleGroup
-                aria-label="Scaling target"
-                className="grid h-9 w-full grid-cols-2 rounded-lg bg-background/40 p-0.5"
-                onValueChange={(value) => {
-                  const next = value[0];
-                  if (next === "cpu" || next === "memory") {
-                    onElasticTargetMetricChange(next);
-                  }
-                }}
-                spacing={1}
-                value={[targetMetric]}
-                variant="outline"
-              >
-                <ToggleGroupItem
-                  aria-label="CPU utilization target"
-                  className="h-8 min-w-0 rounded-md border-0 text-xs"
-                  data-selected={targetMetric === "cpu" ? "true" : undefined}
-                  disabled={readOnly}
-                  value="cpu"
-                >
-                  CPU utilization target
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  aria-label="Memory average target"
-                  className="h-8 min-w-0 rounded-md border-0 text-xs"
-                  data-selected={targetMetric === "memory" ? "true" : undefined}
-                  disabled={readOnly}
-                  value="memory"
-                >
-                  Memory average target
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </ResourceSettingsInset>
-
-            {targetMetric === "memory" ? (
-              <ResourceSettingsSlider
-                ariaLabel="Memory average target"
-                disabled={readOnly}
-                formatBound={formatMemoryMibValue}
-                formatValue={formatMemoryMibValue}
-                icon={MemoryStick}
-                label="Memory average target"
-                max={MEMORY_AVERAGE_TARGET_LIMITS.max}
-                maxDecimals={0}
-                min={MEMORY_AVERAGE_TARGET_LIMITS.min}
-                onValueChange={onElasticMemoryTargetChange}
-                step={1}
-                value={memoryTargetMib}
-              />
-            ) : (
-              <ResourceSettingsSlider
-                ariaLabel="CPU utilization target"
-                disabled={readOnly}
-                formatBound={(next) => `${formatPlainNumber(next, 0)}%`}
-                formatValue={(next) => `${formatPlainNumber(next, 0)}%`}
-                icon={Cpu}
-                label="CPU utilization target"
-                max={CPU_UTILIZATION_TARGET_LIMITS.max}
-                maxDecimals={0}
-                min={CPU_UTILIZATION_TARGET_LIMITS.min}
-                onValueChange={onElasticCpuTargetChange}
-                step={1}
-                value={cpuTargetPercent}
-              />
-            )}
+            <ScalingTargetSlider
+              cpuTargetPercent={cpuTargetPercent}
+              disabled={readOnly}
+              memoryTargetMib={memoryTargetMib}
+              onCpuTargetChange={onElasticCpuTargetChange}
+              onMemoryTargetChange={onElasticMemoryTargetChange}
+              onTargetMetricChange={onElasticTargetMetricChange}
+              targetMetric={targetMetric}
+            />
           </div>
         )}
       </div>
