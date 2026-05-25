@@ -20,6 +20,7 @@ import {
   applyApEnv,
   applyApImage,
   applyApNetwork,
+  applyApPublicAddresses,
   applyApResourceQuotas,
   applyApSettingsDraft,
 } from "@/lib/project-canvas/k8s/ap-json-patch";
@@ -332,7 +333,9 @@ export function useWorkloadClaimSettings(
       }
       setLocalOverride((prev) => ({ ...(prev ?? {}), network }));
       try {
-        await applyApNetwork(kc, body, network, { existingCustomDomains });
+        await applyApPublicAddresses(kc, body, network, {
+          existingCustomDomains,
+        });
         toast.success("Public addresses applied.");
         await revalidateAfterApMutation();
       } catch (e) {

@@ -5,6 +5,8 @@ import { PLATFORM_ADDRESS_ID_RE } from "../platform-addresses";
 import {
   patchOpsForApEnvSettings,
   patchOpsForApNetworkSettings,
+  patchOpsForApPrivatePortSettings,
+  patchOpsForApPublicAddressesSettings,
   patchOpsForApReplicaStrategySettings,
   patchOpsForApResourceQuotaSettings,
   patchOpsForApSettingsDraft,
@@ -280,6 +282,88 @@ test("AP network settings preserves existing routing domain label", () => {
 
   assert.equal(ops.length, 1);
   assert.equal(ops[0]?.path, "/spec/input/network");
+});
+
+test("AP public address settings patch does not rewrite Private Address target port", () => {
+  const ops = patchOpsForApPublicAddressesSettings(
+    {
+      input: {
+        network: {
+          customDomains: [
+            {
+              domain: "old.example.com",
+              id: "cd_old123",
+              platformAddressId: "pa_old123",
+            },
+          ],
+          platformAddresses: [{ id: "pa_old123", port: 80 }],
+          privatePort: 80,
+        },
+      },
+    },
+    {
+      customDomains: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_new456",
+        },
+      ],
+      publicAddresses: [{ id: "pa_new456", port: 8080 }],
+    },
+    {
+      metadata: { labels: { region: "custom.example.com" } },
+      routingDomain: "192.168.12.53.nip.io",
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network/platformAddresses",
+      value: [{ id: "pa_new456", port: 8080 }],
+    },
+    {
+      op: "replace",
+      path: "/spec/input/network/customDomains",
+      value: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_new456",
+        },
+      ],
+    },
+  ]);
+});
+
+test("AP private port settings patch does not rewrite Public Addresses", () => {
+  const ops = patchOpsForApPrivatePortSettings(
+    {
+      input: {
+        network: {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+            },
+          ],
+          platformAddresses: [{ id: "pa_abc123", port: 80 }],
+          privatePort: 80,
+        },
+      },
+    },
+    { privatePort: 8080 }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network/privatePort",
+      value: 8080,
+    },
+  ]);
 });
 
 test("AP network settings validate App Listening Ports", () => {

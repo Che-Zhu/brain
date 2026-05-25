@@ -51,6 +51,14 @@ const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
   Partial<Pick<ContainerNetwork, "customDomains" | "publicAddresses">>;
 
+type ApPrivatePortSettingsPatch = Pick<ContainerNetwork, "privatePort">;
+
+type ApPublicAddressesSettingsPatch = Pick<
+  ContainerNetwork,
+  "publicAddresses"
+> &
+  Partial<Pick<ContainerNetwork, "customDomains">>;
+
 interface ApNetworkSettingsPatchOptions {
   existingCustomDomains?: readonly ExistingCustomDomainBinding[];
   metadata?: Record<string, unknown>;
@@ -378,6 +386,84 @@ function buildApNetworkInput(
     hasPublicAddresses: (platformAddresses?.length ?? 0) > 0,
     networkInput,
   };
+}
+
+export function patchOpsForApPrivatePortSettings(
+  spec: Record<string, unknown> | undefined,
+  network: ApPrivatePortSettingsPatch
+): K8sJsonPatchOp[] {
+  const privatePort = validatedNetworkPort(
+    network.privatePort,
+    "Private Address target port"
+  );
+  const input = asRecord(spec?.input);
+  const inputNetwork = asRecord(readApInput(spec ?? {}).network);
+  const ops =
+    inputNetwork == null
+      ? patchOpsForApInput(spec, { network: { privatePort } })
+      : [
+          {
+            op: Object.hasOwn(inputNetwork, "privatePort") ? "replace" : "add",
+            path: "/spec/input/network/privatePort",
+            value: privatePort,
+          } satisfies K8sJsonPatchOp,
+        ];
+  removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
+  return ops;
+}
+
+function networkInputFieldPatch(
+  network: Record<string, unknown>,
+  field: "customDomains" | "platformAddresses",
+  value: Record<string, unknown>[]
+): K8sJsonPatchOp | null {
+  if (value.length === 0) {
+    return Object.hasOwn(network, field)
+      ? { op: "remove", path: `/spec/input/network/${field}` }
+      : null;
+  }
+  return {
+    op: Object.hasOwn(network, field) ? "replace" : "add",
+    path: `/spec/input/network/${field}`,
+    value,
+  };
+}
+
+export function patchOpsForApPublicAddressesSettings(
+  spec: Record<string, unknown> | undefined,
+  network: ApPublicAddressesSettingsPatch,
+  options: ApNetworkSettingsPatchOptions = {}
+): K8sJsonPatchOp[] {
+  const inputNetwork = asRecord(readApInput(spec ?? {}).network);
+  if (inputNetwork == null) {
+    throw new Error("AP network settings are missing.");
+  }
+
+  const platformAddresses =
+    validatedPlatformAddresses(network.publicAddresses) ?? [];
+  const customDomains =
+    validatedCustomDomains(network.customDomains, platformAddresses, options) ??
+    [];
+  const ops = [
+    networkInputFieldPatch(
+      inputNetwork,
+      "platformAddresses",
+      platformAddresses
+    ),
+    networkInputFieldPatch(inputNetwork, "customDomains", customDomains),
+  ].filter((op): op is K8sJsonPatchOp => op != null);
+  removeExistingApInputFields(
+    ops,
+    asRecord(spec?.input),
+    LEGACY_AP_NETWORK_INPUT_FIELDS
+  );
+  appendRoutingDomainPatch(
+    ops,
+    options.metadata,
+    options.routingDomain ?? "",
+    platformAddresses.length > 0
+  );
+  return ops;
 }
 
 export async function applyApImage(
@@ -814,6 +900,37 @@ export async function applyApNetwork(
     kubeconfig,
     claim,
     patchOpsForApNetworkSettings(spec, network, {
+      existingCustomDomains: options.existingCustomDomains,
+      metadata: asRecord(claim.metadata),
+      routingDomain: routingDomainFromKubeconfig(kubeconfig),
+    })
+  );
+}
+
+export async function applyApPrivatePort(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  network: ApPrivatePortSettingsPatch
+): Promise<void> {
+  const spec = asRecord(claim.spec);
+  await patchAp(
+    kubeconfig,
+    claim,
+    patchOpsForApPrivatePortSettings(spec, network)
+  );
+}
+
+export async function applyApPublicAddresses(
+  kubeconfig: string,
+  claim: Record<string, unknown>,
+  network: ApPublicAddressesSettingsPatch,
+  options: Pick<ApNetworkSettingsPatchOptions, "existingCustomDomains"> = {}
+): Promise<void> {
+  const spec = asRecord(claim.spec);
+  await patchAp(
+    kubeconfig,
+    claim,
+    patchOpsForApPublicAddressesSettings(spec, network, {
       existingCustomDomains: options.existingCustomDomains,
       metadata: asRecord(claim.metadata),
       routingDomain: routingDomainFromKubeconfig(kubeconfig),
