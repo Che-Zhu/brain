@@ -4,6 +4,10 @@ import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
 } from "../nodes/constants";
+import {
+  canvasResourceIdentityFromNode,
+  canvasResourceLastSeenUidFromNode,
+} from "../nodes/resource-identity";
 
 export interface ProjectCanvasConnectionCommandAp {
   name: string;
@@ -63,15 +67,14 @@ function apFromNode(
   if (kind !== undefined && kind.toUpperCase() !== "AP") {
     return undefined;
   }
-  const name = nonEmptyString(states?.name);
-  const namespace = nonEmptyString(states?.namespace);
-  if (name === undefined || namespace === undefined) {
+  const identity = canvasResourceIdentityFromNode(node);
+  if (identity?.kind !== "AP") {
     return undefined;
   }
-  const uid = nonEmptyString(states?.uid);
+  const uid = canvasResourceLastSeenUidFromNode(node);
   return {
-    name,
-    namespace,
+    name: identity.name,
+    namespace: identity.namespace,
     nodeId: node.id,
     ...(uid === undefined ? {} : { uid }),
   };
@@ -83,13 +86,15 @@ function dbFromNode(
   if (node?.type !== CANVAS_DATABASE_NODE_TYPE) {
     return undefined;
   }
-  const workload = asRecord(asRecord(node.data)?.workload);
-  const name = nonEmptyString(workload?.name);
-  const namespace = nonEmptyString(workload?.namespace);
-  if (name === undefined || namespace === undefined) {
+  const identity = canvasResourceIdentityFromNode(node);
+  if (identity?.kind !== "DB") {
     return undefined;
   }
-  return { name, namespace, nodeId: node.id };
+  return {
+    name: identity.name,
+    namespace: identity.namespace,
+    nodeId: node.id,
+  };
 }
 
 function commandFromApDbNodePair(

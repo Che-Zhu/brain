@@ -363,7 +363,7 @@ test("canvas connections keep EntryPoint-to-AP detection alongside AP-to-DB dete
     [
       {
         kind: "EntryPointToAP",
-        source: { kind: "EntryPoint", name: "api-entry", namespace: "default" },
+        source: { kind: "EntryPoint", name: "api", namespace: "default" },
         target: { kind: "AP", name: "api", namespace: "default" },
       },
       {

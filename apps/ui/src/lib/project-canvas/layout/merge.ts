@@ -1,10 +1,10 @@
 import type { Node } from "@xyflow/react";
 
 import {
-  CANVAS_CONTAINER_NODE_TYPE,
-  CANVAS_DATABASE_NODE_TYPE,
-  CANVAS_ENTRY_NODE_TYPE,
-} from "../nodes/constants";
+  canvasResourceIdentityFromNode,
+  canvasResourceKey,
+  canvasResourceLastSeenUidFromNode,
+} from "../nodes/resource-identity";
 import {
   cleanupCanvasLayoutDocument,
   cloneCanvasLayoutDocument,
@@ -15,11 +15,7 @@ import {
   canvasNodeStackOrder,
   nodeWithCanvasStackOrder,
 } from "./node-stack-order";
-import {
-  canvasLayoutResourceKey as layoutResourceKey,
-  canvasLayoutResourceRefFromNode as layoutResourceRefFromNode,
-  placeCanvasNodes,
-} from "./placement";
+import { placeCanvasNodes } from "./placement";
 import {
   CANVAS_STACK_ORDER_RETURN_STABILITY_MS,
   canvasStackOrderValue,
@@ -46,12 +42,6 @@ export interface CanvasLayoutMergeOptions {
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value != null && typeof value === "object"
     ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function nonEmptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== ""
-    ? value.trim()
     : undefined;
 }
 
@@ -96,31 +86,16 @@ function withCanvasLayoutExpansion(
   };
 }
 
-function lastSeenUidFromNode(node: Node): string | undefined {
-  const data = asRecord(node.data);
-
-  switch (node.type) {
-    case CANVAS_CONTAINER_NODE_TYPE:
-      return nonEmptyString(asRecord(data?.states)?.uid);
-    case CANVAS_DATABASE_NODE_TYPE:
-      return nonEmptyString(data?.uid);
-    case CANVAS_ENTRY_NODE_TYPE:
-      return nonEmptyString(asRecord(data?.resource)?.uid);
-    default:
-      return undefined;
-  }
-}
-
 export function canvasLayoutNodeFromNode(
   node: Node
 ): CanvasLayoutNode | undefined {
-  const ref = layoutResourceRefFromNode(node);
+  const ref = canvasResourceIdentityFromNode(node);
   const position = finitePosition(node.position);
   if (ref === undefined || position === undefined) {
     return undefined;
   }
   const expanded = canvasLayoutExpandedFromNode(node) ?? false;
-  const lastSeenUid = lastSeenUidFromNode(node);
+  const lastSeenUid = canvasResourceLastSeenUidFromNode(node);
   const stackOrder = canvasNodeStackOrder(node);
   return {
     expanded,
@@ -146,10 +121,11 @@ function hasDifferentDetectedUid(
   saved: CanvasLayoutNode,
   detected: Node
 ): boolean {
-  const savedUid = nonEmptyString(saved.lastSeenUid);
-  const detectedUid = lastSeenUidFromNode(detected);
+  const savedUid = saved.lastSeenUid?.trim();
+  const detectedUid = canvasResourceLastSeenUidFromNode(detected);
   return (
     savedUid !== undefined &&
+    savedUid !== "" &&
     detectedUid !== undefined &&
     savedUid !== detectedUid
   );
@@ -204,7 +180,8 @@ function restoredLayoutNodeFromDetectedNode(
   saved: CanvasLayoutNode,
   detected: Node
 ): CanvasLayoutNode {
-  const lastSeenUid = lastSeenUidFromNode(detected) ?? saved.lastSeenUid;
+  const lastSeenUid =
+    canvasResourceLastSeenUidFromNode(detected) ?? saved.lastSeenUid;
   const restored: CanvasLayoutNode = {
     position: { x: saved.position.x, y: saved.position.y },
     ref: { ...saved.ref },
@@ -250,17 +227,17 @@ export function mergeCanvasLayoutWithDetectedNodes({
   let nextFreshStackOrder = nextExplicitCanvasStackOrder(cleanedLayout.nodes);
   const layoutByRef = new Map<string, CanvasLayoutNode>();
   for (const item of cleanedLayout.nodes) {
-    layoutByRef.set(layoutResourceKey(item.ref), item);
+    layoutByRef.set(canvasResourceKey(item.ref), item);
   }
 
   const nextLayoutByRef = new Map<string, CanvasLayoutNode>();
   const renderedNodes = nodes.map((node) => {
-    const ref = layoutResourceRefFromNode(node);
+    const ref = canvasResourceIdentityFromNode(node);
     if (ref === undefined) {
       return { ...node };
     }
 
-    const key = layoutResourceKey(ref);
+    const key = canvasResourceKey(ref);
     const saved = layoutByRef.get(key);
     if (saved === undefined) {
       return { ...node };
@@ -287,7 +264,7 @@ export function mergeCanvasLayoutWithDetectedNodes({
 
   const nextLayout = cloneCanvasLayoutDocument(cleanedLayout);
   nextLayout.nodes = cleanedLayout.nodes.map((item) => {
-    const key = layoutResourceKey(item.ref);
+    const key = canvasResourceKey(item.ref);
     const live = nextLayoutByRef.get(key);
     if (live !== undefined) {
       return live;

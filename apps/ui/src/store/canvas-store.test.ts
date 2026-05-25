@@ -24,20 +24,22 @@ import {
 } from "@/lib/project-canvas/panels/workload-pane-mode";
 import { projectCanvasNodeServiceUid } from "./canvas-store";
 
-test("projectCanvasNodeServiceUid reads EntryPoint resource uid", () => {
+test("projectCanvasNodeServiceUid derives EntryPoint AP-bound Surface Key", () => {
   const node = {
     data: {
       resource: {
-        name: "web",
+        apRef: "web",
+        name: "web-entry",
         namespace: "default",
         uid: "entrypoint-uid",
       },
     },
     id: "entry-web",
     position: { x: 0, y: 0 },
+    type: CANVAS_ENTRY_NODE_TYPE,
   } as Node;
 
-  assert.equal(projectCanvasNodeServiceUid(node), "entrypoint-uid");
+  assert.equal(projectCanvasNodeServiceUid(node), "entry:default:web");
 });
 
 test("projectCanvasNodeServiceUid prefers EntryPoint selection key", () => {
@@ -52,6 +54,7 @@ test("projectCanvasNodeServiceUid prefers EntryPoint selection key", () => {
     },
     id: "entry-web",
     position: { x: 0, y: 0 },
+    type: CANVAS_ENTRY_NODE_TYPE,
   } as Node;
 
   assert.equal(projectCanvasNodeServiceUid(node), "entry:default:web");

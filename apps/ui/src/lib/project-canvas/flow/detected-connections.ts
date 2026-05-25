@@ -9,10 +9,9 @@ import type { Edge, Node } from "@xyflow/react";
 
 import { dbDsnReferenceSourceFromDb } from "../k8s/db-dsn-reference-sources";
 import {
-  CANVAS_CONTAINER_NODE_TYPE,
-  CANVAS_DATABASE_NODE_TYPE,
-  CANVAS_ENTRY_NODE_TYPE,
-} from "../nodes/constants";
+  canvasResourceIdentityFromNode,
+  canvasResourceKey,
+} from "../nodes/resource-identity";
 import { isPlatformAddressId } from "../platform-addresses";
 
 export type CanvasDetectedConnectionKind = "EntryPointToAP" | "APToDB";
@@ -77,7 +76,7 @@ function metadataNamespace(
 export function canvasConnectionResourceKey(
   ref: CanvasConnectionResourceRef
 ): string {
-  return `${ref.kind}:${ref.namespace}:${ref.name}`;
+  return canvasResourceKey(ref);
 }
 
 function connectionKey(connection: CanvasDetectedConnection): string {
@@ -101,17 +100,6 @@ function resourceRef(
   return { kind, name, namespace };
 }
 
-function resourceRefFromRecord(
-  kind: CanvasConnectionResourceKind,
-  source: Record<string, unknown> | undefined
-): CanvasConnectionResourceRef | undefined {
-  return resourceRef(
-    kind,
-    nonEmptyString(source?.name),
-    nonEmptyString(source?.namespace)
-  );
-}
-
 function resourceRefFromMetadata(
   kind: CanvasConnectionResourceKind,
   resource: unknown,
@@ -127,18 +115,7 @@ function resourceRefFromMetadata(
 export function canvasConnectionNodeResourceRef(
   node: Node
 ): CanvasConnectionResourceRef | undefined {
-  const data = asRecord(node.data);
-
-  switch (node.type) {
-    case CANVAS_CONTAINER_NODE_TYPE:
-      return resourceRefFromRecord("AP", asRecord(data?.states));
-    case CANVAS_DATABASE_NODE_TYPE:
-      return resourceRefFromRecord("DB", asRecord(data?.workload));
-    case CANVAS_ENTRY_NODE_TYPE:
-      return resourceRefFromRecord("EntryPoint", asRecord(data?.resource));
-    default:
-      return undefined;
-  }
+  return canvasResourceIdentityFromNode(node);
 }
 
 function specRecord(resource: unknown): Record<string, unknown> | undefined {
@@ -157,11 +134,7 @@ function entryPointRefByApKey(
   for (const entryPoint of entryPoints) {
     const apRef = entryPointApRef(entryPoint);
     const namespace = metadataNamespace(entryPoint, namespaceFallback);
-    const ref = resourceRefFromMetadata(
-      "EntryPoint",
-      entryPoint,
-      namespaceFallback
-    );
+    const ref = resourceRef("EntryPoint", apRef, namespace);
     if (apRef === undefined || namespace === undefined || ref === undefined) {
       continue;
     }
@@ -263,12 +236,9 @@ function addEntryPointConnections(
 ): void {
   for (const entryPoint of entryPoints) {
     const namespace = metadataNamespace(entryPoint, namespaceFallback);
-    const source = resourceRefFromMetadata(
-      "EntryPoint",
-      entryPoint,
-      namespaceFallback
-    );
-    const target = resourceRef("AP", entryPointApRef(entryPoint), namespace);
+    const apRef = entryPointApRef(entryPoint);
+    const source = resourceRef("EntryPoint", apRef, namespace);
+    const target = resourceRef("AP", apRef, namespace);
     if (
       source === undefined ||
       target === undefined ||

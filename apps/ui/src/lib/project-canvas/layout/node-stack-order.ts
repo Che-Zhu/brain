@@ -1,8 +1,8 @@
 import type { Node } from "@xyflow/react";
 import {
-  canvasLayoutResourceKey,
-  canvasLayoutResourceRefFromNode,
-} from "./placement";
+  canvasResourceIdentityFromNode,
+  canvasResourceKey,
+} from "../nodes/resource-identity";
 import {
   bringCanvasStackOrderItemToFront,
   type CanvasStackOrderItem,
@@ -25,7 +25,7 @@ function canvasStackOrderItemsFromNodes(
   nodes: readonly Node[]
 ): CanvasStackOrderItem[] {
   return nodes.flatMap((node) => {
-    const ref = canvasLayoutResourceRefFromNode(node);
+    const ref = canvasResourceIdentityFromNode(node);
     if (ref === undefined) {
       return [];
     }
@@ -65,8 +65,8 @@ export function applyCanvasStackOrderToNodes(nodes: readonly Node[]): Node[] {
 }
 
 export function canvasNodeResourceStackKey(node: Node): string | undefined {
-  const ref = canvasLayoutResourceRefFromNode(node);
-  return ref === undefined ? undefined : canvasLayoutResourceKey(ref);
+  const ref = canvasResourceIdentityFromNode(node);
+  return ref === undefined ? undefined : canvasResourceKey(ref);
 }
 
 export function bringCanvasNodeToFrontInStackOrder(

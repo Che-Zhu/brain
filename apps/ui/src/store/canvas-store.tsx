@@ -12,6 +12,7 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
+import { canvasNodeSelectionKey } from "@/lib/project-canvas/nodes/resource-identity";
 
 /** nuqs key for the selected workload card (Kubernetes `metadata.uid`). */
 export const CANVAS_SERVICE_QUERY_KEY = "service" as const;
@@ -48,27 +49,7 @@ export const ENTRY_PANE = {
 export const WORKLOAD_PANEL_REPLICAS = { min: 1, max: 20 } as const;
 
 export function projectCanvasNodeServiceUid(node: Node): string | null {
-  const data =
-    node.data === null || typeof node.data !== "object" ? undefined : node.data;
-  const topLevelUid = (data as { uid?: unknown } | undefined)?.uid;
-  if (typeof topLevelUid === "string" && topLevelUid !== "") {
-    return topLevelUid;
-  }
-  const uid = (data as { states?: { uid?: unknown } } | undefined)?.states?.uid;
-  if (typeof uid === "string" && uid !== "") {
-    return uid;
-  }
-  const resourceUid = (data as { resource?: { uid?: unknown } } | undefined)
-    ?.resource?.uid;
-  const entrySelectionKey = (
-    data as { resource?: { selectionKey?: unknown } } | undefined
-  )?.resource?.selectionKey;
-  if (typeof entrySelectionKey === "string" && entrySelectionKey !== "") {
-    return entrySelectionKey;
-  }
-  return typeof resourceUid === "string" && resourceUid !== ""
-    ? resourceUid
-    : null;
+  return canvasNodeSelectionKey(node);
 }
 
 export const projectCanvasFlowNodeTypes = {

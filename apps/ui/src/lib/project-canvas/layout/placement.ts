@@ -1,14 +1,13 @@
 import type { Node } from "@xyflow/react";
 
 import {
-  CANVAS_CONTAINER_NODE_TYPE,
-  CANVAS_DATABASE_NODE_TYPE,
-  CANVAS_ENTRY_NODE_TYPE,
-} from "../nodes/constants";
+  canvasEntryPointApResourceIdentityFromNode,
+  canvasResourceIdentityFromNode,
+  canvasResourceKey,
+} from "../nodes/resource-identity";
 import type {
   CanvasLayoutDocument,
   CanvasLayoutPosition,
-  CanvasLayoutResourceKind,
   CanvasLayoutResourceRef,
 } from "./types";
 
@@ -71,61 +70,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function nonEmptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== ""
-    ? value.trim()
-    : undefined;
-}
-
-export function canvasLayoutResourceKey(ref: CanvasLayoutResourceRef): string {
-  return `${ref.kind}:${ref.namespace}:${ref.name}`;
-}
-
-function resourceRefFromRecord(
-  kind: CanvasLayoutResourceKind,
-  source: Record<string, unknown> | undefined
-): CanvasLayoutResourceRef | undefined {
-  const name = nonEmptyString(source?.name);
-  const namespace = nonEmptyString(source?.namespace);
-
-  if (name === undefined || namespace === undefined) {
-    return undefined;
-  }
-
-  return { kind, name, namespace };
-}
-
-export function canvasLayoutResourceRefFromNode(
-  node: Node
-): CanvasLayoutResourceRef | undefined {
-  const data = asRecord(node.data);
-
-  switch (node.type) {
-    case CANVAS_CONTAINER_NODE_TYPE:
-      return resourceRefFromRecord("AP", asRecord(data?.states));
-    case CANVAS_DATABASE_NODE_TYPE:
-      return resourceRefFromRecord("DB", asRecord(data?.workload));
-    case CANVAS_ENTRY_NODE_TYPE:
-      return resourceRefFromRecord("EntryPoint", asRecord(data?.resource));
-    default:
-      return undefined;
-  }
-}
-
-function entryPointApRefFromNode(
-  node: Node
-): CanvasLayoutResourceRef | undefined {
-  if (node.type !== CANVAS_ENTRY_NODE_TYPE) {
-    return undefined;
-  }
-
-  const resource = asRecord(asRecord(node.data)?.resource);
-  return resourceRefFromRecord("AP", {
-    name: resource?.apRef,
-    namespace: resource?.namespace,
-  });
-}
-
 export function isCanvasNodeGeneratedPosition(node: Node | undefined): boolean {
   const layout = asRecord(asRecord(node?.data)?.layout);
   return layout?.positionSource === GENERATED_POSITION_SOURCE;
@@ -184,7 +128,7 @@ export function placeCanvasNodes({
 }: PlaceCanvasNodesOptions): Node[] {
   const savedByRef = new Map(
     (layout?.nodes ?? []).map((node) => [
-      canvasLayoutResourceKey(node.ref),
+      canvasResourceKey(node.ref),
       node.position,
     ])
   );
@@ -195,8 +139,8 @@ export function placeCanvasNodes({
   const entryPointCandidates: PlacementCandidate[] = [];
 
   placedNodes.forEach((node, index) => {
-    const ref = canvasLayoutResourceRefFromNode(node);
-    const key = ref === undefined ? undefined : canvasLayoutResourceKey(ref);
+    const ref = canvasResourceIdentityFromNode(node);
+    const key = ref === undefined ? undefined : canvasResourceKey(ref);
     const savedPosition = key === undefined ? undefined : savedByRef.get(key);
     if (savedPosition !== undefined) {
       placedNodes[index] = nodeWithPosition(node, savedPosition);
@@ -226,18 +170,18 @@ export function placeCanvasNodes({
       position
     );
     if (candidate.ref !== undefined) {
-      positionByRef.set(canvasLayoutResourceKey(candidate.ref), position);
+      positionByRef.set(canvasResourceKey(candidate.ref), position);
     }
   }
 
   for (const candidate of [...entryPointCandidates].sort(
     comparePlacementCandidates
   )) {
-    const apRef = entryPointApRefFromNode(candidate.node);
+    const apRef = canvasEntryPointApResourceIdentityFromNode(candidate.node);
     const apPosition =
       apRef === undefined
         ? undefined
-        : positionByRef.get(canvasLayoutResourceKey(apRef));
+        : positionByRef.get(canvasResourceKey(apRef));
     const position =
       apPosition === undefined
         ? firstOpenFallbackPosition(allocated)

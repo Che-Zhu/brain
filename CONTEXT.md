@@ -135,6 +135,20 @@ A canvas node that represents an AP workload. The name is retained as a product/
 
 A Project-scoped visual arrangement of the canvas, shared by everyone who opens that Project.
 
+### Canvas Resource Identity
+
+The product identity of a canvas node's backing AP, DB, or AP-bound EntryPoint surface. Canvas Resource Identity is keyed by `kind`, `namespace`, and `name`, which keeps Canvas Layout stable across short reconciliation gaps.
+
+For AP and DB nodes, `name` is the Kubernetes resource name. For EntryPoint nodes, `name` is the associated AP name: the node represents that AP's Public Addresses surface, including the pending state before a real EntryPoint resource exists. Real EntryPoint `metadata.name`, `metadata.uid`, and status are observed resource facts attached to that surface, not the stable Canvas Resource Identity.
+
+Kubernetes UID is retained separately as the last-seen entity identity so the UI can detect when a same-named AP, DB, or observed EntryPoint resource is meaningfully new.
+
+### AP-bound Surface Key
+
+The EntryPoint selection identity used by URL state and the Canvas Resource Pane. An AP-bound Surface Key is stable for `{ namespace, apName }` and selects the AP's Public Addresses surface, whether the real EntryPoint resource already exists or is still pending.
+
+The AP-bound Surface Key is not the same thing as the Canvas Layout resource key. Canvas Layout uses Canvas Resource Identity. URL and pane selection may derive an AP-bound Surface Key from the same EntryPoint node facts, but the two keys are not interchangeable.
+
 ### Canvas Node Expansion State
 
 The per-node expanded or collapsed presentation state of a canvas node card.

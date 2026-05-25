@@ -1,4 +1,4 @@
-import { canvasLayoutResourceKey } from "./placement";
+import { canvasResourceKey } from "../nodes/resource-identity";
 import type { CanvasLayoutNode } from "./types";
 
 interface TimerApi {
@@ -44,7 +44,7 @@ export function createCanvasLayoutNodeSaveScheduler(
     cancel,
     flush,
     schedule: (node) => {
-      pending.set(canvasLayoutResourceKey(node.ref), node);
+      pending.set(canvasResourceKey(node.ref), node);
       cancel();
       timer = options.setTimeout(flush, options.delayMs);
     },

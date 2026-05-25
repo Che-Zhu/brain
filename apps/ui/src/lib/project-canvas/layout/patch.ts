@@ -1,5 +1,5 @@
+import { canvasResourceKey } from "../nodes/resource-identity";
 import { cleanupCanvasLayoutDocument } from "./cleanup";
-import { canvasLayoutResourceKey } from "./placement";
 import {
   canvasStackOrderValue,
   normalizeCanvasLayoutStackOrders,
@@ -97,7 +97,7 @@ function upsertNormalizedNode(
   node: CanvasLayoutNode
 ): void {
   const normalized = normalizeNode(node);
-  const key = canvasLayoutResourceKey(normalized.ref);
+  const key = canvasResourceKey(normalized.ref);
   if (!nodesByRef.has(key)) {
     order.push(key);
   }
