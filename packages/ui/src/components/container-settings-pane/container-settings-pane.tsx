@@ -1749,7 +1749,7 @@ interface NetworkCardProps {
 
 function NetworkCard({ actions, children, title }: NetworkCardProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-resource-pane-border">
+    <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-resource-pane-border">
       <div className="flex h-11 min-w-0 items-center gap-1.5 border-resource-pane-border border-b px-2.5">
         <Network
           aria-hidden
@@ -1764,7 +1764,7 @@ function NetworkCard({ actions, children, title }: NetworkCardProps) {
         )}
       </div>
       <div className="flex min-w-0 flex-col gap-2 px-2.5 pb-3">{children}</div>
-    </div>
+    </section>
   );
 }
 
@@ -2141,95 +2141,91 @@ function NetworkSettingsSection({
 
   return (
     <>
-      <section className="flex min-w-0 flex-col gap-3">
-        <NetworkCard
-          actions={
-            readOnly || usesPanelDraft || !portDirty ? null : (
-              <NetworkSectionActions
-                canSave={canSave}
-                onCancel={handleCancel}
-                onSave={handleSave}
-                pending={savePending}
-              />
-            )
-          }
-          title="Private Address"
+      <NetworkCard
+        actions={
+          readOnly || usesPanelDraft || !portDirty ? null : (
+            <NetworkSectionActions
+              canSave={canSave}
+              onCancel={handleCancel}
+              onSave={handleSave}
+              pending={savePending}
+            />
+          )
+        }
+        title="Private Address"
+      >
+        <button
+          aria-label="Copy Private Address"
+          className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2 text-left transition-colors hover:bg-resource-pane-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-resource-pane-card"
+          disabled={!hasPrivateAddress}
+          onClick={handleCopyPrivateAddress}
+          title="Copy Private Address"
+          type="button"
         >
-          <button
-            aria-label="Copy Private Address"
-            className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2 text-left transition-colors hover:bg-resource-pane-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-resource-pane-card"
-            disabled={!hasPrivateAddress}
-            onClick={handleCopyPrivateAddress}
-            title="Copy Private Address"
-            type="button"
-          >
-            <div className="min-w-0 flex-1 truncate font-mono text-resource-pane-foreground text-sm leading-5">
-              {hasPrivateAddress ? privateAddress : "Pending"}
-            </div>
-            <Copy
-              aria-hidden
-              className="size-4 shrink-0 text-resource-pane-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-            />
-          </button>
-
-          <div className="grid min-w-0 gap-1.5">
-            <Label
-              className="text-resource-pane-muted text-sm leading-5"
-              htmlFor={networkInputId}
-            >
-              Private Address target port
-            </Label>
-            <Input
-              aria-describedby={
-                effectivePortError == null
-                  ? undefined
-                  : `${networkInputId}-error`
-              }
-              aria-invalid={effectivePortError != null}
-              className="h-8 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-xs dark:bg-transparent"
-              disabled={readOnly}
-              id={networkInputId}
-              inputMode="numeric"
-              onChange={(event) => {
-                if (onPrivatePortDraftChange == null) {
-                  setDraftPort(event.target.value);
-                } else {
-                  onPrivatePortDraftChange(event.target.value);
-                }
-                setPortError(null);
-              }}
-              value={portDraft}
-            />
-            {effectivePortError == null ? null : (
-              <p
-                className="text-destructive text-xs"
-                id={`${networkInputId}-error`}
-                role="alert"
-              >
-                {effectivePortError}
-              </p>
-            )}
+          <div className="min-w-0 flex-1 truncate font-mono text-resource-pane-foreground text-sm leading-5">
+            {hasPrivateAddress ? privateAddress : "Pending"}
           </div>
-        </NetworkCard>
+          <Copy
+            aria-hidden
+            className="size-4 shrink-0 text-resource-pane-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          />
+        </button>
 
-        <DomainListSection
-          addOpen={addOpen}
-          canMutateNetwork={canMutateNetwork}
-          defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-          hiddenPublicAddressCount={hiddenPublicAddressCount}
-          onAddPublicAddress={handleAddPublicAddress}
-          onBindAddress={setCnameAddress}
-          onCancelAddPublicAddress={handleCancelAddPublicAddress}
-          onDeletePublicAddress={handleDeletePublicAddress}
-          onOpenAddPublicAddress={() => setAddOpen(true)}
-          onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
-          onUnbindCustomDomain={handleUnbindCustomDomain}
-          platformAddressDraftContext={platformAddressDraftContext}
-          readOnly={readOnly}
-          visibleDomainRows={visibleDomains}
-          visiblePublicAddresses={visiblePublicAddresses}
-        />
-      </section>
+        <div className="grid min-w-0 gap-1.5">
+          <Label
+            className="text-resource-pane-muted text-sm leading-5"
+            htmlFor={networkInputId}
+          >
+            Private Address target port
+          </Label>
+          <Input
+            aria-describedby={
+              effectivePortError == null ? undefined : `${networkInputId}-error`
+            }
+            aria-invalid={effectivePortError != null}
+            className="h-8 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-xs dark:bg-transparent"
+            disabled={readOnly}
+            id={networkInputId}
+            inputMode="numeric"
+            onChange={(event) => {
+              if (onPrivatePortDraftChange == null) {
+                setDraftPort(event.target.value);
+              } else {
+                onPrivatePortDraftChange(event.target.value);
+              }
+              setPortError(null);
+            }}
+            value={portDraft}
+          />
+          {effectivePortError == null ? null : (
+            <p
+              className="text-destructive text-xs"
+              id={`${networkInputId}-error`}
+              role="alert"
+            >
+              {effectivePortError}
+            </p>
+          )}
+        </div>
+      </NetworkCard>
+
+      <DomainListSection
+        addOpen={addOpen}
+        canMutateNetwork={canMutateNetwork}
+        defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
+        hiddenPublicAddressCount={hiddenPublicAddressCount}
+        onAddPublicAddress={handleAddPublicAddress}
+        onBindAddress={setCnameAddress}
+        onCancelAddPublicAddress={handleCancelAddPublicAddress}
+        onDeletePublicAddress={handleDeletePublicAddress}
+        onOpenAddPublicAddress={() => setAddOpen(true)}
+        onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+        onUnbindCustomDomain={handleUnbindCustomDomain}
+        platformAddressDraftContext={platformAddressDraftContext}
+        readOnly={readOnly}
+        visibleDomainRows={visibleDomains}
+        visiblePublicAddresses={visiblePublicAddresses}
+      />
       <CnameBindingDialog
         address={cnameAddress}
         onBind={handleBindCustomDomain}
