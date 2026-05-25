@@ -1,8 +1,9 @@
 "use client";
 
+import { Button } from "@workspace/ui/components/button";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { cn } from "@workspace/ui/lib/utils";
-import { type LucideIcon, Settings2 } from "lucide-react";
+import { type LucideIcon, Settings2, Upload } from "lucide-react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 export function ResourceSettingsSection({
@@ -20,15 +21,18 @@ export function ResourceSettingsSection({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-transparent",
+        "flex min-w-0 flex-col gap-3 rounded-lg border border-resource-pane-border bg-transparent",
         className
       )}
       {...props}
     >
-      <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-border border-b px-2.5">
+      <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-resource-pane-border border-b px-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
-          <Icon aria-hidden className="size-4 shrink-0 text-card-foreground" />
-          <h3 className="truncate font-medium text-card-foreground text-sm leading-5">
+          <Icon
+            aria-hidden
+            className="size-4 shrink-0 text-resource-pane-foreground"
+          />
+          <h3 className="truncate font-medium text-resource-pane-foreground text-sm leading-5">
             {title}
           </h3>
         </div>
@@ -48,11 +52,123 @@ export function ResourceSettingsInset({
 }: ComponentPropsWithoutRef<"div">) {
   return (
     <div
-      className={cn("rounded-lg bg-database-metrics-card p-2.5", className)}
+      className={cn("rounded-lg bg-resource-pane-card p-2.5", className)}
       {...props}
     >
       {children}
     </div>
+  );
+}
+
+export function ResourceSettingsDraftFooter({
+  backingResourceChanged,
+  canSubmit,
+  cancelAriaLabel = "Cancel settings changes",
+  className,
+  dirty,
+  onCancel,
+  onKeepEditing,
+  onReload,
+  onSubmit,
+  pending,
+  pendingSubmitLabel = "Updating",
+  saveFailureMessage,
+  submitAriaLabel = "Update settings",
+  SubmitIcon = Upload,
+  submitLabel = "Update",
+  unsavedMessage = "Unsaved configuration changes.",
+  ...props
+}: ComponentPropsWithoutRef<"footer"> & {
+  backingResourceChanged: boolean;
+  canSubmit: boolean;
+  cancelAriaLabel?: string;
+  dirty: boolean;
+  onCancel: () => void;
+  onKeepEditing: () => void;
+  onReload: () => void;
+  onSubmit: () => void | Promise<void>;
+  pending: boolean;
+  pendingSubmitLabel?: string;
+  saveFailureMessage: string | null;
+  submitAriaLabel?: string;
+  SubmitIcon?: LucideIcon | null;
+  submitLabel?: string;
+  unsavedMessage?: string;
+}) {
+  return (
+    <footer
+      className={cn("flex shrink-0 flex-col gap-2", className)}
+      {...props}
+    >
+      {backingResourceChanged ? (
+        <div
+          className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-2 text-xs text-yellow-500 leading-4"
+          role="status"
+        >
+          <span className="min-w-0 truncate">Backing resource changed.</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onReload}
+              type="button"
+              variant="ghost"
+            >
+              Reload
+            </Button>
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={onKeepEditing}
+              type="button"
+              variant="ghost"
+            >
+              Keep editing
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {saveFailureMessage == null ? null : (
+        <p className="text-destructive text-xs leading-4" role="alert">
+          {saveFailureMessage}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className={cn(
+            "min-w-0 truncate text-xs text-yellow-500 leading-4",
+            !dirty && "invisible"
+          )}
+        >
+          {unsavedMessage}
+        </p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            aria-label={cancelAriaLabel}
+            className="h-9 rounded-lg px-4 text-resource-pane-muted hover:bg-resource-pane-input hover:text-resource-pane-foreground"
+            disabled={!dirty || pending}
+            onClick={onCancel}
+            type="button"
+            variant="ghost"
+          >
+            Cancel
+          </Button>
+          <Button
+            aria-label={submitAriaLabel}
+            className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary hover:bg-resource-pane-input"
+            disabled={!canSubmit}
+            onClick={async () => {
+              await onSubmit();
+            }}
+            type="button"
+            variant="ghost"
+          >
+            {SubmitIcon == null ? null : (
+              <SubmitIcon aria-hidden className="size-4" />
+            )}
+            {pending ? pendingSubmitLabel : submitLabel}
+          </Button>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -104,24 +220,24 @@ export function ResourceSettingsSlider({
               {Icon == null ? null : (
                 <Icon
                   aria-hidden
-                  className="size-4 shrink-0 text-muted-foreground"
+                  className="size-4 shrink-0 text-resource-pane-muted"
                 />
               )}
-              <ScaleSlider.Label className="truncate text-muted-foreground text-sm leading-5">
+              <ScaleSlider.Label className="truncate text-resource-pane-muted text-sm leading-5">
                 {label}
               </ScaleSlider.Label>
             </ScaleSlider.Group>
-            <span className="shrink-0 text-primary text-sm leading-5">
+            <span className="shrink-0 text-resource-pane-foreground text-sm leading-5">
               {formatValue(value)}
             </span>
           </ScaleSlider.Header>
           <ScaleSlider.Control aria-label={ariaLabel} className="h-2">
-            <ScaleSlider.Track className="h-2 bg-input/80">
-              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-theme-blue" />
+            <ScaleSlider.Track className="h-2 bg-resource-pane-input">
+              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-blue-500" />
             </ScaleSlider.Track>
-            <ScaleSlider.Thumb className="size-4 border-2 border-primary bg-theme-blue shadow-none ring-0" />
+            <ScaleSlider.Thumb className="size-4 border-2 border-resource-pane-primary bg-blue-500 shadow-none ring-0" />
           </ScaleSlider.Control>
-          <div className="flex min-w-0 items-center justify-between gap-3 text-muted-foreground text-sm leading-5">
+          <div className="flex min-w-0 items-center justify-between gap-3 text-resource-pane-muted text-sm leading-5">
             <span className="truncate">{boundFormatter(min)}</span>
             <span className="truncate text-right">{boundFormatter(max)}</span>
           </div>

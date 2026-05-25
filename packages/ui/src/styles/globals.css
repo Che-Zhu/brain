@@ -55,6 +55,13 @@
   --color-background-secondary: var(--background-secondary);
   --color-background-selected: var(--background-selected);
   --color-background-tertiary: var(--background-tertiary);
+  --color-resource-pane: var(--resource-pane);
+  --color-resource-pane-border: var(--resource-pane-border);
+  --color-resource-pane-card: var(--resource-pane-card);
+  --color-resource-pane-foreground: var(--resource-pane-foreground);
+  --color-resource-pane-input: var(--resource-pane-input);
+  --color-resource-pane-muted: var(--resource-pane-muted);
+  --color-resource-pane-primary: var(--resource-pane-primary);
   --color-database-metrics-card: var(--database-metrics-card);
   --color-database-metrics-chart: var(--database-metrics-chart);
   --color-database-metrics-grid: var(--database-metrics-grid);
@@ -119,13 +126,21 @@
     var(--color-theme-gray) 55%,
     transparent
   );
-  --database-metrics-pane: oklch(0.105 0.018 265);
-  --database-metrics-pane-overlay: oklch(1 0 0 / 4.5%);
-  --database-metrics-card: oklch(1 0 0 / 5%);
-  --database-metrics-chart: oklch(0.6231 0.188 259.81);
-  --database-metrics-grid: oklch(1 0 0 / 8%);
+  --resource-pane: #13151c;
+  --resource-pane-card: rgb(255 255 255 / 5%);
+  --resource-pane-border: rgb(255 255 255 / 10%);
+  --resource-pane-input: rgb(255 255 255 / 15%);
+  --resource-pane-foreground: #fafafa;
+  --resource-pane-primary: #e5e5e5;
+  --resource-pane-muted: #a1a1a1;
+  /** Compatibility aliases for older metrics names. Prefer `resource-pane-*`. */
+  --database-metrics-pane: var(--resource-pane);
+  --database-metrics-pane-overlay: transparent;
+  --database-metrics-card: var(--resource-pane-card);
+  --database-metrics-chart: var(--color-blue-500);
+  --database-metrics-grid: var(--resource-pane-border);
   --database-metrics-status-running: oklch(0.72 0.17 149 / 30%);
-  --database-metrics-storage-track: oklch(1 0 0 / 5%);
+  --database-metrics-storage-track: var(--resource-pane-card);
 }
 
 .dark {
@@ -209,13 +224,10 @@
     background-color: var(--border);
   }
 
+  .resource-pane-surface,
   .database-metrics-pane-surface {
-    background-color: var(--database-metrics-pane);
-    background-image: linear-gradient(
-      90deg,
-      var(--database-metrics-pane-overlay) 0%,
-      var(--database-metrics-pane-overlay) 100%
-    );
+    color: var(--resource-pane-foreground);
+    background-color: var(--resource-pane);
   }
 }
 

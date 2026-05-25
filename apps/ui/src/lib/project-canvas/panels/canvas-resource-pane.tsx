@@ -29,7 +29,7 @@ export function CanvasResourcePane({
   return (
     <aside
       className={cn(
-        "database-metrics-pane-surface pointer-events-auto absolute top-0 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-xl flex-col overflow-hidden border-input border-l px-2.5 py-5 shadow-lg",
+        "resource-pane-surface pointer-events-auto absolute top-13 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-screen-sm flex-col overflow-hidden rounded-tl-lg border-resource-pane-input border-t border-l px-2.5 py-5 shadow-lg",
         className
       )}
     >
@@ -48,14 +48,14 @@ export function CanvasResourcePane({
                 </span>
               )}
               <h2
-                className="truncate font-semibold text-lg text-primary leading-none"
+                className="truncate font-semibold text-lg text-resource-pane-foreground leading-none"
                 title={title}
               >
                 {title}
               </h2>
             </div>
             {subtitle == null || subtitle.trim() === "" ? null : (
-              <p className="truncate text-muted-foreground text-sm leading-5">
+              <p className="truncate text-resource-pane-muted text-sm leading-5">
                 {subtitle}
               </p>
             )}

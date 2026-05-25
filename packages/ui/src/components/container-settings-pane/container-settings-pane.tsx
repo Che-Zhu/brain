@@ -18,17 +18,17 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import {
+  ResourceSettingsDraftFooter,
   ResourceSettingsInset,
   ResourceSettingsSection,
   ResourceSettingsSlider,
 } from "@workspace/ui/components/resource-settings/resource-settings";
+import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
-import { Separator } from "@workspace/ui/components/separator";
-import { Textarea } from "@workspace/ui/components/textarea";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@workspace/ui/components/toggle-group";
+  SlidingToggle,
+  type SlidingToggleOption,
+} from "@workspace/ui/components/sliding-toggle";
 import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
@@ -212,6 +212,42 @@ export type ContainerReplicaStrategy =
 
 type ReplicaStrategyType = ContainerReplicaStrategy["type"];
 type ElasticTargetMetric = ContainerElasticReplicaTarget["metric"];
+
+const REPLICA_STRATEGY_TOGGLE_OPTIONS = [
+  {
+    ariaLabel: "Fixed Replicas",
+    label: "Fixed Replicas",
+    value: "fixed",
+  },
+  {
+    ariaLabel: "Elastic Scaling",
+    label: "Elastic Scaling",
+    value: "elastic",
+  },
+] as const satisfies readonly SlidingToggleOption<ReplicaStrategyType>[];
+
+const SCALING_TARGET_TOGGLE_OPTIONS = [
+  {
+    ariaLabel: "CPU utilization target",
+    label: (
+      <span className="inline-flex items-center gap-1.5">
+        <Cpu aria-hidden className="size-3.5" />
+        Target CPU
+      </span>
+    ),
+    value: "cpu",
+  },
+  {
+    ariaLabel: "Memory average target",
+    label: (
+      <span className="inline-flex items-center gap-1.5">
+        <MemoryStick aria-hidden className="size-3.5" />
+        Target Memory
+      </span>
+    ),
+    value: "memory",
+  },
+] as const satisfies readonly SlidingToggleOption<ElasticTargetMetric>[];
 
 interface ResourceQuotasDirtyReplicaStrategy {
   committed: ContainerReplicaStrategy;
@@ -686,25 +722,6 @@ function networkWithDraftPrivatePort(
   };
 }
 
-function SectionTitle({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <h3
-      className={cn(
-        "font-medium text-foreground text-sm",
-        className ?? "leading-snug"
-      )}
-    >
-      {children}
-    </h3>
-  );
-}
-
 function formatPlainNumber(value: number, maximumFractionDigits: number) {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits,
@@ -913,34 +930,42 @@ export function confirmedAddDbDsnReferencesFromEnvDraft(
 }
 
 const envReferenceSelectClassName =
-  "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+  "h-9 min-w-0 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
 function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
   return (
     <div
-      className="flex max-h-56 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/30 p-2"
+      className="flex max-h-72 w-full flex-col gap-2 overflow-y-auto"
       data-slot="container-env-rows"
     >
       {env.length === 0 ? (
-        <span className="text-muted-foreground text-sm italic">
+        <span className="flex h-9 items-center rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-muted text-sm leading-5">
           No variables
         </span>
       ) : (
         env.map((row, index) => (
           <div
-            className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2 rounded-md border border-border bg-background/50 px-2.5 py-2"
+            className="grid min-w-0 gap-2 sm:grid-cols-2"
             key={envRowKey(row, index)}
           >
-            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+            <span
+              className="flex h-9 min-w-0 items-center truncate rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5"
+              title={row.name}
+            >
               {row.name}
             </span>
-            <span className="min-w-0 truncate font-mono text-foreground text-xs">
-              {envRowDisplayValue(row)}
+            <span
+              className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5"
+              title={envRowDisplayValue(row)}
+            >
+              <span className="min-w-0 truncate">
+                {envRowDisplayValue(row)}
+              </span>
               {row.valueSource === "valueFrom" ? (
-                <ExternalEnvBadge className="ml-2 align-middle" />
+                <ExternalEnvBadge className="shrink-0" />
               ) : null}
               {row.valueSource === "dbDsn" ? (
-                <ReferenceEnvBadge className="ml-2 align-middle" />
+                <ReferenceEnvBadge className="shrink-0" />
               ) : null}
             </span>
           </div>
@@ -976,8 +1001,8 @@ function EditableEnvValueControl({
 }: EditableEnvValueControlProps) {
   if (row.valueSource === "valueFrom") {
     return (
-      <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
-        <span className="min-w-0 truncate font-mono">External reference</span>
+      <div className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5">
+        <span className="min-w-0 truncate">External reference</span>
         <ExternalEnvBadge className="shrink-0" />
       </div>
     );
@@ -1050,13 +1075,14 @@ function EditableEnvValueControl({
   return (
     <Input
       aria-label="Environment variable value"
-      className="h-8 font-mono text-xs"
+      className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
       onChange={(event) =>
         onUpdateRow(index, {
           value: event.target.value,
           valueSource: "direct",
         })
       }
+      placeholder="Value"
       value={row.value}
     />
   );
@@ -1074,11 +1100,11 @@ function EditableEnvRows({
 }: EditableEnvRowsProps) {
   return (
     <div
-      className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
+      className="flex max-h-72 w-full flex-col gap-2 overflow-y-auto"
       data-slot="container-env-rows"
     >
       {envDraft.length === 0 ? (
-        <div className="flex min-h-16 items-center text-muted-foreground text-sm italic">
+        <div className="flex h-9 items-center rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-muted text-sm leading-5">
           No variables
         </div>
       ) : (
@@ -1087,16 +1113,17 @@ function EditableEnvRows({
           const rowKey = envRowKeys[index] ?? envRowKey(row, index);
           return (
             <div className="grid min-w-0 gap-1.5" key={rowKey}>
-              <div className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_auto] gap-2">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <Input
                   aria-invalid={error != null}
                   aria-label="Environment variable name"
-                  className="h-8 font-mono text-xs"
+                  className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
                   onChange={(event) =>
                     onUpdateRow(index, {
                       name: event.target.value,
                     })
                   }
+                  placeholder="Name"
                   value={row.name}
                 />
                 <EditableEnvValueControl
@@ -1107,12 +1134,14 @@ function EditableEnvRows({
                 />
                 <Button
                   aria-label="Remove environment variable"
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
                   onClick={() => onDeleteRow(index)}
-                  size="icon-sm"
+                  size="lg"
                   type="button"
                   variant="ghost"
                 >
-                  <Trash2 aria-hidden />
+                  <Trash2 aria-hidden data-icon="inline-start" />
+                  Delete
                 </Button>
               </div>
               {error == null ? null : (
@@ -1324,7 +1353,7 @@ function PublicAddressRow({
   };
 
   return (
-    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
       <span
         aria-label={`Public Address status: ${publicAddressStatusLabel(address)}`}
         className={cn(
@@ -1334,10 +1363,10 @@ function PublicAddressRow({
         role="img"
       />
       <div className="grid min-w-0 flex-1 gap-1">
-        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
           {value === "" ? "Pending domain" : value}
         </div>
-        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
           {address.port}
         </div>
       </div>
@@ -1424,7 +1453,7 @@ function CustomDomainLifecycleDetail({
         {lifecycleDetailLabel(label, detail)}
       </Badge>
       {text === "" ? null : (
-        <span className="min-w-0 truncate text-muted-foreground text-xs">
+        <span className="min-w-0 truncate text-resource-pane-muted text-xs">
           {text}
         </span>
       )}
@@ -1452,7 +1481,7 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
       : domain.cnameTarget.trim();
 
   return (
-    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
       <span
         aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
         className={cn(
@@ -1462,10 +1491,10 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
         role="img"
       />
       <div className="grid min-w-0 flex-1 gap-2">
-        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
           {domain.domain}
         </div>
-        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
           {targetPort == null ? targetText : `${targetText} -> ${targetPort}`}
         </div>
         <div className="grid min-w-0 gap-1 sm:grid-cols-3">
@@ -1588,7 +1617,7 @@ function CnameBindingDialog({
         <div className="grid gap-4">
           <div className="grid gap-1.5">
             <Label>CNAME target</Label>
-            <div className="min-w-0 truncate rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm">
+            <div className="min-w-0 truncate rounded-md border border-resource-pane-border bg-resource-pane-card px-2.5 py-2 font-mono text-resource-pane-foreground text-sm">
               {target === "" ? "Pending domain" : target}
             </div>
           </div>
@@ -1673,49 +1702,69 @@ async function commitNetworkChange(
   }
 }
 
-interface NetworkSettingsHeaderProps {
+interface NetworkSectionActionsProps {
   canSave: boolean;
   onCancel: () => void;
   onSave: () => void | Promise<void>;
   pending: boolean;
-  showActions: boolean;
 }
 
-function NetworkSettingsHeader({
+function NetworkSectionActions({
   canSave,
   onCancel,
   onSave,
   pending,
-  showActions,
-}: NetworkSettingsHeaderProps) {
+}: NetworkSectionActionsProps) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      <SectionTitle>Network</SectionTitle>
-      {showActions ? (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            className="h-7 px-2 text-xs"
-            disabled={pending}
-            onClick={onCancel}
-            type="button"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="h-7 px-2 text-xs"
-            disabled={!canSave}
-            onClick={async () => {
-              await onSave();
-            }}
-            type="button"
-            variant="secondary"
-          >
-            Save
-          </Button>
-        </div>
-      ) : null}
+    <div className="flex shrink-0 items-center gap-1">
+      <Button
+        className="h-7 px-2 text-xs"
+        disabled={pending}
+        onClick={onCancel}
+        type="button"
+        variant="ghost"
+      >
+        Cancel
+      </Button>
+      <Button
+        className="h-7 px-2 text-xs"
+        disabled={!canSave}
+        onClick={async () => {
+          await onSave();
+        }}
+        type="button"
+        variant="secondary"
+      >
+        Save
+      </Button>
     </div>
+  );
+}
+
+interface NetworkCardProps {
+  actions?: ReactNode;
+  children: ReactNode;
+  title: string;
+}
+
+function NetworkCard({ actions, children, title }: NetworkCardProps) {
+  return (
+    <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-resource-pane-border">
+      <div className="flex h-11 min-w-0 items-center gap-1.5 border-resource-pane-border border-b px-2.5">
+        <Network
+          aria-hidden
+          className="size-4 shrink-0 text-resource-pane-foreground"
+          strokeWidth={2}
+        />
+        <Label className="min-w-0 truncate font-medium text-resource-pane-foreground text-sm">
+          {title}
+        </Label>
+        {actions == null ? null : (
+          <div className="ml-auto flex shrink-0 items-center">{actions}</div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 px-2.5 pb-3">{children}</div>
+    </section>
   );
 }
 
@@ -1788,13 +1837,13 @@ function AddPublicAddressForm({
   };
 
   return (
-    <div className="grid min-w-0 gap-3 rounded-md border border-border border-dashed bg-background/40 p-3">
+    <div className="grid min-w-0 gap-3 rounded-md border border-resource-pane-border border-dashed bg-transparent p-3">
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
         <Input
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className="h-9 max-w-32 font-mono text-sm"
+          className="h-9 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-sm dark:bg-transparent"
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -1876,26 +1925,18 @@ function DomainListSection({
     visibleDomainRows.customDomains.length === 0;
 
   return (
-    <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
-      <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <Network
-          aria-hidden
-          className="size-4 shrink-0 text-muted-foreground"
-          strokeWidth={2}
-        />
-        <Label className="truncate text-foreground text-sm">Domain List</Label>
-      </div>
+    <NetworkCard title="Public Addresses">
       {readOnly ? null : (
         <Button
           aria-label="Add Public Address"
-          className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+          className="h-9 w-full bg-resource-pane-card text-resource-pane-primary text-sm hover:bg-resource-pane-input"
           disabled={addOpen || !canMutateNetwork}
           onClick={onOpenAddPublicAddress}
           type="button"
           variant="secondary"
         >
-          <Plus aria-hidden className="text-primary" />
-          Add Domain
+          <Plus aria-hidden className="text-blue-500" />
+          Add Public Address
         </Button>
       )}
       {addOpen ? (
@@ -1907,8 +1948,8 @@ function DomainListSection({
         />
       ) : null}
       {noDomains ? (
-        <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
-          No domains yet
+        <div className="rounded-md border border-resource-pane-border border-dashed px-2.5 py-3 text-center text-resource-pane-muted text-xs">
+          No public addresses yet
         </div>
       ) : (
         <div className="grid gap-2">
@@ -1943,7 +1984,7 @@ function DomainListSection({
       )}
       {hiddenPublicAddressCount > 0 ? (
         <Button
-          className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+          className="h-4 justify-self-center px-2 text-resource-pane-muted text-xs hover:text-resource-pane-foreground"
           onClick={onShowAllPublicAddresses}
           size="xs"
           type="button"
@@ -1952,7 +1993,7 @@ function DomainListSection({
           View All
         </Button>
       ) : null}
-    </div>
+    </NetworkCard>
   );
 }
 
@@ -2100,90 +2141,91 @@ function NetworkSettingsSection({
 
   return (
     <>
-      <section className="flex min-w-0 flex-col gap-3">
-        <NetworkSettingsHeader
-          canSave={canSave}
-          onCancel={handleCancel}
-          onSave={handleSave}
-          pending={savePending}
-          showActions={!(readOnly || usesPanelDraft) && portDirty}
-        />
-
-        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
-          <div className="grid min-w-0 gap-1.5">
-            <Label className="text-muted-foreground text-xs">
-              Private Address
-            </Label>
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
-                {hasPrivateAddress ? privateAddress : "Pending"}
-              </div>
-              <Button
-                aria-label="Copy Private Address"
-                disabled={!hasPrivateAddress}
-                onClick={handleCopyPrivateAddress}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <Copy aria-hidden />
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor={networkInputId}>Private Address target port</Label>
-            <Input
-              aria-describedby={
-                effectivePortError == null
-                  ? undefined
-                  : `${networkInputId}-error`
-              }
-              aria-invalid={effectivePortError != null}
-              className="h-8 max-w-32 font-mono text-xs"
-              disabled={readOnly}
-              id={networkInputId}
-              inputMode="numeric"
-              onChange={(event) => {
-                if (onPrivatePortDraftChange == null) {
-                  setDraftPort(event.target.value);
-                } else {
-                  onPrivatePortDraftChange(event.target.value);
-                }
-                setPortError(null);
-              }}
-              value={portDraft}
+      <NetworkCard
+        actions={
+          readOnly || usesPanelDraft || !portDirty ? null : (
+            <NetworkSectionActions
+              canSave={canSave}
+              onCancel={handleCancel}
+              onSave={handleSave}
+              pending={savePending}
             />
-            {effectivePortError == null ? null : (
-              <p
-                className="text-destructive text-xs"
-                id={`${networkInputId}-error`}
-                role="alert"
-              >
-                {effectivePortError}
-              </p>
-            )}
+          )
+        }
+        title="Private Address"
+      >
+        <button
+          aria-label="Copy Private Address"
+          className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2 text-left transition-colors hover:bg-resource-pane-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-resource-pane-card"
+          disabled={!hasPrivateAddress}
+          onClick={handleCopyPrivateAddress}
+          title="Copy Private Address"
+          type="button"
+        >
+          <div className="min-w-0 flex-1 truncate font-mono text-resource-pane-foreground text-sm leading-5">
+            {hasPrivateAddress ? privateAddress : "Pending"}
           </div>
-
-          <DomainListSection
-            addOpen={addOpen}
-            canMutateNetwork={canMutateNetwork}
-            defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-            hiddenPublicAddressCount={hiddenPublicAddressCount}
-            onAddPublicAddress={handleAddPublicAddress}
-            onBindAddress={setCnameAddress}
-            onCancelAddPublicAddress={handleCancelAddPublicAddress}
-            onDeletePublicAddress={handleDeletePublicAddress}
-            onOpenAddPublicAddress={() => setAddOpen(true)}
-            onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
-            onUnbindCustomDomain={handleUnbindCustomDomain}
-            platformAddressDraftContext={platformAddressDraftContext}
-            readOnly={readOnly}
-            visibleDomainRows={visibleDomains}
-            visiblePublicAddresses={visiblePublicAddresses}
+          <Copy
+            aria-hidden
+            className="size-4 shrink-0 text-resource-pane-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           />
+        </button>
+
+        <div className="grid min-w-0 gap-1.5">
+          <Label
+            className="text-resource-pane-muted text-sm leading-5"
+            htmlFor={networkInputId}
+          >
+            Private Address target port
+          </Label>
+          <Input
+            aria-describedby={
+              effectivePortError == null ? undefined : `${networkInputId}-error`
+            }
+            aria-invalid={effectivePortError != null}
+            className="h-8 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-xs dark:bg-transparent"
+            disabled={readOnly}
+            id={networkInputId}
+            inputMode="numeric"
+            onChange={(event) => {
+              if (onPrivatePortDraftChange == null) {
+                setDraftPort(event.target.value);
+              } else {
+                onPrivatePortDraftChange(event.target.value);
+              }
+              setPortError(null);
+            }}
+            value={portDraft}
+          />
+          {effectivePortError == null ? null : (
+            <p
+              className="text-destructive text-xs"
+              id={`${networkInputId}-error`}
+              role="alert"
+            >
+              {effectivePortError}
+            </p>
+          )}
         </div>
-      </section>
+      </NetworkCard>
+
+      <DomainListSection
+        addOpen={addOpen}
+        canMutateNetwork={canMutateNetwork}
+        defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
+        hiddenPublicAddressCount={hiddenPublicAddressCount}
+        onAddPublicAddress={handleAddPublicAddress}
+        onBindAddress={setCnameAddress}
+        onCancelAddPublicAddress={handleCancelAddPublicAddress}
+        onDeletePublicAddress={handleDeletePublicAddress}
+        onOpenAddPublicAddress={() => setAddOpen(true)}
+        onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+        onUnbindCustomDomain={handleUnbindCustomDomain}
+        platformAddressDraftContext={platformAddressDraftContext}
+        readOnly={readOnly}
+        visibleDomainRows={visibleDomains}
+        visiblePublicAddresses={visiblePublicAddresses}
+      />
       <CnameBindingDialog
         address={cnameAddress}
         onBind={handleBindCustomDomain}
@@ -2227,11 +2269,11 @@ interface ReadOnlyReplicaValueProps {
 
 function ReadOnlyReplicaValue({ label, value }: ReadOnlyReplicaValueProps) {
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background/60 px-2.5 py-2">
-      <span className="min-w-0 truncate text-muted-foreground text-xs">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-resource-pane-border bg-resource-pane-card px-2.5 py-2">
+      <span className="min-w-0 truncate text-resource-pane-muted text-xs">
         {label}
       </span>
-      <span className="shrink-0 font-medium text-foreground text-xs tabular-nums">
+      <span className="shrink-0 font-medium text-resource-pane-foreground text-xs tabular-nums">
         {value}
       </span>
     </div>
@@ -2348,6 +2390,88 @@ function ReadOnlyReplicaStrategySummary({
   );
 }
 
+function ScalingTargetSlider({
+  cpuTargetPercent,
+  disabled,
+  memoryTargetMib,
+  onCpuTargetChange,
+  onMemoryTargetChange,
+  onTargetMetricChange,
+  targetMetric,
+}: {
+  cpuTargetPercent: number;
+  disabled: boolean;
+  memoryTargetMib: number;
+  onCpuTargetChange: (value: number) => void;
+  onMemoryTargetChange: (value: number) => void;
+  onTargetMetricChange: (metric: ElasticTargetMetric) => void;
+  targetMetric: ElasticTargetMetric;
+}) {
+  const config =
+    targetMetric === "memory"
+      ? {
+          ariaLabel: "Memory average target",
+          format: formatMemoryMibValue,
+          max: MEMORY_AVERAGE_TARGET_LIMITS.max,
+          min: MEMORY_AVERAGE_TARGET_LIMITS.min,
+          onChange: onMemoryTargetChange,
+          value: memoryTargetMib,
+        }
+      : {
+          ariaLabel: "CPU utilization target",
+          format: (next: number) => `${formatPlainNumber(next, 0)}%`,
+          max: CPU_UTILIZATION_TARGET_LIMITS.max,
+          min: CPU_UTILIZATION_TARGET_LIMITS.min,
+          onChange: onCpuTargetChange,
+          value: cpuTargetPercent,
+        };
+
+  return (
+    <ResourceSettingsInset>
+      <ScaleSlider.Root
+        disabled={disabled}
+        max={config.max}
+        maxDecimals={0}
+        min={config.min}
+        onValueChange={config.onChange}
+        step={1}
+        value={config.value}
+        valueDisplay="number"
+      >
+        <ScaleSlider.Stack className="w-full gap-1.5">
+          <ScaleSlider.Header className="mb-0.5 h-9">
+            <SlidingToggle
+              ariaLabel="Scaling target"
+              className="h-8 w-auto"
+              disabled={disabled}
+              indicatorClassName="rounded-md bg-resource-pane-card"
+              itemClassName="!rounded-md h-8 min-w-0 px-3 text-xs data-[state=on]:text-resource-pane-foreground text-resource-pane-muted"
+              onValueChange={onTargetMetricChange}
+              options={SCALING_TARGET_TOGGLE_OPTIONS}
+              value={targetMetric}
+            />
+            <span className="shrink-0 text-resource-pane-foreground text-sm leading-5">
+              {config.format(config.value)}
+            </span>
+          </ScaleSlider.Header>
+          <ScaleSlider.Control aria-label={config.ariaLabel} className="h-2">
+            <ScaleSlider.Track className="h-2 bg-resource-pane-input">
+              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-blue-500" />
+            </ScaleSlider.Track>
+            <ScaleSlider.Thumb className="size-4 border-2 border-resource-pane-primary bg-blue-500 shadow-none ring-0" />
+          </ScaleSlider.Control>
+          <div className="flex min-w-0 items-center justify-between gap-3 text-resource-pane-muted text-sm leading-5">
+            <span className="truncate">{config.format(config.min)}</span>
+            <span className="truncate text-right">
+              {config.format(config.max)}
+            </span>
+          </div>
+        </ScaleSlider.Stack>
+      </ScaleSlider.Root>
+    </ResourceSettingsInset>
+  );
+}
+
 function ReplicaStrategySection({
   actions,
   elastic,
@@ -2396,38 +2520,13 @@ function ReplicaStrategySection({
   return (
     <ResourceSettingsSection actions={actions} title="Replica Strategy">
       <div className="grid min-w-0 gap-3">
-        <ToggleGroup
-          aria-label="Replica Strategy"
-          className="grid h-9 w-full grid-cols-2 rounded-lg bg-muted/40 p-0.5"
-          onValueChange={(value) => {
-            const next = value[0];
-            if (next === "fixed" || next === "elastic") {
-              onStrategyTypeChange(next);
-            }
-          }}
-          spacing={1}
-          value={[strategyType]}
-          variant="outline"
-        >
-          <ToggleGroupItem
-            aria-label="Fixed Replicas"
-            className="h-8 min-w-0 rounded-md border-0 text-xs"
-            data-selected={strategyType === "fixed" ? "true" : undefined}
-            disabled={readOnly}
-            value="fixed"
-          >
-            Fixed Replicas
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            aria-label="Elastic Scaling"
-            className="h-8 min-w-0 rounded-md border-0 text-xs"
-            data-selected={strategyType === "elastic" ? "true" : undefined}
-            disabled={readOnly}
-            value="elastic"
-          >
-            Elastic Scaling
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <SlidingToggle
+          ariaLabel="Replica Strategy"
+          disabled={readOnly}
+          onValueChange={onStrategyTypeChange}
+          options={REPLICA_STRATEGY_TOGGLE_OPTIONS}
+          value={strategyType}
+        />
 
         {strategyType === "fixed" ? (
           <ResourceSettingsSlider
@@ -2444,7 +2543,7 @@ function ReplicaStrategySection({
             value={fixedReplicasSliderParts.replicasValue}
           />
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
             <ResourceSettingsSlider
               ariaLabel="Minimum replicas"
               disabled={readOnly}
@@ -2473,74 +2572,64 @@ function ReplicaStrategySection({
               value={maxReplicas}
             />
 
-            <ResourceSettingsInset>
-              <Label className="text-foreground text-xs">Scaling target</Label>
-              <ToggleGroup
-                aria-label="Scaling target"
-                className="grid h-9 w-full grid-cols-2 rounded-lg bg-background/40 p-0.5"
-                onValueChange={(value) => {
-                  const next = value[0];
-                  if (next === "cpu" || next === "memory") {
-                    onElasticTargetMetricChange(next);
-                  }
-                }}
-                spacing={1}
-                value={[targetMetric]}
-                variant="outline"
-              >
-                <ToggleGroupItem
-                  aria-label="CPU utilization target"
-                  className="h-8 min-w-0 rounded-md border-0 text-xs"
-                  data-selected={targetMetric === "cpu" ? "true" : undefined}
-                  disabled={readOnly}
-                  value="cpu"
-                >
-                  CPU utilization target
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  aria-label="Memory average target"
-                  className="h-8 min-w-0 rounded-md border-0 text-xs"
-                  data-selected={targetMetric === "memory" ? "true" : undefined}
-                  disabled={readOnly}
-                  value="memory"
-                >
-                  Memory average target
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </ResourceSettingsInset>
-
-            {targetMetric === "memory" ? (
-              <ResourceSettingsSlider
-                ariaLabel="Memory average target"
-                disabled={readOnly}
-                formatBound={formatMemoryMibValue}
-                formatValue={formatMemoryMibValue}
-                icon={MemoryStick}
-                label="Memory average target"
-                max={MEMORY_AVERAGE_TARGET_LIMITS.max}
-                maxDecimals={0}
-                min={MEMORY_AVERAGE_TARGET_LIMITS.min}
-                onValueChange={onElasticMemoryTargetChange}
-                step={1}
-                value={memoryTargetMib}
-              />
-            ) : (
-              <ResourceSettingsSlider
-                ariaLabel="CPU utilization target"
-                disabled={readOnly}
-                formatBound={(next) => `${formatPlainNumber(next, 0)}%`}
-                formatValue={(next) => `${formatPlainNumber(next, 0)}%`}
-                icon={Cpu}
-                label="CPU utilization target"
-                max={CPU_UTILIZATION_TARGET_LIMITS.max}
-                maxDecimals={0}
-                min={CPU_UTILIZATION_TARGET_LIMITS.min}
-                onValueChange={onElasticCpuTargetChange}
-                step={1}
-                value={cpuTargetPercent}
-              />
-            )}
+            <ScalingTargetSlider
+              cpuTargetPercent={cpuTargetPercent}
+              disabled={readOnly}
+              memoryTargetMib={memoryTargetMib}
+              onCpuTargetChange={onElasticCpuTargetChange}
+              onMemoryTargetChange={onElasticMemoryTargetChange}
+              onTargetMetricChange={onElasticTargetMetricChange}
+              targetMetric={targetMetric}
+            />
           </div>
+        )}
+      </div>
+    </ResourceSettingsSection>
+  );
+}
+
+function ImageSettingsSection({
+  imageInputId,
+  onBlur,
+  onChange,
+  readOnly,
+  value,
+}: {
+  imageInputId: string;
+  onBlur: () => void;
+  onChange: (image: string) => void;
+  readOnly: boolean;
+  value: string;
+}) {
+  const shownImage = value.trim() === "" ? "No image configured" : value;
+
+  return (
+    <ResourceSettingsSection icon={SquarePen} title="Image">
+      <div className="flex min-w-0 flex-col gap-2">
+        <Label
+          className="text-resource-pane-foreground text-sm leading-none"
+          htmlFor={imageInputId}
+        >
+          Image
+        </Label>
+        {readOnly ? (
+          <div
+            className="flex h-9 min-w-0 items-center overflow-hidden rounded-md border border-resource-pane-input bg-transparent px-3 py-2 text-resource-pane-muted text-sm leading-5"
+            title={shownImage}
+          >
+            <span className="min-w-0 truncate">{shownImage}</span>
+          </div>
+        ) : (
+          <Input
+            aria-label="Container image"
+            className="h-9 border-resource-pane-input bg-transparent text-resource-pane-muted text-sm dark:bg-transparent"
+            id={imageInputId}
+            onBlur={onBlur}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="ghcr.io/org/app:1.0.0"
+            title={shownImage}
+            value={value}
+          />
         )}
       </div>
     </ResourceSettingsSection>
@@ -2569,77 +2658,20 @@ function ContainerSettingsDraftFooter({
   saveFailureMessage: string | null;
 }) {
   return (
-    <footer
-      className="flex shrink-0 flex-col gap-2 border-border border-t pt-3"
+    <ResourceSettingsDraftFooter
+      backingResourceChanged={backingResourceChanged}
+      canSubmit={canSave}
+      className="p-2.5"
       data-slot="container-settings-draft-actions"
-    >
-      {backingResourceChanged ? (
-        <div
-          className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-theme-yellow/40 bg-theme-yellow/10 px-2.5 py-2 text-theme-yellow text-xs leading-4"
-          role="status"
-        >
-          <span className="min-w-0 truncate">Backing resource changed.</span>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onReload}
-              type="button"
-              variant="ghost"
-            >
-              Reload
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onKeepEditing}
-              type="button"
-              variant="ghost"
-            >
-              Keep editing
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {saveFailureMessage == null ? null : (
-        <p className="text-destructive text-xs leading-4" role="alert">
-          {saveFailureMessage}
-        </p>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <p
-          className={cn(
-            "min-w-0 truncate text-theme-yellow text-xs leading-4",
-            !dirty && "invisible"
-          )}
-        >
-          Unsaved settings changes.
-        </p>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            aria-label="Cancel settings changes"
-            className="h-8 px-3 text-xs"
-            disabled={!dirty || pending}
-            onClick={onCancel}
-            type="button"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            aria-label="Save settings"
-            className="h-8 px-3 text-xs"
-            disabled={!canSave}
-            onClick={async () => {
-              await onSave();
-            }}
-            type="button"
-            variant="secondary"
-          >
-            <Save aria-hidden data-icon="inline-start" />
-            {pending ? "Saving" : "Save"}
-          </Button>
-        </div>
-      </div>
-    </footer>
+      dirty={dirty}
+      onCancel={onCancel}
+      onKeepEditing={onKeepEditing}
+      onReload={onReload}
+      onSubmit={onSave}
+      pending={pending}
+      saveFailureMessage={saveFailureMessage}
+      submitAriaLabel="Save settings"
+    />
   );
 }
 
@@ -2671,9 +2703,7 @@ export function ContainerSettingsPane({
   readOnly = false,
   dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
-  const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [draftImage, setDraftImage] = useState(image);
-  const [imageDialogDraft, setImageDialogDraft] = useState(image);
   const [quotaSavePending, setQuotaSavePending] = useState(false);
   const [settingsSavePending, setSettingsSavePending] = useState(false);
   const [draftNetwork, setDraftNetwork] = useState<
@@ -2682,7 +2712,7 @@ export function ContainerSettingsPane({
   const [networkPrivatePortDraft, setNetworkPrivatePortDraft] = useState(() =>
     network == null ? "" : String(network.privatePort)
   );
-  const inputId = useId();
+  const imageInputId = useId();
   const envDraftKeyPrefix = useId();
   const envDraftKeyCounter = useRef(0);
   const initialEnvDraft = useMemo(
@@ -2728,7 +2758,6 @@ export function ContainerSettingsPane({
       return;
     }
     setDraftImage(image);
-    setImageDialogDraft(image);
   }, [image, settingsCommitMode]);
 
   useEffect(() => {
@@ -2944,7 +2973,6 @@ export function ContainerSettingsPane({
   const applySettingsDraftToLocalState = useCallback(
     (next: ContainerSettingsDraft) => {
       setDraftImage(next.image);
-      setImageDialogDraft(next.image);
       setDraftCpu(next.cpuCores);
       setDraftMem(next.memoryMib);
       setDraftReplicaStrategy(
@@ -3237,21 +3265,26 @@ export function ContainerSettingsPane({
       </>
     ) : null;
 
-  const handleImageDialogChange = (open: boolean) => {
-    setImageDialogOpen(open);
-    if (open) {
-      setImageDialogDraft(settingsCommitMode ? draftImage : image);
-    }
-  };
-
-  const handleSaveImage = () => {
-    const nextImage = imageDialogDraft.trim();
+  const handleImageChange = (nextImage: string) => {
     if (settingsCommitMode) {
       setDraftImage(nextImage);
     } else {
       onImageChange(nextImage);
+      setDraftImage(nextImage);
     }
-    setImageDialogOpen(false);
+  };
+
+  const handleImageBlur = () => {
+    const nextImage = draftImage.trim();
+    if (nextImage === draftImage) {
+      return;
+    }
+    if (settingsCommitMode) {
+      setDraftImage(nextImage);
+    } else {
+      onImageChange(nextImage);
+      setDraftImage(nextImage);
+    }
   };
 
   const handleSaveEnvRows = () => {
@@ -3318,7 +3351,6 @@ export function ContainerSettingsPane({
 
   const resetSettingsDraft = useCallback(() => {
     applySettingsDraftToLocalState(settingsBaseDraft);
-    setImageDialogOpen(false);
     setSettingsBackingState((current) => ({
       ...current,
       saveFailureMessage: null,
@@ -3351,6 +3383,7 @@ export function ContainerSettingsPane({
     const draft: ContainerSettingsDraft = {
       ...settingsDraft,
       env: normalizedEnv,
+      image: settingsDraft.image.trim(),
     };
     const meta: ContainerSettingsPaneSettingsDraftCommitMeta = {
       baseDraft: settingsBaseDraft,
@@ -3429,164 +3462,85 @@ export function ContainerSettingsPane({
     settingsCommitMode,
   ]);
 
-  const displayImage = settingsCommitMode ? draftImage : image;
+  const displayImage = draftImage;
   const networkForRender = settingsCommitMode ? activeDraftNetwork : network;
 
   return (
-    <>
-      <div
-        className={cn(
-          "flex w-full flex-col gap-5 text-muted-foreground",
-          className
-        )}
-        data-slot="container-settings-pane"
-      >
-        <section className="flex flex-col gap-2">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <SectionTitle>Image</SectionTitle>
-          </div>
-          {readOnly ? (
-            <div
-              className={cn(
-                "flex min-w-0 items-start break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm leading-snug"
-              )}
-            >
-              {displayImage}
-            </div>
-          ) : (
-            <button
-              aria-label="Edit container image"
-              className={cn(
-                "flex items-center justify-between gap-1.5 break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 text-left font-mono text-foreground text-sm leading-snug",
-                "cursor-pointer transition-colors hover:bg-muted/60",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-              )}
-              onClick={() => handleImageDialogChange(true)}
-              type="button"
-            >
-              {displayImage}
-              <SquarePen
-                aria-hidden
-                className="size-3.5 shrink-0 text-muted-foreground"
-                strokeWidth={2}
-              />
-            </button>
-          )}
-        </section>
-
-        <Separator />
-
-        <div className="grid gap-3">
-          {replicasSliderParts == null ? null : (
-            <ReplicaStrategySection
-              actions={quotaActions}
-              elastic={normalizeElasticReplicaSettings(
-                elasticSettingsFromStrategy(draftReplicaStrategy)
-              )}
-              fixedReplicasSliderParts={replicasSliderParts}
-              onElasticCpuTargetChange={handleElasticCpuTargetChange}
-              onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
-              onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
-              onElasticMinReplicasChange={handleElasticMinReplicasChange}
-              onElasticTargetMetricChange={handleElasticTargetMetricChange}
-              onStrategyTypeChange={handleReplicaStrategyTypeChange}
-              readOnly={readOnly}
-              strategyType={replicaStrategyType}
-            />
-          )}
-
-          <ResourceSettingsSection
-            actions={replicasSliderParts == null ? quotaActions : undefined}
-            title="CPU / Memory"
-          >
-            <ResourceSettingsSlider
-              ariaLabel="CPU quota (cores)"
-              disabled={cpuSliderRest.disabled}
-              formatBound={(next) => formatPlainNumber(next, 2)}
-              formatValue={formatCpuCoresValue}
-              icon={Cpu}
-              label="CPU"
-              max={cpuSlider.max}
-              maxDecimals={cpuDecimals}
-              min={cpuSlider.min}
-              onValueChange={onCpuQuotaChange}
-              step={cpuSliderRest.step}
-              value={cpuValue}
-            />
-
-            <ResourceSettingsSlider
-              ariaLabel="Memory quota (MiB)"
-              disabled={memorySliderRest.disabled}
-              formatBound={formatMemoryMibValue}
-              formatValue={formatMemoryMibValue}
-              icon={MemoryStick}
-              label="Memory"
-              max={memorySlider.max}
-              maxDecimals={memoryDecimals}
-              min={memorySlider.min}
-              onValueChange={onMemoryQuotaChange}
-              step={memorySliderRest.step}
-              value={memoryValue}
-            />
-          </ResourceSettingsSection>
-        </div>
-
-        <Separator />
-
-        <section className="flex flex-col gap-3">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <SectionTitle>Environment</SectionTitle>
-            {readOnly ? null : (
-              <div className="flex shrink-0 items-center gap-1">
-                {!settingsCommitMode && envDirty ? (
-                  <>
-                    <Button
-                      aria-label="Cancel environment changes"
-                      onClick={handleCancelEnvRows}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <X aria-hidden data-icon="inline-start" />
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={!canSaveEnv}
-                      onClick={handleSaveEnvRows}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      <Save aria-hidden data-icon="inline-start" />
-                      Save environment
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  aria-label="Add environment variable"
-                  onClick={handleAddEnvRow}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Plus aria-hidden data-icon="inline-start" />
-                  Add
-                </Button>
-                {canAddDbDsnReference ? (
-                  <Button
-                    aria-label="Add Project DB reference"
-                    onClick={handleAddDbDsnReferenceRow}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Plus aria-hidden data-icon="inline-start" />
-                    Add Reference
-                  </Button>
-                ) : null}
-              </div>
+    <div
+      className={cn(
+        "flex w-full flex-col gap-5 text-resource-pane-muted",
+        className
+      )}
+      data-slot="container-settings-pane"
+    >
+      <div className="grid gap-5">
+        {replicasSliderParts == null ? null : (
+          <ReplicaStrategySection
+            actions={quotaActions}
+            elastic={normalizeElasticReplicaSettings(
+              elasticSettingsFromStrategy(draftReplicaStrategy)
             )}
-          </div>
+            fixedReplicasSliderParts={replicasSliderParts}
+            onElasticCpuTargetChange={handleElasticCpuTargetChange}
+            onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
+            onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
+            onElasticMinReplicasChange={handleElasticMinReplicasChange}
+            onElasticTargetMetricChange={handleElasticTargetMetricChange}
+            onStrategyTypeChange={handleReplicaStrategyTypeChange}
+            readOnly={readOnly}
+            strategyType={replicaStrategyType}
+          />
+        )}
+
+        <ResourceSettingsSection
+          actions={replicasSliderParts == null ? quotaActions : undefined}
+          title="CPU / Memory"
+        >
+          <ResourceSettingsSlider
+            ariaLabel="CPU quota (cores)"
+            disabled={cpuSliderRest.disabled}
+            formatBound={(next) => formatPlainNumber(next, 2)}
+            formatValue={formatCpuCoresValue}
+            icon={Cpu}
+            label="CPU"
+            max={cpuSlider.max}
+            maxDecimals={cpuDecimals}
+            min={cpuSlider.min}
+            onValueChange={onCpuQuotaChange}
+            step={cpuSliderRest.step}
+            value={cpuValue}
+          />
+
+          <ResourceSettingsSlider
+            ariaLabel="Memory quota (MiB)"
+            disabled={memorySliderRest.disabled}
+            formatBound={formatMemoryMibValue}
+            formatValue={formatMemoryMibValue}
+            icon={MemoryStick}
+            label="Memory"
+            max={memorySlider.max}
+            maxDecimals={memoryDecimals}
+            min={memorySlider.min}
+            onValueChange={onMemoryQuotaChange}
+            step={memorySliderRest.step}
+            value={memoryValue}
+          />
+        </ResourceSettingsSection>
+
+        <ImageSettingsSection
+          imageInputId={imageInputId}
+          onBlur={handleImageBlur}
+          onChange={handleImageChange}
+          readOnly={readOnly}
+          value={displayImage}
+        />
+      </div>
+
+      <ResourceSettingsSection icon={SquarePen} title="Environment Variables">
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label className="text-resource-pane-foreground text-sm leading-none">
+            Variables
+          </Label>
           {readOnly ? (
             <ReadOnlyEnvRows env={env} />
           ) : (
@@ -3601,78 +3555,95 @@ export function ContainerSettingsPane({
               onUpdateRow={handleUpdateEnvRow}
             />
           )}
-        </section>
-
-        <Separator />
-
-        {networkForRender == null ? null : (
-          <NetworkSettingsSection
-            network={networkForRender}
-            onCustomDomainCnameVerify={onCustomDomainCnameVerify}
-            onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
-            onNetworkDraftChange={
-              settingsCommitMode ? setDraftNetwork : undefined
-            }
-            onPrivatePortDraftChange={
-              settingsCommitMode ? setNetworkPrivatePortDraft : undefined
-            }
-            platformAddressDraftContext={networkPlatformAddressDraftContext}
-            privatePortDraft={
-              settingsCommitMode ? networkPrivatePortDraft : undefined
-            }
-            readOnly={readOnly}
-          />
-        )}
-
-        {settingsCommitMode ? (
-          <ContainerSettingsDraftFooter
-            backingResourceChanged={settingsBackingState.resourceChanged}
-            canSave={canSaveSettings}
-            dirty={panelDraftDirty}
-            onCancel={resetSettingsDraft}
-            onKeepEditing={keepEditingSettingsDraft}
-            onReload={reloadSettingsDraft}
-            onSave={handleSaveSettingsDraft}
-            pending={settingsSavePending}
-            saveFailureMessage={settingsBackingState.saveFailureMessage}
-          />
-        ) : null}
-      </div>
-
-      {readOnly ? null : (
-        <Dialog onOpenChange={handleImageDialogChange} open={imageDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Container image</DialogTitle>
-              <DialogDescription>
-                Registry path, tag, or digest for this workload.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-2">
-              <Label htmlFor={inputId}>Image reference</Label>
-              <Textarea
-                className="min-h-24 font-mono text-sm"
-                id={inputId}
-                onChange={(e) => setImageDialogDraft(e.target.value)}
-                placeholder="e.g. ghcr.io/org/app:1.0.0"
-                value={imageDialogDraft}
-              />
-            </div>
-            <DialogFooter>
+        </div>
+        {readOnly ? null : (
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {!settingsCommitMode && envDirty ? (
+              <>
+                <Button
+                  aria-label="Cancel environment changes"
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
+                  onClick={handleCancelEnvRows}
+                  size="lg"
+                  type="button"
+                  variant="ghost"
+                >
+                  <X aria-hidden data-icon="inline-start" />
+                  Cancel
+                </Button>
+                <Button
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
+                  disabled={!canSaveEnv}
+                  onClick={handleSaveEnvRows}
+                  size="lg"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Save aria-hidden data-icon="inline-start" />
+                  Save environment
+                </Button>
+              </>
+            ) : null}
+            <Button
+              aria-label="Add environment variable"
+              className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
+              onClick={handleAddEnvRow}
+              size="lg"
+              type="button"
+              variant="ghost"
+            >
+              <Plus aria-hidden data-icon="inline-start" />
+              Add
+            </Button>
+            {canAddDbDsnReference ? (
               <Button
-                onClick={() => handleImageDialogChange(false)}
+                aria-label="Add Project DB reference"
+                className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
+                onClick={handleAddDbDsnReferenceRow}
+                size="lg"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
-                {settingsCommitMode ? "Discard" : "Cancel"}
+                <Plus aria-hidden data-icon="inline-start" />
+                Add Reference
               </Button>
-              <Button onClick={handleSaveImage} type="button">
-                {settingsCommitMode ? "Apply to draft" : "Save"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            ) : null}
+          </div>
+        )}
+      </ResourceSettingsSection>
+
+      {networkForRender == null ? null : (
+        <NetworkSettingsSection
+          network={networkForRender}
+          onCustomDomainCnameVerify={onCustomDomainCnameVerify}
+          onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
+          onNetworkDraftChange={
+            settingsCommitMode ? setDraftNetwork : undefined
+          }
+          onPrivatePortDraftChange={
+            settingsCommitMode ? setNetworkPrivatePortDraft : undefined
+          }
+          platformAddressDraftContext={networkPlatformAddressDraftContext}
+          privatePortDraft={
+            settingsCommitMode ? networkPrivatePortDraft : undefined
+          }
+          readOnly={readOnly}
+        />
       )}
-    </>
+
+      {settingsCommitMode ? (
+        <ContainerSettingsDraftFooter
+          backingResourceChanged={settingsBackingState.resourceChanged}
+          canSave={canSaveSettings}
+          dirty={panelDraftDirty}
+          onCancel={resetSettingsDraft}
+          onKeepEditing={keepEditingSettingsDraft}
+          onReload={reloadSettingsDraft}
+          onSave={handleSaveSettingsDraft}
+          pending={settingsSavePending}
+          saveFailureMessage={settingsBackingState.saveFailureMessage}
+        />
+      ) : null}
+    </div>
   );
 }

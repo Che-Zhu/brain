@@ -57,7 +57,7 @@ function DatabaseMetricCard({
   return (
     <section
       className={cn(
-        "flex h-54 min-h-54 min-w-0 flex-col gap-6 overflow-hidden rounded-lg bg-database-metrics-card p-4 shadow-sm",
+        "flex h-54 min-h-54 min-w-0 flex-col gap-6 overflow-hidden rounded-lg bg-resource-pane-card p-4 shadow-sm",
         className
       )}
     >
@@ -66,26 +66,28 @@ function DatabaseMetricCard({
           <div className="flex min-w-0 items-center gap-1.5">
             <Icon
               aria-hidden
-              className="size-4 shrink-0 text-card-foreground"
+              className="size-4 shrink-0 text-resource-pane-foreground"
             />
-            <h3 className="truncate font-medium text-card-foreground text-sm leading-5">
+            <h3 className="truncate font-medium text-resource-pane-foreground text-sm leading-5">
               {label}
             </h3>
           </div>
-          <p className="shrink-0 text-primary text-sm leading-5">
+          <p className="shrink-0 text-resource-pane-foreground text-sm leading-5">
             {metricReading({ capacity, kind: metric, percent })}
           </p>
         </div>
         <div className="flex min-w-0 justify-between gap-3 text-sm leading-5">
-          <p className="truncate text-muted-foreground">
+          <p className="truncate text-resource-pane-muted">
             {formatMetricTrend(series)}
           </p>
-          <p className="shrink-0 text-primary">{formatPercent(percent)}</p>
+          <p className="shrink-0 text-resource-pane-foreground">
+            {formatPercent(percent)}
+          </p>
         </div>
       </div>
       <div className="min-h-0 flex-1">
         {series.length === 0 ? (
-          <div className="flex h-full min-h-0 items-center justify-center border-database-metrics-grid border-y text-muted-foreground text-xs">
+          <div className="flex h-full min-h-0 items-center justify-center border-resource-pane-border border-y text-resource-pane-muted text-xs">
             No telemetry
           </div>
         ) : (
@@ -95,7 +97,7 @@ function DatabaseMetricCard({
           />
         )}
       </div>
-      <div className="flex shrink-0 justify-between text-muted-foreground text-sm leading-5">
+      <div className="flex shrink-0 justify-between text-resource-pane-muted text-sm leading-5">
         <span>Now</span>
         <span>-60m</span>
       </div>
@@ -105,7 +107,7 @@ function DatabaseMetricCard({
 
 function StorageGauge({ percent }: { percent: number | undefined }) {
   return (
-    <div className="h-8 w-full overflow-hidden bg-database-metrics-storage-track">
+    <div className="h-8 w-full overflow-hidden bg-resource-pane-input">
       <div
         className="h-full rounded-r-lg bg-gradient-to-r from-blue-500/40 to-blue-400/40 transition-[width]"
         style={{ width: `${percent ?? 0}%` }}
@@ -128,27 +130,29 @@ function DatabaseStorageCard({
   const percent = latestPercent(series, fallback);
 
   return (
-    <section className="flex min-w-0 flex-col gap-6 rounded-lg bg-database-metrics-card p-4">
+    <section className="flex min-w-0 flex-col gap-6 rounded-lg bg-resource-pane-card p-4">
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <HardDrive
               aria-hidden
-              className="size-4 shrink-0 text-card-foreground"
+              className="size-4 shrink-0 text-resource-pane-foreground"
             />
-            <h3 className="truncate font-medium text-card-foreground text-sm leading-5">
+            <h3 className="truncate font-medium text-resource-pane-foreground text-sm leading-5">
               Storage
             </h3>
           </div>
-          <p className="shrink-0 text-primary text-sm leading-5">
+          <p className="shrink-0 text-resource-pane-foreground text-sm leading-5">
             {metricReading({ capacity, kind: "storage", percent })}
           </p>
         </div>
         <div className="flex min-w-0 justify-between gap-3 text-sm leading-5">
-          <p className="truncate text-muted-foreground">
+          <p className="truncate text-resource-pane-muted">
             Mounted directory: {mountPath ?? "--"}
           </p>
-          <p className="shrink-0 text-primary">{formatPercent(percent)}</p>
+          <p className="shrink-0 text-resource-pane-foreground">
+            {formatPercent(percent)}
+          </p>
         </div>
       </div>
       <StorageGauge percent={percent} />
@@ -196,12 +200,7 @@ export function DatabaseMetricsPane({
     <CanvasResourcePane
       bodyClassName="gap-3.5"
       closeAriaLabel="Close database metrics"
-      icon={
-        <Activity
-          aria-hidden
-          className="size-4 shrink-0 text-database-metrics-chart"
-        />
-      }
+      icon={<Activity aria-hidden className="size-4 shrink-0 text-blue-500" />}
       onClose={onClose}
       subtitle={subtitle}
       title={title}

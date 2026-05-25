@@ -1,7 +1,6 @@
 "use client";
 
 import { useDbSettingsOperations } from "@workspace/api/hooks";
-import { Button } from "@workspace/ui/components/button";
 import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import {
   canCopyDatabaseNodeConnection,
@@ -11,6 +10,7 @@ import {
   maskDatabaseConnectionString,
 } from "@workspace/ui/components/database-node/database-node";
 import {
+  ResourceSettingsDraftFooter,
   ResourceSettingsSection,
   ResourceSettingsSlider,
 } from "@workspace/ui/components/resource-settings/resource-settings";
@@ -32,7 +32,6 @@ import {
   MemoryStick,
   Network,
   Settings2,
-  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -149,7 +148,7 @@ function DatabaseSettingsHeaderIcon({ iconUrl }: { iconUrl?: string }) {
       />
     );
   }
-  return <Database aria-hidden className="size-4 shrink-0 text-theme-blue" />;
+  return <Database aria-hidden className="size-4 shrink-0 text-blue-500" />;
 }
 
 function DatabaseSettingsConnectionAddressRow({
@@ -194,7 +193,7 @@ function DatabaseSettingsConnectionAddressRow({
   return (
     <CanvasNode.CopyableRow
       className={cn(
-        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-zinc-950/20 p-2.5 shadow-sm transition-colors",
+        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-resource-pane-card p-2.5 shadow-sm transition-colors",
         displayValue ? "min-h-20" : "min-h-11"
       )}
       copyAriaLabel={`Copy ${displayLabel}`}
@@ -212,7 +211,7 @@ function DatabaseSettingsConnectionAddressRow({
               rowCopyable ? "pointer-events-none" : "pointer-events-auto"
             )}
           >
-            <span className="min-w-0 truncate text-muted-foreground text-sm leading-5">
+            <span className="min-w-0 truncate text-resource-pane-muted text-sm leading-5">
               {displayLabel}
             </span>
             {publicSwitch}
@@ -223,8 +222,8 @@ function DatabaseSettingsConnectionAddressRow({
               className={cn(
                 "relative z-10 flex h-8 min-w-0 items-center justify-between gap-2 py-1.5 text-left text-sm leading-5",
                 rowCopyable
-                  ? "pointer-events-none text-primary"
-                  : "text-muted-foreground"
+                  ? "pointer-events-none text-resource-pane-foreground"
+                  : "text-resource-pane-muted"
               )}
               data-copied={copied ? "true" : undefined}
               data-slot="database-settings-connection-address-value"
@@ -280,7 +279,7 @@ function DatabaseSettingsConnectionAddressList({
   if (visibleConnections.length === 0) {
     return (
       <div
-        className="flex min-h-11 min-w-0 items-center rounded-lg bg-zinc-950/20 px-2.5 text-muted-foreground text-sm leading-5"
+        className="flex min-h-11 min-w-0 items-center rounded-lg bg-resource-pane-card px-2.5 text-resource-pane-muted text-sm leading-5"
         data-slot="database-settings-connection-address-empty"
       >
         No connection addresses
@@ -313,6 +312,7 @@ function DatabaseSettingsFooter({
   backingResourceChanged,
   canUpdate,
   dirty,
+  onCancel,
   onKeepEditing,
   onReload,
   onUpdate,
@@ -322,6 +322,7 @@ function DatabaseSettingsFooter({
   backingResourceChanged: boolean;
   canUpdate: boolean;
   dirty: boolean;
+  onCancel: () => void;
   onKeepEditing: () => void;
   onReload: () => void;
   onUpdate: () => void;
@@ -329,59 +330,19 @@ function DatabaseSettingsFooter({
   updating: boolean;
 }) {
   return (
-    <footer className="flex shrink-0 flex-col gap-2 p-2.5">
-      {backingResourceChanged ? (
-        <div
-          className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-theme-yellow/40 bg-theme-yellow/10 px-2.5 py-2 text-theme-yellow text-xs leading-4"
-          role="status"
-        >
-          <span className="min-w-0 truncate">Backing resource changed.</span>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onReload}
-              type="button"
-              variant="ghost"
-            >
-              Reload
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onKeepEditing}
-              type="button"
-              variant="ghost"
-            >
-              Keep editing
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {saveFailureMessage == null ? null : (
-        <p className="text-destructive text-xs leading-4" role="alert">
-          {saveFailureMessage}
-        </p>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <p
-          className={cn(
-            "min-w-0 truncate text-theme-yellow text-xs leading-4",
-            !dirty && "invisible"
-          )}
-        >
-          Unsaved configuration changes.
-        </p>
-        <Button
-          className="h-9 rounded-lg bg-database-metrics-card px-4 text-primary hover:bg-database-metrics-card/80"
-          disabled={!canUpdate}
-          onClick={onUpdate}
-          type="button"
-          variant="ghost"
-        >
-          <Upload aria-hidden className="size-4" />
-          {updating ? "Updating" : "Update"}
-        </Button>
-      </div>
-    </footer>
+    <ResourceSettingsDraftFooter
+      backingResourceChanged={backingResourceChanged}
+      canSubmit={canUpdate}
+      className="p-2.5"
+      dirty={dirty}
+      onCancel={onCancel}
+      onKeepEditing={onKeepEditing}
+      onReload={onReload}
+      onSubmit={onUpdate}
+      pending={updating}
+      saveFailureMessage={saveFailureMessage}
+      submitAriaLabel="Update database settings"
+    />
   );
 }
 
@@ -709,6 +670,7 @@ export function DatabaseSettingsPaneContent({
           backingResourceChanged={backingState.resourceChanged}
           canUpdate={canUpdate}
           dirty={dirty}
+          onCancel={handleReloadDraft}
           onKeepEditing={handleKeepEditingDraft}
           onReload={handleReloadDraft}
           onUpdate={handleUpdate}

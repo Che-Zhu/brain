@@ -65,12 +65,7 @@ function WorkloadSettingsShell({
   return (
     <CanvasResourcePane
       closeAriaLabel="Close workload settings"
-      icon={
-        <Settings2
-          aria-hidden
-          className="size-4 shrink-0 text-database-metrics-chart"
-        />
-      }
+      icon={<Settings2 aria-hidden className="size-4 shrink-0 text-blue-500" />}
       onClose={onClose}
       subtitle={subtitle}
       title={title}
@@ -147,7 +142,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         subtitle={subtitle}
         title={title}
       >
-        <p className="text-muted-foreground text-sm">
+        <p className="text-resource-pane-muted text-sm">
           Select a workload with a name and configure namespace in settings.
         </p>
       </WorkloadSettingsShell>
@@ -175,7 +170,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
         subtitle={subtitle}
         title={title}
       >
-        <p className="text-muted-foreground text-sm">Loading workload…</p>
+        <p className="text-resource-pane-muted text-sm">Loading workload…</p>
       </WorkloadSettingsShell>
     );
   }
@@ -184,7 +179,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     <WorkloadSettingsShell onClose={onClose} subtitle={subtitle} title={title}>
       <ContainerSettingsPane
         addDbDsnReferenceIntent={data?.addDbDsnReferenceIntent}
-        className="gap-4"
+        className="gap-5"
         cpuQuota={{
           max: 8,
           min: 0.25,

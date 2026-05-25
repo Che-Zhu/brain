@@ -47,12 +47,7 @@ function WorkloadHistoryShell({
   return (
     <CanvasResourcePane
       closeAriaLabel="Close workload history"
-      icon={
-        <History
-          aria-hidden
-          className="size-4 shrink-0 text-database-metrics-chart"
-        />
-      }
+      icon={<History aria-hidden className="size-4 shrink-0 text-blue-500" />}
       onClose={onClose}
       subtitle={subtitle}
       title={title}
@@ -164,7 +159,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
         subtitle={workloadKind}
         title={title}
       >
-        <p className="text-muted-foreground text-sm">
+        <p className="text-resource-pane-muted text-sm">
           Select a workload with a name and configure namespace in settings.
         </p>
       </WorkloadHistoryShell>
@@ -178,7 +173,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
         subtitle={workloadKind}
         title={title}
       >
-        <p className="text-muted-foreground text-sm">
+        <p className="text-resource-pane-muted text-sm">
           Config snapshot history applies to AP workloads. Database claims use a
           different backup model.
         </p>
@@ -207,7 +202,7 @@ export const WorkloadHistoryPane = memo(function WorkloadHistoryPane({
         subtitle={workloadKind}
         title={title}
       >
-        <p className="text-muted-foreground text-sm">Loading history…</p>
+        <p className="text-resource-pane-muted text-sm">Loading history…</p>
       </WorkloadHistoryShell>
     );
   }

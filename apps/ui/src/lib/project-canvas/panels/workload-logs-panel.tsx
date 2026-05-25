@@ -22,16 +22,15 @@ export const WorkloadLogsPane = memo(function WorkloadLogsPane({
     <CanvasResourcePane
       closeAriaLabel="Close workload logs"
       icon={
-        <ScrollText
-          aria-hidden
-          className="size-4 shrink-0 text-database-metrics-chart"
-        />
+        <ScrollText aria-hidden className="size-4 shrink-0 text-blue-500" />
       }
       onClose={onClose}
       subtitle={states?.kind ?? "Workload"}
       title={`${title} Logs`}
     >
-      <p className="text-muted-foreground text-sm">Log stream not connected.</p>
+      <p className="text-resource-pane-muted text-sm">
+        Log stream not connected.
+      </p>
     </CanvasResourcePane>
   );
 });
