@@ -24,7 +24,10 @@ import {
 } from "@workspace/ui/components/resource-settings/resource-settings";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
-import { Textarea } from "@workspace/ui/components/textarea";
+import {
+  SlidingToggle,
+  type SlidingToggleOption,
+} from "@workspace/ui/components/sliding-toggle";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -212,6 +215,19 @@ export type ContainerReplicaStrategy =
 
 type ReplicaStrategyType = ContainerReplicaStrategy["type"];
 type ElasticTargetMetric = ContainerElasticReplicaTarget["metric"];
+
+const REPLICA_STRATEGY_TOGGLE_OPTIONS = [
+  {
+    ariaLabel: "Fixed Replicas",
+    label: "Fixed Replicas",
+    value: "fixed",
+  },
+  {
+    ariaLabel: "Elastic Scaling",
+    label: "Elastic Scaling",
+    value: "elastic",
+  },
+] as const satisfies readonly SlidingToggleOption<ReplicaStrategyType>[];
 
 interface ResourceQuotasDirtyReplicaStrategy {
   committed: ContainerReplicaStrategy;
@@ -913,34 +929,42 @@ export function confirmedAddDbDsnReferencesFromEnvDraft(
 }
 
 const envReferenceSelectClassName =
-  "h-8 min-w-0 rounded-md border border-input bg-background px-2 font-mono text-foreground text-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+  "h-9 min-w-0 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
 function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
   return (
     <div
-      className="flex max-h-56 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/30 p-2"
+      className="flex max-h-72 w-full flex-col gap-2 overflow-y-auto"
       data-slot="container-env-rows"
     >
       {env.length === 0 ? (
-        <span className="text-muted-foreground text-sm italic">
+        <span className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-muted-foreground text-sm leading-5">
           No variables
         </span>
       ) : (
         env.map((row, index) => (
           <div
-            className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2 rounded-md border border-border bg-background/50 px-2.5 py-2"
+            className="grid min-w-0 gap-2 sm:grid-cols-2"
             key={envRowKey(row, index)}
           >
-            <span className="min-w-0 truncate font-mono text-foreground text-xs">
+            <span
+              className="flex h-9 min-w-0 items-center truncate rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5"
+              title={row.name}
+            >
               {row.name}
             </span>
-            <span className="min-w-0 truncate font-mono text-foreground text-xs">
-              {envRowDisplayValue(row)}
+            <span
+              className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5"
+              title={envRowDisplayValue(row)}
+            >
+              <span className="min-w-0 truncate">
+                {envRowDisplayValue(row)}
+              </span>
               {row.valueSource === "valueFrom" ? (
-                <ExternalEnvBadge className="ml-2 align-middle" />
+                <ExternalEnvBadge className="shrink-0" />
               ) : null}
               {row.valueSource === "dbDsn" ? (
-                <ReferenceEnvBadge className="ml-2 align-middle" />
+                <ReferenceEnvBadge className="shrink-0" />
               ) : null}
             </span>
           </div>
@@ -976,8 +1000,8 @@ function EditableEnvValueControl({
 }: EditableEnvValueControlProps) {
   if (row.valueSource === "valueFrom") {
     return (
-      <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-input bg-muted/40 px-2.5 text-foreground text-xs">
-        <span className="min-w-0 truncate font-mono">External reference</span>
+      <div className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5">
+        <span className="min-w-0 truncate">External reference</span>
         <ExternalEnvBadge className="shrink-0" />
       </div>
     );
@@ -1050,13 +1074,14 @@ function EditableEnvValueControl({
   return (
     <Input
       aria-label="Environment variable value"
-      className="h-8 font-mono text-xs"
+      className="h-9 bg-background text-foreground text-sm"
       onChange={(event) =>
         onUpdateRow(index, {
           value: event.target.value,
           valueSource: "direct",
         })
       }
+      placeholder="Value"
       value={row.value}
     />
   );
@@ -1074,11 +1099,11 @@ function EditableEnvRows({
 }: EditableEnvRowsProps) {
   return (
     <div
-      className="flex max-h-72 min-h-24 w-full flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-2"
+      className="flex max-h-72 w-full flex-col gap-2 overflow-y-auto"
       data-slot="container-env-rows"
     >
       {envDraft.length === 0 ? (
-        <div className="flex min-h-16 items-center text-muted-foreground text-sm italic">
+        <div className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-muted-foreground text-sm leading-5">
           No variables
         </div>
       ) : (
@@ -1087,16 +1112,17 @@ function EditableEnvRows({
           const rowKey = envRowKeys[index] ?? envRowKey(row, index);
           return (
             <div className="grid min-w-0 gap-1.5" key={rowKey}>
-              <div className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_auto] gap-2">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <Input
                   aria-invalid={error != null}
                   aria-label="Environment variable name"
-                  className="h-8 font-mono text-xs"
+                  className="h-9 bg-background text-foreground text-sm"
                   onChange={(event) =>
                     onUpdateRow(index, {
                       name: event.target.value,
                     })
                   }
+                  placeholder="Name"
                   value={row.name}
                 />
                 <EditableEnvValueControl
@@ -1107,12 +1133,14 @@ function EditableEnvRows({
                 />
                 <Button
                   aria-label="Remove environment variable"
+                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
                   onClick={() => onDeleteRow(index)}
-                  size="icon-sm"
+                  size="lg"
                   type="button"
                   variant="ghost"
                 >
-                  <Trash2 aria-hidden />
+                  <Trash2 aria-hidden data-icon="inline-start" />
+                  Delete
                 </Button>
               </div>
               {error == null ? null : (
@@ -2396,38 +2424,13 @@ function ReplicaStrategySection({
   return (
     <ResourceSettingsSection actions={actions} title="Replica Strategy">
       <div className="grid min-w-0 gap-3">
-        <ToggleGroup
-          aria-label="Replica Strategy"
-          className="grid h-9 w-full grid-cols-2 rounded-lg bg-muted/40 p-0.5"
-          onValueChange={(value) => {
-            const next = value[0];
-            if (next === "fixed" || next === "elastic") {
-              onStrategyTypeChange(next);
-            }
-          }}
-          spacing={1}
-          value={[strategyType]}
-          variant="outline"
-        >
-          <ToggleGroupItem
-            aria-label="Fixed Replicas"
-            className="h-8 min-w-0 rounded-md border-0 text-xs"
-            data-selected={strategyType === "fixed" ? "true" : undefined}
-            disabled={readOnly}
-            value="fixed"
-          >
-            Fixed Replicas
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            aria-label="Elastic Scaling"
-            className="h-8 min-w-0 rounded-md border-0 text-xs"
-            data-selected={strategyType === "elastic" ? "true" : undefined}
-            disabled={readOnly}
-            value="elastic"
-          >
-            Elastic Scaling
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <SlidingToggle
+          ariaLabel="Replica Strategy"
+          disabled={readOnly}
+          onValueChange={onStrategyTypeChange}
+          options={REPLICA_STRATEGY_TOGGLE_OPTIONS}
+          value={strategyType}
+        />
 
         {strategyType === "fixed" ? (
           <ResourceSettingsSlider
@@ -2541,6 +2544,54 @@ function ReplicaStrategySection({
               />
             )}
           </div>
+        )}
+      </div>
+    </ResourceSettingsSection>
+  );
+}
+
+function ImageSettingsSection({
+  imageInputId,
+  onBlur,
+  onChange,
+  readOnly,
+  value,
+}: {
+  imageInputId: string;
+  onBlur: () => void;
+  onChange: (image: string) => void;
+  readOnly: boolean;
+  value: string;
+}) {
+  const shownImage = value.trim() === "" ? "No image configured" : value;
+
+  return (
+    <ResourceSettingsSection icon={SquarePen} title="Image">
+      <div className="flex min-w-0 flex-col gap-2">
+        <Label
+          className="text-foreground text-sm leading-none"
+          htmlFor={imageInputId}
+        >
+          Image
+        </Label>
+        {readOnly ? (
+          <div
+            className="flex h-9 min-w-0 items-center overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-muted-foreground text-sm leading-5"
+            title={shownImage}
+          >
+            <span className="min-w-0 truncate">{shownImage}</span>
+          </div>
+        ) : (
+          <Input
+            aria-label="Container image"
+            className="h-9 bg-background text-muted-foreground text-sm"
+            id={imageInputId}
+            onBlur={onBlur}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="ghcr.io/org/app:1.0.0"
+            title={shownImage}
+            value={value}
+          />
         )}
       </div>
     </ResourceSettingsSection>
@@ -2671,9 +2722,7 @@ export function ContainerSettingsPane({
   readOnly = false,
   dbDsnReferenceSources = [],
 }: ContainerSettingsPaneProps) {
-  const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [draftImage, setDraftImage] = useState(image);
-  const [imageDialogDraft, setImageDialogDraft] = useState(image);
   const [quotaSavePending, setQuotaSavePending] = useState(false);
   const [settingsSavePending, setSettingsSavePending] = useState(false);
   const [draftNetwork, setDraftNetwork] = useState<
@@ -2682,7 +2731,7 @@ export function ContainerSettingsPane({
   const [networkPrivatePortDraft, setNetworkPrivatePortDraft] = useState(() =>
     network == null ? "" : String(network.privatePort)
   );
-  const inputId = useId();
+  const imageInputId = useId();
   const envDraftKeyPrefix = useId();
   const envDraftKeyCounter = useRef(0);
   const initialEnvDraft = useMemo(
@@ -2728,7 +2777,6 @@ export function ContainerSettingsPane({
       return;
     }
     setDraftImage(image);
-    setImageDialogDraft(image);
   }, [image, settingsCommitMode]);
 
   useEffect(() => {
@@ -2944,7 +2992,6 @@ export function ContainerSettingsPane({
   const applySettingsDraftToLocalState = useCallback(
     (next: ContainerSettingsDraft) => {
       setDraftImage(next.image);
-      setImageDialogDraft(next.image);
       setDraftCpu(next.cpuCores);
       setDraftMem(next.memoryMib);
       setDraftReplicaStrategy(
@@ -3237,21 +3284,26 @@ export function ContainerSettingsPane({
       </>
     ) : null;
 
-  const handleImageDialogChange = (open: boolean) => {
-    setImageDialogOpen(open);
-    if (open) {
-      setImageDialogDraft(settingsCommitMode ? draftImage : image);
-    }
-  };
-
-  const handleSaveImage = () => {
-    const nextImage = imageDialogDraft.trim();
+  const handleImageChange = (nextImage: string) => {
     if (settingsCommitMode) {
       setDraftImage(nextImage);
     } else {
       onImageChange(nextImage);
+      setDraftImage(nextImage);
     }
-    setImageDialogOpen(false);
+  };
+
+  const handleImageBlur = () => {
+    const nextImage = draftImage.trim();
+    if (nextImage === draftImage) {
+      return;
+    }
+    if (settingsCommitMode) {
+      setDraftImage(nextImage);
+    } else {
+      onImageChange(nextImage);
+      setDraftImage(nextImage);
+    }
   };
 
   const handleSaveEnvRows = () => {
@@ -3318,7 +3370,6 @@ export function ContainerSettingsPane({
 
   const resetSettingsDraft = useCallback(() => {
     applySettingsDraftToLocalState(settingsBaseDraft);
-    setImageDialogOpen(false);
     setSettingsBackingState((current) => ({
       ...current,
       saveFailureMessage: null,
@@ -3351,6 +3402,7 @@ export function ContainerSettingsPane({
     const draft: ContainerSettingsDraft = {
       ...settingsDraft,
       env: normalizedEnv,
+      image: settingsDraft.image.trim(),
     };
     const meta: ContainerSettingsPaneSettingsDraftCommitMeta = {
       baseDraft: settingsBaseDraft,
@@ -3429,164 +3481,87 @@ export function ContainerSettingsPane({
     settingsCommitMode,
   ]);
 
-  const displayImage = settingsCommitMode ? draftImage : image;
+  const displayImage = draftImage;
   const networkForRender = settingsCommitMode ? activeDraftNetwork : network;
 
   return (
-    <>
-      <div
-        className={cn(
-          "flex w-full flex-col gap-5 text-muted-foreground",
-          className
-        )}
-        data-slot="container-settings-pane"
-      >
-        <section className="flex flex-col gap-2">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <SectionTitle>Image</SectionTitle>
-          </div>
-          {readOnly ? (
-            <div
-              className={cn(
-                "flex min-w-0 items-start break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm leading-snug"
-              )}
-            >
-              {displayImage}
-            </div>
-          ) : (
-            <button
-              aria-label="Edit container image"
-              className={cn(
-                "flex items-center justify-between gap-1.5 break-all rounded-md border border-border bg-muted/40 px-2.5 py-2 text-left font-mono text-foreground text-sm leading-snug",
-                "cursor-pointer transition-colors hover:bg-muted/60",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-              )}
-              onClick={() => handleImageDialogChange(true)}
-              type="button"
-            >
-              {displayImage}
-              <SquarePen
-                aria-hidden
-                className="size-3.5 shrink-0 text-muted-foreground"
-                strokeWidth={2}
-              />
-            </button>
-          )}
-        </section>
-
-        <Separator />
-
-        <div className="grid gap-3">
-          {replicasSliderParts == null ? null : (
-            <ReplicaStrategySection
-              actions={quotaActions}
-              elastic={normalizeElasticReplicaSettings(
-                elasticSettingsFromStrategy(draftReplicaStrategy)
-              )}
-              fixedReplicasSliderParts={replicasSliderParts}
-              onElasticCpuTargetChange={handleElasticCpuTargetChange}
-              onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
-              onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
-              onElasticMinReplicasChange={handleElasticMinReplicasChange}
-              onElasticTargetMetricChange={handleElasticTargetMetricChange}
-              onStrategyTypeChange={handleReplicaStrategyTypeChange}
-              readOnly={readOnly}
-              strategyType={replicaStrategyType}
-            />
-          )}
-
-          <ResourceSettingsSection
-            actions={replicasSliderParts == null ? quotaActions : undefined}
-            title="CPU / Memory"
-          >
-            <ResourceSettingsSlider
-              ariaLabel="CPU quota (cores)"
-              disabled={cpuSliderRest.disabled}
-              formatBound={(next) => formatPlainNumber(next, 2)}
-              formatValue={formatCpuCoresValue}
-              icon={Cpu}
-              label="CPU"
-              max={cpuSlider.max}
-              maxDecimals={cpuDecimals}
-              min={cpuSlider.min}
-              onValueChange={onCpuQuotaChange}
-              step={cpuSliderRest.step}
-              value={cpuValue}
-            />
-
-            <ResourceSettingsSlider
-              ariaLabel="Memory quota (MiB)"
-              disabled={memorySliderRest.disabled}
-              formatBound={formatMemoryMibValue}
-              formatValue={formatMemoryMibValue}
-              icon={MemoryStick}
-              label="Memory"
-              max={memorySlider.max}
-              maxDecimals={memoryDecimals}
-              min={memorySlider.min}
-              onValueChange={onMemoryQuotaChange}
-              step={memorySliderRest.step}
-              value={memoryValue}
-            />
-          </ResourceSettingsSection>
-        </div>
-
-        <Separator />
-
-        <section className="flex flex-col gap-3">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <SectionTitle>Environment</SectionTitle>
-            {readOnly ? null : (
-              <div className="flex shrink-0 items-center gap-1">
-                {!settingsCommitMode && envDirty ? (
-                  <>
-                    <Button
-                      aria-label="Cancel environment changes"
-                      onClick={handleCancelEnvRows}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <X aria-hidden data-icon="inline-start" />
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={!canSaveEnv}
-                      onClick={handleSaveEnvRows}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      <Save aria-hidden data-icon="inline-start" />
-                      Save environment
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  aria-label="Add environment variable"
-                  onClick={handleAddEnvRow}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Plus aria-hidden data-icon="inline-start" />
-                  Add
-                </Button>
-                {canAddDbDsnReference ? (
-                  <Button
-                    aria-label="Add Project DB reference"
-                    onClick={handleAddDbDsnReferenceRow}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Plus aria-hidden data-icon="inline-start" />
-                    Add Reference
-                  </Button>
-                ) : null}
-              </div>
+    <div
+      className={cn(
+        "flex w-full flex-col gap-5 text-muted-foreground",
+        className
+      )}
+      data-slot="container-settings-pane"
+    >
+      <div className="grid gap-3">
+        {replicasSliderParts == null ? null : (
+          <ReplicaStrategySection
+            actions={quotaActions}
+            elastic={normalizeElasticReplicaSettings(
+              elasticSettingsFromStrategy(draftReplicaStrategy)
             )}
-          </div>
+            fixedReplicasSliderParts={replicasSliderParts}
+            onElasticCpuTargetChange={handleElasticCpuTargetChange}
+            onElasticMaxReplicasChange={handleElasticMaxReplicasChange}
+            onElasticMemoryTargetChange={handleElasticMemoryTargetChange}
+            onElasticMinReplicasChange={handleElasticMinReplicasChange}
+            onElasticTargetMetricChange={handleElasticTargetMetricChange}
+            onStrategyTypeChange={handleReplicaStrategyTypeChange}
+            readOnly={readOnly}
+            strategyType={replicaStrategyType}
+          />
+        )}
+
+        <ResourceSettingsSection
+          actions={replicasSliderParts == null ? quotaActions : undefined}
+          title="CPU / Memory"
+        >
+          <ResourceSettingsSlider
+            ariaLabel="CPU quota (cores)"
+            disabled={cpuSliderRest.disabled}
+            formatBound={(next) => formatPlainNumber(next, 2)}
+            formatValue={formatCpuCoresValue}
+            icon={Cpu}
+            label="CPU"
+            max={cpuSlider.max}
+            maxDecimals={cpuDecimals}
+            min={cpuSlider.min}
+            onValueChange={onCpuQuotaChange}
+            step={cpuSliderRest.step}
+            value={cpuValue}
+          />
+
+          <ResourceSettingsSlider
+            ariaLabel="Memory quota (MiB)"
+            disabled={memorySliderRest.disabled}
+            formatBound={formatMemoryMibValue}
+            formatValue={formatMemoryMibValue}
+            icon={MemoryStick}
+            label="Memory"
+            max={memorySlider.max}
+            maxDecimals={memoryDecimals}
+            min={memorySlider.min}
+            onValueChange={onMemoryQuotaChange}
+            step={memorySliderRest.step}
+            value={memoryValue}
+          />
+        </ResourceSettingsSection>
+
+        <ImageSettingsSection
+          imageInputId={imageInputId}
+          onBlur={handleImageBlur}
+          onChange={handleImageChange}
+          readOnly={readOnly}
+          value={displayImage}
+        />
+      </div>
+
+      <Separator />
+
+      <ResourceSettingsSection icon={SquarePen} title="Environment Variables">
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label className="text-foreground text-sm leading-none">
+            Variables
+          </Label>
           {readOnly ? (
             <ReadOnlyEnvRows env={env} />
           ) : (
@@ -3601,78 +3576,97 @@ export function ContainerSettingsPane({
               onUpdateRow={handleUpdateEnvRow}
             />
           )}
-        </section>
-
-        <Separator />
-
-        {networkForRender == null ? null : (
-          <NetworkSettingsSection
-            network={networkForRender}
-            onCustomDomainCnameVerify={onCustomDomainCnameVerify}
-            onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
-            onNetworkDraftChange={
-              settingsCommitMode ? setDraftNetwork : undefined
-            }
-            onPrivatePortDraftChange={
-              settingsCommitMode ? setNetworkPrivatePortDraft : undefined
-            }
-            platformAddressDraftContext={networkPlatformAddressDraftContext}
-            privatePortDraft={
-              settingsCommitMode ? networkPrivatePortDraft : undefined
-            }
-            readOnly={readOnly}
-          />
-        )}
-
-        {settingsCommitMode ? (
-          <ContainerSettingsDraftFooter
-            backingResourceChanged={settingsBackingState.resourceChanged}
-            canSave={canSaveSettings}
-            dirty={panelDraftDirty}
-            onCancel={resetSettingsDraft}
-            onKeepEditing={keepEditingSettingsDraft}
-            onReload={reloadSettingsDraft}
-            onSave={handleSaveSettingsDraft}
-            pending={settingsSavePending}
-            saveFailureMessage={settingsBackingState.saveFailureMessage}
-          />
-        ) : null}
-      </div>
-
-      {readOnly ? null : (
-        <Dialog onOpenChange={handleImageDialogChange} open={imageDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Container image</DialogTitle>
-              <DialogDescription>
-                Registry path, tag, or digest for this workload.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-2">
-              <Label htmlFor={inputId}>Image reference</Label>
-              <Textarea
-                className="min-h-24 font-mono text-sm"
-                id={inputId}
-                onChange={(e) => setImageDialogDraft(e.target.value)}
-                placeholder="e.g. ghcr.io/org/app:1.0.0"
-                value={imageDialogDraft}
-              />
-            </div>
-            <DialogFooter>
+        </div>
+        {readOnly ? null : (
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {!settingsCommitMode && envDirty ? (
+              <>
+                <Button
+                  aria-label="Cancel environment changes"
+                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                  onClick={handleCancelEnvRows}
+                  size="lg"
+                  type="button"
+                  variant="ghost"
+                >
+                  <X aria-hidden data-icon="inline-start" />
+                  Cancel
+                </Button>
+                <Button
+                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                  disabled={!canSaveEnv}
+                  onClick={handleSaveEnvRows}
+                  size="lg"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Save aria-hidden data-icon="inline-start" />
+                  Save environment
+                </Button>
+              </>
+            ) : null}
+            <Button
+              aria-label="Add environment variable"
+              className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+              onClick={handleAddEnvRow}
+              size="lg"
+              type="button"
+              variant="ghost"
+            >
+              <Plus aria-hidden data-icon="inline-start" />
+              Add
+            </Button>
+            {canAddDbDsnReference ? (
               <Button
-                onClick={() => handleImageDialogChange(false)}
+                aria-label="Add Project DB reference"
+                className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                onClick={handleAddDbDsnReferenceRow}
+                size="lg"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
-                {settingsCommitMode ? "Discard" : "Cancel"}
+                <Plus aria-hidden data-icon="inline-start" />
+                Add Reference
               </Button>
-              <Button onClick={handleSaveImage} type="button">
-                {settingsCommitMode ? "Apply to draft" : "Save"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            ) : null}
+          </div>
+        )}
+      </ResourceSettingsSection>
+
+      <Separator />
+
+      {networkForRender == null ? null : (
+        <NetworkSettingsSection
+          network={networkForRender}
+          onCustomDomainCnameVerify={onCustomDomainCnameVerify}
+          onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
+          onNetworkDraftChange={
+            settingsCommitMode ? setDraftNetwork : undefined
+          }
+          onPrivatePortDraftChange={
+            settingsCommitMode ? setNetworkPrivatePortDraft : undefined
+          }
+          platformAddressDraftContext={networkPlatformAddressDraftContext}
+          privatePortDraft={
+            settingsCommitMode ? networkPrivatePortDraft : undefined
+          }
+          readOnly={readOnly}
+        />
       )}
-    </>
+
+      {settingsCommitMode ? (
+        <ContainerSettingsDraftFooter
+          backingResourceChanged={settingsBackingState.resourceChanged}
+          canSave={canSaveSettings}
+          dirty={panelDraftDirty}
+          onCancel={resetSettingsDraft}
+          onKeepEditing={keepEditingSettingsDraft}
+          onReload={reloadSettingsDraft}
+          onSave={handleSaveSettingsDraft}
+          pending={settingsSavePending}
+          saveFailureMessage={settingsBackingState.saveFailureMessage}
+        />
+      ) : null}
+    </div>
   );
 }

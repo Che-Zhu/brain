@@ -35,6 +35,8 @@ const SAVE_ENV_RE = /Save environment/;
 const SAVE_SETTINGS_RE = /aria-label="Save settings"/;
 const CANCEL_ENV_RE = /Cancel environment changes/;
 const CANCEL_SETTINGS_RE = /aria-label="Cancel settings changes"/;
+const CPU_MEMORY_SECTION_RE = /CPU \/ Memory/;
+const IMAGE_INPUT_RE = /aria-label="Container image"/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
 const MYSQL_OPTION_SELECTED_RE =
   /<option value="default\/mysql" selected="">mysql/;
@@ -132,6 +134,16 @@ test("container settings pane renders editable structured environment rows", () 
   assert.match(html, ENV_NAME_INPUT_RE);
   assert.match(html, ENV_VALUE_INPUT_RE);
   assert.doesNotMatch(html, RAW_ENV_EDITOR_RE);
+});
+
+test("container settings pane renders Image below CPU / Memory", () => {
+  const html = renderPane();
+  const cpuMemoryIndex = html.search(CPU_MEMORY_SECTION_RE);
+  const imageIndex = html.search(IMAGE_INPUT_RE);
+
+  assert.notEqual(cpuMemoryIndex, -1);
+  assert.notEqual(imageIndex, -1);
+  assert.ok(cpuMemoryIndex < imageIndex);
 });
 
 test("container settings pane shows no AP networking surface without Network data", () => {
