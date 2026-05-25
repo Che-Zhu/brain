@@ -18,11 +18,12 @@ import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/place
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
+import { EntryPointSettingsPane } from "@/lib/project-canvas/panels/entrypoint-settings-panel";
 import { WorkloadResourcePane } from "@/lib/project-canvas/panels/workload-resource-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
-import { DATABASE_PANE } from "@/store/canvas-store";
+import { DATABASE_PANE, ENTRY_PANE } from "@/store/canvas-store";
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -85,9 +86,11 @@ export default function ProjectUidPage() {
     closeResourcePane,
     connectionOrigin,
     databasePane,
+    entryPane,
     meta: canvasMeta,
     nodes,
     registerSettingsLeaveGuard,
+    selectedEntryRef,
     selectedEdge,
     selectedNode,
     settingsLeaveGuardDialog,
@@ -101,6 +104,7 @@ export default function ProjectUidPage() {
     onNodeStackOrderChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onPendingApDbReferencesStart: beginPendingApDbReferences,
     refreshWorkloadLists,
+    selectionReady: !isEmptyGraphLoading,
   });
   const selectedTelemetryTarget = useMemo(
     () => telemetryTargetFromCanvasNode(selectedNode),
@@ -181,6 +185,16 @@ export default function ProjectUidPage() {
                       onClose={closeResourcePane}
                       onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
                       onUpdated={refreshWorkloadLists}
+                    />
+                  ) : null}
+                  {entryPane === ENTRY_PANE.settings &&
+                  selectedEntryRef != null ? (
+                    <EntryPointSettingsPane
+                      kubeconfig={kubeconfig}
+                      onClose={closeResourcePane}
+                      onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
+                      onUpdated={refreshWorkloadLists}
+                      selection={selectedEntryRef}
                     />
                   ) : null}
                   {settingsLeaveGuardDialog}

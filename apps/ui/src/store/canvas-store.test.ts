@@ -6,12 +6,17 @@ import type { Node } from "@xyflow/react";
 import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
+  CANVAS_ENTRY_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
 import {
   databasePaneModeForNodeClick,
   normalizeDatabasePaneMode,
   shouldClearDatabasePaneMode,
 } from "@/lib/project-canvas/panels/database-panel-mode";
+import {
+  entryPaneModeForNodeClick,
+  normalizeEntryPaneMode,
+} from "@/lib/project-canvas/panels/entrypoint-panel-mode";
 import {
   normalizeWorkloadPaneMode,
   shouldClearWorkloadPaneMode,
@@ -33,6 +38,23 @@ test("projectCanvasNodeServiceUid reads EntryPoint resource uid", () => {
   } as Node;
 
   assert.equal(projectCanvasNodeServiceUid(node), "entrypoint-uid");
+});
+
+test("projectCanvasNodeServiceUid prefers EntryPoint selection key", () => {
+  const node = {
+    data: {
+      resource: {
+        name: "web-entry",
+        namespace: "default",
+        selectionKey: "entry:default:web",
+        uid: "entrypoint-uid",
+      },
+    },
+    id: "entry-web",
+    position: { x: 0, y: 0 },
+  } as Node;
+
+  assert.equal(projectCanvasNodeServiceUid(node), "entry:default:web");
 });
 
 test("database panel mode distinguishes settings and metrics URL values", () => {
@@ -60,6 +82,11 @@ test("workload panel mode distinguishes AP pane URL values", () => {
   assert.equal(normalizeWorkloadPaneMode("Settings"), null);
 });
 
+test("entry panel mode only accepts settings URL value", () => {
+  assert.equal(normalizeEntryPaneMode("settings"), "settings");
+  assert.equal(normalizeEntryPaneMode("metrics"), null);
+});
+
 test("container node selection opens settings mode and non-container selection clears it", () => {
   assert.equal(
     workloadPaneModeForNodeClick({ type: CANVAS_CONTAINER_NODE_TYPE }),
@@ -67,6 +94,17 @@ test("container node selection opens settings mode and non-container selection c
   );
   assert.equal(
     workloadPaneModeForNodeClick({ type: CANVAS_DATABASE_NODE_TYPE }),
+    null
+  );
+});
+
+test("entry node selection opens EntryPoint settings mode", () => {
+  assert.equal(
+    entryPaneModeForNodeClick({ type: CANVAS_ENTRY_NODE_TYPE }),
+    "settings"
+  );
+  assert.equal(
+    entryPaneModeForNodeClick({ type: CANVAS_CONTAINER_NODE_TYPE }),
     null
   );
 });

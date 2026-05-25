@@ -22,6 +22,9 @@ export const WORKLOAD_PANE_QUERY_KEY = "apPane" as const;
 /** nuqs key for the database action pane (`?dbPane=settings|metrics`). */
 export const DATABASE_PANE_QUERY_KEY = "dbPane" as const;
 
+/** nuqs key for the EntryPoint action pane (`?entryPane=settings`). */
+export const ENTRY_PANE_QUERY_KEY = "entryPane" as const;
+
 export const WORKLOAD_PANE = {
   history: "history",
   logs: "logs",
@@ -31,6 +34,10 @@ export const WORKLOAD_PANE = {
 
 export const DATABASE_PANE = {
   metrics: "metrics",
+  settings: "settings",
+} as const;
+
+export const ENTRY_PANE = {
   settings: "settings",
 } as const;
 
@@ -53,6 +60,12 @@ export function projectCanvasNodeServiceUid(node: Node): string | null {
   }
   const resourceUid = (data as { resource?: { uid?: unknown } } | undefined)
     ?.resource?.uid;
+  const entrySelectionKey = (
+    data as { resource?: { selectionKey?: unknown } } | undefined
+  )?.resource?.selectionKey;
+  if (typeof entrySelectionKey === "string" && entrySelectionKey !== "") {
+    return entrySelectionKey;
+  }
   return typeof resourceUid === "string" && resourceUid !== ""
     ? resourceUid
     : null;

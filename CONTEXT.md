@@ -83,6 +83,22 @@ Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that compo
 
 The primary UI surface for viewing and editing AP desired configuration, including image, resource capacity, Replica Strategy, environment, and network settings.
 
+### EntryPoint Public Addresses Panel
+
+A narrow UI surface opened from an EntryPoint selection that presents the associated AP's Public Addresses. It is scoped to public routing and is not the full AP Settings surface.
+
+The panel can open for an AP-derived pending EntryPoint selection before a real EntryPoint resource exists, because the user's public routing intent belongs to the associated AP's Public Addresses. It includes Platform Address rows and Custom Domain rows, and does not present the AP's Private Address.
+
+Edits made from the panel use the same Settings Draft confirmation model as AP Settings.
+
+The panel title is anchored on the associated AP name, even when the EntryPoint resource has its own name or has not been created yet.
+
+After the last Public Address is removed, the panel may remain open as an AP-bound Public Addresses settings surface even though the EntryPoint node disappears from the canvas.
+
+The panel closes when the associated AP no longer exists.
+
+When no Public Addresses remain, the panel shows an empty state and still allows adding a Public Address. Public Address behavior in this panel matches AP Settings Public Address behavior.
+
 ### AP Replica Strategy
 
 The AP configuration choice for how many workload replicas should run: either a fixed user-selected count or Elastic Scaling within user-selected bounds.
@@ -130,6 +146,10 @@ The per-node visual layering order used when canvas node cards overlap.
 ### Canvas Connection
 
 A canvas edge that represents an established runtime dependency between resources.
+
+### Canvas Resource Pane
+
+A right-side canvas surface opened from a selected AP or DB node to inspect or change resource-scoped details such as settings, metrics, logs, or history. It is distinct from the project assistant chat pane.
 
 ### Connecting Edge
 

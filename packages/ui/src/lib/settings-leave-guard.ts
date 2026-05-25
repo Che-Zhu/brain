@@ -1,4 +1,4 @@
-export type SettingsLeaveGuardScope = "ap" | "database";
+export type SettingsLeaveGuardScope = "ap" | "database" | "publicAddresses";
 export type SettingsLeaveGuardAction = "close" | "switch";
 export type SettingsLeaveGuardDecision = "discard" | "save" | "stay";
 

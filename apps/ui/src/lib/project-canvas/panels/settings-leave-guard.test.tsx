@@ -11,6 +11,7 @@ import {
 
 const UNSAVED_DATABASE_CONFIGURATION_RE =
   /Unsaved database configuration changes/;
+const UNSAVED_PUBLIC_ADDRESS_RE = /Unsaved Public Address changes/;
 const SAVE_BUTTON_RE = />Save</;
 const DISCARD_BUTTON_RE = />Discard</;
 const STAY_BUTTON_RE = />Stay</;
@@ -154,4 +155,19 @@ test("settings leave guard dialog offers Save, Discard, and Stay", () => {
   assert.match(html, SAVE_BUTTON_RE);
   assert.match(html, DISCARD_BUTTON_RE);
   assert.match(html, STAY_BUTTON_RE);
+});
+
+test("settings leave guard dialog names Public Address drafts", () => {
+  const html = renderToStaticMarkup(
+    <SettingsLeaveGuardDialogContent
+      action="switch"
+      guard={dirtyGuard("publicAddresses", [])}
+      onDecision={() => {
+        /* noop */
+      }}
+      pending={false}
+    />
+  );
+
+  assert.match(html, UNSAVED_PUBLIC_ADDRESS_RE);
 });

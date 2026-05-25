@@ -53,6 +53,10 @@ import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
 } from "@/lib/project-canvas/nodes/constants";
+import {
+  canvasHasApForEntrySelection,
+  entryPointSelectionRefFromKey,
+} from "@/lib/project-canvas/nodes/entry-node-selection";
 import type {
   CanvasContainerNodeData,
   CanvasDatabaseNodeData,
@@ -63,6 +67,10 @@ import {
   databasePaneModeForNodeClick,
   shouldClearDatabasePaneMode,
 } from "@/lib/project-canvas/panels/database-panel-mode";
+import {
+  entryPaneModeForNodeClick,
+  normalizeEntryPaneMode,
+} from "@/lib/project-canvas/panels/entrypoint-panel-mode";
 import { useSettingsLeaveGuardController } from "@/lib/project-canvas/panels/settings-leave-guard";
 import {
   shouldClearWorkloadPaneMode,
@@ -72,6 +80,7 @@ import {
   CANVAS_SERVICE_QUERY_KEY,
   DATABASE_PANE,
   DATABASE_PANE_QUERY_KEY,
+  ENTRY_PANE_QUERY_KEY,
   projectCanvasFlowNodeTypes,
   projectCanvasNodeServiceUid,
   selectedEdgeAtom,
@@ -92,6 +101,8 @@ export interface UseProjectCanvasOptions {
   readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
+  /** True when the resource lists have settled enough to clear stale URL selections. */
+  selectionReady?: boolean;
   shareToken?: string;
 }
 
@@ -229,9 +240,14 @@ export function useProjectCanvas(
     DATABASE_PANE_QUERY_KEY,
     parseAsString
   );
+  const [entryPane, setEntryPane] = useQueryState(
+    ENTRY_PANE_QUERY_KEY,
+    parseAsString
+  );
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const selectedEdge = useAtomValue(selectedEdgeAtom);
   const readOnly = options?.readOnly === true;
+  const selectionReady = options?.selectionReady ?? rawNodes.length > 0;
   const routingDomain = useMemo(
     () =>
       readOnly ? "" : routingDomainFromKubeconfig(options?.kubeconfig ?? ""),
@@ -447,6 +463,7 @@ export function useProjectCanvas(
                       requestSettingsLeave("switch", () => {
                         setSelectedEdge(null);
                         setServiceUid(uid).catch(() => undefined);
+                        setEntryPane(null).catch(() => undefined);
                         setWorkloadPane(null).catch(() => undefined);
                         setDatabasePane(DATABASE_PANE.metrics).catch(
                           () => undefined
@@ -478,6 +495,7 @@ export function useProjectCanvas(
       requestSettingsLeave,
       routingDomain,
       setDatabasePane,
+      setEntryPane,
       setWorkloadPane,
       startDbWorkload,
       stopDbWorkload,
@@ -533,6 +551,7 @@ export function useProjectCanvas(
         requestSettingsLeave("switch", () => {
           setSelectedEdge(null);
           setDatabasePane(null).catch(() => undefined);
+          setEntryPane(null).catch(() => undefined);
           setServiceUid(uid ?? "").catch(() => undefined);
           setWorkloadPane(pane).catch(() => undefined);
         });
@@ -627,6 +646,7 @@ export function useProjectCanvas(
       restartWorkload,
       runMutationThenRefresh,
       setDatabasePane,
+      setEntryPane,
       setSelectedEdge,
       setServiceUid,
       setWorkloadPane,
@@ -702,6 +722,17 @@ export function useProjectCanvas(
       nodes.find((n) => projectCanvasNodeServiceUid(n) === serviceUid) ?? null
     );
   }, [serviceUid, nodes]);
+  const selectedEntryRef = useMemo(
+    () => entryPointSelectionRefFromKey(serviceUid),
+    [serviceUid]
+  );
+  const selectedEntryApExists = useMemo(
+    () =>
+      selectedEntryRef == null
+        ? false
+        : canvasHasApForEntrySelection(rawNodes, selectedEntryRef),
+    [rawNodes, selectedEntryRef]
+  );
 
   const frontCanvasNode = useCallback(
     (node: Node) => {
@@ -777,6 +808,7 @@ export function useProjectCanvas(
         });
         setSelectedEdge(null);
         setDatabasePane(null).catch(() => undefined);
+        setEntryPane(null).catch(() => undefined);
         setServiceUid(apUid).catch(() => undefined);
         setWorkloadPane(WORKLOAD_PANE.settings).catch(() => undefined);
       });
@@ -786,6 +818,7 @@ export function useProjectCanvas(
       readOnly,
       requestSettingsLeave,
       setDatabasePane,
+      setEntryPane,
       setSelectedEdge,
       setServiceUid,
       setWorkloadPane,
@@ -860,14 +893,37 @@ export function useProjectCanvas(
   const isStale =
     serviceUid != null &&
     serviceUid !== "" &&
-    rawNodes.length > 0 &&
-    selectedNode == null;
+    selectionReady &&
+    selectedNode == null &&
+    !(normalizeEntryPaneMode(entryPane) != null && selectedEntryApExists);
 
   useEffect(() => {
     if (isStale) {
       setServiceUid(null).catch(() => undefined);
+      setEntryPane(null).catch(() => undefined);
     }
-  }, [isStale, setServiceUid]);
+  }, [isStale, setEntryPane, setServiceUid]);
+
+  useEffect(() => {
+    if (entryPane == null) {
+      return;
+    }
+    if (
+      normalizeEntryPaneMode(entryPane) == null ||
+      selectedEntryRef == null ||
+      (selectionReady && !selectedEntryApExists)
+    ) {
+      setEntryPane(null).catch(() => undefined);
+      setServiceUid(null).catch(() => undefined);
+    }
+  }, [
+    entryPane,
+    selectionReady,
+    selectedEntryApExists,
+    selectedEntryRef,
+    setEntryPane,
+    setServiceUid,
+  ]);
 
   useEffect(() => {
     if (
@@ -911,8 +967,15 @@ export function useProjectCanvas(
     setSelectedEdge(null);
     setServiceUid(null).catch(() => undefined);
     setDatabasePane(null).catch(() => undefined);
+    setEntryPane(null).catch(() => undefined);
     setWorkloadPane(null).catch(() => undefined);
-  }, [setDatabasePane, setSelectedEdge, setServiceUid, setWorkloadPane]);
+  }, [
+    setDatabasePane,
+    setEntryPane,
+    setSelectedEdge,
+    setServiceUid,
+    setWorkloadPane,
+  ]);
 
   const clearSelection = useCallback(() => {
     requestSettingsLeave("close", clearSelectedResource);
@@ -952,19 +1015,22 @@ export function useProjectCanvas(
         onNodeClick: (_, node: Node) => {
           const nextWorkloadPane = workloadPaneModeForNodeClick(node);
           const nextDatabasePane = databasePaneModeForNodeClick(node);
+          const nextEntryPane = entryPaneModeForNodeClick(node);
           const nextServiceUid = projectCanvasNodeServiceUid(node);
           const selectNode = () => {
             frontCanvasNode(node);
             setSelectedEdge(null);
             setWorkloadPane(nextWorkloadPane).catch(() => undefined);
             setDatabasePane(nextDatabasePane).catch(() => undefined);
+            setEntryPane(nextEntryPane).catch(() => undefined);
             setServiceUid(nextServiceUid).catch(() => undefined);
           };
 
           if (
             nextServiceUid === serviceUid &&
             nextWorkloadPane === workloadPane &&
-            nextDatabasePane === databasePane
+            nextDatabasePane === databasePane &&
+            nextEntryPane === entryPane
           ) {
             selectNode();
             return;
@@ -980,6 +1046,7 @@ export function useProjectCanvas(
             setSelectedEdge(edge);
             setServiceUid(null).catch(() => undefined);
             setDatabasePane(null).catch(() => undefined);
+            setEntryPane(null).catch(() => undefined);
             setWorkloadPane(null).catch(() => undefined);
           });
         },
@@ -995,6 +1062,7 @@ export function useProjectCanvas(
       clearSelection,
       connectionGestureActive,
       databasePane,
+      entryPane,
       frontCanvasNode,
       handleConnect,
       handleConnectEnd,
@@ -1006,6 +1074,7 @@ export function useProjectCanvas(
       requestSettingsLeave,
       serviceUid,
       setDatabasePane,
+      setEntryPane,
       setSelectedEdge,
       setServiceUid,
       setWorkloadPane,
@@ -1018,9 +1087,11 @@ export function useProjectCanvas(
     closeResourcePane,
     connectionOrigin,
     databasePane,
+    entryPane,
     meta,
     nodes,
     registerSettingsLeaveGuard,
+    selectedEntryRef,
     selectedEdge,
     selectedNode,
     settingsLeaveGuardDialog,

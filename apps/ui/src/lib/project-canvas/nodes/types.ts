@@ -99,6 +99,7 @@ export interface CanvasEntryNodeData extends Record<string, unknown> {
     apRef?: string;
     name: string;
     namespace: string;
+    selectionKey?: string;
     uid?: string;
   };
   states: EntryNodeStates;

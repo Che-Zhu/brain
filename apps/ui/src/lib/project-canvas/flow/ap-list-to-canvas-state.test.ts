@@ -74,6 +74,7 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
       apRef: "api",
       name: "api",
       namespace: "default",
+      selectionKey: "entry:default:api",
     },
     states: { name: "api" },
     targets: [
@@ -141,6 +142,7 @@ test("EntryPoint canvas nodes display AP-projected Custom Domain rows", () => {
       apRef: "api",
       name: "api",
       namespace: "default",
+      selectionKey: "entry:default:api",
     },
     states: { name: "api" },
     targets: [
@@ -189,6 +191,7 @@ test("EntryPoint canvas nodes fall back to desired Platform Addresses while obse
       apRef: "api",
       name: "api",
       namespace: "default",
+      selectionKey: "entry:default:api",
     },
     states: { name: "api" },
     targets: [
@@ -235,6 +238,7 @@ test("EntryPoint canvas nodes keep uid fallback when resource name is unavailabl
       apRef: "api",
       name: "unknown",
       namespace: "default",
+      selectionKey: "entry:default:api",
       uid: "entry-uid",
     },
     states: { name: "unknown" },

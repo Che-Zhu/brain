@@ -30,6 +30,7 @@ import {
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
 } from "../nodes/constants";
+import { entryPointSelectionKey } from "../nodes/entry-node-selection";
 import type { CanvasDatabaseNodeData } from "../nodes/types";
 import {
   platformAddressIdFromValue,
@@ -532,6 +533,10 @@ export function entryPointsToCanvasState(
     const accessDomain = entryNodeAccessDomainFromTargets(targets);
     const g = grid0 + i;
     const apRef = item.apRef;
+    const selectionKey =
+      apRef === undefined || namespace === ""
+        ? undefined
+        : entryPointSelectionKey({ apName: apRef, namespace });
 
     return {
       data: {
@@ -540,6 +545,7 @@ export function entryPointsToCanvasState(
           ...(apRef === undefined ? {} : { apRef }),
           name,
           namespace,
+          ...(selectionKey === undefined ? {} : { selectionKey }),
           ...(uid === undefined || uid === "" ? {} : { uid }),
         },
         states: { name },

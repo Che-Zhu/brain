@@ -81,9 +81,14 @@ export async function continueSettingsLeave({
 }
 
 function settingsLeaveGuardTitle(scope: SettingsLeaveGuardScope) {
-  return scope === "database"
-    ? "Unsaved database configuration changes"
-    : "Unsaved AP Settings changes";
+  switch (scope) {
+    case "database":
+      return "Unsaved database configuration changes";
+    case "publicAddresses":
+      return "Unsaved Public Address changes";
+    default:
+      return "Unsaved AP Settings changes";
+  }
 }
 
 function settingsLeaveGuardDescription(action: SettingsLeaveGuardAction) {

@@ -523,6 +523,10 @@ export interface ContainerSettingsPaneSettingsDraftCommitMeta
   baseDraft: ContainerSettingsDraft;
 }
 
+export interface ContainerPublicAddressesSettingsDraftCommitMeta {
+  baseNetwork: ContainerNetwork;
+}
+
 export interface ContainerSettingsPaneProps {
   /**
    * One-shot request from a Canvas Connecting Edge to append an Add Reference row
@@ -580,6 +584,20 @@ export interface ContainerSettingsPaneProps {
    * Fixed AP replica count. Omit to hide the control (e.g. DB workloads).
    */
   replicasQuota?: ContainerSettingsControlledQuotaProps;
+}
+
+export interface ContainerPublicAddressesSettingsPaneProps {
+  className?: string;
+  identityKey?: string;
+  network: ContainerNetwork;
+  networkPlatformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
+  onCustomDomainCnameVerify?: ContainerCustomDomainCnameVerifier;
+  onNetworkDraftCommit?: (
+    network: ContainerNetwork,
+    meta: ContainerPublicAddressesSettingsDraftCommitMeta
+  ) => void | Promise<void>;
+  onSettingsDraftLeaveGuardChange?: SettingsLeaveGuardRegistration;
+  readOnly?: boolean;
 }
 
 interface AddDbDsnReferenceIntentDraftMetadata {
@@ -673,6 +691,10 @@ export function containerSettingsDraftIsDirty(
 
 function containerSettingsDraftBackingKey(draft: ContainerSettingsDraft) {
   return JSON.stringify(draft);
+}
+
+function containerNetworkDraftBackingKey(network: ContainerNetwork) {
+  return JSON.stringify(network);
 }
 
 interface ContainerSettingsDraftValues {
@@ -2241,6 +2263,277 @@ function NetworkSettingsSection({
   );
 }
 
+function publicAddressNetworkDirty(
+  base: ContainerNetwork,
+  draft: ContainerNetwork
+): boolean {
+  return !containerNetworksEqual(base, draft);
+}
+
+export function ContainerPublicAddressesSettingsPane({
+  className,
+  identityKey,
+  network,
+  networkPlatformAddressDraftContext,
+  onCustomDomainCnameVerify,
+  onNetworkDraftCommit,
+  onSettingsDraftLeaveGuardChange,
+  readOnly = false,
+}: ContainerPublicAddressesSettingsPaneProps) {
+  const commitMode = onNetworkDraftCommit != null && readOnly !== true;
+  const [draftNetwork, setDraftNetwork] = useState(network);
+  const [savePending, setSavePending] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
+  const [cnameAddress, setCnameAddress] = useState<
+    ContainerNetworkPublicAddress | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (commitMode) {
+      return;
+    }
+    setDraftNetwork(network);
+  }, [commitMode, network]);
+
+  const networkBackingKey = useMemo(
+    () => containerNetworkDraftBackingKey(network),
+    [network]
+  );
+  const [networkBackingState, setNetworkBackingState] = useState(() =>
+    createSettingsDraftBackingState(network, networkBackingKey, identityKey)
+  );
+  const applyNetworkDraftToLocalState = useCallback(
+    (next: ContainerNetwork) => {
+      setDraftNetwork(next);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!commitMode) {
+      return;
+    }
+    const synced = syncSettingsDraftBackingState(networkBackingState, {
+      backing: network,
+      backingKey: networkBackingKey,
+      draft: draftNetwork,
+      identityKey,
+      isDirty: publicAddressNetworkDirty,
+    });
+    if (synced.state === networkBackingState && synced.draft === undefined) {
+      return;
+    }
+    applySettingsDraftBackingResult(synced, {
+      draft: applyNetworkDraftToLocalState,
+      state: setNetworkBackingState,
+    });
+  }, [
+    applyNetworkDraftToLocalState,
+    commitMode,
+    draftNetwork,
+    identityKey,
+    network,
+    networkBackingKey,
+    networkBackingState,
+  ]);
+
+  const networkForRender = commitMode ? draftNetwork : network;
+  const visibleDomains = visibleDomainRows(networkForRender);
+  const visiblePublicAddresses = showAllPublicAddresses
+    ? visibleDomains.publicAddresses
+    : visibleDomains.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+  const hiddenPublicAddressCount =
+    visibleDomains.publicAddresses.length - visiblePublicAddresses.length;
+  const networkDirty = publicAddressNetworkDirty(
+    networkBackingState.base,
+    draftNetwork
+  );
+  const canSave = commitMode && networkDirty && !savePending;
+  const canMutateNetwork = commitMode;
+
+  useEffect(() => {
+    if (visibleDomains.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+      setShowAllPublicAddresses(false);
+    }
+  }, [visibleDomains.publicAddresses.length]);
+
+  const resetNetworkDraft = useCallback(() => {
+    applyNetworkDraftToLocalState(networkBackingState.base);
+    setNetworkBackingState((current) => ({
+      ...current,
+      saveFailureMessage: null,
+    }));
+  }, [applyNetworkDraftToLocalState, networkBackingState.base]);
+
+  const reloadNetworkDraft = useCallback(() => {
+    applySettingsDraftBackingResult(
+      reloadSettingsDraftBackingState(networkBackingState),
+      {
+        draft: applyNetworkDraftToLocalState,
+        state: setNetworkBackingState,
+      }
+    );
+  }, [applyNetworkDraftToLocalState, networkBackingState]);
+
+  const keepEditingNetworkDraft = useCallback(() => {
+    setNetworkBackingState((current) =>
+      keepEditingSettingsDraftBackingState(current)
+    );
+  }, []);
+
+  const saveNetworkDraft = useCallback(async () => {
+    if (!canSave || onNetworkDraftCommit == null) {
+      throw new Error("Public Address draft cannot be saved yet.");
+    }
+    const draft = draftNetwork;
+    setSavePending(true);
+    setNetworkBackingState((current) => ({
+      ...current,
+      saveFailureMessage: null,
+    }));
+    try {
+      await onNetworkDraftCommit(draft, {
+        baseNetwork: networkBackingState.base,
+      });
+      setNetworkBackingState((current) =>
+        commitSettingsDraftBackingState(current, draft)
+      );
+    } catch (error) {
+      setNetworkBackingState((current) =>
+        failSettingsDraftSave(
+          current,
+          error,
+          "Could not save public addresses."
+        )
+      );
+      throw error;
+    } finally {
+      setSavePending(false);
+    }
+  }, [canSave, draftNetwork, networkBackingState.base, onNetworkDraftCommit]);
+
+  const handleSaveNetworkDraft = useCallback(async () => {
+    try {
+      await saveNetworkDraft();
+    } catch {
+      // The footer keeps the user on the draft and shows the panel-level failure.
+    }
+  }, [saveNetworkDraft]);
+
+  useEffect(() => {
+    if (!commitMode || onSettingsDraftLeaveGuardChange == null) {
+      return;
+    }
+
+    onSettingsDraftLeaveGuardChange(
+      networkDirty
+        ? {
+            canSave,
+            dirty: true,
+            discard: resetNetworkDraft,
+            save: saveNetworkDraft,
+            scope: "publicAddresses",
+          }
+        : null
+    );
+
+    return () => {
+      onSettingsDraftLeaveGuardChange(null);
+    };
+  }, [
+    canSave,
+    commitMode,
+    networkDirty,
+    onSettingsDraftLeaveGuardChange,
+    resetNetworkDraft,
+    saveNetworkDraft,
+  ]);
+
+  const handleAddPublicAddress = (address: PublicAddressDraft) => {
+    setDraftNetwork({
+      ...networkForRender,
+      publicAddresses: [...networkForRender.publicAddresses, address],
+    });
+  };
+
+  const handleDeletePublicAddress = (index: number) => {
+    const target = visibleDomains.publicAddresses[index];
+    const publicAddresses = networkForRender.publicAddresses.filter(
+      (address, itemIndex) =>
+        !isPublicAddressDeleteTarget(address, itemIndex, target, index)
+    );
+    setDraftNetwork({ ...networkForRender, publicAddresses });
+  };
+
+  const handleBindCustomDomain = (domain: ContainerNetworkCustomDomain) => {
+    setDraftNetwork({
+      ...networkForRender,
+      customDomains: [...(networkForRender.customDomains ?? []), domain],
+    });
+  };
+
+  const handleUnbindCustomDomain = (domain: ContainerNetworkCustomDomain) => {
+    setDraftNetwork(
+      containerNetworkAfterUnbindCustomDomain(networkForRender, domain)
+    );
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex w-full flex-col gap-5 text-resource-pane-muted",
+        className
+      )}
+      data-slot="container-public-addresses-settings-pane"
+    >
+      <DomainListSection
+        addOpen={addOpen}
+        canMutateNetwork={canMutateNetwork}
+        defaultPort={networkForRender.privatePort}
+        hiddenPublicAddressCount={hiddenPublicAddressCount}
+        onAddPublicAddress={handleAddPublicAddress}
+        onBindAddress={setCnameAddress}
+        onCancelAddPublicAddress={() => setAddOpen(false)}
+        onDeletePublicAddress={handleDeletePublicAddress}
+        onOpenAddPublicAddress={() => setAddOpen(true)}
+        onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+        onUnbindCustomDomain={handleUnbindCustomDomain}
+        platformAddressDraftContext={networkPlatformAddressDraftContext}
+        readOnly={readOnly}
+        visibleDomainRows={visibleDomains}
+        visiblePublicAddresses={visiblePublicAddresses}
+      />
+      <CnameBindingDialog
+        address={cnameAddress}
+        onBind={handleBindCustomDomain}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCnameAddress(undefined);
+          }
+        }}
+        open={cnameAddress != null}
+        verify={onCustomDomainCnameVerify}
+      />
+      {commitMode ? (
+        <ContainerSettingsDraftFooter
+          backingResourceChanged={networkBackingState.resourceChanged}
+          canSave={canSave}
+          dirty={networkDirty}
+          onCancel={resetNetworkDraft}
+          onKeepEditing={keepEditingNetworkDraft}
+          onReload={reloadNetworkDraft}
+          onSave={handleSaveNetworkDraft}
+          pending={savePending}
+          saveFailureMessage={networkBackingState.saveFailureMessage}
+          submitAriaLabel="Save public addresses"
+          unsavedMessage="Unsaved Public Address changes."
+        />
+      ) : null}
+    </div>
+  );
+}
+
 interface ReplicaStrategySectionProps {
   actions?: ReactNode;
   elastic: ContainerElasticReplicaSettings;
@@ -2646,6 +2939,8 @@ function ContainerSettingsDraftFooter({
   onSave,
   pending,
   saveFailureMessage,
+  submitAriaLabel = "Save settings",
+  unsavedMessage,
 }: {
   backingResourceChanged: boolean;
   canSave: boolean;
@@ -2656,6 +2951,8 @@ function ContainerSettingsDraftFooter({
   onSave: () => void | Promise<void>;
   pending: boolean;
   saveFailureMessage: string | null;
+  submitAriaLabel?: string;
+  unsavedMessage?: string;
 }) {
   return (
     <ResourceSettingsDraftFooter
@@ -2670,7 +2967,8 @@ function ContainerSettingsDraftFooter({
       onSubmit={onSave}
       pending={pending}
       saveFailureMessage={saveFailureMessage}
-      submitAriaLabel="Save settings"
+      submitAriaLabel={submitAriaLabel}
+      unsavedMessage={unsavedMessage}
     />
   );
 }

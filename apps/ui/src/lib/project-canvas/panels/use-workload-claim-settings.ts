@@ -318,6 +318,38 @@ export function useWorkloadClaimSettings(
     ]
   );
 
+  const onNetworkDraftCommit = useCallback(
+    async (network: NonNullable<ClaimContainerSettings["network"]>) => {
+      if (!isApWorkload || readOnly) {
+        return;
+      }
+      const body = claimBodyRef.current;
+      const kc = kubeconfig.trim();
+      if (body == null || kc === "") {
+        const error = new Error("Claim or kubeconfig missing.");
+        toast.error(error.message);
+        throw error;
+      }
+      setLocalOverride((prev) => ({ ...(prev ?? {}), network }));
+      try {
+        await applyApNetwork(kc, body, network, { existingCustomDomains });
+        toast.success("Public addresses applied.");
+        await revalidateAfterApMutation();
+      } catch (e) {
+        setLocalOverride(null);
+        toast.error(settingsDraftSaveFailureMessage(e, "Apply failed."));
+        throw e;
+      }
+    },
+    [
+      existingCustomDomains,
+      isApWorkload,
+      kubeconfig,
+      readOnly,
+      revalidateAfterApMutation,
+    ]
+  );
+
   const onResourceQuotasCommit = useCallback(
     async (next: ResourceQuotaCommitDraft) => {
       if (!isApWorkload || readOnly) {
@@ -456,6 +488,7 @@ export function useWorkloadClaimSettings(
     onEnvChange,
     onImageChange,
     onNetworkChange,
+    onNetworkDraftCommit,
     onResourceQuotasCommit,
     onSettingsDraftCommit,
     revalidateClaim,

@@ -18,9 +18,10 @@ import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-t
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
 import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
+import { EntryPointSettingsPane } from "@/lib/project-canvas/panels/entrypoint-settings-panel";
 import { WorkloadResourcePane } from "@/lib/project-canvas/panels/workload-resource-pane";
 import { buildPreviewProjectCanvasState } from "@/lib/project-canvas/preview/state";
-import { DATABASE_PANE } from "@/store/canvas-store";
+import { DATABASE_PANE, ENTRY_PANE } from "@/store/canvas-store";
 
 const METRICS_REFRESH_MS = 5000;
 
@@ -152,9 +153,11 @@ export default function PreviewProjectPage() {
     closeResourcePane,
     connectionOrigin,
     databasePane,
+    entryPane,
     meta,
     nodes,
     registerSettingsLeaveGuard,
+    selectedEntryRef,
     selectedEdge,
     selectedNode,
     settingsLeaveGuardDialog,
@@ -162,6 +165,7 @@ export default function PreviewProjectPage() {
   } = useProjectCanvas(canvasState.nodes, {
     readOnly: true,
     refreshWorkloadLists,
+    selectionReady: !isLoading,
     shareToken,
   });
   const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
@@ -214,6 +218,16 @@ export default function PreviewProjectPage() {
                 onClose={closeResourcePane}
                 onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
                 onUpdated={refreshWorkloadLists}
+              />
+            ) : null}
+            {entryPane === ENTRY_PANE.settings && selectedEntryRef != null ? (
+              <EntryPointSettingsPane
+                onClose={closeResourcePane}
+                onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
+                onUpdated={refreshWorkloadLists}
+                readOnly
+                selection={selectedEntryRef}
+                shareToken={shareToken}
               />
             ) : null}
             {settingsLeaveGuardDialog}
