@@ -16,14 +16,10 @@ import {
 } from "@/lib/project-canvas/flow/pending-connections";
 import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
-import { DatabaseMetricsPane } from "@/lib/project-canvas/panels/database-metrics-pane";
-import { DatabaseSettingsPane } from "@/lib/project-canvas/panels/database-settings-pane";
-import { EntryPointSettingsPane } from "@/lib/project-canvas/panels/entrypoint-settings-panel";
-import { WorkloadResourcePane } from "@/lib/project-canvas/panels/workload-resource-pane";
+import { ProjectCanvasResourcePane } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
-import { DATABASE_PANE, ENTRY_PANE } from "@/store/canvas-store";
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -165,38 +161,18 @@ export default function ProjectUidPage() {
                   </div>
                 ) : null}
                 <Canvas.Flow>
-                  <WorkloadResourcePane
-                    mode={workloadPane}
-                    node={selectedNode}
+                  <ProjectCanvasResourcePane
+                    databasePane={databasePane}
+                    entryPane={entryPane}
+                    kubeconfig={kubeconfig}
                     onClose={closeResourcePane}
                     onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
+                    onUpdated={refreshWorkloadLists}
+                    selectedDatabaseData={selectedDatabaseData}
+                    selectedEntryRef={selectedEntryRef}
+                    selectedNode={selectedNode}
+                    workloadPane={workloadPane}
                   />
-                  <DatabaseMetricsPane
-                    kubeconfig={kubeconfig}
-                    node={selectedNode}
-                    onClose={closeResourcePane}
-                    open={databasePane === DATABASE_PANE.metrics}
-                  />
-                  {databasePane === DATABASE_PANE.settings &&
-                  selectedDatabaseData != null ? (
-                    <DatabaseSettingsPane
-                      data={selectedDatabaseData}
-                      kubeconfig={kubeconfig}
-                      onClose={closeResourcePane}
-                      onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
-                      onUpdated={refreshWorkloadLists}
-                    />
-                  ) : null}
-                  {entryPane === ENTRY_PANE.settings &&
-                  selectedEntryRef != null ? (
-                    <EntryPointSettingsPane
-                      kubeconfig={kubeconfig}
-                      onClose={closeResourcePane}
-                      onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
-                      onUpdated={refreshWorkloadLists}
-                      selection={selectedEntryRef}
-                    />
-                  ) : null}
                   {settingsLeaveGuardDialog}
                 </Canvas.Flow>
               </div>
