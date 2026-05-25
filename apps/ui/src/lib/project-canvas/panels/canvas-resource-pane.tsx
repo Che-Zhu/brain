@@ -29,7 +29,7 @@ export function CanvasResourcePane({
   return (
     <aside
       className={cn(
-        "resource-pane-surface pointer-events-auto absolute top-13 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-screen-sm flex-col overflow-hidden rounded-tl-lg border-resource-pane-input border-t border-l px-2.5 py-5 shadow-lg",
+        "resource-pane-surface pointer-events-auto absolute top-13 right-0 bottom-0 z-20 flex w-full min-w-0 max-w-screen-sm flex-col overflow-hidden rounded-tl-lg border-resource-pane-input border-t border-l bg-resource-pane px-2.5 py-5 text-resource-pane-foreground shadow-lg",
         className
       )}
     >
