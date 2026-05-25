@@ -49,22 +49,25 @@ export default function ProjectIndexPage() {
   );
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 overflow-hidden"
         data-slot="project-index-background"
       >
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-0"
           style={{
             backgroundImage:
-              "radial-gradient(circle, color-mix(in oklab, var(--color-foreground) 6%, transparent) 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
+              "radial-gradient(circle, color-mix(in oklab, var(--color-zinc-600) 72%, transparent) 0.5px, transparent 0.5px)",
+            backgroundPosition: "24px 0",
+            backgroundSize: "32px 41px",
+            maskImage:
+              "linear-gradient(to bottom, black 0%, black 58%, transparent 94%)",
           }}
         />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-10"
           style={{
             backgroundImage:
               "radial-gradient(ellipse 60% 40% at 50% 100%, color-mix(in oklab, var(--color-blue-500) 22%, transparent), transparent 70%)",
