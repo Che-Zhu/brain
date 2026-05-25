@@ -15,7 +15,6 @@ export function EntryNodeTargetList({ className }: { className?: string }) {
   const {
     state: { targets = [] },
   } = useEntryNode();
-  const scrollable = targets.length > 2;
 
   if (targets.length === 0) {
     return (
@@ -37,7 +36,6 @@ export function EntryNodeTargetList({ className }: { className?: string }) {
         "entry-node-target-list mt-2.5 flex min-w-0 flex-col gap-2",
         className
       )}
-      data-scrollable={scrollable || undefined}
       data-slot="entry-node-target-list"
     >
       {targets.map((target, index) => (

@@ -71,7 +71,7 @@ export default function ProjectIndexPage() {
           }}
         />
       </div>
-      <div className="relative flex min-h-0 flex-1 flex-col items-center gap-4 px-[52px] pt-0 pb-6">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center gap-4 px-[52px] pt-[52px] pb-6">
         <ProjectExplorer.Root actions={explorerActions} states={states}>
           <ProjectExplorer.Variant1
             className="w-full min-w-0 max-w-6xl flex-1"

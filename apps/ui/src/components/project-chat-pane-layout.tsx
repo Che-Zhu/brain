@@ -495,7 +495,7 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
   return (
     <header
       className={cn(
-        "flex h-13 shrink-0 items-center gap-2 bg-background pr-2 pl-6",
+        "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-13 items-center gap-2 bg-transparent pr-2 pl-6",
         !rightPaneOpen && "pr-12"
       )}
     >
@@ -528,7 +528,7 @@ export default function ProjectChatPaneLayout({
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
       <section
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         data-slot="project-main-pane"
       >
         <ProjectRouteTopBar rightPaneOpen={rightPaneOpen} />
