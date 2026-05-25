@@ -18,13 +18,13 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import {
+  ResourceSettingsDraftFooter,
   ResourceSettingsInset,
   ResourceSettingsSection,
   ResourceSettingsSlider,
 } from "@workspace/ui/components/resource-settings/resource-settings";
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
-import { Separator } from "@workspace/ui/components/separator";
 import {
   SlidingToggle,
   type SlidingToggleOption,
@@ -930,7 +930,7 @@ export function confirmedAddDbDsnReferencesFromEnvDraft(
 }
 
 const envReferenceSelectClassName =
-  "h-9 min-w-0 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+  "h-9 min-w-0 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
 function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
   return (
@@ -939,7 +939,7 @@ function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
       data-slot="container-env-rows"
     >
       {env.length === 0 ? (
-        <span className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-muted-foreground text-sm leading-5">
+        <span className="flex h-9 items-center rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-muted text-sm leading-5">
           No variables
         </span>
       ) : (
@@ -949,13 +949,13 @@ function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
             key={envRowKey(row, index)}
           >
             <span
-              className="flex h-9 min-w-0 items-center truncate rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5"
+              className="flex h-9 min-w-0 items-center truncate rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5"
               title={row.name}
             >
               {row.name}
             </span>
             <span
-              className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5"
+              className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5"
               title={envRowDisplayValue(row)}
             >
               <span className="min-w-0 truncate">
@@ -1001,7 +1001,7 @@ function EditableEnvValueControl({
 }: EditableEnvValueControlProps) {
   if (row.valueSource === "valueFrom") {
     return (
-      <div className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-input bg-background px-3 text-foreground text-sm leading-5">
+      <div className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5">
         <span className="min-w-0 truncate">External reference</span>
         <ExternalEnvBadge className="shrink-0" />
       </div>
@@ -1075,7 +1075,7 @@ function EditableEnvValueControl({
   return (
     <Input
       aria-label="Environment variable value"
-      className="h-9 bg-background text-foreground text-sm"
+      className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
       onChange={(event) =>
         onUpdateRow(index, {
           value: event.target.value,
@@ -1104,7 +1104,7 @@ function EditableEnvRows({
       data-slot="container-env-rows"
     >
       {envDraft.length === 0 ? (
-        <div className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-muted-foreground text-sm leading-5">
+        <div className="flex h-9 items-center rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-muted text-sm leading-5">
           No variables
         </div>
       ) : (
@@ -1117,7 +1117,7 @@ function EditableEnvRows({
                 <Input
                   aria-invalid={error != null}
                   aria-label="Environment variable name"
-                  className="h-9 bg-background text-foreground text-sm"
+                  className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
                   onChange={(event) =>
                     onUpdateRow(index, {
                       name: event.target.value,
@@ -1134,7 +1134,7 @@ function EditableEnvRows({
                 />
                 <Button
                   aria-label="Remove environment variable"
-                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
                   onClick={() => onDeleteRow(index)}
                   size="lg"
                   type="button"
@@ -1353,7 +1353,7 @@ function PublicAddressRow({
   };
 
   return (
-    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
       <span
         aria-label={`Public Address status: ${publicAddressStatusLabel(address)}`}
         className={cn(
@@ -1363,10 +1363,10 @@ function PublicAddressRow({
         role="img"
       />
       <div className="grid min-w-0 flex-1 gap-1">
-        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
           {value === "" ? "Pending domain" : value}
         </div>
-        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
           {address.port}
         </div>
       </div>
@@ -1453,7 +1453,7 @@ function CustomDomainLifecycleDetail({
         {lifecycleDetailLabel(label, detail)}
       </Badge>
       {text === "" ? null : (
-        <span className="min-w-0 truncate text-muted-foreground text-xs">
+        <span className="min-w-0 truncate text-resource-pane-muted text-xs">
           {text}
         </span>
       )}
@@ -1481,7 +1481,7 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
       : domain.cnameTarget.trim();
 
   return (
-    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
       <span
         aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
         className={cn(
@@ -1491,10 +1491,10 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
         role="img"
       />
       <div className="grid min-w-0 flex-1 gap-2">
-        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
           {domain.domain}
         </div>
-        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
           {targetPort == null ? targetText : `${targetText} -> ${targetPort}`}
         </div>
         <div className="grid min-w-0 gap-1 sm:grid-cols-3">
@@ -1617,7 +1617,7 @@ function CnameBindingDialog({
         <div className="grid gap-4">
           <div className="grid gap-1.5">
             <Label>CNAME target</Label>
-            <div className="min-w-0 truncate rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm">
+            <div className="min-w-0 truncate rounded-md border border-resource-pane-border bg-resource-pane-card px-2.5 py-2 font-mono text-resource-pane-foreground text-sm">
               {target === "" ? "Pending domain" : target}
             </div>
           </div>
@@ -1749,14 +1749,14 @@ interface NetworkCardProps {
 
 function NetworkCard({ actions, children, title }: NetworkCardProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border">
-      <div className="flex h-11 min-w-0 items-center gap-1.5 border-border border-b px-2.5">
+    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-resource-pane-border">
+      <div className="flex h-11 min-w-0 items-center gap-1.5 border-resource-pane-border border-b px-2.5">
         <Network
           aria-hidden
-          className="size-4 shrink-0 text-muted-foreground"
+          className="size-4 shrink-0 text-resource-pane-foreground"
           strokeWidth={2}
         />
-        <Label className="min-w-0 truncate font-medium text-foreground text-sm">
+        <Label className="min-w-0 truncate font-medium text-resource-pane-foreground text-sm">
           {title}
         </Label>
         {actions == null ? null : (
@@ -1837,13 +1837,13 @@ function AddPublicAddressForm({
   };
 
   return (
-    <div className="grid min-w-0 gap-3 rounded-md border border-border border-dashed bg-background/40 p-3">
+    <div className="grid min-w-0 gap-3 rounded-md border border-resource-pane-border border-dashed bg-transparent p-3">
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
         <Input
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className="h-9 max-w-32 font-mono text-sm"
+          className="h-9 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-sm dark:bg-transparent"
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -1929,13 +1929,13 @@ function DomainListSection({
       {readOnly ? null : (
         <Button
           aria-label="Add Public Address"
-          className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+          className="h-9 w-full bg-resource-pane-card text-resource-pane-primary text-sm hover:bg-resource-pane-input"
           disabled={addOpen || !canMutateNetwork}
           onClick={onOpenAddPublicAddress}
           type="button"
           variant="secondary"
         >
-          <Plus aria-hidden className="text-primary" />
+          <Plus aria-hidden className="text-blue-500" />
           Add Public Address
         </Button>
       )}
@@ -1948,7 +1948,7 @@ function DomainListSection({
         />
       ) : null}
       {noDomains ? (
-        <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
+        <div className="rounded-md border border-resource-pane-border border-dashed px-2.5 py-3 text-center text-resource-pane-muted text-xs">
           No public addresses yet
         </div>
       ) : (
@@ -1984,7 +1984,7 @@ function DomainListSection({
       )}
       {hiddenPublicAddressCount > 0 ? (
         <Button
-          className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+          className="h-4 justify-self-center px-2 text-resource-pane-muted text-xs hover:text-resource-pane-foreground"
           onClick={onShowAllPublicAddresses}
           size="xs"
           type="button"
@@ -2157,24 +2157,24 @@ function NetworkSettingsSection({
         >
           <button
             aria-label="Copy Private Address"
-            className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-muted/50 px-2.5 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-muted/50"
+            className="group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2 text-left transition-colors hover:bg-resource-pane-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:hover:bg-resource-pane-card"
             disabled={!hasPrivateAddress}
             onClick={handleCopyPrivateAddress}
             title="Copy Private Address"
             type="button"
           >
-            <div className="min-w-0 flex-1 truncate font-mono text-foreground text-sm leading-5">
+            <div className="min-w-0 flex-1 truncate font-mono text-resource-pane-foreground text-sm leading-5">
               {hasPrivateAddress ? privateAddress : "Pending"}
             </div>
             <Copy
               aria-hidden
-              className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              className="size-4 shrink-0 text-resource-pane-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
             />
           </button>
 
           <div className="grid min-w-0 gap-1.5">
             <Label
-              className="text-muted-foreground text-sm leading-5"
+              className="text-resource-pane-muted text-sm leading-5"
               htmlFor={networkInputId}
             >
               Private Address target port
@@ -2186,7 +2186,7 @@ function NetworkSettingsSection({
                   : `${networkInputId}-error`
               }
               aria-invalid={effectivePortError != null}
-              className="h-8 max-w-32 font-mono text-xs"
+              className="h-8 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-xs dark:bg-transparent"
               disabled={readOnly}
               id={networkInputId}
               inputMode="numeric"
@@ -2273,11 +2273,11 @@ interface ReadOnlyReplicaValueProps {
 
 function ReadOnlyReplicaValue({ label, value }: ReadOnlyReplicaValueProps) {
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background/60 px-2.5 py-2">
-      <span className="min-w-0 truncate text-muted-foreground text-xs">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-resource-pane-border bg-resource-pane-card px-2.5 py-2">
+      <span className="min-w-0 truncate text-resource-pane-muted text-xs">
         {label}
       </span>
-      <span className="shrink-0 font-medium text-foreground text-xs tabular-nums">
+      <span className="shrink-0 font-medium text-resource-pane-foreground text-xs tabular-nums">
         {value}
       </span>
     </div>
@@ -2448,23 +2448,23 @@ function ScalingTargetSlider({
               ariaLabel="Scaling target"
               className="h-8 w-auto"
               disabled={disabled}
-              indicatorClassName="rounded-md bg-input"
-              itemClassName="!rounded-md h-8 min-w-0 px-3 text-xs data-[state=on]:text-foreground text-muted-foreground"
+              indicatorClassName="rounded-md bg-resource-pane-card"
+              itemClassName="!rounded-md h-8 min-w-0 px-3 text-xs data-[state=on]:text-resource-pane-foreground text-resource-pane-muted"
               onValueChange={onTargetMetricChange}
               options={SCALING_TARGET_TOGGLE_OPTIONS}
               value={targetMetric}
             />
-            <span className="shrink-0 text-primary text-sm leading-5">
+            <span className="shrink-0 text-resource-pane-foreground text-sm leading-5">
               {config.format(config.value)}
             </span>
           </ScaleSlider.Header>
           <ScaleSlider.Control aria-label={config.ariaLabel} className="h-2">
-            <ScaleSlider.Track className="h-2 bg-input/80">
-              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-theme-blue" />
+            <ScaleSlider.Track className="h-2 bg-resource-pane-input">
+              <ScaleSlider.Range className="bg-gradient-to-r from-blue-950 to-blue-500" />
             </ScaleSlider.Track>
-            <ScaleSlider.Thumb className="size-4 border-2 border-primary bg-theme-blue shadow-none ring-0" />
+            <ScaleSlider.Thumb className="size-4 border-2 border-resource-pane-primary bg-blue-500 shadow-none ring-0" />
           </ScaleSlider.Control>
-          <div className="flex min-w-0 items-center justify-between gap-3 text-muted-foreground text-sm leading-5">
+          <div className="flex min-w-0 items-center justify-between gap-3 text-resource-pane-muted text-sm leading-5">
             <span className="truncate">{config.format(config.min)}</span>
             <span className="truncate text-right">
               {config.format(config.max)}
@@ -2547,7 +2547,7 @@ function ReplicaStrategySection({
             value={fixedReplicasSliderParts.replicasValue}
           />
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
             <ResourceSettingsSlider
               ariaLabel="Minimum replicas"
               disabled={readOnly}
@@ -2611,14 +2611,14 @@ function ImageSettingsSection({
     <ResourceSettingsSection icon={SquarePen} title="Image">
       <div className="flex min-w-0 flex-col gap-2">
         <Label
-          className="text-foreground text-sm leading-none"
+          className="text-resource-pane-foreground text-sm leading-none"
           htmlFor={imageInputId}
         >
           Image
         </Label>
         {readOnly ? (
           <div
-            className="flex h-9 min-w-0 items-center overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-muted-foreground text-sm leading-5"
+            className="flex h-9 min-w-0 items-center overflow-hidden rounded-md border border-resource-pane-input bg-transparent px-3 py-2 text-resource-pane-muted text-sm leading-5"
             title={shownImage}
           >
             <span className="min-w-0 truncate">{shownImage}</span>
@@ -2626,7 +2626,7 @@ function ImageSettingsSection({
         ) : (
           <Input
             aria-label="Container image"
-            className="h-9 bg-background text-muted-foreground text-sm"
+            className="h-9 border-resource-pane-input bg-transparent text-resource-pane-muted text-sm dark:bg-transparent"
             id={imageInputId}
             onBlur={onBlur}
             onChange={(event) => onChange(event.target.value)}
@@ -2662,77 +2662,20 @@ function ContainerSettingsDraftFooter({
   saveFailureMessage: string | null;
 }) {
   return (
-    <footer
-      className="flex shrink-0 flex-col gap-2 border-border border-t pt-3"
+    <ResourceSettingsDraftFooter
+      backingResourceChanged={backingResourceChanged}
+      canSubmit={canSave}
+      className="p-2.5"
       data-slot="container-settings-draft-actions"
-    >
-      {backingResourceChanged ? (
-        <div
-          className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-theme-yellow/40 bg-theme-yellow/10 px-2.5 py-2 text-theme-yellow text-xs leading-4"
-          role="status"
-        >
-          <span className="min-w-0 truncate">Backing resource changed.</span>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onReload}
-              type="button"
-              variant="ghost"
-            >
-              Reload
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={onKeepEditing}
-              type="button"
-              variant="ghost"
-            >
-              Keep editing
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {saveFailureMessage == null ? null : (
-        <p className="text-destructive text-xs leading-4" role="alert">
-          {saveFailureMessage}
-        </p>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <p
-          className={cn(
-            "min-w-0 truncate text-theme-yellow text-xs leading-4",
-            !dirty && "invisible"
-          )}
-        >
-          Unsaved settings changes.
-        </p>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            aria-label="Cancel settings changes"
-            className="h-8 px-3 text-xs"
-            disabled={!dirty || pending}
-            onClick={onCancel}
-            type="button"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            aria-label="Save settings"
-            className="h-8 px-3 text-xs"
-            disabled={!canSave}
-            onClick={async () => {
-              await onSave();
-            }}
-            type="button"
-            variant="secondary"
-          >
-            <Save aria-hidden data-icon="inline-start" />
-            {pending ? "Saving" : "Save"}
-          </Button>
-        </div>
-      </div>
-    </footer>
+      dirty={dirty}
+      onCancel={onCancel}
+      onKeepEditing={onKeepEditing}
+      onReload={onReload}
+      onSubmit={onSave}
+      pending={pending}
+      saveFailureMessage={saveFailureMessage}
+      submitAriaLabel="Save settings"
+    />
   );
 }
 
@@ -3529,12 +3472,12 @@ export function ContainerSettingsPane({
   return (
     <div
       className={cn(
-        "flex w-full flex-col gap-5 text-muted-foreground",
+        "flex w-full flex-col gap-5 text-resource-pane-muted",
         className
       )}
       data-slot="container-settings-pane"
     >
-      <div className="grid gap-3">
+      <div className="grid gap-5">
         {replicasSliderParts == null ? null : (
           <ReplicaStrategySection
             actions={quotaActions}
@@ -3597,11 +3540,9 @@ export function ContainerSettingsPane({
         />
       </div>
 
-      <Separator />
-
       <ResourceSettingsSection icon={SquarePen} title="Environment Variables">
         <div className="flex min-w-0 flex-col gap-2">
-          <Label className="text-foreground text-sm leading-none">
+          <Label className="text-resource-pane-foreground text-sm leading-none">
             Variables
           </Label>
           {readOnly ? (
@@ -3625,7 +3566,7 @@ export function ContainerSettingsPane({
               <>
                 <Button
                   aria-label="Cancel environment changes"
-                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
                   onClick={handleCancelEnvRows}
                   size="lg"
                   type="button"
@@ -3635,7 +3576,7 @@ export function ContainerSettingsPane({
                   Cancel
                 </Button>
                 <Button
-                  className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                  className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
                   disabled={!canSaveEnv}
                   onClick={handleSaveEnvRows}
                   size="lg"
@@ -3649,7 +3590,7 @@ export function ContainerSettingsPane({
             ) : null}
             <Button
               aria-label="Add environment variable"
-              className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+              className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
               onClick={handleAddEnvRow}
               size="lg"
               type="button"
@@ -3661,7 +3602,7 @@ export function ContainerSettingsPane({
             {canAddDbDsnReference ? (
               <Button
                 aria-label="Add Project DB reference"
-                className="h-9 rounded-lg bg-input/30 px-4 text-foreground text-sm hover:bg-input/50"
+                className="h-9 rounded-lg bg-resource-pane-card px-4 text-resource-pane-primary text-sm hover:bg-resource-pane-input"
                 onClick={handleAddDbDsnReferenceRow}
                 size="lg"
                 type="button"
@@ -3674,8 +3615,6 @@ export function ContainerSettingsPane({
           </div>
         )}
       </ResourceSettingsSection>
-
-      <Separator />
 
       {networkForRender == null ? null : (
         <NetworkSettingsSection

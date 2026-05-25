@@ -81,6 +81,13 @@ test("database settings pane renders copyable connection address rows", () => {
   assert.match(html, COPY_PUBLIC_CONNECTION_RE);
 });
 
+test("database settings pane renders shared draft actions", () => {
+  const html = renderPane();
+
+  assert.match(html, UPDATE_BUTTON_RE);
+  assert.match(html, CANCEL_BUTTON_RE);
+});
+
 test("database settings pane hides unprovisioned public address while public access is off", () => {
   const html = renderPane(
     <DatabaseSettingsPaneContent

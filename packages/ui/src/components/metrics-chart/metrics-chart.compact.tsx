@@ -19,7 +19,7 @@ export interface MetricsChartCompactProps {
 
 const COMPACT_CHART_CONFIG = {
   value: {
-    color: "var(--color-database-metrics-chart)",
+    color: "var(--color-blue-500)",
     label: "Value",
   },
 } satisfies ChartConfig;
@@ -34,7 +34,7 @@ function formatTimestamp(timestamp: number): string {
 /** Single-series compact area chart for dense pane cards. */
 export function MetricsChartCompact({
   chartClassName,
-  color = "var(--color-database-metrics-chart)",
+  color = "var(--color-blue-500)",
   data,
 }: MetricsChartCompactProps) {
   const gradientId = useId().replace(/:/g, "");
@@ -81,7 +81,7 @@ export function MetricsChartCompact({
           </linearGradient>
         </defs>
         <CartesianGrid
-          stroke="var(--color-database-metrics-grid)"
+          stroke="var(--color-resource-pane-border)"
           vertical={false}
         />
         <XAxis dataKey="readableTime" hide />
