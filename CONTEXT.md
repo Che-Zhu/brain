@@ -29,7 +29,7 @@ An externally reachable URL/domain alias for an AP that targets one App Listenin
 
 ### Platform Address
 
-A system-assigned Public Address that the platform can create without user DNS or certificate setup; in v1, users request one by choosing an App Listening Port, not by providing a host or URL.
+A system-assigned Public Address that the platform can create without user DNS or certificate setup; in v1, users request one by choosing an App Listening Port, not by providing a host or URL. A Platform Address may be promoted into the CNAME target for a Custom Domain Binding, after which its host remains the binding target rather than the primary displayed Public Address.
 
 ### Requested Platform Address
 
@@ -45,7 +45,35 @@ A Public Address whose allocated host resolves and successfully routes external 
 
 ### Custom Domain
 
-A user-owned Public Address that requires DNS verification and TLS certificate lifecycle management. Multiple Custom Domains may target the same App Listening Port.
+A user-owned Public Address that requires DNS verification and TLS certificate lifecycle management. Multiple Custom Domains may target the same App Listening Port, and each binding points at a promoted Platform Address host as its CNAME target.
+
+Removing a Custom Domain Binding unbinds the user-owned domain and returns the promoted Platform Address to ordinary display; it does not delete the Platform Address or close public access.
+
+A Custom Domain Binding requires an allocated Platform Address host first, because that host is the CNAME target shown to the user.
+
+When a Platform Address is promoted into a Custom Domain Binding, AP Settings hides the Platform Address row and shows the Custom Domain row instead. Unbinding the Custom Domain returns the Platform Address row to ordinary display.
+
+In v1, one Platform Address can be promoted into at most one Custom Domain Binding. Multiple Custom Domains for the same App Listening Port require multiple Platform Addresses targeting that port.
+
+Custom Domain Binding desired state must reference an existing Platform Address in the same AP, and the same Platform Address ID cannot be referenced by more than one Custom Domain Binding.
+
+AP Settings may use the deterministic draft Platform Address host as the CNAME target for submit-time verification before the Platform Address has appeared in observed routing state. Reachability still belongs to EntryPoint status after save.
+
+AP observed Public Address rows may include Custom Domain rows as a display projection. A Custom Domain row replaces the promoted Platform Address row in AP Settings, but the authoritative DNS, certificate, routing, and binding health comes from EntryPoint status.
+
+### Custom Domain Binding ID
+
+The stable opaque identity of a Custom Domain Binding. Custom Domain Binding IDs use the opaque format `cd_` followed by lowercase alphanumeric characters; each binding references the promoted Platform Address ID that supplies its CNAME target. The domain name is separately unique because an external host can route to only one AP binding in a routing scope.
+
+Custom Domain Binding desired state references the promoted Platform Address by ID and does not store a separate target port; the target App Listening Port belongs to the referenced Platform Address.
+
+AP Custom Domain Binding desired entries contain `id`, `domain`, and `platformAddressId`. They do not store `port`, `cnameTarget`, `status`, or `verified`.
+
+EntryPoint Custom Domain Binding desired entries contain `id`, `domain`, `platformAddressId`, `targetPort`, and `cnameTarget`. AP Composition derives `targetPort` and `cnameTarget` when it writes the EntryPoint task list so EntryPoint does not need to recalculate AP network allocation rules.
+
+### Routing Scope
+
+The public routing boundary within which one Custom Domain can belong to only one AP. In v1, the enforceable Routing Scope is the current Kubernetes namespace; broader cluster-wide uniqueness requires platform-level admission or indexing.
 
 ### AP (Application)
 
@@ -119,9 +147,9 @@ A derived health tone for one Project row in the project list, computed from the
 
 The human-facing Project name shown in navigation and project chrome, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name.
 
-### Custom Domain Binding (future, not yet implemented)
+### Custom Domain Binding
 
-The process of attaching a Custom Domain as a Public Address for an AP. Blocked on cert-manager infrastructure. When implemented, the desired-state location will be decided by the Custom Domain PRD; the lifecycle still includes:
+The process of attaching a Custom Domain as a Public Address for an AP. This is the user-facing domain concept; a CNAME record is one DNS mechanism used during binding, not the feature itself. The AP owns the user's binding intent, while EntryPoint owns DNS verification, routing, certificate lifecycle, and binding status. The lifecycle includes:
 
 1. User adds a Custom Domain and target App Listening Port.
 2. Platform creates or updates the public routing rule for the custom domain.
@@ -144,7 +172,7 @@ EntryPoint uses Crossplane XRD for schema registration (consistent with AP and D
 Two Compositions interact with EntryPoint:
 
 - **AP Composition** creates/updates EntryPoint via provider-kubernetes Object (writes `spec.apRef` + allocated Public Address target data). Manages EntryPoint's lifecycle — creation when allocated public routing targets exist, deletion when AP is deleted.
-- **EntryPoint Composition** reconciles EntryPoint's own composed resources. Currently minimal (echoes spec to status). Will be extended to manage custom domain Ingress + Certificate resources when that feature is built.
+- **EntryPoint Composition** reconciles EntryPoint's own composed resources. Platform Domain Ingress remains AP-owned, while Custom Domain Ingress, certificate resources, and Custom Domain Binding status belong to EntryPoint.
 
 These do not conflict: AP Composition writes EntryPoint's spec (external write), EntryPoint Composition writes status + composed resources (internal reconcile).
 
@@ -170,7 +198,7 @@ Each Public Address chooses the App Listening Port it should reach. Users should
 
 ### Platform Addresses are allocated by the platform
 
-For v1 Platform Addresses, the user chooses the target App Listening Port while the UI/API supplies a stable opaque Platform Address ID. The platform allocates the public host and URL, and the UI renders those values from observed state.
+For v1 Platform Addresses, the user chooses the target App Listening Port while the UI/API supplies a stable opaque Platform Address ID. The platform allocates the public host and URL through a deterministic rule that both the UI/API and AP Composition can apply, so AP Settings can show the draft Platform Address host before the AP has reconciled.
 
 Observed Public Address rows include the stable Platform Address ID so desired and observed addresses can be matched even when multiple addresses target the same App Listening Port.
 
@@ -182,7 +210,7 @@ The base domain used to allocate Platform Address hosts belongs to platform inst
 
 ### Platform Address identity is stable in v1
 
-For v1 Platform Addresses, identity belongs to the Public Address itself, not to the target App Listening Port. The target App Listening Port is chosen when the Platform Address is created and is not editable afterward; changing the target port means deleting the old Public Address and creating a new one.
+For v1 Platform Addresses, identity belongs to the Public Address row itself, not to the target App Listening Port. The target App Listening Port may be edited; any Custom Domain Binding that references the Platform Address follows that Platform Address to the new target port.
 
 The Platform Address ID is generated by the UI/API when the address is added and is persisted in desired state. The ID is opaque and stable; the AP Composition consumes it when allocating the host.
 
@@ -194,15 +222,17 @@ Platform Address IDs use the opaque format `pa_` followed by lowercase alphanume
 
 ### Platform Address hosts are stable platform allocations
 
-For a given AP and Platform Address identity, the platform should allocate a stable host derived from platform-owned identity such as namespace, AP name, AP UID, Platform Address ID, and the configured base domain.
+For a given AP and Platform Address identity, the platform should allocate a stable host derived from namespace, AP name, Platform Address ID, and the configured base domain. AP UID is intentionally excluded so the host can be computed before the AP has reconciled.
 
-V1 Platform Address hosts use `{dns-safe-ap-name}-{slug}.{routing-domain}`. The slug is a 10-character hash derived from AP identity and Platform Address ID, not from the target App Listening Port.
+V1 Platform Address hosts use `{dns-safe-ap-name}-{slug}.{routing-domain}`. The slug is a 10-character hash derived from namespace, AP name, and Platform Address ID, not from the target App Listening Port.
+
+Changing a Platform Address's target App Listening Port must not change its host or any Custom Domain CNAME target derived from it.
 
 ### Pending Platform Address
 
-A Requested Platform Address whose stable ID and target App Listening Port exist in desired state but whose platform-allocated URL has not appeared in observed state yet. The UI may show it as pending, but must not invent a host or URL.
+A Requested Platform Address whose stable ID and target App Listening Port exist in desired state but whose route has not appeared in observed state yet. The UI may show the deterministic draft host when the routing domain and required AP identity inputs are known, while still marking the address as pending until observed routing state appears.
 
-If the routing domain carrier is missing, a requested Platform Address remains pending rather than falling back to a hardcoded host or exposing an invented URL.
+If the routing domain carrier or required AP identity inputs are missing, a requested Platform Address remains pending rather than falling back to a hardcoded host or exposing an invented URL.
 
 ### Platform Addresses are identified separately from target ports in v1
 
@@ -217,6 +247,16 @@ Public Addresses belong to the EntryPoint domain model, but the AP Settings pane
 ### AP Settings owns the empty Public Addresses affordance
 
 The AP Settings panel should show Public Addresses even when the AP has no EntryPoint yet. Adding the first Public Address creates a Requested Platform Address; once allocation is possible, the AP Composition creates or enables the EntryPoint behind the scenes. Users should not need a separate "create EntryPoint" action.
+
+The AP Settings `Add Domain` action creates a Platform Address draft. Custom Domain Binding starts from the CNAME action on a specific Platform Address row, which promotes that Platform Address into the binding target.
+
+After CNAME verification succeeds, AP Settings updates only the local Settings Draft. The Custom Domain Binding is submitted to AP desired state only when the panel-level Save is confirmed.
+
+AP Settings CNAME verification is a submit-time guard, not the source of truth for binding health. EntryPoint remains the source of truth for Custom Domain Binding health, routing, certificate lifecycle, and status; v1 does not include ongoing DNS polling.
+
+Saving AP Settings submits Custom Domain Binding desired state without synchronously re-verifying DNS. If DNS changes after submit-time verification, v1 may surface the resulting certificate or routing failure, but it does not promise active DNS drift detection.
+
+Custom Domain Binding top-level status uses `pending`, `verifying`, `accessible`, and `blocked`. Detailed DNS (`pending`, `verified`, `unknown`, `blocked`), certificate (`pending`, `ready`, `failed`, `unknown`), and routing (`pending`, `configured`, `blocked`) statuses explain the reason and user action, but the top-level status answers whether the Public Address is usable or waiting on external work.
 
 ### New APs are private by default
 
@@ -466,9 +506,9 @@ Canvas nodes consume workload telemetry through a shared telemetry store rather 
 
 Canvas telemetry snapshots use instant telemetry queries and return only the latest sampled metric values. Snapshot requests do not carry a sampling window. Detailed metrics panels request one workload at a time and use range telemetry queries with `start`, `end`, and `step` when they need a Workload Telemetry Series.
 
-### Custom domain implementation is deferred
+### Custom Domain Binding desired state is part of the v1 AP Network contract
 
-Custom Domain desired-state shape and resource ownership are intentionally deferred until DNS verification and certificate infrastructure are designed. Implementation requires cert-manager + Let's Encrypt infrastructure that is not yet deployed. Platform-assigned domains use a wildcard certificate (`wildcard-cert`) and do not need per-domain certificate management.
+AP Custom Domain Binding desired state is no longer deferred: it is represented by `spec.input.network.customDomains[]` entries containing `id`, `domain`, and `platformAddressId`. The implementation of ongoing DNS verification, routing, and certificate lifecycle remains an EntryPoint responsibility and depends on public entry infrastructure decisions.
 
 ### Project Aggregate Status is derived from AP and DB phases, not from Project conditions
 
