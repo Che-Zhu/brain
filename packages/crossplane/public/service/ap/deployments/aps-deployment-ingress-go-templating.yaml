@@ -136,14 +136,44 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- $platformAddressByID := dict }}
+            {{- range $platformAddresses }}
+            {{- $_ := set $platformAddressByID .id . }}
+            {{- end }}
+            {{- $customDomains := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "customDomains") }}
+            {{- range $network.customDomains }}
+            {{- $cdID := "" }}
+            {{- if hasKey . "id" }}{{ $cdID = trim (toString .id) }}{{ end }}
+            {{- $cdDomain := "" }}
+            {{- if hasKey . "domain" }}{{ $cdDomain = lower (trim (toString .domain)) }}{{ end }}
+            {{- $cdPlatformAddressID := "" }}
+            {{- if hasKey . "platformAddressId" }}{{ $cdPlatformAddressID = trim (toString .platformAddressId) }}{{ end }}
+            {{- if and (regexMatch "^cd_[a-z0-9]{6,32}$" $cdID) (ne $cdDomain "") (hasKey $platformAddressByID $cdPlatformAddressID) }}
+            {{- $customDomains = concat $customDomains (list (dict "id" $cdID "domain" $cdDomain "platformAddressId" $cdPlatformAddressID)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $networkPublicAddresses := list }}
+            {{- $networkPublicAddressByID := dict }}
             {{- if ne $routingDomain "" }}
             {{- range $platformAddresses }}
-            {{- $slug := sha256sum (printf "%s/%s/%s/%s" $ns $name $apUid .id) | trunc 10 }}
+            {{- $slug := sha256sum (printf "%s/%s/%s" $ns $name .id) | trunc 10 }}
             {{- $hostPrefix := $safeAPName | trunc 52 | trimSuffix "-" }}
             {{- if eq $hostPrefix "" }}{{ $hostPrefix = "ap" }}{{ end }}
             {{- $host := printf "%s-%s.%s" $hostPrefix $slug $routingDomain }}
-            {{- $networkPublicAddresses = concat $networkPublicAddresses (list (dict "id" .id "host" $host "port" .port)) }}
+            {{- $networkPublicAddress := dict "id" .id "host" $host "port" .port }}
+            {{- $networkPublicAddresses = concat $networkPublicAddresses (list $networkPublicAddress) }}
+            {{- $_ := set $networkPublicAddressByID .id $networkPublicAddress }}
+            {{- end }}
+            {{- end }}
+            {{- $entryPointCustomDomains := list }}
+            {{- $promotedPlatformAddressIDs := dict }}
+            {{- range $customDomains }}
+            {{- $target := index $networkPublicAddressByID .platformAddressId }}
+            {{- if $target }}
+            {{- $entryPointCustomDomains = concat $entryPointCustomDomains (list (dict "id" .id "domain" .domain "platformAddressId" .platformAddressId "targetPort" $target.port "cnameTarget" $target.host)) }}
+            {{- $_ := set $promotedPlatformAddressIDs .platformAddressId 1 }}
             {{- end }}
             {{- end }}
             {{- $ports := list }}
@@ -178,6 +208,9 @@ spec:
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
             {{- if gt (len $platformAddresses) 0 }}
             {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
+            {{- end }}
+            {{- if gt (len $customDomains) 0 }}
+            {{- $_ := set $effectiveNetwork "customDomains" $customDomains }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
@@ -644,6 +677,16 @@ spec:
                         platformDomain: {{ .host | quote }}
                         status: {{ $entryTargetStatus | quote }}
                       {{ end }}
+                    {{ if gt (len $entryPointCustomDomains) 0 }}
+                    customDomains:
+                      {{ range $entryPointCustomDomains }}
+                      - id: {{ .id | quote }}
+                        domain: {{ .domain | quote }}
+                        platformAddressId: {{ .platformAddressId | quote }}
+                        targetPort: {{ .targetPort }}
+                        cnameTarget: {{ .cnameTarget | quote }}
+                      {{ end }}
+                    {{ end }}
             {{- end }}
 
             ---
@@ -673,13 +716,25 @@ spec:
                 privatePort: {{ $privatePort }}
                 {{- if $needIngress }}
                 publicAddresses:
+                  {{ range $entryPointCustomDomains }}
+                  - id: {{ .id | quote }}
+                    host: {{ .domain | quote }}
+                    url: {{ printf "https://%s/" .domain | quote }}
+                    port: {{ .targetPort }}
+                    type: "custom"
+                    status: "pending"
+                    platformAddressId: {{ .platformAddressId | quote }}
+                    cnameTarget: {{ .cnameTarget | quote }}
+                  {{ end }}
                   {{ range $networkPublicAddresses }}
+                  {{ if not (index $promotedPlatformAddressIDs .id) }}
                   - id: {{ .id | quote }}
                     host: {{ .host | quote }}
                     url: {{ printf "%s://%s/" $pubScheme .host | quote }}
                     port: {{ .port }}
                     type: "platform"
                     status: {{ $entryTargetStatus | quote }}
+                  {{ end }}
                   {{ end }}
                 {{- end }}
               {{ end }}
@@ -764,6 +819,24 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- $platformAddressByID := dict }}
+            {{- range $platformAddresses }}
+            {{- $_ := set $platformAddressByID .id . }}
+            {{- end }}
+            {{- $customDomains := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "customDomains") }}
+            {{- range $network.customDomains }}
+            {{- $cdID := "" }}
+            {{- if hasKey . "id" }}{{ $cdID = trim (toString .id) }}{{ end }}
+            {{- $cdDomain := "" }}
+            {{- if hasKey . "domain" }}{{ $cdDomain = lower (trim (toString .domain)) }}{{ end }}
+            {{- $cdPlatformAddressID := "" }}
+            {{- if hasKey . "platformAddressId" }}{{ $cdPlatformAddressID = trim (toString .platformAddressId) }}{{ end }}
+            {{- if and (regexMatch "^cd_[a-z0-9]{6,32}$" $cdID) (ne $cdDomain "") (hasKey $platformAddressByID $cdPlatformAddressID) }}
+            {{- $customDomains = concat $customDomains (list (dict "id" $cdID "domain" $cdDomain "platformAddressId" $cdPlatformAddressID)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $paused := false }}
             {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
             {{- $desiredReplicas := $replicas }}
@@ -780,6 +853,9 @@ spec:
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
             {{- if gt (len $platformAddresses) 0 }}
             {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
+            {{- end }}
+            {{- if gt (len $customDomains) 0 }}
+            {{- $_ := set $effectiveNetwork "customDomains" $customDomains }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}
@@ -971,6 +1047,24 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- $platformAddressByID := dict }}
+            {{- range $platformAddresses }}
+            {{- $_ := set $platformAddressByID .id . }}
+            {{- end }}
+            {{- $customDomains := list }}
+            {{- if and (gt $privatePort 0) (hasKey $network "customDomains") }}
+            {{- range $network.customDomains }}
+            {{- $cdID := "" }}
+            {{- if hasKey . "id" }}{{ $cdID = trim (toString .id) }}{{ end }}
+            {{- $cdDomain := "" }}
+            {{- if hasKey . "domain" }}{{ $cdDomain = lower (trim (toString .domain)) }}{{ end }}
+            {{- $cdPlatformAddressID := "" }}
+            {{- if hasKey . "platformAddressId" }}{{ $cdPlatformAddressID = trim (toString .platformAddressId) }}{{ end }}
+            {{- if and (regexMatch "^cd_[a-z0-9]{6,32}$" $cdID) (ne $cdDomain "") (hasKey $platformAddressByID $cdPlatformAddressID) }}
+            {{- $customDomains = concat $customDomains (list (dict "id" $cdID "domain" $cdDomain "platformAddressId" $cdPlatformAddressID)) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- $paused := false }}
             {{- if and (hasKey $spec "paused") $spec.paused }}{{ $paused = true }}{{ end }}
             {{- $desiredReplicas := $replicas }}
@@ -987,6 +1081,9 @@ spec:
             {{- $effectiveNetwork := dict "privatePort" $privatePort }}
             {{- if gt (len $platformAddresses) 0 }}
             {{- $_ := set $effectiveNetwork "platformAddresses" $platformAddresses }}
+            {{- end }}
+            {{- if gt (len $customDomains) 0 }}
+            {{- $_ := set $effectiveNetwork "customDomains" $customDomains }}
             {{- end }}
             {{- $_ := set $effectiveInput "network" $effectiveNetwork }}
             {{- end }}

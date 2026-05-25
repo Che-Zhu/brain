@@ -15,8 +15,11 @@ import {
   routingDomainFromKubeconfig,
 } from "@/lib/kubeconfig-routing-domain";
 import {
+  CUSTOM_DOMAIN_BINDING_ID_PATTERN,
   generatePlatformAddressId,
+  isCustomDomainBindingId,
   isPlatformAddressId,
+  normalizeCustomDomainBindingId,
   normalizePlatformAddressId,
   PLATFORM_ADDRESS_ID_PATTERN,
 } from "../platform-addresses";
@@ -36,15 +39,20 @@ import {
   readApInput,
   readApReplicaStrategy,
 } from "./ap-spec-access";
+import {
+  type ExistingCustomDomainBinding,
+  normalizeCustomDomainName,
+} from "./entrypoint-custom-domains";
 import { type K8sJsonPatchOp, k8sJsonPatchResource } from "./http/json-patch";
 
 const AP_K8S_KIND = "aps";
 const LEGACY_AP_NETWORK_INPUT_FIELDS = ["endpoints", "port", "host"] as const;
 
 type ApNetworkSettingsPatch = Pick<ContainerNetwork, "privatePort"> &
-  Partial<Pick<ContainerNetwork, "publicAddresses">>;
+  Partial<Pick<ContainerNetwork, "customDomains" | "publicAddresses">>;
 
 interface ApNetworkSettingsPatchOptions {
+  existingCustomDomains?: readonly ExistingCustomDomainBinding[];
   metadata?: Record<string, unknown>;
   routingDomain?: string;
 }
@@ -294,6 +302,33 @@ function publicAddressesEqual(
   });
 }
 
+function customDomainsEqual(
+  a:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined,
+  b:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((domain, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      normalizeCustomDomainBindingId(domain.id) ===
+        normalizeCustomDomainBindingId(other.id) &&
+      domain.domain.trim().toLowerCase() ===
+        other.domain.trim().toLowerCase() &&
+      normalizePlatformAddressId(domain.platformAddressId) ===
+        normalizePlatformAddressId(other.platformAddressId)
+    );
+  });
+}
+
 function apNetworksEqual(
   a: ApNetworkSettingsPatch | undefined,
   b: ApNetworkSettingsPatch | undefined
@@ -303,7 +338,8 @@ function apNetworksEqual(
   }
   return (
     Math.round(a.privatePort) === Math.round(b.privatePort) &&
-    publicAddressesEqual(a.publicAddresses, b.publicAddresses)
+    publicAddressesEqual(a.publicAddresses, b.publicAddresses) &&
+    customDomainsEqual(a.customDomains, b.customDomains)
   );
 }
 
@@ -314,7 +350,10 @@ function apSettingsImageChanged(
   return next !== undefined && next.trim() !== (previous ?? "").trim();
 }
 
-function buildApNetworkInput(network: ApNetworkSettingsPatch): {
+function buildApNetworkInput(
+  network: ApNetworkSettingsPatch,
+  options: ApNetworkSettingsPatchOptions = {}
+): {
   hasPublicAddresses: boolean;
   networkInput: Record<string, unknown>;
 } {
@@ -323,9 +362,17 @@ function buildApNetworkInput(network: ApNetworkSettingsPatch): {
     "Private Address target port"
   );
   const platformAddresses = validatedPlatformAddresses(network.publicAddresses);
+  const customDomains = validatedCustomDomains(
+    network.customDomains,
+    platformAddresses,
+    options
+  );
   const networkInput: Record<string, unknown> = { privatePort };
   if (platformAddresses != null && platformAddresses.length > 0) {
     networkInput.platformAddresses = platformAddresses;
+  }
+  if (customDomains != null && customDomains.length > 0) {
+    networkInput.customDomains = customDomains;
   }
   return {
     hasPublicAddresses: (platformAddresses?.length ?? 0) > 0,
@@ -513,12 +560,104 @@ function validatedPlatformAddresses(
   });
 }
 
+function validatedCustomDomains(
+  customDomains:
+    | readonly NonNullable<ContainerNetwork["customDomains"]>[number][]
+    | undefined,
+  platformAddresses: readonly Record<string, unknown>[] | undefined,
+  options: ApNetworkSettingsPatchOptions = {}
+): Record<string, unknown>[] | undefined {
+  if (customDomains == null) {
+    return undefined;
+  }
+
+  const platformAddressIds = new Set(
+    (platformAddresses ?? []).flatMap((address) => {
+      const id = normalizePlatformAddressId(address.id);
+      return isPlatformAddressId(id) ? [id] : [];
+    })
+  );
+  const seenIds = new Set<string>();
+  const seenDomains = new Set<string>();
+  const seenPlatformAddressIds = new Set<string>();
+
+  return customDomains.map((customDomain) => {
+    const id = normalizeCustomDomainBindingId(customDomain.id);
+    if (!isCustomDomainBindingId(id)) {
+      throw new Error(
+        `Custom Domain Binding ID must match ${CUSTOM_DOMAIN_BINDING_ID_PATTERN}.`
+      );
+    }
+    if (seenIds.has(id)) {
+      throw new Error("Custom Domain Binding IDs must be unique.");
+    }
+    seenIds.add(id);
+
+    const platformAddressId = normalizePlatformAddressId(
+      customDomain.platformAddressId
+    );
+    if (!platformAddressIds.has(platformAddressId)) {
+      throw new Error(
+        "Custom Domain Binding must reference an existing Platform Address."
+      );
+    }
+    if (seenPlatformAddressIds.has(platformAddressId)) {
+      throw new Error(
+        "Platform Address can only be bound to one Custom Domain."
+      );
+    }
+    seenPlatformAddressIds.add(platformAddressId);
+
+    const domain = normalizeCustomDomainName(customDomain.domain);
+    if (domain === "") {
+      throw new Error("Custom Domain is required.");
+    }
+    if (seenDomains.has(domain)) {
+      throw new Error("Custom Domain can only be bound once.");
+    }
+    seenDomains.add(domain);
+    assertCustomDomainAvailableInNamespace(domain, options);
+
+    return { domain, id, platformAddressId };
+  });
+}
+
+function assertCustomDomainAvailableInNamespace(
+  domain: string,
+  options: ApNetworkSettingsPatchOptions
+): void {
+  const metadata = options.metadata;
+  const namespace =
+    typeof metadata?.namespace === "string" ? metadata.namespace.trim() : "";
+  const currentAp =
+    typeof metadata?.name === "string" ? metadata.name.trim() : "";
+  if (namespace === "" || currentAp === "") {
+    return;
+  }
+
+  for (const binding of options.existingCustomDomains ?? []) {
+    if (binding.namespace.trim() !== namespace) {
+      continue;
+    }
+    if (normalizeCustomDomainName(binding.domain) !== domain) {
+      continue;
+    }
+    if (binding.apRef.trim() === currentAp) {
+      continue;
+    }
+    throw new Error("Custom Domain is already bound in this namespace.");
+  }
+}
+
 export function patchOpsForApNetworkSettings(
   spec: Record<string, unknown> | undefined,
   network: ApNetworkSettingsPatch,
   options: ApNetworkSettingsPatchOptions = {}
 ): K8sJsonPatchOp[] {
-  const { hasPublicAddresses, networkInput } = buildApNetworkInput(network);
+  const { hasPublicAddresses, networkInput } = buildApNetworkInput(
+    network,
+    options
+  );
   const input = asRecord(spec?.input);
   const ops = patchOpsForApInput(spec, { network: networkInput });
   removeExistingApInputFields(ops, input, LEGACY_AP_NETWORK_INPUT_FIELDS);
@@ -568,7 +707,8 @@ function patchOpsForApSettingsDraftInput(
     !apNetworksEqual(next.network, previous.network)
   ) {
     const { hasPublicAddresses, networkInput } = buildApNetworkInput(
-      next.network
+      next.network,
+      options
     );
     inputPatch.network = networkInput;
     networkHasPublicAddresses = hasPublicAddresses;
@@ -666,13 +806,15 @@ export async function applyApEnv(
 export async function applyApNetwork(
   kubeconfig: string,
   claim: Record<string, unknown>,
-  network: ApNetworkSettingsPatch
+  network: ApNetworkSettingsPatch,
+  options: Pick<ApNetworkSettingsPatchOptions, "existingCustomDomains"> = {}
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   await patchAp(
     kubeconfig,
     claim,
     patchOpsForApNetworkSettings(spec, network, {
+      existingCustomDomains: options.existingCustomDomains,
       metadata: asRecord(claim.metadata),
       routingDomain: routingDomainFromKubeconfig(kubeconfig),
     })
@@ -683,10 +825,12 @@ export async function applyApSettingsDraft(
   kubeconfig: string,
   claim: Record<string, unknown>,
   next: ApSettingsDraftPatch,
-  previous: ApSettingsDraftPatch
+  previous: ApSettingsDraftPatch,
+  options: Pick<ApNetworkSettingsPatchOptions, "existingCustomDomains"> = {}
 ): Promise<void> {
   const spec = asRecord(claim.spec);
   const patch = patchOpsForApSettingsDraft(spec, next, previous, {
+    existingCustomDomains: options.existingCustomDomains,
     metadata: asRecord(claim.metadata),
     routingDomain: routingDomainFromKubeconfig(kubeconfig),
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useK8sGetResource } from "@workspace/api/hooks";
+import { useEntryPointList, useK8sGetResource } from "@workspace/api/hooks";
 import type { K8sGetResponse } from "@workspace/api/schemas/k8s-get";
 import type {
   ContainerEnvVar,
@@ -33,6 +33,7 @@ import {
   k8sGetClaimBody,
   type WorkloadClaimKind,
 } from "@/lib/project-canvas/k8s/claim-mapper";
+import { existingCustomDomainBindingsFromEntryPoints } from "@/lib/project-canvas/k8s/entrypoint-custom-domains";
 
 export type ContainerSettingsOnPortsChange = (ports: ContainerPort[]) => void;
 
@@ -131,6 +132,21 @@ export function useWorkloadClaimSettings(
       claimReconcilePollUntil > Date.now() ? WORKLOAD_RECONCILE_POLL_MS : 0,
     shareToken: shareToken === "" ? undefined : shareToken,
   });
+  const {
+    data: entryPointsData,
+    error: entryPointsError,
+    isLoading: entryPointsLoading,
+    mutate: revalidateEntryPoints,
+  } = useEntryPointList({
+    kubeconfig: isApWorkload ? kubeconfig : "",
+    namespace,
+    pollWhileEmpty: false,
+    refreshInterval:
+      isApWorkload && claimReconcilePollUntil > Date.now()
+        ? WORKLOAD_RECONCILE_POLL_MS
+        : 0,
+    shareToken: isApWorkload && shareToken !== "" ? shareToken : undefined,
+  });
 
   const claimBodyRef = useRef<Record<string, unknown> | undefined>(undefined);
   claimBodyRef.current = k8sGetClaimBody(claimPayload);
@@ -158,8 +174,22 @@ export function useWorkloadClaimSettings(
     () =>
       claimToContainerSettings(k8sGetClaimBody(claimPayload), workloadKind, {
         dbDsnReferenceSources,
+        entryPointsData: isApWorkload ? entryPointsData : undefined,
       }),
-    [claimPayload, dbDsnReferenceSources, workloadKind]
+    [
+      claimPayload,
+      dbDsnReferenceSources,
+      entryPointsData,
+      isApWorkload,
+      workloadKind,
+    ]
+  );
+  const existingCustomDomains = useMemo(
+    () =>
+      isApWorkload
+        ? existingCustomDomainBindingsFromEntryPoints(entryPointsData)
+        : [],
+    [entryPointsData, isApWorkload]
   );
 
   const display = useMemo(
@@ -170,9 +200,10 @@ export function useWorkloadClaimSettings(
     setClaimReconcilePollUntil(Date.now() + WORKLOAD_RECONCILE_POLL_WINDOW_MS);
     await Promise.all([
       revalidateClaim(),
+      revalidateEntryPoints(),
       onWorkloadMutation?.().catch(() => undefined),
     ]);
-  }, [onWorkloadMutation, revalidateClaim]);
+  }, [onWorkloadMutation, revalidateClaim, revalidateEntryPoints]);
 
   const ignoreImage = useCallback((_image: string) => {
     /* read-only */
@@ -270,7 +301,7 @@ export function useWorkloadClaimSettings(
       }
       setLocalOverride((prev) => ({ ...(prev ?? {}), network }));
       try {
-        await applyApNetwork(kc, body, network);
+        await applyApNetwork(kc, body, network, { existingCustomDomains });
         toast.success("Network applied.");
         await revalidateAfterApMutation();
       } catch (e) {
@@ -278,7 +309,13 @@ export function useWorkloadClaimSettings(
         toast.error(e instanceof Error ? e.message : "Apply failed");
       }
     },
-    [isApWorkload, kubeconfig, readOnly, revalidateAfterApMutation]
+    [
+      existingCustomDomains,
+      isApWorkload,
+      kubeconfig,
+      readOnly,
+      revalidateAfterApMutation,
+    ]
   );
 
   const onResourceQuotasCommit = useCallback(
@@ -375,7 +412,9 @@ export function useWorkloadClaimSettings(
           : onAddDbDsnReferenceMutationStart?.(confirmedReferences);
 
       try {
-        await applyApSettingsDraft(kc, body, draft, previous);
+        await applyApSettingsDraft(kc, body, draft, previous, {
+          existingCustomDomains,
+        });
         toast.success("Settings applied.");
         await revalidateAfterApMutation();
       } catch (e) {
@@ -393,6 +432,7 @@ export function useWorkloadClaimSettings(
       display.network,
       display.replicaStrategy,
       display.replicas,
+      existingCustomDomains,
       isApWorkload,
       kubeconfig,
       onAddDbDsnReferenceMutationStart,
@@ -404,7 +444,7 @@ export function useWorkloadClaimSettings(
   return {
     claimPayload: claimPayload as K8sGetResponse | undefined,
     display,
-    error,
+    error: error ?? (isApWorkload ? entryPointsError : undefined),
     ignoreEnv,
     ignoreImage,
     ignoreNetwork,
@@ -412,7 +452,7 @@ export function useWorkloadClaimSettings(
     ignoreQuota,
     ignoreReplicas,
     isApWorkload,
-    isLoading,
+    isLoading: isLoading || (isApWorkload && entryPointsLoading),
     onEnvChange,
     onImageChange,
     onNetworkChange,

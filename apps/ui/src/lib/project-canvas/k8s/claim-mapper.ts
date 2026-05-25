@@ -13,6 +13,8 @@ import {
 } from "@workspace/ui/lib/container-env-rows";
 
 import {
+  customDomainBindingIdFromValue,
+  platformAddressEndpoint,
   platformAddressIdFromValue,
   platformAddressIdsFromRows,
 } from "../platform-addresses";
@@ -29,8 +31,20 @@ import {
   readApMemoryLimit,
   readApReplicaStrategy,
 } from "./ap-spec-access";
+import {
+  entryPointCustomDomainStatusesForAp,
+  normalizeCustomDomainName,
+} from "./entrypoint-custom-domains";
 
 export type WorkloadClaimKind = "AP" | "DB";
+type ContainerCustomDomain = NonNullable<
+  ContainerNetwork["customDomains"]
+>[number];
+type CustomDomainReadModelPatch = Partial<ContainerCustomDomain>;
+type CustomDomainReadModelById = ReadonlyMap<
+  string,
+  CustomDomainReadModelPatch
+>;
 
 const MEM_SUFFIX_GI = /^([0-9]+(?:\.[0-9]+)?)gi$/i;
 const MEM_SUFFIX_MI = /^([0-9]+(?:\.[0-9]+)?)mi$/i;
@@ -190,9 +204,18 @@ function trimStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+function apRoutingDomainFromMetadata(
+  metadata: Record<string, unknown> | undefined
+): string {
+  const labels = asRecord(metadata?.labels);
+  return trimStr(labels?.region);
+}
+
 function apNetworkFromSpecAndStatus(
+  metadata: Record<string, unknown> | undefined,
   spec: Record<string, unknown>,
-  status: Record<string, unknown>
+  status: Record<string, unknown>,
+  options?: ClaimToContainerSettingsOptions
 ): ContainerNetwork | undefined {
   const inputNetwork = asRecord(readApInput(spec).network);
   const statusNetwork = asRecord(status.network);
@@ -203,23 +226,52 @@ function apNetworkFromSpecAndStatus(
     return undefined;
   }
   const privateAddress = trimStr(statusNetwork?.privateAddress);
+  const entryPointCustomDomains = entryPointCustomDomainStatusesForAp(
+    options?.entryPointsData,
+    metadata ?? {}
+  );
   return {
     ...(privateAddress === "" ? {} : { privateAddress }),
+    ...apNetworkCustomDomains(
+      inputNetwork,
+      statusNetwork,
+      entryPointCustomDomains
+    ),
     privatePort,
-    publicAddresses: apNetworkPublicAddresses(inputNetwork, statusNetwork),
+    publicAddresses: apNetworkPublicAddresses(
+      metadata,
+      inputNetwork,
+      statusNetwork
+    ),
   };
 }
 
+function apNetworkCustomDomains(
+  inputNetwork: Record<string, unknown> | undefined,
+  statusNetwork: Record<string, unknown> | undefined,
+  entryPointCustomDomains: ReadonlyMap<string, ContainerCustomDomain>
+): Pick<ContainerNetwork, "customDomains"> | Record<string, never> {
+  const customDomains = normalizeDesiredCustomDomains(
+    inputNetwork?.customDomains,
+    projectedCustomDomainsById(statusNetwork?.publicAddresses),
+    entryPointCustomDomains
+  );
+  return customDomains.length === 0 ? {} : { customDomains };
+}
+
 function apNetworkPublicAddresses(
+  metadata: Record<string, unknown> | undefined,
   inputNetwork: Record<string, unknown> | undefined,
   statusNetwork: Record<string, unknown> | undefined
 ): ContainerNetwork["publicAddresses"] {
   const observed = normalizeNetworkPublicAddresses(
     statusNetwork?.publicAddresses,
     true
-  );
+  ).filter(isPlatformPublicAddressRow);
   const desiredPending = normalizeDesiredPlatformAddresses(
-    inputNetwork?.platformAddresses
+    inputNetwork?.platformAddresses,
+    metadata,
+    apRoutingDomainFromMetadata(metadata)
   );
   if (observed.length > 0) {
     const observedIds = platformAddressIdsFromRows(observed);
@@ -233,12 +285,115 @@ function apNetworkPublicAddresses(
   return desiredPending;
 }
 
+function isCustomPublicAddressRow(
+  address: ContainerNetwork["publicAddresses"][number]
+): boolean {
+  return address.type?.trim().toLowerCase() === "custom";
+}
+
+function isPlatformPublicAddressRow(
+  address: ContainerNetwork["publicAddresses"][number]
+): boolean {
+  return !isCustomPublicAddressRow(address);
+}
+
+function normalizeDesiredCustomDomains(
+  raw: unknown,
+  projectedCustomDomains: CustomDomainReadModelById = new Map(),
+  entryPointCustomDomains: ReadonlyMap<
+    string,
+    ContainerCustomDomain
+  > = new Map()
+): NonNullable<ContainerNetwork["customDomains"]> {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: NonNullable<ContainerNetwork["customDomains"]> = [];
+  for (const item of raw) {
+    const binding = asRecord(item);
+    if (binding == null) {
+      continue;
+    }
+    const id = customDomainBindingIdFromValue(binding.id);
+    const platformAddressId = platformAddressIdFromValue(
+      binding.platformAddressId
+    );
+    const domain = normalizeCustomDomainName(binding.domain);
+    if (id === undefined || platformAddressId === undefined || domain === "") {
+      continue;
+    }
+    out.push(
+      mergedCustomDomainReadModel(
+        { domain, id, platformAddressId },
+        projectedCustomDomains.get(id),
+        entryPointCustomDomains.get(id)
+      )
+    );
+  }
+  return out;
+}
+
+function mergedCustomDomainReadModel(
+  desired: Pick<ContainerCustomDomain, "domain" | "id" | "platformAddressId">,
+  projected: CustomDomainReadModelPatch | undefined,
+  entryPoint: ContainerCustomDomain | undefined
+): ContainerCustomDomain {
+  const observed = {
+    status: "pending",
+    ...projected,
+    ...entryPoint,
+  };
+  return {
+    ...observed,
+    domain: entryPoint?.domain ?? projected?.domain ?? desired.domain,
+    id: desired.id,
+    platformAddressId:
+      entryPoint?.platformAddressId ??
+      projected?.platformAddressId ??
+      desired.platformAddressId,
+  };
+}
+
+function projectedCustomDomainsById(raw: unknown): CustomDomainReadModelById {
+  if (!Array.isArray(raw)) {
+    return new Map();
+  }
+  const out = new Map<string, CustomDomainReadModelPatch>();
+  for (const item of raw) {
+    const row = asRecord(item);
+    if (row == null || trimStr(row.type).toLowerCase() !== "custom") {
+      continue;
+    }
+    const id = customDomainBindingIdFromValue(row.id);
+    const platformAddressId = platformAddressIdFromValue(row.platformAddressId);
+    const domain = normalizeCustomDomainName(row.host);
+    if (id === undefined) {
+      continue;
+    }
+    const cnameTarget = trimStr(row.cnameTarget);
+    const status = trimStr(row.status);
+    const targetPort = privatePortNum(row.port);
+    out.set(id, {
+      ...(cnameTarget === "" ? {} : { cnameTarget }),
+      ...(domain === "" ? {} : { domain }),
+      ...(platformAddressId === undefined ? {} : { platformAddressId }),
+      ...(status === "" ? {} : { status }),
+      ...(targetPort == null ? {} : { targetPort }),
+    });
+  }
+  return out;
+}
+
 function normalizeDesiredPlatformAddresses(
-  raw: unknown
+  raw: unknown,
+  metadata: Record<string, unknown> | undefined,
+  routingDomain: string
 ): ContainerNetwork["publicAddresses"] {
   if (!Array.isArray(raw)) {
     return [];
   }
+  const namespace = trimStr(metadata?.namespace);
+  const appName = trimStr(metadata?.name);
   const out: ContainerNetwork["publicAddresses"] = [];
   for (const item of raw) {
     const address = asRecord(item);
@@ -250,7 +405,19 @@ function normalizeDesiredPlatformAddresses(
     if (id === undefined || port == null) {
       continue;
     }
-    out.push({ id, port, status: "progressing", type: "platform" });
+    const endpoint = platformAddressEndpoint({
+      appName,
+      namespace,
+      platformAddressId: id,
+      routingDomain,
+    });
+    out.push({
+      ...(endpoint ?? {}),
+      id,
+      port,
+      status: "progressing",
+      type: "platform",
+    });
   }
   return out;
 }
@@ -323,9 +490,11 @@ const MEM_MIN = 512;
 const MEM_MAX = 8192;
 export interface ClaimToContainerSettingsOptions {
   dbDsnReferenceSources?: ContainerEnvDbDsnSource[];
+  entryPointsData?: K8sGetResponse;
 }
 
 function mapApClaim(
+  metadata: Record<string, unknown>,
   spec: Record<string, unknown>,
   status: Record<string, unknown>,
   options?: ClaimToContainerSettingsOptions
@@ -342,7 +511,7 @@ function mapApClaim(
     env: envFromSpecEnvList(readApEnv(spec), options?.dbDsnReferenceSources),
     image,
     memoryMib,
-    network: apNetworkFromSpecAndStatus(spec, status),
+    network: apNetworkFromSpecAndStatus(metadata, spec, status, options),
     ports: [],
     replicaStrategy,
     replicas,
@@ -385,7 +554,8 @@ export function claimToContainerSettings(
   }
   const spec = asRecord(claim.spec) ?? {};
   const status = asRecord(claim.status) ?? {};
+  const metadata = asRecord(claim.metadata) ?? {};
   return workloadKind === "DB"
     ? mapDbSpec(spec)
-    : mapApClaim(spec, status, options);
+    : mapApClaim(metadata, spec, status, options);
 }

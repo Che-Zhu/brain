@@ -15,8 +15,8 @@ const noop = () => {
 const REPLICA_STRATEGY_RE = /Replica Strategy/;
 const FIXED_REPLICAS_RE = /Fixed Replicas/;
 const ELASTIC_SCALING_RE = /Elastic Scaling/;
-const REPLICA_COUNT_RE = /Replica count/;
-const LEGACY_REPLICA_VALUE_RE = />3</;
+const REPLICA_COUNT_RE = /Number of Replicas/;
+const LEGACY_REPLICA_VALUE_RE = />3 Replicas</;
 const BUTTON_RE = /<button/;
 
 test("AP claim settings reconstruct direct and non-direct environment rows", () => {
@@ -153,7 +153,11 @@ test("AP claim settings falls back to desired Platform Addresses while observed 
   const settings = claimToContainerSettings(
     {
       kind: "AP",
-      metadata: { name: "api", namespace: "default" },
+      metadata: {
+        labels: { region: "apps.example.com" },
+        name: "api",
+        namespace: "default",
+      },
       spec: {
         input: {
           image: "ghcr.io/acme/api:latest",
@@ -167,6 +171,249 @@ test("AP claim settings falls back to desired Platform Addresses while observed 
         network: {
           privateAddress: "http://api-service-port-8080.default.svc:8080",
           privatePort: 8080,
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.publicAddresses, [
+    {
+      host: "api-7c6ad52581.apps.example.com",
+      id: "pa_abc123",
+      port: 8080,
+      status: "progressing",
+      type: "platform",
+      url: "https://api-7c6ad52581.apps.example.com/",
+    },
+  ]);
+});
+
+test("AP claim settings maps desired Custom Domain Bindings into the network draft", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: {
+        labels: { region: "apps.example.com" },
+        name: "api",
+        namespace: "default",
+      },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            customDomains: [
+              {
+                domain: "www.example.com",
+                id: "cd_def456",
+                platformAddressId: "pa_abc123",
+              },
+            ],
+            privatePort: 8080,
+            platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          },
+        },
+      },
+      status: {
+        network: {
+          privatePort: 8080,
+          publicAddresses: [
+            {
+              cnameTarget: "api-7c6ad52581.apps.example.com",
+              host: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+              port: 8080,
+              status: "pending",
+              type: "custom",
+              url: "https://www.example.com/",
+            },
+          ],
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.customDomains, [
+    {
+      cnameTarget: "api-7c6ad52581.apps.example.com",
+      domain: "www.example.com",
+      id: "cd_def456",
+      platformAddressId: "pa_abc123",
+      status: "pending",
+      targetPort: 8080,
+    },
+  ]);
+  assert.deepEqual(settings.network?.publicAddresses, [
+    {
+      host: "api-7c6ad52581.apps.example.com",
+      id: "pa_abc123",
+      port: 8080,
+      status: "progressing",
+      type: "platform",
+      url: "https://api-7c6ad52581.apps.example.com/",
+    },
+  ]);
+});
+
+test("AP claim settings prefers EntryPoint Custom Domain Binding health over AP projection", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: {
+        labels: { region: "apps.example.com" },
+        name: "api",
+        namespace: "default",
+      },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            customDomains: [
+              {
+                domain: "www.example.com",
+                id: "cd_def456",
+                platformAddressId: "pa_abc123",
+              },
+            ],
+            privatePort: 8080,
+            platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          },
+        },
+      },
+      status: {
+        network: {
+          privatePort: 8080,
+          publicAddresses: [
+            {
+              cnameTarget: "api-7c6ad52581.apps.example.com",
+              host: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+              port: 8080,
+              status: "pending",
+              type: "custom",
+              url: "https://www.example.com/",
+            },
+          ],
+        },
+      },
+    },
+    "AP",
+    {
+      entryPointsData: {
+        items: [
+          {
+            kind: "EntryPoint",
+            metadata: { name: "api", namespace: "default" },
+            spec: { apRef: "api" },
+            status: {
+              customDomains: [
+                {
+                  certificate: {
+                    message: "Certificate request failed.",
+                    reason: "IssuerNotReady",
+                    status: "failed",
+                  },
+                  cnameTarget: "api-7c6ad52581.apps.example.com",
+                  dns: {
+                    message:
+                      "CNAME for www.example.com was verified before save.",
+                    status: "verified",
+                  },
+                  domain: "www.example.com",
+                  id: "cd_def456",
+                  platformAddressId: "pa_abc123",
+                  routing: {
+                    message: "Custom Domain Ingress has not been observed yet.",
+                    reason: "IngressPending",
+                    status: "pending",
+                  },
+                  status: "blocked",
+                  targetPort: 8080,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    }
+  );
+
+  assert.deepEqual(settings.network?.customDomains, [
+    {
+      certificate: {
+        message: "Certificate request failed.",
+        reason: "IssuerNotReady",
+        status: "failed",
+      },
+      cnameTarget: "api-7c6ad52581.apps.example.com",
+      dns: {
+        message: "CNAME for www.example.com was verified before save.",
+        status: "verified",
+      },
+      domain: "www.example.com",
+      id: "cd_def456",
+      platformAddressId: "pa_abc123",
+      routing: {
+        message: "Custom Domain Ingress has not been observed yet.",
+        reason: "IngressPending",
+        status: "pending",
+      },
+      status: "blocked",
+      targetPort: 8080,
+    },
+  ]);
+});
+
+test("AP claim settings Platform Address host ignores AP UID and target port", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: {
+        labels: { region: "apps.example.com" },
+        name: "api",
+        namespace: "default",
+        uid: "ap-uid-1",
+      },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080,
+            platformAddresses: [{ id: "pa_abc123", port: 9000 }],
+          },
+        },
+      },
+    },
+    "AP"
+  );
+
+  assert.deepEqual(settings.network?.publicAddresses, [
+    {
+      host: "api-7c6ad52581.apps.example.com",
+      id: "pa_abc123",
+      port: 9000,
+      status: "progressing",
+      type: "platform",
+      url: "https://api-7c6ad52581.apps.example.com/",
+    },
+  ]);
+});
+
+test("AP claim settings leaves desired Platform Address hosts pending when draft inputs are missing", () => {
+  const settings = claimToContainerSettings(
+    {
+      kind: "AP",
+      metadata: { name: "api", namespace: "default" },
+      spec: {
+        input: {
+          image: "ghcr.io/acme/api:latest",
+          network: {
+            privatePort: 8080,
+            platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          },
         },
       },
     },

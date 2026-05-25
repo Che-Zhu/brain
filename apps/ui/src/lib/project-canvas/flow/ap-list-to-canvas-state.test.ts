@@ -87,6 +87,73 @@ test("EntryPoint canvas nodes are derived from AP Network public addresses", () 
   });
 });
 
+test("EntryPoint canvas nodes display AP-projected Custom Domain rows", () => {
+  const state = entryPointsToCanvasState(undefined, {
+    apsData: {
+      items: [
+        {
+          metadata: { name: "api", namespace: "default", uid: "ap-uid" },
+          spec: {
+            input: {
+              network: {
+                customDomains: [
+                  {
+                    domain: "www.example.com",
+                    id: "cd_def456",
+                    platformAddressId: "pa_abc123",
+                  },
+                ],
+                privatePort: 8080,
+                platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+              },
+            },
+          },
+          status: {
+            network: {
+              privateAddress: "http://api-service.default.svc:8080",
+              privatePort: 8080,
+              publicAddresses: [
+                {
+                  cnameTarget: "api.example.com",
+                  host: "www.example.com",
+                  id: "cd_def456",
+                  platformAddressId: "pa_abc123",
+                  port: 8080,
+                  status: "pending",
+                  type: "custom",
+                  url: "https://www.example.com/",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    namespaceFallback: "default",
+  });
+
+  assert.deepEqual(state.nodes[0]?.data, {
+    accessDomain: {
+      label: "Access domain",
+      value: "www.example.com",
+    },
+    resource: {
+      apRef: "api",
+      name: "api",
+      namespace: "default",
+    },
+    states: { name: "api" },
+    targets: [
+      {
+        id: "cd_def456",
+        label: "Custom Domain",
+        status: { label: "Pending", tone: "pending" },
+        value: "https://www.example.com/",
+      },
+    ],
+  });
+});
+
 test("EntryPoint canvas nodes fall back to desired Platform Addresses while observed URLs are pending", () => {
   const state = entryPointsToCanvasState(undefined, {
     apsData: {

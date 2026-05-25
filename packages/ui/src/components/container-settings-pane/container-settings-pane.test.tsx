@@ -10,6 +10,7 @@ import type {
 import {
   ContainerSettingsPane,
   confirmedAddDbDsnReferencesFromEnvDraft,
+  containerNetworkAfterUnbindCustomDomain,
   containerSettingsDraftIsDirty,
   resourceQuotaReplicaPatchFromDraft,
 } from "./container-settings-pane";
@@ -48,9 +49,21 @@ const COPY_PRIVATE_ADDRESS_RE = /aria-label="Copy Private Address"/;
 const DOMAIN_LIST_RE = /Domain List/;
 const NO_DOMAINS_RE = /No domains yet/;
 const PUBLIC_ADDRESS_VALUE_RE = /https:\/\/api.example.com\//;
+const DRAFT_PUBLIC_ADDRESS_VALUE_RE =
+  /https:\/\/api-58b271f360.apps.example.com\//;
 const PUBLIC_ADDRESS_STATUS_RE = /Public Address status: accessible/;
+const CUSTOM_DOMAIN_VALUE_RE = /www\.example\.com/;
+const CUSTOM_DOMAIN_STATUS_RE = /Custom Domain status: accessible/;
+const CUSTOM_DOMAIN_BLOCKED_STATUS_RE = /Custom Domain status: blocked/;
+const CUSTOM_DOMAIN_DNS_DETAIL_RE = /DNS verified/;
+const CUSTOM_DOMAIN_CERT_DETAIL_RE = /Certificate failed/;
+const CUSTOM_DOMAIN_ROUTING_DETAIL_RE = /Routing pending/;
+const CUSTOM_DOMAIN_DETAIL_REASON_RE = /IssuerNotReady/;
+const CUSTOM_DOMAIN_DETAIL_MESSAGE_RE = /Certificate request failed/;
+const UNBIND_CUSTOM_DOMAIN_RE = /aria-label="Unbind Custom Domain"/;
 const COPY_PUBLIC_ADDRESS_RE = /aria-label="Copy Public Address"/;
 const CNAME_RE = /CNAME/;
+const BIND_CUSTOM_DOMAIN_RE = /aria-label="Bind Custom Domain"/;
 const DELETE_PUBLIC_ADDRESS_RE = /aria-label="Delete Public Address"/;
 const ADD_PUBLIC_ADDRESS_RE = /aria-label="Add Public Address"/;
 const ADD_DOMAIN_RE = /Add Domain/;
@@ -59,19 +72,19 @@ const PRIVATE_PORT_VALUE_RE = /value="8080"/;
 const REPLICA_STRATEGY_RE = /Replica Strategy/;
 const FIXED_REPLICAS_RE = /Fixed Replicas/;
 const ELASTIC_SCALING_RE = /Elastic Scaling/;
-const REPLICA_COUNT_RE = /Replica count/;
-const REPLICA_VALUE_RE = />4</;
+const REPLICA_COUNT_RE = /Number of Replicas/;
+const REPLICA_VALUE_RE = />4 Replicas</;
 const MIN_REPLICAS_RE = /Minimum replicas/;
-const MIN_REPLICA_VALUE_RE = />2</;
+const MIN_REPLICA_VALUE_RE = />2 Replicas</;
 const MAX_REPLICAS_RE = /Maximum replicas/;
-const MAX_REPLICA_VALUE_RE = />8</;
+const MAX_REPLICA_VALUE_RE = />8 Replicas</;
 const CPU_TARGET_RE = /CPU utilization target/;
-const CPU_TARGET_VALUE_RE = />75</;
+const CPU_TARGET_VALUE_RE = />75%/;
 const CPU_TARGET_PERCENT_RE = />75%</;
 const SCALING_TARGET_RE = /Scaling target/;
 const MEMORY_TARGET_RE = /Memory average target/;
-const MEMORY_TARGET_VALUE_RE = />512</;
-const MEMORY_TARGET_QUANTITY_RE = />512Mi</;
+const MEMORY_TARGET_VALUE_RE = />512 Mi</;
+const MEMORY_TARGET_QUANTITY_RE = />512 Mi</;
 const BUTTON_RE = /<button/;
 
 function renderPane(
@@ -202,10 +215,208 @@ test("container settings pane renders editable public address rows", () => {
   assert.match(html, PUBLIC_ADDRESS_STATUS_RE);
   assert.match(html, COPY_PUBLIC_ADDRESS_RE);
   assert.match(html, CNAME_RE);
+  assert.match(html, BIND_CUSTOM_DOMAIN_RE);
   assert.match(html, DELETE_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_PUBLIC_ADDRESS_RE);
   assert.match(html, ADD_DOMAIN_RE);
   assert.doesNotMatch(html, NO_DOMAINS_RE);
+});
+
+test("container settings pane renders draft-visible Platform Address hosts", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api-58b271f360.apps.example.com",
+            id: "pa_old123",
+            port: 8080,
+            status: "progressing",
+            type: "platform",
+            url: "https://api-58b271f360.apps.example.com/",
+          },
+        ],
+      }}
+      networkPlatformAddressDraftContext={{
+        appName: "api",
+        namespace: "project-a",
+        routingDomain: "apps.example.com",
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, DRAFT_PUBLIC_ADDRESS_VALUE_RE);
+  assert.match(html, COPY_PUBLIC_ADDRESS_RE);
+  assert.match(html, CNAME_RE);
+  assert.doesNotMatch(html, NO_DOMAINS_RE);
+});
+
+test("container settings pane shows Custom Domain rows instead of bound Platform Addresses", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+            status: "accessible",
+          },
+        ],
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api.example.com",
+            id: "pa_abc123",
+            port: 8080,
+            status: "accessible",
+            type: "platform",
+            url: "https://api.example.com/",
+          },
+        ],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, CUSTOM_DOMAIN_VALUE_RE);
+  assert.match(html, CUSTOM_DOMAIN_STATUS_RE);
+  assert.doesNotMatch(html, PUBLIC_ADDRESS_VALUE_RE);
+  assert.doesNotMatch(html, BIND_CUSTOM_DOMAIN_RE);
+});
+
+test("container settings pane renders Custom Domain Binding lifecycle detail states", () => {
+  const html = renderToStaticMarkup(
+    <ContainerSettingsPane
+      cpuQuota={{ onValueChange: noop, value: 1 }}
+      env={[]}
+      image="ghcr.io/acme/api:latest"
+      memoryQuota={{ onValueChange: noop, value: 512 }}
+      network={{
+        customDomains: [
+          {
+            certificate: {
+              message: "Certificate request failed.",
+              reason: "IssuerNotReady",
+              status: "failed",
+            },
+            dns: { status: "verified" },
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+            routing: {
+              message: "Custom Domain Ingress has not been observed yet.",
+              status: "pending",
+            },
+            status: "blocked",
+            targetPort: 8080,
+          },
+        ],
+        privateAddress: "http://api-service.default.svc:8080",
+        privatePort: 8080,
+        publicAddresses: [
+          {
+            host: "api.example.com",
+            id: "pa_abc123",
+            port: 8080,
+            status: "accessible",
+            type: "platform",
+            url: "https://api.example.com/",
+          },
+        ],
+      }}
+      onEnvChange={noop}
+      onImageChange={noop}
+      onNetworkChange={noop}
+      onPortsChange={noop}
+      ports={[]}
+    />
+  );
+
+  assert.match(html, CUSTOM_DOMAIN_BLOCKED_STATUS_RE);
+  assert.match(html, CUSTOM_DOMAIN_DNS_DETAIL_RE);
+  assert.match(html, CUSTOM_DOMAIN_CERT_DETAIL_RE);
+  assert.match(html, CUSTOM_DOMAIN_ROUTING_DETAIL_RE);
+  assert.match(html, CUSTOM_DOMAIN_DETAIL_REASON_RE);
+  assert.match(html, CUSTOM_DOMAIN_DETAIL_MESSAGE_RE);
+  assert.match(html, UNBIND_CUSTOM_DOMAIN_RE);
+});
+
+test("container settings pane unbinds Custom Domains without deleting Platform Addresses", () => {
+  const next = containerNetworkAfterUnbindCustomDomain(
+    {
+      customDomains: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_abc123",
+          status: "accessible",
+        },
+      ],
+      privateAddress: "http://api-service.default.svc:8080",
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api.example.com",
+          id: "pa_abc123",
+          port: 8080,
+          status: "accessible",
+          type: "platform",
+          url: "https://api.example.com/",
+        },
+      ],
+    },
+    { id: "cd_def456" }
+  );
+
+  assert.deepEqual(next.customDomains, []);
+  assert.deepEqual(next.publicAddresses, [
+    {
+      host: "api.example.com",
+      id: "pa_abc123",
+      port: 8080,
+      status: "accessible",
+      type: "platform",
+      url: "https://api.example.com/",
+    },
+  ]);
+  assert.match(
+    renderToStaticMarkup(
+      <ContainerSettingsPane
+        cpuQuota={{ onValueChange: noop, value: 1 }}
+        env={[]}
+        image="ghcr.io/acme/api:latest"
+        memoryQuota={{ onValueChange: noop, value: 512 }}
+        network={next}
+        onEnvChange={noop}
+        onImageChange={noop}
+        onNetworkChange={noop}
+        onPortsChange={noop}
+        ports={[]}
+      />
+    ),
+    PUBLIC_ADDRESS_VALUE_RE
+  );
 });
 
 test("container settings pane renders fixed replica strategy controls", () => {

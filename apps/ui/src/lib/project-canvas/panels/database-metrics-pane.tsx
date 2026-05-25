@@ -191,7 +191,6 @@ export function DatabaseMetricsPane({
   const storageSeries = metricsData.storage ?? [];
   const title = `${states.name} Metrics`;
   const subtitle = `${states.displayEngine}${states.formattedVersion ? ` ${states.formattedVersion}` : ""} · Last 60 minutes`;
-  const statusLabel = states.status?.label ?? "Unknown";
 
   return (
     <CanvasResourcePane
@@ -204,7 +203,6 @@ export function DatabaseMetricsPane({
         />
       }
       onClose={onClose}
-      status={{ ...states.status, label: statusLabel }}
       subtitle={subtitle}
       title={title}
     >

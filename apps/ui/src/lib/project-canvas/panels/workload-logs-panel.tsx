@@ -28,7 +28,6 @@ export const WorkloadLogsPane = memo(function WorkloadLogsPane({
         />
       }
       onClose={onClose}
-      status={states?.status}
       subtitle={states?.kind ?? "Workload"}
       title={`${title} Logs`}
     >

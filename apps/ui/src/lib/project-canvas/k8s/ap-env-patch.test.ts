@@ -19,6 +19,14 @@ const PUBLIC_PORT_RANGE_RE =
 const PLATFORM_ADDRESS_ID_INVALID_RE =
   /Platform Address ID must match \^pa_\[a-z0-9\]\{6,32\}\$/;
 const PLATFORM_ADDRESS_ID_UNIQUE_RE = /Platform Address IDs must be unique/;
+const CUSTOM_DOMAIN_ID_INVALID_RE =
+  /Custom Domain Binding ID must match \^cd_\[a-z0-9\]\{6,32\}\$/;
+const CUSTOM_DOMAIN_PLATFORM_ADDRESS_MISSING_RE =
+  /Custom Domain Binding must reference an existing Platform Address/;
+const CUSTOM_DOMAIN_PLATFORM_ADDRESS_UNIQUE_RE =
+  /Platform Address can only be bound to one Custom Domain/;
+const CUSTOM_DOMAIN_DUPLICATE_RE =
+  /Custom Domain is already bound in this namespace/;
 
 function patchOpValue(op: K8sJsonPatchOp | undefined): unknown {
   if (op === undefined || op.op === "remove") {
@@ -168,6 +176,59 @@ test("AP network settings writes v1 Platform Addresses with stable IDs and no ho
   ]);
 });
 
+test("AP network settings writes v1 Custom Domains as AP desired state", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        network: {
+          privatePort: 80,
+          platformAddresses: [{ id: "pa_abc123", port: 80 }],
+        },
+      },
+    },
+    {
+      customDomains: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_abc123",
+          status: "verified",
+          type: "custom",
+        },
+      ],
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api.example.com",
+          id: "pa_abc123",
+          port: 8080,
+          status: "accessible",
+          type: "platform",
+          url: "https://api.example.com/",
+        },
+      ],
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+          },
+        ],
+        platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+        privatePort: 8080,
+      },
+    },
+  ]);
+});
+
 test("AP network settings backfills routing domain label when adding Public Addresses", () => {
   const ops = patchOpsForApNetworkSettings(
     {
@@ -273,6 +334,187 @@ test("AP network settings validate Platform Address IDs and Public Address ports
       ),
     PUBLIC_PORT_RANGE_RE
   );
+});
+
+test("AP network settings validate Custom Domain Binding references", () => {
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "custom-domain",
+              platformAddressId: "pa_abc123",
+            },
+          ],
+          privatePort: 8080,
+          publicAddresses: [{ id: "pa_abc123", port: 8080 }],
+        }
+      ),
+    CUSTOM_DOMAIN_ID_INVALID_RE
+  );
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_missing",
+            },
+          ],
+          privatePort: 8080,
+          publicAddresses: [{ id: "pa_abc123", port: 8080 }],
+        }
+      ),
+    CUSTOM_DOMAIN_PLATFORM_ADDRESS_MISSING_RE
+  );
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings(
+        { input: {} },
+        {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+            },
+            {
+              domain: "api.example.com",
+              id: "cd_ghi789",
+              platformAddressId: "pa_abc123",
+            },
+          ],
+          privatePort: 8080,
+          publicAddresses: [{ id: "pa_abc123", port: 8080 }],
+        }
+      ),
+    CUSTOM_DOMAIN_PLATFORM_ADDRESS_UNIQUE_RE
+  );
+});
+
+test("AP network settings reject duplicate Custom Domains in the namespace routing scope", () => {
+  const network = {
+    customDomains: [
+      {
+        domain: "WWW.Example.COM.",
+        id: "cd_def456",
+        platformAddressId: "pa_abc123",
+      },
+    ],
+    privatePort: 8080,
+    publicAddresses: [{ id: "pa_abc123", port: 8080 }],
+  };
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings({ input: {} }, network, {
+        existingCustomDomains: [
+          {
+            apRef: "worker",
+            domain: "www.example.com",
+            namespace: "default",
+          },
+        ],
+        metadata: { name: "api", namespace: "default" },
+      }),
+    CUSTOM_DOMAIN_DUPLICATE_RE
+  );
+
+  assert.doesNotThrow(() =>
+    patchOpsForApNetworkSettings({ input: {} }, network, {
+      existingCustomDomains: [
+        {
+          apRef: "api",
+          domain: "www.example.com",
+          namespace: "default",
+        },
+      ],
+      metadata: { name: "api", namespace: "default" },
+    })
+  );
+
+  assert.throws(
+    () =>
+      patchOpsForApNetworkSettings({ input: {} }, network, {
+        existingCustomDomains: [
+          {
+            apRef: "worker",
+            domain: "www.example.com",
+            id: "cd_def456",
+            namespace: "default",
+          },
+        ],
+        metadata: { name: "api", namespace: "default" },
+      }),
+    CUSTOM_DOMAIN_DUPLICATE_RE
+  );
+});
+
+test("AP network settings keep bound Custom Domains following Platform Address port changes", () => {
+  const ops = patchOpsForApNetworkSettings(
+    {
+      input: {
+        network: {
+          customDomains: [
+            {
+              domain: "www.example.com",
+              id: "cd_def456",
+              platformAddressId: "pa_abc123",
+            },
+          ],
+          platformAddresses: [{ id: "pa_abc123", port: 8080 }],
+          privatePort: 8080,
+        },
+      },
+    },
+    {
+      customDomains: [
+        {
+          domain: "www.example.com",
+          id: "cd_def456",
+          platformAddressId: "pa_abc123",
+          status: "accessible",
+        },
+      ],
+      privatePort: 8080,
+      publicAddresses: [
+        {
+          host: "api-7c6ad52581.apps.example.com",
+          id: "pa_abc123",
+          port: 9000,
+          status: "accessible",
+          type: "platform",
+          url: "https://api-7c6ad52581.apps.example.com/",
+        },
+      ],
+    }
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+          },
+        ],
+        platformAddresses: [{ id: "pa_abc123", port: 9000 }],
+        privatePort: 8080,
+      },
+    },
+  ]);
 });
 
 test("AP resource quota settings write canonical fixed replica strategy", () => {
@@ -769,6 +1011,77 @@ test("AP settings draft builds one patch for combined dirty settings", () => {
           type: "elastic",
         },
         replicas: 2,
+      },
+    },
+  ]);
+});
+
+test("AP settings draft persists Custom Domain Bindings only on panel Save", () => {
+  const previous = {
+    cpuCores: 1,
+    env: [],
+    image: "ghcr.io/acme/api:old",
+    memoryMib: 1024,
+    network: {
+      privatePort: 80,
+      publicAddresses: [{ id: "pa_abc123", port: 80 }],
+    },
+    replicaStrategy: {
+      fixed: { replicas: 2 },
+      type: "fixed",
+    },
+  } as const;
+
+  const ops = patchOpsForApSettingsDraft(
+    {
+      input: {
+        env: [],
+        image: "ghcr.io/acme/api:old",
+        network: {
+          privatePort: 80,
+          platformAddresses: [{ id: "pa_abc123", port: 80 }],
+        },
+      },
+      resource: {
+        limits: { cpu: "1", memory: "1024Mi" },
+        replicaStrategy: {
+          fixed: { replicas: 2 },
+          type: "fixed",
+        },
+      },
+    },
+    {
+      ...previous,
+      network: {
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+            status: "verified",
+          },
+        ],
+        privatePort: 80,
+        publicAddresses: [{ id: "pa_abc123", port: 80 }],
+      },
+    },
+    previous
+  );
+
+  assert.deepEqual(ops, [
+    {
+      op: "replace",
+      path: "/spec/input/network",
+      value: {
+        customDomains: [
+          {
+            domain: "www.example.com",
+            id: "cd_def456",
+            platformAddressId: "pa_abc123",
+          },
+        ],
+        platformAddresses: [{ id: "pa_abc123", port: 80 }],
+        privatePort: 80,
       },
     },
   ]);

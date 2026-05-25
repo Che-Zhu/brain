@@ -115,6 +115,32 @@ spec:
                               minimum: 1
                               maximum: 65535
                               description: Target App Listening Port for this Public Address.
+                      customDomains:
+                        type: array
+                        x-kubernetes-list-type: map
+                        x-kubernetes-list-map-keys:
+                          - id
+                        description: >
+                          Custom Domain Binding requests desired for this AP. Each entry binds a
+                          user-owned domain to an existing Platform Address by stable ID.
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - domain
+                            - platformAddressId
+                          properties:
+                            id:
+                              type: string
+                              pattern: ^cd_[a-z0-9]{6,32}$
+                              description: Stable opaque Custom Domain Binding ID.
+                            domain:
+                              type: string
+                              description: User-owned Custom Domain.
+                            platformAddressId:
+                              type: string
+                              pattern: ^pa_[a-z0-9]{6,32}$
+                              description: Existing Platform Address ID used as the CNAME target.
                   imagePullPolicy:
                     type: string
                     default: "Always"
@@ -381,7 +407,13 @@ spec:
                           description: Public Address host.
                         id:
                           type: string
-                          description: Stable opaque Platform Address ID.
+                          description: Stable opaque Platform Address or Custom Domain Binding ID.
+                        platformAddressId:
+                          type: string
+                          description: Referenced Platform Address ID when type is custom.
+                        cnameTarget:
+                          type: string
+                          description: Platform Address hostname used as the Custom Domain CNAME target.
                         url:
                           type: string
                           description: Render-ready public URL including scheme.

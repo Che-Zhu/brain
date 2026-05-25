@@ -164,6 +164,7 @@ func TestAPTransformEnrichesPendingPublicAddressesFromDesiredPlatformAddresses(t
 	out := APWithIngressesAndServicesFromList(
 		map[string]interface{}{
 			"metadata": map[string]interface{}{
+				"labels":    map[string]interface{}{"region": "apps.example.com"},
 				"name":      "api",
 				"namespace": "default",
 			},
@@ -193,8 +194,174 @@ func TestAPTransformEnrichesPendingPublicAddressesFromDesiredPlatformAddresses(t
 	if got := len(addresses); got != 2 {
 		t.Fatalf("status.network.publicAddresses count = %d, want 2", got)
 	}
+	assertPendingPublicNetworkAddressWithHost(t, addresses, "pa_abc123", "api-7c6ad52581.apps.example.com", 8080)
+	assertPendingPublicNetworkAddressWithHost(t, addresses, "pa_def456", "api-21dd51436b.apps.example.com", 8080)
+}
+
+func TestAPTransformPendingPlatformAddressHostIgnoresUIDAndTargetPort(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels":    map[string]interface{}{"region": "apps.example.com"},
+				"name":      "api",
+				"namespace": "default",
+				"uid":       "ap-uid-1",
+			},
+			"spec": map[string]interface{}{
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 8080,
+						"platformAddresses": []interface{}{
+							map[string]interface{}{"id": "pa_abc123", "port": 9000},
+						},
+					},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	status := out["status"].(map[string]interface{})
+	network := status["network"].(map[string]interface{})
+	addresses := network["publicAddresses"].([]map[string]interface{})
+	assertPendingPublicNetworkAddressWithHost(t, addresses, "pa_abc123", "api-7c6ad52581.apps.example.com", 9000)
+}
+
+func TestAPTransformPromotesDesiredCustomDomainRows(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels":    map[string]interface{}{"region": "apps.example.com"},
+				"name":      "api",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 8080,
+						"platformAddresses": []interface{}{
+							map[string]interface{}{"id": "pa_abc123", "port": 8080},
+							map[string]interface{}{"id": "pa_def456", "port": 9000},
+						},
+						"customDomains": []interface{}{
+							map[string]interface{}{
+								"domain":            "WWW.Example.COM.",
+								"id":                "cd_def456",
+								"platformAddressId": "pa_abc123",
+							},
+						},
+					},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	status := out["status"].(map[string]interface{})
+	network := status["network"].(map[string]interface{})
+	addresses := network["publicAddresses"].([]map[string]interface{})
+	if got := len(addresses); got != 2 {
+		t.Fatalf("status.network.publicAddresses count = %d, want 2", got)
+	}
+	assertCustomDomainPublicNetworkAddress(t, addresses, "cd_def456", "www.example.com", "pa_abc123", "api-7c6ad52581.apps.example.com", 8080)
+	assertPendingPublicNetworkAddressWithHost(t, addresses, "pa_def456", "api-21dd51436b.apps.example.com", 9000)
+	assertPublicNetworkAddressIDMissing(t, addresses, "pa_abc123")
+}
+
+func TestAPTransformObservedCustomDomainHidesPromotedPlatformAddress(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels":    map[string]interface{}{"region": "apps.example.com"},
+				"name":      "api",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 8080,
+						"platformAddresses": []interface{}{
+							map[string]interface{}{"id": "pa_abc123", "port": 8080},
+							map[string]interface{}{"id": "pa_def456", "port": 9000},
+						},
+						"customDomains": []interface{}{
+							map[string]interface{}{
+								"domain":            "www.example.com",
+								"id":                "cd_def456",
+								"platformAddressId": "pa_abc123",
+							},
+						},
+					},
+				},
+			},
+			"status": map[string]interface{}{
+				"network": map[string]interface{}{
+					"publicAddresses": []interface{}{
+						map[string]interface{}{
+							"host":   "api-7c6ad52581.apps.example.com",
+							"id":     "pa_abc123",
+							"port":   8080,
+							"status": "accessible",
+							"type":   "platform",
+							"url":    "https://api-7c6ad52581.apps.example.com/",
+						},
+						map[string]interface{}{
+							"cnameTarget":       "api-7c6ad52581.apps.example.com",
+							"host":              "www.example.com",
+							"id":                "cd_def456",
+							"platformAddressId": "pa_abc123",
+							"port":              8080,
+							"status":            "pending",
+							"type":              "custom",
+							"url":               "https://www.example.com/",
+						},
+					},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	status := out["status"].(map[string]interface{})
+	network := status["network"].(map[string]interface{})
+	addresses := network["publicAddresses"].([]map[string]interface{})
+	if got := len(addresses); got != 2 {
+		t.Fatalf("status.network.publicAddresses count = %d, want 2", got)
+	}
+	assertCustomDomainPublicNetworkAddress(t, addresses, "cd_def456", "www.example.com", "pa_abc123", "api-7c6ad52581.apps.example.com", 8080)
+	assertPendingPublicNetworkAddressWithHost(t, addresses, "pa_def456", "api-21dd51436b.apps.example.com", 9000)
+	assertPublicNetworkAddressIDMissing(t, addresses, "pa_abc123")
+}
+
+func TestAPTransformLeavesDesiredPlatformAddressHostPendingWhenInputsAreMissing(t *testing.T) {
+	out := APWithIngressesAndServicesFromList(
+		map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name":      "api",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"input": map[string]interface{}{
+					"network": map[string]interface{}{
+						"privatePort": 8080,
+						"platformAddresses": []interface{}{
+							map[string]interface{}{"id": "pa_abc123", "port": 8080},
+						},
+					},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	status := out["status"].(map[string]interface{})
+	network := status["network"].(map[string]interface{})
+	addresses := network["publicAddresses"].([]map[string]interface{})
 	assertPendingPublicNetworkAddress(t, addresses, "pa_abc123", 8080)
-	assertPendingPublicNetworkAddress(t, addresses, "pa_def456", 8080)
 }
 
 func TestAPTransformDoesNotInferNetworkFromRetiredSpecEndpoints(t *testing.T) {
@@ -333,6 +500,73 @@ func assertPendingPublicNetworkAddress(t *testing.T, addresses []map[string]inte
 		}
 		if _, ok := address["url"]; ok {
 			t.Fatalf("pending public address %s has url = %v, want absent", id, address["url"])
+		}
+		if got := address["port"]; got != port {
+			t.Fatalf("pending public address %s port = %v, want %d", id, got, port)
+		}
+		if got := address["type"]; got != "platform" {
+			t.Fatalf("pending public address %s type = %v, want platform", id, got)
+		}
+		if got := address["status"]; got != "progressing" {
+			t.Fatalf("pending public address %s status = %v, want progressing", id, got)
+		}
+		return
+	}
+	t.Fatalf("missing pending public address for id %s", id)
+}
+
+func assertCustomDomainPublicNetworkAddress(t *testing.T, addresses []map[string]interface{}, id string, domain string, platformAddressID string, cnameTarget string, port int) {
+	t.Helper()
+	for _, address := range addresses {
+		if address["id"] != id {
+			continue
+		}
+		if got := address["host"]; got != domain {
+			t.Fatalf("custom domain address %s host = %v, want %s", id, got, domain)
+		}
+		if got := address["url"]; got != fmt.Sprintf("https://%s/", domain) {
+			t.Fatalf("custom domain address %s url = %v, want host URL", id, got)
+		}
+		if got := address["platformAddressId"]; got != platformAddressID {
+			t.Fatalf("custom domain address %s platformAddressId = %v, want %s", id, got, platformAddressID)
+		}
+		if got := address["cnameTarget"]; got != cnameTarget {
+			t.Fatalf("custom domain address %s cnameTarget = %v, want %s", id, got, cnameTarget)
+		}
+		if got := address["port"]; got != port {
+			t.Fatalf("custom domain address %s port = %v, want %d", id, got, port)
+		}
+		if got := address["type"]; got != "custom" {
+			t.Fatalf("custom domain address %s type = %v, want custom", id, got)
+		}
+		if got := address["status"]; got != "pending" {
+			t.Fatalf("custom domain address %s status = %v, want pending", id, got)
+		}
+		return
+	}
+	t.Fatalf("missing custom domain address for id %s", id)
+}
+
+func assertPublicNetworkAddressIDMissing(t *testing.T, addresses []map[string]interface{}, id string) {
+	t.Helper()
+	for _, address := range addresses {
+		if address["id"] == id {
+			t.Fatalf("public address id %s should be hidden after Custom Domain promotion", id)
+		}
+	}
+}
+
+func assertPendingPublicNetworkAddressWithHost(t *testing.T, addresses []map[string]interface{}, id string, host string, port int) {
+	t.Helper()
+	for _, address := range addresses {
+		if address["id"] != id {
+			continue
+		}
+		if got := address["host"]; got != host {
+			t.Fatalf("pending public address %s host = %v, want %s", id, got, host)
+		}
+		if got := address["url"]; got != fmt.Sprintf("https://%s/", host) {
+			t.Fatalf("pending public address %s url = %v, want host URL", id, got)
 		}
 		if got := address["port"]; got != port {
 			t.Fatalf("pending public address %s port = %v, want %d", id, got, port)

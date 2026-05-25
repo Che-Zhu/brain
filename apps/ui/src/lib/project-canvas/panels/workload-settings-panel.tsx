@@ -6,6 +6,8 @@ import { useAtomValue } from "jotai";
 import { Settings2 } from "lucide-react";
 import { memo } from "react";
 
+import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
+import { verifyCustomDomainCnameFromApi } from "@/lib/project-canvas/custom-domain-cname-client";
 import {
   containerStatesFromNode,
   workloadClaimKindFromStates,
@@ -32,15 +34,31 @@ function workloadSettingsSubtitle({
   return imageValue === "" ? kind : `${kind} · ${imageValue}`;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function draftRoutingDomainFromClaim(
+  claim: Record<string, unknown> | undefined,
+  kubeconfig: string
+): string {
+  const metadata = asRecord(claim?.metadata);
+  const labels = asRecord(metadata?.labels);
+  const claimRoutingDomain =
+    typeof labels?.region === "string" ? labels.region.trim() : "";
+  return claimRoutingDomain || routingDomainFromKubeconfig(kubeconfig);
+}
+
 type WorkloadSettingsShellProps = Pick<
   CanvasResourcePaneProps,
-  "children" | "onClose" | "status" | "subtitle" | "title"
+  "children" | "onClose" | "subtitle" | "title"
 >;
 
 function WorkloadSettingsShell({
   children,
   onClose,
-  status,
   subtitle,
   title,
 }: WorkloadSettingsShellProps) {
@@ -54,7 +72,6 @@ function WorkloadSettingsShell({
         />
       }
       onClose={onClose}
-      status={status}
       subtitle={subtitle}
       title={title}
     >
@@ -121,12 +138,12 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     workloadKind,
   });
   const claim = k8sGetClaimBody(claimPayload);
+  const draftRoutingDomain = draftRoutingDomainFromClaim(claim, kubeconfig);
 
   if (ns === "" || name === "") {
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -141,7 +158,6 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -156,7 +172,6 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
     return (
       <WorkloadSettingsShell
         onClose={onClose}
-        status={states?.status}
         subtitle={subtitle}
         title={title}
       >
@@ -166,12 +181,7 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
   }
 
   return (
-    <WorkloadSettingsShell
-      onClose={onClose}
-      status={states?.status}
-      subtitle={subtitle}
-      title={title}
-    >
+    <WorkloadSettingsShell onClose={onClose} subtitle={subtitle} title={title}>
       <ContainerSettingsPane
         addDbDsnReferenceIntent={data?.addDbDsnReferenceIntent}
         className="gap-4"
@@ -193,9 +203,15 @@ export const WorkloadSettingsPane = memo(function WorkloadSettingsPane({
           value: display.memoryMib,
         }}
         network={display.network}
+        networkPlatformAddressDraftContext={{
+          appName: name,
+          namespace: ns,
+          routingDomain: draftRoutingDomain,
+        }}
         onAddDbDsnReferenceIntentConsumed={
           data?.onAddDbDsnReferenceIntentConsumed
         }
+        onCustomDomainCnameVerify={verifyCustomDomainCnameFromApi}
         onEnvChange={canEditAp ? onEnvChange : ignoreEnv}
         onImageChange={canEditAp ? onImageChange : ignoreImage}
         onNetworkChange={canEditAp ? onNetworkChange : ignoreNetwork}

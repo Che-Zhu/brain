@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  generateCustomDomainBindingId,
+  generatePlatformAddressId,
+  platformAddressEndpoint,
+} from "@workspace/crossplane/lib/platform-address";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -12,7 +17,11 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
+import {
+  ResourceSettingsInset,
+  ResourceSettingsSection,
+  ResourceSettingsSlider,
+} from "@workspace/ui/components/resource-settings/resource-settings";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -41,8 +50,6 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   Copy,
   Cpu,
-  Layers,
-  type LucideIcon,
   MemoryStick,
   Network,
   Plus,
@@ -112,17 +119,54 @@ export interface ContainerPort {
 export interface ContainerNetworkPublicAddress {
   host?: string;
   id?: string;
+  platformAddressId?: string;
   port: number;
   status?: string;
   type?: string;
   url?: string;
 }
 
+export interface ContainerNetworkCustomDomainDetail {
+  message?: string;
+  reason?: string;
+  status?: string;
+}
+
+export interface ContainerNetworkCustomDomain {
+  certificate?: ContainerNetworkCustomDomainDetail;
+  cnameTarget?: string;
+  dns?: ContainerNetworkCustomDomainDetail;
+  domain: string;
+  id: string;
+  platformAddressId: string;
+  routing?: ContainerNetworkCustomDomainDetail;
+  status?: string;
+  targetPort?: number;
+}
+
 export interface ContainerNetwork {
+  customDomains?: ContainerNetworkCustomDomain[];
   privateAddress?: string;
   privatePort: number;
   publicAddresses: ContainerNetworkPublicAddress[];
 }
+
+export interface ContainerNetworkPlatformAddressDraftContext {
+  appName?: string;
+  namespace?: string;
+  routingDomain?: string;
+}
+
+export interface ContainerCustomDomainCnameVerificationResult {
+  message?: string;
+  ok: boolean;
+  reason?: string;
+}
+
+export type ContainerCustomDomainCnameVerifier = (input: {
+  domain: string;
+  target: string;
+}) => Promise<ContainerCustomDomainCnameVerificationResult>;
 
 export interface ContainerFixedReplicaStrategy {
   elastic?: ContainerElasticReplicaSettings;
@@ -460,7 +504,9 @@ export interface ContainerSettingsPaneProps {
   memoryQuota: ContainerSettingsControlledQuotaProps;
   /** AP network model rendered by the Network section. */
   network?: ContainerNetwork;
+  networkPlatformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   onAddDbDsnReferenceIntentConsumed?: (id: string) => void;
+  onCustomDomainCnameVerify?: ContainerCustomDomainCnameVerifier;
   onEnvChange: (
     env: ContainerEnvVar[],
     meta?: ContainerSettingsPaneEnvChangeMeta
@@ -523,6 +569,27 @@ function publicAddressDraftsEqual(
   });
 }
 
+function customDomainDraftsEqual(
+  a: readonly ContainerNetworkCustomDomain[] | undefined,
+  b: readonly ContainerNetworkCustomDomain[] | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((domain, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      domain.id.trim() === other.id.trim() &&
+      domain.domain.trim().toLowerCase() ===
+        other.domain.trim().toLowerCase() &&
+      domain.platformAddressId.trim() === other.platformAddressId.trim()
+    );
+  });
+}
+
 function containerNetworksEqual(
   a: ContainerNetwork | undefined,
   b: ContainerNetwork | undefined
@@ -532,7 +599,8 @@ function containerNetworksEqual(
   }
   return (
     Math.round(a.privatePort) === Math.round(b.privatePort) &&
-    publicAddressDraftsEqual(a.publicAddresses, b.publicAddresses)
+    publicAddressDraftsEqual(a.publicAddresses, b.publicAddresses) &&
+    customDomainDraftsEqual(a.customDomains, b.customDomains)
   );
 }
 
@@ -635,6 +703,32 @@ function SectionTitle({
       {children}
     </h3>
   );
+}
+
+function formatPlainNumber(value: number, maximumFractionDigits: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits,
+  }).format(value);
+}
+
+function formatCpuCoresValue(cores: number) {
+  const rounded = Number(cores.toFixed(2));
+  return `${formatPlainNumber(rounded, 2)} ${rounded === 1 ? "Core" : "Cores"}`;
+}
+
+function formatMemoryMibValue(mib: number) {
+  const rounded = Math.round(mib);
+  if (Math.abs(rounded) >= 1024) {
+    return `${formatPlainNumber(rounded / 1024, 2)} Gi`;
+  }
+  return `${formatPlainNumber(rounded, 0)} Mi`;
+}
+
+function formatReplicaValue(replicas: number) {
+  const rounded = Math.round(replicas);
+  return `${formatPlainNumber(rounded, 0)} ${
+    rounded === 1 ? "Replica" : "Replicas"
+  }`;
 }
 
 const DB_REFERENCE_FIELD_LABELS: Record<ContainerEnvDbReferenceField, string> =
@@ -1041,9 +1135,11 @@ function EditableEnvRows({
 
 interface NetworkSettingsSectionProps {
   network: ContainerNetwork;
+  onCustomDomainCnameVerify?: ContainerCustomDomainCnameVerifier;
   onNetworkChange?: (network: ContainerNetwork) => void | Promise<void>;
   onNetworkDraftChange?: (network: ContainerNetwork) => void;
   onPrivatePortDraftChange?: (value: string) => void;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
   privatePortDraft?: string;
   readOnly: boolean;
 }
@@ -1075,6 +1171,24 @@ function publicAddressValue(address: ContainerNetworkPublicAddress): string {
   return address.url?.trim() || address.host?.trim() || "";
 }
 
+function publicAddressHostValue(
+  address: ContainerNetworkPublicAddress | undefined
+): string {
+  const host = address?.host?.trim() ?? "";
+  if (host !== "") {
+    return host;
+  }
+  const url = address?.url?.trim() ?? "";
+  if (url === "") {
+    return "";
+  }
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
 function publicAddressStatusLabel(
   address: ContainerNetworkPublicAddress
 ): string {
@@ -1098,12 +1212,14 @@ function publicAddressStatusDotClass(
   if (
     status === "progressing" ||
     status === "pending" ||
+    status === "verifying" ||
     status === "creating"
   ) {
     return "bg-theme-yellow ring-theme-yellow/20";
   }
 
   if (
+    status === "blocked" ||
     status === "failed" ||
     status === "error" ||
     status === "inaccessible" ||
@@ -1115,6 +1231,10 @@ function publicAddressStatusDotClass(
   return "bg-theme-gray ring-theme-gray/20";
 }
 
+function customDomainStatusLabel(domain: ContainerNetworkCustomDomain): string {
+  return domain.status?.trim() || "Pending";
+}
+
 function publicAddressKey(
   address: ContainerNetworkPublicAddress,
   index: number
@@ -1124,6 +1244,35 @@ function publicAddressKey(
     address.host?.trim().toLowerCase() ||
     `pending-${index}`
   );
+}
+
+function customDomainKey(
+  domain: ContainerNetworkCustomDomain,
+  index: number
+): string {
+  return (
+    domain.id.trim() || domain.domain.trim().toLowerCase() || `cd-${index}`
+  );
+}
+
+function platformAddressDraftFromPort(
+  port: number,
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext
+): PublicAddressDraft {
+  const id = generatePlatformAddressId();
+  const endpoint = platformAddressEndpoint({
+    appName: platformAddressDraftContext?.appName ?? "",
+    namespace: platformAddressDraftContext?.namespace ?? "",
+    platformAddressId: id,
+    routingDomain: platformAddressDraftContext?.routingDomain ?? "",
+  });
+  return {
+    ...(endpoint ?? {}),
+    id,
+    port,
+    status: "progressing",
+    type: "platform",
+  };
 }
 
 function isPublicAddressDeleteTarget(
@@ -1141,12 +1290,14 @@ function isPublicAddressDeleteTarget(
 
 interface PublicAddressRowProps {
   address: ContainerNetworkPublicAddress;
+  onBindCustomDomain?: () => void;
   onDelete?: () => void | Promise<void>;
   readOnly: boolean;
 }
 
 function PublicAddressRow({
   address,
+  onBindCustomDomain,
   onDelete,
   readOnly,
 }: PublicAddressRowProps) {
@@ -1193,15 +1344,29 @@ function PublicAddressRow({
       <div className="flex shrink-0 items-center gap-1">
         <Button
           aria-label="Copy Public Address"
-          className="h-9 min-w-16 px-3 text-sm"
+          className="h-9"
           disabled={value === ""}
           onClick={handleCopy}
-          size="lg"
+          size="icon-lg"
+          title="Copy Public Address"
           type="button"
-          variant="secondary"
+          variant="ghost"
         >
-          CNAME
+          <Copy aria-hidden />
         </Button>
+        {readOnly || onBindCustomDomain == null ? null : (
+          <Button
+            aria-label="Bind Custom Domain"
+            className="h-9 min-w-16 px-3 text-sm"
+            disabled={value === ""}
+            onClick={onBindCustomDomain}
+            size="lg"
+            type="button"
+            variant="secondary"
+          >
+            CNAME
+          </Button>
+        )}
         {readOnly || onDelete == null ? null : (
           <Button
             aria-label="Delete Public Address"
@@ -1220,7 +1385,342 @@ function PublicAddressRow({
   );
 }
 
-interface PublicAddressDraft {
+interface CustomDomainRowProps {
+  domain: ContainerNetworkCustomDomain;
+  onUnbind?: () => void | Promise<void>;
+  readOnly: boolean;
+}
+
+function lifecycleDetailLabel(
+  label: string,
+  detail: ContainerNetworkCustomDomainDetail | undefined
+): string {
+  const status = detail?.status?.trim().toLowerCase() || "unknown";
+  return `${label} ${status}`;
+}
+
+function lifecycleDetailText(
+  detail: ContainerNetworkCustomDomainDetail | undefined
+): string {
+  const reason = detail?.reason?.trim() ?? "";
+  const message = detail?.message?.trim() ?? "";
+  if (reason !== "" && message !== "") {
+    return `${reason}: ${message}`;
+  }
+  return reason || message;
+}
+
+function CustomDomainLifecycleDetail({
+  detail,
+  label,
+}: {
+  detail: ContainerNetworkCustomDomainDetail | undefined;
+  label: string;
+}) {
+  const text = lifecycleDetailText(detail);
+  return (
+    <div className="grid min-w-0 gap-0.5">
+      <Badge className="justify-self-start" variant="outline">
+        {lifecycleDetailLabel(label, detail)}
+      </Badge>
+      {text === "" ? null : (
+        <span className="min-w-0 truncate text-muted-foreground text-xs">
+          {text}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
+  const [pending, setPending] = useState(false);
+  const handleUnbind = async () => {
+    if (onUnbind == null) {
+      return;
+    }
+    setPending(true);
+    try {
+      await onUnbind();
+    } finally {
+      setPending(false);
+    }
+  };
+  const targetPort = domain.targetPort ?? undefined;
+  const targetText =
+    domain.cnameTarget == null || domain.cnameTarget.trim() === ""
+      ? domain.platformAddressId
+      : domain.cnameTarget.trim();
+
+  return (
+    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-muted/50 px-2.5 py-2">
+      <span
+        aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
+        className={cn(
+          "mt-1 size-3 shrink-0 rounded-full ring-4",
+          publicAddressStatusDotClass({ port: 1, status: domain.status })
+        )}
+        role="img"
+      />
+      <div className="grid min-w-0 flex-1 gap-2">
+        <div className="min-w-0 truncate text-foreground text-sm leading-5">
+          {domain.domain}
+        </div>
+        <div className="min-w-0 truncate font-mono text-muted-foreground text-sm leading-5">
+          {targetPort == null ? targetText : `${targetText} -> ${targetPort}`}
+        </div>
+        <div className="grid min-w-0 gap-1 sm:grid-cols-3">
+          <CustomDomainLifecycleDetail detail={domain.dns} label="DNS" />
+          <CustomDomainLifecycleDetail
+            detail={domain.certificate}
+            label="Certificate"
+          />
+          <CustomDomainLifecycleDetail
+            detail={domain.routing}
+            label="Routing"
+          />
+        </div>
+      </div>
+      {readOnly || onUnbind == null ? null : (
+        <Button
+          aria-label="Unbind Custom Domain"
+          className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={pending}
+          onClick={handleUnbind}
+          size="icon-lg"
+          title="Unbind Custom Domain"
+          type="button"
+          variant="ghost"
+        >
+          <X aria-hidden />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function normalizeCustomDomainDraft(value: string): string {
+  return value.trim().toLowerCase().replace(/\.+$/g, "");
+}
+
+interface VisibleDomainRows {
+  customDomains: ContainerNetworkCustomDomain[];
+  publicAddresses: ContainerNetworkPublicAddress[];
+}
+
+interface CnameBindingDialogProps {
+  address: ContainerNetworkPublicAddress | undefined;
+  onBind: (domain: ContainerNetworkCustomDomain) => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  verify?: ContainerCustomDomainCnameVerifier;
+}
+
+function CnameBindingDialog({
+  address,
+  onBind,
+  onOpenChange,
+  open,
+  verify,
+}: CnameBindingDialogProps) {
+  const inputId = useId();
+  const target = publicAddressHostValue(address);
+  const platformAddressId = address?.id?.trim() ?? "";
+  const [domainDraft, setDomainDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setDomainDraft("");
+      setError(null);
+      setPending(false);
+    }
+  }, [open]);
+
+  const handleVerify = async () => {
+    const domain = normalizeCustomDomainDraft(domainDraft);
+    if (domain === "") {
+      setError("Custom Domain is required.");
+      return;
+    }
+    if (target === "" || platformAddressId === "") {
+      setError("Platform Address host is not ready.");
+      return;
+    }
+    if (verify == null) {
+      setError("CNAME verification is unavailable.");
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+    try {
+      const result = await verify({ domain, target });
+      if (!result.ok) {
+        setError(result.message ?? "CNAME verification failed.");
+        return;
+      }
+      onBind({
+        domain,
+        id: generateCustomDomainBindingId(),
+        platformAddressId,
+        status: "verified",
+      });
+      onOpenChange(false);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "CNAME verification failed."
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Bind Custom Domain</DialogTitle>
+          <DialogDescription>
+            Configure a CNAME record pointing to this Platform Address.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label>CNAME target</Label>
+            <div className="min-w-0 truncate rounded-md border border-border bg-muted/40 px-2.5 py-2 font-mono text-foreground text-sm">
+              {target === "" ? "Pending domain" : target}
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={inputId}>Custom Domain</Label>
+            <Input
+              aria-invalid={error != null}
+              className="font-mono text-sm"
+              disabled={pending}
+              id={inputId}
+              onChange={(event) => {
+                setDomainDraft(event.target.value);
+                setError(null);
+              }}
+              placeholder="www.example.com"
+              value={domainDraft}
+            />
+          </div>
+          {error == null ? null : (
+            <p className="text-destructive text-xs" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={pending}
+            onClick={() => onOpenChange(false)}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button disabled={pending} onClick={handleVerify} type="button">
+            {pending ? "Verifying" : "Verify"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function visibleDomainRows(network: ContainerNetwork): VisibleDomainRows {
+  const customDomains = network.customDomains ?? [];
+  const boundPlatformAddressIds = new Set(
+    customDomains.map((domain) => domain.platformAddressId.trim())
+  );
+  return {
+    customDomains,
+    publicAddresses: network.publicAddresses.filter(
+      (address) => !boundPlatformAddressIds.has(address.id?.trim() ?? "")
+    ),
+  };
+}
+
+export function containerNetworkAfterUnbindCustomDomain(
+  network: ContainerNetwork,
+  target: Pick<ContainerNetworkCustomDomain, "id">
+): ContainerNetwork {
+  const targetId = target.id.trim();
+  return {
+    ...network,
+    customDomains: (network.customDomains ?? []).filter(
+      (domain) => domain.id.trim() !== targetId
+    ),
+  };
+}
+
+async function commitNetworkChange(
+  network: ContainerNetwork,
+  options: Pick<
+    NetworkSettingsSectionProps,
+    "onNetworkChange" | "onNetworkDraftChange"
+  >
+) {
+  if (options.onNetworkDraftChange != null) {
+    options.onNetworkDraftChange(network);
+    return;
+  }
+  if (options.onNetworkChange != null) {
+    await options.onNetworkChange(network);
+  }
+}
+
+interface NetworkSettingsHeaderProps {
+  canSave: boolean;
+  onCancel: () => void;
+  onSave: () => void | Promise<void>;
+  pending: boolean;
+  showActions: boolean;
+}
+
+function NetworkSettingsHeader({
+  canSave,
+  onCancel,
+  onSave,
+  pending,
+  showActions,
+}: NetworkSettingsHeaderProps) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <SectionTitle>Network</SectionTitle>
+      {showActions ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            className="h-7 px-2 text-xs"
+            disabled={pending}
+            onClick={onCancel}
+            type="button"
+            variant="ghost"
+          >
+            Cancel
+          </Button>
+          <Button
+            className="h-7 px-2 text-xs"
+            disabled={!canSave}
+            onClick={async () => {
+              await onSave();
+            }}
+            type="button"
+            variant="secondary"
+          >
+            Save
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface PublicAddressDraft extends ContainerNetworkPublicAddress {
+  id: string;
   port: number;
 }
 
@@ -1229,26 +1729,35 @@ type PublicAddressDraftValidation =
   | { message: string; ok: false };
 
 function validatePublicAddressDraft(
-  portDraft: string
+  portDraft: string,
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext
 ): PublicAddressDraftValidation {
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   if (!parsedPort.ok) {
     return { message: parsedPort.message, ok: false };
   }
 
-  return { address: { port: parsedPort.n }, ok: true };
+  return {
+    address: platformAddressDraftFromPort(
+      parsedPort.n,
+      platformAddressDraftContext
+    ),
+    ok: true,
+  };
 }
 
 interface AddPublicAddressFormProps {
   defaultPort: number;
   onCancel: () => void;
   onSubmit?: (address: PublicAddressDraft) => void | Promise<void>;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
 }
 
 function AddPublicAddressForm({
   defaultPort,
   onCancel,
   onSubmit,
+  platformAddressDraftContext,
 }: AddPublicAddressFormProps) {
   const portInputId = useId();
   const errorId = `${portInputId}-error`;
@@ -1260,7 +1769,10 @@ function AddPublicAddressForm({
     if (onSubmit == null) {
       return;
     }
-    const validation = validatePublicAddressDraft(draftPort);
+    const validation = validatePublicAddressDraft(
+      draftPort,
+      platformAddressDraftContext
+    );
     if (!validation.ok) {
       setError(validation.message);
       return;
@@ -1322,8 +1834,132 @@ function AddPublicAddressForm({
   );
 }
 
+interface DomainListSectionProps {
+  addOpen: boolean;
+  canMutateNetwork: boolean;
+  defaultPort: number;
+  hiddenPublicAddressCount: number;
+  onAddPublicAddress: (address: PublicAddressDraft) => void | Promise<void>;
+  onBindAddress: (address: ContainerNetworkPublicAddress) => void;
+  onCancelAddPublicAddress: () => void;
+  onDeletePublicAddress: (index: number) => void | Promise<void>;
+  onOpenAddPublicAddress: () => void;
+  onShowAllPublicAddresses: () => void;
+  onUnbindCustomDomain: (
+    domain: ContainerNetworkCustomDomain
+  ) => void | Promise<void>;
+  platformAddressDraftContext?: ContainerNetworkPlatformAddressDraftContext;
+  readOnly: boolean;
+  visibleDomainRows: VisibleDomainRows;
+  visiblePublicAddresses: ContainerNetworkPublicAddress[];
+}
+
+function DomainListSection({
+  addOpen,
+  canMutateNetwork,
+  defaultPort,
+  hiddenPublicAddressCount,
+  onAddPublicAddress,
+  onBindAddress,
+  onCancelAddPublicAddress,
+  onDeletePublicAddress,
+  onOpenAddPublicAddress,
+  onShowAllPublicAddresses,
+  onUnbindCustomDomain,
+  platformAddressDraftContext,
+  readOnly,
+  visibleDomainRows,
+  visiblePublicAddresses,
+}: DomainListSectionProps) {
+  const noDomains =
+    visibleDomainRows.publicAddresses.length === 0 &&
+    visibleDomainRows.customDomains.length === 0;
+
+  return (
+    <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
+      <div className="flex min-w-0 items-center gap-2 px-0.5">
+        <Network
+          aria-hidden
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={2}
+        />
+        <Label className="truncate text-foreground text-sm">Domain List</Label>
+      </div>
+      {readOnly ? null : (
+        <Button
+          aria-label="Add Public Address"
+          className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
+          disabled={addOpen || !canMutateNetwork}
+          onClick={onOpenAddPublicAddress}
+          type="button"
+          variant="secondary"
+        >
+          <Plus aria-hidden className="text-primary" />
+          Add Domain
+        </Button>
+      )}
+      {addOpen ? (
+        <AddPublicAddressForm
+          defaultPort={defaultPort}
+          onCancel={onCancelAddPublicAddress}
+          onSubmit={canMutateNetwork ? onAddPublicAddress : undefined}
+          platformAddressDraftContext={platformAddressDraftContext}
+        />
+      ) : null}
+      {noDomains ? (
+        <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
+          No domains yet
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          {visibleDomainRows.customDomains.map((domain, index) => (
+            <CustomDomainRow
+              domain={domain}
+              key={customDomainKey(domain, index)}
+              onUnbind={
+                canMutateNetwork
+                  ? () => onUnbindCustomDomain(domain)
+                  : undefined
+              }
+              readOnly={readOnly}
+            />
+          ))}
+          {visiblePublicAddresses.map((address, index) => (
+            <PublicAddressRow
+              address={address}
+              key={publicAddressKey(address, index)}
+              onBindCustomDomain={
+                canMutateNetwork ? () => onBindAddress(address) : undefined
+              }
+              onDelete={
+                canMutateNetwork
+                  ? () => onDeletePublicAddress(index)
+                  : undefined
+              }
+              readOnly={readOnly}
+            />
+          ))}
+        </div>
+      )}
+      {hiddenPublicAddressCount > 0 ? (
+        <Button
+          className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
+          onClick={onShowAllPublicAddresses}
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
+          View All
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function NetworkSettingsSection({
   network,
+  onCustomDomainCnameVerify,
+  platformAddressDraftContext,
   onNetworkDraftChange,
   onNetworkChange,
   onPrivatePortDraftChange,
@@ -1336,9 +1972,13 @@ function NetworkSettingsSection({
   const [portError, setPortError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [showAllPublicAddresses, setShowAllPublicAddresses] = useState(false);
+  const [cnameAddress, setCnameAddress] = useState<
+    ContainerNetworkPublicAddress | undefined
+  >(undefined);
   const portDraft = privatePortDraft ?? draftPort;
   const privateAddress = network.privateAddress ?? "";
   const hasPrivateAddress = privateAddress !== "";
+  const visibleDomains = visibleDomainRows(network);
   const usesPanelDraft = hasNetworkPanelDraftControls({
     onNetworkDraftChange,
     onPrivatePortDraftChange,
@@ -1349,10 +1989,10 @@ function NetworkSettingsSection({
     readOnly,
   });
   const visiblePublicAddresses = showAllPublicAddresses
-    ? network.publicAddresses
-    : network.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
+    ? visibleDomains.publicAddresses
+    : visibleDomains.publicAddresses.slice(0, PUBLIC_ADDRESS_VISIBLE_COUNT);
   const hiddenPublicAddressCount =
-    network.publicAddresses.length - visiblePublicAddresses.length;
+    visibleDomains.publicAddresses.length - visiblePublicAddresses.length;
 
   useEffect(() => {
     if (privatePortDraft == null) {
@@ -1362,10 +2002,10 @@ function NetworkSettingsSection({
   }, [network.privatePort, privatePortDraft]);
 
   useEffect(() => {
-    if (network.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
+    if (visibleDomains.publicAddresses.length <= PUBLIC_ADDRESS_VISIBLE_COUNT) {
       setShowAllPublicAddresses(false);
     }
-  }, [network.publicAddresses.length]);
+  }, [visibleDomains.publicAddresses.length]);
 
   const parsedPort = parsePortNumberDigits(portDraft.trim());
   const effectivePortError =
@@ -1416,190 +2056,151 @@ function NetworkSettingsSection({
   };
 
   const handleAddPublicAddress = async (address: PublicAddressDraft) => {
-    const nextNetwork = {
-      ...network,
-      publicAddresses: [...network.publicAddresses, address],
-    };
-    if (onNetworkDraftChange != null) {
-      onNetworkDraftChange(nextNetwork);
-      return;
-    }
-    if (onNetworkChange == null) {
-      return;
-    }
-    await onNetworkChange(nextNetwork);
+    await commitNetworkChange(
+      {
+        ...network,
+        publicAddresses: [...network.publicAddresses, address],
+      },
+      { onNetworkChange, onNetworkDraftChange }
+    );
   };
 
   const handleDeletePublicAddress = async (index: number) => {
-    const target = network.publicAddresses[index];
+    const target = visibleDomains.publicAddresses[index];
     const publicAddresses = network.publicAddresses.filter(
       (address, itemIndex) =>
         !isPublicAddressDeleteTarget(address, itemIndex, target, index)
     );
-    const nextNetwork = { ...network, publicAddresses };
-    if (onNetworkDraftChange != null) {
-      onNetworkDraftChange(nextNetwork);
-      return;
-    }
-    if (onNetworkChange == null) {
-      return;
-    }
-    await onNetworkChange(nextNetwork);
+    await commitNetworkChange(
+      { ...network, publicAddresses },
+      { onNetworkChange, onNetworkDraftChange }
+    );
+  };
+
+  const handleBindCustomDomain = async (
+    domain: ContainerNetworkCustomDomain
+  ) => {
+    await commitNetworkChange(
+      {
+        ...network,
+        customDomains: [...(network.customDomains ?? []), domain],
+      },
+      { onNetworkChange, onNetworkDraftChange }
+    );
+  };
+
+  const handleUnbindCustomDomain = async (
+    domain: ContainerNetworkCustomDomain
+  ) => {
+    await commitNetworkChange(
+      containerNetworkAfterUnbindCustomDomain(network, domain),
+      { onNetworkChange, onNetworkDraftChange }
+    );
   };
 
   return (
-    <section className="flex min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <SectionTitle>Network</SectionTitle>
-        {readOnly || usesPanelDraft || !portDirty ? null : (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={savePending}
-              onClick={handleCancel}
-              type="button"
-              variant="ghost"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={!canSave}
-              onClick={async () => {
-                await handleSave();
-              }}
-              type="button"
-              variant="secondary"
-            >
-              Save
-            </Button>
-          </div>
-        )}
-      </div>
+    <>
+      <section className="flex min-w-0 flex-col gap-3">
+        <NetworkSettingsHeader
+          canSave={canSave}
+          onCancel={handleCancel}
+          onSave={handleSave}
+          pending={savePending}
+          showActions={!(readOnly || usesPanelDraft) && portDirty}
+        />
 
-      <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
-        <div className="grid min-w-0 gap-1.5">
-          <Label className="text-muted-foreground text-xs">
-            Private Address
-          </Label>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
-              {hasPrivateAddress ? privateAddress : "Pending"}
-            </div>
-            <Button
-              aria-label="Copy Private Address"
-              disabled={!hasPrivateAddress}
-              onClick={handleCopyPrivateAddress}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            >
-              <Copy aria-hidden />
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid min-w-0 gap-1.5">
-          <Label htmlFor={networkInputId}>Private Address target port</Label>
-          <Input
-            aria-describedby={
-              effectivePortError == null ? undefined : `${networkInputId}-error`
-            }
-            aria-invalid={effectivePortError != null}
-            className="h-8 max-w-32 font-mono text-xs"
-            disabled={readOnly}
-            id={networkInputId}
-            inputMode="numeric"
-            onChange={(event) => {
-              if (onPrivatePortDraftChange == null) {
-                setDraftPort(event.target.value);
-              } else {
-                onPrivatePortDraftChange(event.target.value);
-              }
-              setPortError(null);
-            }}
-            value={portDraft}
-          />
-          {effectivePortError == null ? null : (
-            <p
-              className="text-destructive text-xs"
-              id={`${networkInputId}-error`}
-              role="alert"
-            >
-              {effectivePortError}
-            </p>
-          )}
-        </div>
-
-        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-background/50 p-2.5">
-          <div className="flex min-w-0 items-center gap-2 px-0.5">
-            <Network
-              aria-hidden
-              className="size-4 shrink-0 text-muted-foreground"
-              strokeWidth={2}
-            />
-            <Label className="truncate text-foreground text-sm">
-              Domain List
+        <div className="grid min-w-0 gap-3 rounded-md border border-border bg-muted/20 p-3">
+          <div className="grid min-w-0 gap-1.5">
+            <Label className="text-muted-foreground text-xs">
+              Private Address
             </Label>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-background/60 px-2.5 py-2 font-mono text-foreground text-xs">
+                {hasPrivateAddress ? privateAddress : "Pending"}
+              </div>
+              <Button
+                aria-label="Copy Private Address"
+                disabled={!hasPrivateAddress}
+                onClick={handleCopyPrivateAddress}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <Copy aria-hidden />
+              </Button>
+            </div>
           </div>
-          {readOnly ? null : (
-            <Button
-              aria-label="Add Public Address"
-              className="h-9 w-full bg-muted/60 text-foreground text-sm hover:bg-muted"
-              disabled={addOpen || !canMutateNetwork}
-              onClick={() => setAddOpen(true)}
-              type="button"
-              variant="secondary"
-            >
-              <Plus aria-hidden className="text-primary" />
-              Add Domain
-            </Button>
-          )}
-          {addOpen ? (
-            <AddPublicAddressForm
-              defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
-              onCancel={handleCancelAddPublicAddress}
-              onSubmit={canMutateNetwork ? handleAddPublicAddress : undefined}
+
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor={networkInputId}>Private Address target port</Label>
+            <Input
+              aria-describedby={
+                effectivePortError == null
+                  ? undefined
+                  : `${networkInputId}-error`
+              }
+              aria-invalid={effectivePortError != null}
+              className="h-8 max-w-32 font-mono text-xs"
+              disabled={readOnly}
+              id={networkInputId}
+              inputMode="numeric"
+              onChange={(event) => {
+                if (onPrivatePortDraftChange == null) {
+                  setDraftPort(event.target.value);
+                } else {
+                  onPrivatePortDraftChange(event.target.value);
+                }
+                setPortError(null);
+              }}
+              value={portDraft}
             />
-          ) : null}
-          {network.publicAddresses.length === 0 ? (
-            <div className="rounded-md border border-border border-dashed px-2.5 py-3 text-center text-muted-foreground text-xs">
-              No domains yet
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {visiblePublicAddresses.map((address, index) => (
-                <PublicAddressRow
-                  address={address}
-                  key={publicAddressKey(address, index)}
-                  onDelete={
-                    canMutateNetwork
-                      ? () => handleDeletePublicAddress(index)
-                      : undefined
-                  }
-                  readOnly={readOnly}
-                />
-              ))}
-            </div>
-          )}
-          {hiddenPublicAddressCount > 0 ? (
-            <Button
-              className="h-4 justify-self-center px-2 text-muted-foreground text-xs hover:text-foreground"
-              onClick={() => setShowAllPublicAddresses(true)}
-              size="xs"
-              type="button"
-              variant="ghost"
-            >
-              View All
-            </Button>
-          ) : null}
+            {effectivePortError == null ? null : (
+              <p
+                className="text-destructive text-xs"
+                id={`${networkInputId}-error`}
+                role="alert"
+              >
+                {effectivePortError}
+              </p>
+            )}
+          </div>
+
+          <DomainListSection
+            addOpen={addOpen}
+            canMutateNetwork={canMutateNetwork}
+            defaultPort={parsedPort.ok ? parsedPort.n : network.privatePort}
+            hiddenPublicAddressCount={hiddenPublicAddressCount}
+            onAddPublicAddress={handleAddPublicAddress}
+            onBindAddress={setCnameAddress}
+            onCancelAddPublicAddress={handleCancelAddPublicAddress}
+            onDeletePublicAddress={handleDeletePublicAddress}
+            onOpenAddPublicAddress={() => setAddOpen(true)}
+            onShowAllPublicAddresses={() => setShowAllPublicAddresses(true)}
+            onUnbindCustomDomain={handleUnbindCustomDomain}
+            platformAddressDraftContext={platformAddressDraftContext}
+            readOnly={readOnly}
+            visibleDomainRows={visibleDomains}
+            visiblePublicAddresses={visiblePublicAddresses}
+          />
         </div>
-      </div>
-    </section>
+      </section>
+      <CnameBindingDialog
+        address={cnameAddress}
+        onBind={handleBindCustomDomain}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCnameAddress(undefined);
+          }
+        }}
+        open={cnameAddress != null}
+        verify={onCustomDomainCnameVerify}
+      />
+    </>
   );
 }
 
 interface ReplicaStrategySectionProps {
+  actions?: ReactNode;
   elastic: ContainerElasticReplicaSettings;
   fixedReplicasSliderParts: {
     onReplicasQuotaChange: (value: number) => void;
@@ -1617,64 +2218,6 @@ interface ReplicaStrategySectionProps {
   onStrategyTypeChange: (type: ReplicaStrategyType) => void;
   readOnly: boolean;
   strategyType: ReplicaStrategyType;
-}
-
-interface ReplicaScaleSliderProps {
-  "aria-label": string;
-  disabled?: boolean;
-  icon: LucideIcon;
-  label: string;
-  max: number;
-  min: number;
-  onValueChange: (value: number) => void;
-  rest?: Omit<ContainerSettingsControlledQuotaProps, "onValueChange" | "value">;
-  value: number;
-}
-
-function ReplicaScaleSlider({
-  "aria-label": ariaLabel,
-  disabled,
-  icon,
-  label,
-  max,
-  min,
-  onValueChange,
-  rest,
-  value,
-}: ReplicaScaleSliderProps) {
-  return (
-    <ScaleSlider.Root
-      {...rest}
-      disabled={disabled ?? rest?.disabled}
-      max={max}
-      maxDecimals={0}
-      min={min}
-      onValueChange={onValueChange}
-      step={rest?.step ?? 1}
-      value={value}
-      valueDisplay="number"
-    >
-      <ScaleSlider.Stack className="w-full">
-        <ScaleSlider.Header className="min-h-6">
-          <ScaleSlider.Group className="min-w-0 gap-2">
-            <ScaleSlider.Icon className="shrink-0" icon={icon} />
-            <ScaleSlider.Label className="text-foreground">
-              {label}
-            </ScaleSlider.Label>
-          </ScaleSlider.Group>
-          <div className="flex h-6 min-w-0 items-center justify-end">
-            <ScaleSlider.Value />
-          </div>
-        </ScaleSlider.Header>
-        <ScaleSlider.Control aria-label={ariaLabel}>
-          <ScaleSlider.Track>
-            <ScaleSlider.Range />
-          </ScaleSlider.Track>
-          <ScaleSlider.Thumb />
-        </ScaleSlider.Control>
-      </ScaleSlider.Stack>
-    </ScaleSlider.Root>
-  );
 }
 
 interface ReadOnlyReplicaValueProps {
@@ -1716,9 +2259,11 @@ function memoryTargetDisplayValue(
   memoryTargetMib: number
 ): string {
   if (elastic.target.metric === "memory") {
-    return elastic.target.averageValue;
+    return formatMemoryMibValue(
+      memoryAverageValueToMib(elastic.target.averageValue)
+    );
   }
-  return `${memoryTargetMib}Mi`;
+  return formatMemoryMibValue(memoryTargetMib);
 }
 
 interface ReadOnlyReplicaStrategyRowsOptions {
@@ -1750,13 +2295,16 @@ function readOnlyReplicaStrategyRows({
   ];
 
   if (strategyType === "fixed") {
-    rows.push({ label: "Replica count", value: fixedReplicas });
+    rows.push({
+      label: "Number of Replicas",
+      value: formatReplicaValue(fixedReplicas),
+    });
     return rows;
   }
 
   rows.push(
-    { label: "Minimum replicas", value: minReplicas },
-    { label: "Maximum replicas", value: maxReplicas },
+    { label: "Minimum replicas", value: formatReplicaValue(minReplicas) },
+    { label: "Maximum replicas", value: formatReplicaValue(maxReplicas) },
     {
       label: "Scaling target",
       value: elasticTargetMetricDisplayName(targetMetric),
@@ -1786,13 +2334,8 @@ function ReadOnlyReplicaStrategySummary({
   rows,
 }: ReadOnlyReplicaStrategySummaryProps) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-        <SectionTitle className="m-0 min-w-0 shrink leading-none">
-          Replica Strategy
-        </SectionTitle>
-      </div>
-      <div className="grid min-w-0 gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+    <ResourceSettingsSection title="Replica Strategy">
+      <div className="grid min-w-0 gap-2">
         {rows.map((row) => (
           <ReadOnlyReplicaValue
             key={row.label}
@@ -1801,11 +2344,12 @@ function ReadOnlyReplicaStrategySummary({
           />
         ))}
       </div>
-    </section>
+    </ResourceSettingsSection>
   );
 }
 
 function ReplicaStrategySection({
+  actions,
   elastic,
   fixedReplicasSliderParts,
   onElasticCpuTargetChange,
@@ -1850,16 +2394,11 @@ function ReplicaStrategySection({
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-        <SectionTitle className="m-0 min-w-0 shrink leading-none">
-          Replica Strategy
-        </SectionTitle>
-      </div>
+    <ResourceSettingsSection actions={actions} title="Replica Strategy">
       <div className="grid min-w-0 gap-3">
         <ToggleGroup
           aria-label="Replica Strategy"
-          className="grid w-full grid-cols-2"
+          className="grid h-9 w-full grid-cols-2 rounded-lg bg-muted/40 p-0.5"
           onValueChange={(value) => {
             const next = value[0];
             if (next === "fixed" || next === "elastic") {
@@ -1872,7 +2411,7 @@ function ReplicaStrategySection({
         >
           <ToggleGroupItem
             aria-label="Fixed Replicas"
-            className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+            className="h-8 min-w-0 rounded-md border-0 text-xs"
             data-selected={strategyType === "fixed" ? "true" : undefined}
             disabled={readOnly}
             value="fixed"
@@ -1881,7 +2420,7 @@ function ReplicaStrategySection({
           </ToggleGroupItem>
           <ToggleGroupItem
             aria-label="Elastic Scaling"
-            className="h-8 min-w-0 text-xs"
+            className="h-8 min-w-0 rounded-md border-0 text-xs"
             data-selected={strategyType === "elastic" ? "true" : undefined}
             disabled={readOnly}
             value="elastic"
@@ -1891,45 +2430,54 @@ function ReplicaStrategySection({
         </ToggleGroup>
 
         {strategyType === "fixed" ? (
-          <ReplicaScaleSlider
-            aria-label="Replica count"
-            icon={Layers}
-            label="Replica count"
+          <ResourceSettingsSlider
+            ariaLabel="Replica count"
+            disabled={readOnly || fixedReplicasSliderParts.rest.disabled}
+            formatBound={formatReplicaValue}
+            formatValue={formatReplicaValue}
+            label="Number of Replicas"
             max={fixedReplicasSliderParts.rest.max ?? REPLICA_LIMITS.max}
+            maxDecimals={0}
             min={fixedReplicasSliderParts.rest.min ?? REPLICA_LIMITS.min}
             onValueChange={fixedReplicasSliderParts.onReplicasQuotaChange}
-            rest={fixedReplicasSliderParts.rest}
+            step={fixedReplicasSliderParts.rest.step ?? 1}
             value={fixedReplicasSliderParts.replicasValue}
           />
         ) : (
           <div className="flex flex-col gap-5">
-            <ReplicaScaleSlider
-              aria-label="Minimum replicas"
+            <ResourceSettingsSlider
+              ariaLabel="Minimum replicas"
               disabled={readOnly}
-              icon={Layers}
+              formatBound={formatReplicaValue}
+              formatValue={formatReplicaValue}
               label="Minimum replicas"
               max={REPLICA_LIMITS.max}
+              maxDecimals={0}
               min={REPLICA_LIMITS.min}
               onValueChange={onElasticMinReplicasChange}
+              step={1}
               value={minReplicas}
             />
 
-            <ReplicaScaleSlider
-              aria-label="Maximum replicas"
+            <ResourceSettingsSlider
+              ariaLabel="Maximum replicas"
               disabled={readOnly}
-              icon={Layers}
+              formatBound={formatReplicaValue}
+              formatValue={formatReplicaValue}
               label="Maximum replicas"
               max={REPLICA_LIMITS.max}
+              maxDecimals={0}
               min={REPLICA_LIMITS.min}
               onValueChange={onElasticMaxReplicasChange}
+              step={1}
               value={maxReplicas}
             />
 
-            <div className="grid min-w-0 gap-2">
+            <ResourceSettingsInset>
               <Label className="text-foreground text-xs">Scaling target</Label>
               <ToggleGroup
                 aria-label="Scaling target"
-                className="grid w-full grid-cols-2"
+                className="grid h-9 w-full grid-cols-2 rounded-lg bg-background/40 p-0.5"
                 onValueChange={(value) => {
                   const next = value[0];
                   if (next === "cpu" || next === "memory") {
@@ -1942,7 +2490,7 @@ function ReplicaStrategySection({
               >
                 <ToggleGroupItem
                   aria-label="CPU utilization target"
-                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  className="h-8 min-w-0 rounded-md border-0 text-xs"
                   data-selected={targetMetric === "cpu" ? "true" : undefined}
                   disabled={readOnly}
                   value="cpu"
@@ -1951,7 +2499,7 @@ function ReplicaStrategySection({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   aria-label="Memory average target"
-                  className="h-8 min-w-0 text-xs data-[selected=true]:bg-muted"
+                  className="h-8 min-w-0 rounded-md border-0 text-xs"
                   data-selected={targetMetric === "memory" ? "true" : undefined}
                   disabled={readOnly}
                   value="memory"
@@ -1959,35 +2507,43 @@ function ReplicaStrategySection({
                   Memory average target
                 </ToggleGroupItem>
               </ToggleGroup>
-            </div>
+            </ResourceSettingsInset>
 
             {targetMetric === "memory" ? (
-              <ReplicaScaleSlider
-                aria-label="Memory average target"
+              <ResourceSettingsSlider
+                ariaLabel="Memory average target"
                 disabled={readOnly}
+                formatBound={formatMemoryMibValue}
+                formatValue={formatMemoryMibValue}
                 icon={MemoryStick}
                 label="Memory average target"
                 max={MEMORY_AVERAGE_TARGET_LIMITS.max}
+                maxDecimals={0}
                 min={MEMORY_AVERAGE_TARGET_LIMITS.min}
                 onValueChange={onElasticMemoryTargetChange}
+                step={1}
                 value={memoryTargetMib}
               />
             ) : (
-              <ReplicaScaleSlider
-                aria-label="CPU utilization target"
+              <ResourceSettingsSlider
+                ariaLabel="CPU utilization target"
                 disabled={readOnly}
+                formatBound={(next) => `${formatPlainNumber(next, 0)}%`}
+                formatValue={(next) => `${formatPlainNumber(next, 0)}%`}
                 icon={Cpu}
                 label="CPU utilization target"
                 max={CPU_UTILIZATION_TARGET_LIMITS.max}
+                maxDecimals={0}
                 min={CPU_UTILIZATION_TARGET_LIMITS.min}
                 onValueChange={onElasticCpuTargetChange}
+                step={1}
                 value={cpuTargetPercent}
               />
             )}
           </div>
         )}
       </div>
-    </section>
+    </ResourceSettingsSection>
   );
 }
 
@@ -2105,6 +2661,8 @@ export function ContainerSettingsPane({
   memoryQuota,
   env,
   network,
+  networkPlatformAddressDraftContext,
+  onCustomDomainCnameVerify,
   replicasQuota,
   replicaStrategy,
   onResourceQuotasCommit,
@@ -2653,6 +3211,31 @@ export function ContainerSettingsPane({
     memorySlider.min,
     memorySlider.max
   );
+  const quotaActions =
+    quotaCommitMode && !settingsCommitMode && quotasDirty ? (
+      <>
+        <Button
+          className="h-7 px-2 text-xs"
+          disabled={quotaSavePending}
+          onClick={handleQuotaCancel}
+          type="button"
+          variant="ghost"
+        >
+          Cancel
+        </Button>
+        <Button
+          className="h-7 px-2 text-xs"
+          disabled={quotaSavePending}
+          onClick={async () => {
+            await handleQuotaSave();
+          }}
+          type="button"
+          variant="secondary"
+        >
+          Save
+        </Button>
+      </>
+    ) : null;
 
   const handleImageDialogChange = (open: boolean) => {
     setImageDialogOpen(open);
@@ -2893,100 +3476,10 @@ export function ContainerSettingsPane({
 
         <Separator />
 
-        <section className="flex flex-col gap-3">
-          <div className="flex h-6 min-w-0 items-center justify-between gap-2">
-            <SectionTitle className="m-0 min-w-0 shrink leading-none">
-              Resource quota
-            </SectionTitle>
-            {quotaCommitMode && !settingsCommitMode && quotasDirty ? (
-              <div className="-mr-1 flex shrink-0 items-center gap-1">
-                <Button
-                  className="h-7 px-2 text-xs"
-                  disabled={quotaSavePending}
-                  onClick={handleQuotaCancel}
-                  type="button"
-                  variant="ghost"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="h-7 px-2 text-xs"
-                  disabled={quotaSavePending}
-                  onClick={async () => {
-                    await handleQuotaSave();
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  Save
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-5">
-            <ScaleSlider.Root
-              {...cpuSliderRest}
-              maxDecimals={cpuDecimals}
-              onValueChange={onCpuQuotaChange}
-              value={cpuValue}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={Cpu} />
-                    <ScaleSlider.Label className="text-foreground">
-                      CPU (cores)
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="CPU quota (cores)">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
-
-            <ScaleSlider.Root
-              {...memorySliderRest}
-              maxDecimals={memoryDecimals}
-              onValueChange={onMemoryQuotaChange}
-              value={memoryValue}
-              valueDisplay="number"
-            >
-              <ScaleSlider.Stack className="w-full">
-                <ScaleSlider.Header className="min-h-6">
-                  <ScaleSlider.Group className="min-w-0 gap-2">
-                    <ScaleSlider.Icon className="shrink-0" icon={MemoryStick} />
-                    <ScaleSlider.Label className="text-foreground">
-                      Memory (MiB)
-                    </ScaleSlider.Label>
-                  </ScaleSlider.Group>
-                  <div className="flex h-6 min-w-0 items-center justify-end">
-                    <ScaleSlider.Value />
-                  </div>
-                </ScaleSlider.Header>
-                <ScaleSlider.Control aria-label="Memory quota (MiB)">
-                  <ScaleSlider.Track>
-                    <ScaleSlider.Range />
-                  </ScaleSlider.Track>
-                  <ScaleSlider.Thumb />
-                </ScaleSlider.Control>
-              </ScaleSlider.Stack>
-            </ScaleSlider.Root>
-          </div>
-        </section>
-
-        {replicasSliderParts == null ? null : (
-          <>
-            <Separator />
-
+        <div className="grid gap-3">
+          {replicasSliderParts == null ? null : (
             <ReplicaStrategySection
+              actions={quotaActions}
               elastic={normalizeElasticReplicaSettings(
                 elasticSettingsFromStrategy(draftReplicaStrategy)
               )}
@@ -3000,8 +3493,43 @@ export function ContainerSettingsPane({
               readOnly={readOnly}
               strategyType={replicaStrategyType}
             />
-          </>
-        )}
+          )}
+
+          <ResourceSettingsSection
+            actions={replicasSliderParts == null ? quotaActions : undefined}
+            title="CPU / Memory"
+          >
+            <ResourceSettingsSlider
+              ariaLabel="CPU quota (cores)"
+              disabled={cpuSliderRest.disabled}
+              formatBound={(next) => formatPlainNumber(next, 2)}
+              formatValue={formatCpuCoresValue}
+              icon={Cpu}
+              label="CPU"
+              max={cpuSlider.max}
+              maxDecimals={cpuDecimals}
+              min={cpuSlider.min}
+              onValueChange={onCpuQuotaChange}
+              step={cpuSliderRest.step}
+              value={cpuValue}
+            />
+
+            <ResourceSettingsSlider
+              ariaLabel="Memory quota (MiB)"
+              disabled={memorySliderRest.disabled}
+              formatBound={formatMemoryMibValue}
+              formatValue={formatMemoryMibValue}
+              icon={MemoryStick}
+              label="Memory"
+              max={memorySlider.max}
+              maxDecimals={memoryDecimals}
+              min={memorySlider.min}
+              onValueChange={onMemoryQuotaChange}
+              step={memorySliderRest.step}
+              value={memoryValue}
+            />
+          </ResourceSettingsSection>
+        </div>
 
         <Separator />
 
@@ -3080,6 +3608,7 @@ export function ContainerSettingsPane({
         {networkForRender == null ? null : (
           <NetworkSettingsSection
             network={networkForRender}
+            onCustomDomainCnameVerify={onCustomDomainCnameVerify}
             onNetworkChange={settingsCommitMode ? undefined : onNetworkChange}
             onNetworkDraftChange={
               settingsCommitMode ? setDraftNetwork : undefined
@@ -3087,6 +3616,7 @@ export function ContainerSettingsPane({
             onPrivatePortDraftChange={
               settingsCommitMode ? setNetworkPrivatePortDraft : undefined
             }
+            platformAddressDraftContext={networkPlatformAddressDraftContext}
             privatePortDraft={
               settingsCommitMode ? networkPrivatePortDraft : undefined
             }

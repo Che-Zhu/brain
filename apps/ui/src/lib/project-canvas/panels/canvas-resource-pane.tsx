@@ -5,12 +5,6 @@ import { cn } from "@workspace/ui/lib/utils";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
-export interface CanvasResourcePaneStatus {
-  label?: string;
-  tone?: string;
-  visualTone?: string;
-}
-
 export interface CanvasResourcePaneProps {
   bodyClassName?: string;
   children: ReactNode;
@@ -18,41 +12,8 @@ export interface CanvasResourcePaneProps {
   closeAriaLabel?: string;
   icon?: ReactNode;
   onClose: () => void;
-  status?: CanvasResourcePaneStatus;
   subtitle?: string;
   title: string;
-}
-
-function statusPillClassName(status: CanvasResourcePaneStatus | undefined) {
-  const tone = (status?.visualTone ?? status?.tone ?? status?.label ?? "")
-    .trim()
-    .toLowerCase();
-
-  switch (tone) {
-    case "positive":
-    case "ready":
-    case "running":
-      return "bg-database-metrics-status-running text-primary";
-    case "negative":
-    case "error":
-    case "failed":
-    case "unhealthy":
-      return "bg-destructive/25 text-destructive";
-    case "warning":
-    case "pending":
-    case "progressing":
-    case "reconciling":
-    case "starting":
-    case "stopping":
-    case "updating":
-      return "bg-theme-yellow/20 text-theme-yellow";
-    case "paused":
-    case "stopped":
-    case "neutral":
-      return "bg-muted text-muted-foreground";
-    default:
-      return "bg-primary/10 text-primary";
-  }
 }
 
 export function CanvasResourcePane({
@@ -62,12 +23,9 @@ export function CanvasResourcePane({
   closeAriaLabel = "Close resource pane",
   icon,
   onClose,
-  status,
   subtitle,
   title,
 }: CanvasResourcePaneProps) {
-  const statusLabel = status?.label?.trim() ?? "";
-
   return (
     <aside
       className={cn(
@@ -83,30 +41,18 @@ export function CanvasResourcePane({
       >
         <header className="flex shrink-0 items-start justify-between gap-3 px-2.5">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex min-w-0 items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                {icon == null ? null : (
-                  <span className="flex size-4 shrink-0 items-center justify-center">
-                    {icon}
-                  </span>
-                )}
-                <h2
-                  className="truncate font-semibold text-lg text-primary leading-none"
-                  title={title}
-                >
-                  {title}
-                </h2>
-              </div>
-              {statusLabel === "" ? null : (
-                <span
-                  className={cn(
-                    "inline-flex h-5 shrink-0 items-center rounded-full px-2.5 text-xs leading-none",
-                    statusPillClassName(status)
-                  )}
-                >
-                  {statusLabel}
+            <div className="flex min-w-0 items-center gap-2.5">
+              {icon == null ? null : (
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  {icon}
                 </span>
               )}
+              <h2
+                className="truncate font-semibold text-lg text-primary leading-none"
+                title={title}
+              >
+                {title}
+              </h2>
             </div>
             {subtitle == null || subtitle.trim() === "" ? null : (
               <p className="truncate text-muted-foreground text-sm leading-5">

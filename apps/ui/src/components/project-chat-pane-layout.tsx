@@ -495,7 +495,7 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
   return (
     <header
       className={cn(
-        "flex h-13 shrink-0 items-center gap-2 bg-background px-2",
+        "flex h-13 shrink-0 items-center gap-2 bg-background pr-2 pl-6",
         !rightPaneOpen && "pr-12"
       )}
     >

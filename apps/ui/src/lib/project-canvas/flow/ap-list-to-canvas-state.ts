@@ -563,8 +563,10 @@ interface EntryPointCanvasResource {
 }
 
 interface NetworkPublicAddress {
+  cnameTarget?: string;
   host?: string;
   id?: string;
+  platformAddressId?: string;
   port: number;
   status?: string;
   type?: string;
@@ -662,15 +664,59 @@ function apNetworkPublicAddresses(ap: unknown): NetworkPublicAddress[] {
     inputNetwork?.platformAddresses
   );
   if (statusAddresses.length > 0) {
-    const observedIds = platformAddressIdsFromRows(statusAddresses);
+    const observedPlatformAddresses = statusAddresses.filter(
+      isPlatformPublicAddressRow
+    );
+    const observedIds = platformAddressIdsFromRows(observedPlatformAddresses);
+    const promotedPlatformAddressIds =
+      platformAddressIdsFromCustomRows(statusAddresses);
     return [
       ...statusAddresses,
       ...desiredPending.filter(
-        (address) => address.id === undefined || !observedIds.has(address.id)
+        (address) =>
+          !isKnownPlatformAddress(
+            address,
+            observedIds,
+            promotedPlatformAddressIds
+          )
       ),
     ];
   }
   return desiredPending;
+}
+
+function isKnownPlatformAddress(
+  address: NetworkPublicAddress,
+  observedIds: ReadonlySet<string>,
+  promotedPlatformAddressIds: ReadonlySet<string>
+): boolean {
+  return (
+    address.id !== undefined &&
+    (observedIds.has(address.id) || promotedPlatformAddressIds.has(address.id))
+  );
+}
+
+function isCustomPublicAddressRow(address: NetworkPublicAddress): boolean {
+  return address.type?.trim().toLowerCase() === "custom";
+}
+
+function isPlatformPublicAddressRow(address: NetworkPublicAddress): boolean {
+  return !isCustomPublicAddressRow(address);
+}
+
+function platformAddressIdsFromCustomRows(
+  addresses: readonly NetworkPublicAddress[]
+): Set<string> {
+  const ids = new Set<string>();
+  for (const address of addresses) {
+    if (
+      isCustomPublicAddressRow(address) &&
+      address.platformAddressId !== undefined
+    ) {
+      ids.add(address.platformAddressId);
+    }
+  }
+  return ids;
 }
 
 function normalizeDesiredPlatformAddresses(
@@ -739,6 +785,8 @@ function networkPublicAddressFromRecord(
   const status = nonEmptyString(record.status);
   const type = nonEmptyString(record.type);
   const url = nonEmptyString(record.url);
+  const platformAddressId = nonEmptyString(record.platformAddressId);
+  const cnameTarget = nonEmptyString(record.cnameTarget);
   if (status !== undefined) {
     address.status = status;
   }
@@ -747,6 +795,12 @@ function networkPublicAddressFromRecord(
   }
   if (url !== undefined) {
     address.url = url;
+  }
+  if (platformAddressId !== undefined) {
+    address.platformAddressId = platformAddressId;
+  }
+  if (cnameTarget !== undefined) {
+    address.cnameTarget = cnameTarget;
   }
   return address;
 }
