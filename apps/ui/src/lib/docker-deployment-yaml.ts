@@ -64,14 +64,27 @@ function metadataWithRoutingDomain(
     metadata.labels && typeof metadata.labels === "object"
       ? { ...(metadata.labels as Record<string, unknown>) }
       : {};
+  const metadataWithoutLabels = Object.fromEntries(
+    Object.entries(metadata).filter(([key]) => key !== "labels")
+  );
+  const labelsWithoutRegion = Object.fromEntries(
+    Object.entries(labels).filter(([key]) => key !== "region")
+  );
   const routingDomain = options.routingDomain.trim();
-
-  return {
-    ...metadata,
-    labels: routingDomain ? { ...labels, region: routingDomain } : labels,
+  const nextMetadata: Record<string, unknown> = {
+    ...metadataWithoutLabels,
     name: options.name,
     namespace: options.namespace,
   };
+  const nextLabels = routingDomain
+    ? { ...labelsWithoutRegion, region: routingDomain }
+    : labelsWithoutRegion;
+
+  if (Object.keys(nextLabels).length > 0) {
+    nextMetadata.labels = nextLabels;
+  }
+
+  return nextMetadata;
 }
 
 export function renderDockerDeploymentYaml(

@@ -112,3 +112,39 @@ spec:
   ]);
   assert.equal(out.spec.resource, undefined);
 });
+
+test("renderDockerDeploymentYaml removes template routing domain when none is provided", () => {
+  const out = YAML.parse(
+    renderDockerDeploymentYaml({
+      name: "project-a-api",
+      namespace: "ns-admin",
+      platformAddressId: "pa_abc123",
+      projectName: "project-a",
+      routingDomain: "",
+      settings: {
+        appListeningPort: 3000,
+        env: [],
+        image: "ghcr.io/acme/api:1.2",
+      },
+      template: `
+apiVersion: example.crossplane.io/v1
+kind: AP
+metadata:
+  name: {{ name }}
+  namespace: {{ namespace }}
+  labels:
+    app.kubernetes.io/name: {{ name }}
+    region: old.example.com
+spec:
+  input:
+    image: old-image
+`,
+    })
+  );
+
+  assert.equal(out.metadata.labels["app.kubernetes.io/name"], "project-a-api");
+  assert.equal(out.metadata.labels.region, undefined);
+  assert.deepEqual(out.spec.input.network.platformAddresses, [
+    { id: "pa_abc123", port: 3000 },
+  ]);
+});
