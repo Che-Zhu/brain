@@ -127,6 +127,10 @@ A local set of pending AP or DB settings changes that is submitted only when the
 
 A runtime dependency where an AP is configured to consume one DB's connection credentials.
 
+### DB Access
+
+A read-only resource workflow for inspecting a DB's objects and data without exposing its connection credentials. DB Access is distinct from DB Settings: DB Settings changes a DB's desired configuration, while DB Access explores the contents exposed by that DB.
+
 ### Container Node
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.
@@ -164,6 +168,14 @@ A canvas edge that represents an established runtime dependency between resource
 ### Canvas Resource Pane
 
 A right-side canvas surface opened from a selected AP or DB node to inspect or change resource-scoped details such as settings, metrics, logs, or history. It is distinct from the project assistant chat pane.
+
+### Canvas Action Surface
+
+A temporary canvas surface opened from a node action for focused resource work, occupying the project main area rather than the Project Assistant Pane. A Canvas Action Surface is distinct from a Canvas Resource Pane because it is not a right-side inspection surface and may host different action-specific experiences over time.
+
+Within one project canvas, a Canvas Action Surface replaces the currently open temporary project surface instead of stacking with a Side Pane or Canvas Resource Pane.
+
+A Canvas Action Surface follows the project main area's available width when the Project Assistant Pane is opened or closed.
 
 ### Side Pane
 

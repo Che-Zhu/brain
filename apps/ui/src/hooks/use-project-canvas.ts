@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
+import { shouldClearCanvasActionMode } from "@/lib/project-canvas/actions/canvas-action-mode";
 import {
   canvasNodeGeometryFromNode,
   selectCanvasAnchorPair,
@@ -77,6 +78,8 @@ import {
   workloadPaneModeForNodeClick,
 } from "@/lib/project-canvas/panels/workload-pane-mode";
 import {
+  CANVAS_ACTION,
+  CANVAS_ACTION_QUERY_KEY,
   CANVAS_SERVICE_QUERY_KEY,
   DATABASE_PANE,
   DATABASE_PANE_QUERY_KEY,
@@ -243,6 +246,10 @@ export function useProjectCanvas(
   );
   const [entryPane, setEntryPane] = useQueryState(
     ENTRY_PANE_QUERY_KEY,
+    parseAsString
+  );
+  const [canvasAction, setCanvasAction] = useQueryState(
+    CANVAS_ACTION_QUERY_KEY,
     parseAsString
   );
   const setSelectedEdge = useSetAtom(selectedEdgeAtom);
@@ -458,11 +465,30 @@ export function useProjectCanvas(
             ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
             quickActions: {
               ...(data.actions?.quickActions ?? {}),
+              dbAccess: {
+                disabled: !hasUrlActions,
+                onClick: hasUrlActions
+                  ? () => {
+                      requestSettingsLeave("switch", () => {
+                        onResourcePaneOpen?.();
+                        setSelectedEdge(null);
+                        setServiceUid(uid).catch(() => undefined);
+                        setEntryPane(null).catch(() => undefined);
+                        setWorkloadPane(null).catch(() => undefined);
+                        setDatabasePane(null).catch(() => undefined);
+                        setCanvasAction(CANVAS_ACTION.dbAccess).catch(
+                          () => undefined
+                        );
+                      });
+                    }
+                  : undefined,
+              },
               metrics: {
                 disabled: !hasUrlActions,
                 onClick: hasUrlActions
                   ? () => {
                       requestSettingsLeave("switch", () => {
+                        setCanvasAction(null).catch(() => undefined);
                         setSelectedEdge(null);
                         setServiceUid(uid).catch(() => undefined);
                         setEntryPane(null).catch(() => undefined);
@@ -491,11 +517,13 @@ export function useProjectCanvas(
       deleteDbWorkload,
       getPublicAccessPendingTarget,
       isDbLifecycleLoading,
+      onResourcePaneOpen,
       restartDbWorkload,
       runMutationThenRefresh,
       readOnly,
       requestSettingsLeave,
       routingDomain,
+      setCanvasAction,
       setDatabasePane,
       setEntryPane,
       setWorkloadPane,
@@ -551,6 +579,7 @@ export function useProjectCanvas(
 
       const select = (pane: string) => {
         requestSettingsLeave("switch", () => {
+          setCanvasAction(null).catch(() => undefined);
           setSelectedEdge(null);
           setDatabasePane(null).catch(() => undefined);
           setEntryPane(null).catch(() => undefined);
@@ -645,6 +674,7 @@ export function useProjectCanvas(
       pauseWorkload,
       readOnly,
       requestSettingsLeave,
+      setCanvasAction,
       restartWorkload,
       runMutationThenRefresh,
       setDatabasePane,
@@ -808,6 +838,7 @@ export function useProjectCanvas(
           dbNamespace: command.db.namespace,
           id: `ap-db-${addDbDsnReferenceIntentCounter.current}`,
         });
+        setCanvasAction(null).catch(() => undefined);
         setSelectedEdge(null);
         setDatabasePane(null).catch(() => undefined);
         setEntryPane(null).catch(() => undefined);
@@ -819,6 +850,7 @@ export function useProjectCanvas(
       nodes,
       readOnly,
       requestSettingsLeave,
+      setCanvasAction,
       setDatabasePane,
       setEntryPane,
       setSelectedEdge,
@@ -901,10 +933,11 @@ export function useProjectCanvas(
 
   useEffect(() => {
     if (isStale) {
+      setCanvasAction(null).catch(() => undefined);
       setServiceUid(null).catch(() => undefined);
       setEntryPane(null).catch(() => undefined);
     }
-  }, [isStale, setEntryPane, setServiceUid]);
+  }, [isStale, setCanvasAction, setEntryPane, setServiceUid]);
 
   useEffect(() => {
     if (entryPane == null) {
@@ -948,6 +981,25 @@ export function useProjectCanvas(
 
   useEffect(() => {
     if (
+      shouldClearCanvasActionMode({
+        canvasAction,
+        rawNodeCount: rawNodes.length,
+        selectedNode,
+        serviceUid,
+      })
+    ) {
+      setCanvasAction(null).catch(() => undefined);
+    }
+  }, [
+    canvasAction,
+    rawNodes.length,
+    selectedNode,
+    serviceUid,
+    setCanvasAction,
+  ]);
+
+  useEffect(() => {
+    if (
       shouldClearWorkloadPaneMode({
         rawNodeCount: rawNodes.length,
         selectedNode,
@@ -966,12 +1018,14 @@ export function useProjectCanvas(
   ]);
 
   const clearSelectedResource = useCallback(() => {
+    setCanvasAction(null).catch(() => undefined);
     setSelectedEdge(null);
     setServiceUid(null).catch(() => undefined);
     setDatabasePane(null).catch(() => undefined);
     setEntryPane(null).catch(() => undefined);
     setWorkloadPane(null).catch(() => undefined);
   }, [
+    setCanvasAction,
     setDatabasePane,
     setEntryPane,
     setSelectedEdge,
@@ -994,6 +1048,9 @@ export function useProjectCanvas(
   }, [clearSelectedResource, requestSettingsLeave]);
 
   const closeResourcePane = clearSelection;
+  const closeCanvasActionSurface = useCallback(() => {
+    setCanvasAction(null).catch(() => undefined);
+  }, [setCanvasAction]);
 
   const meta = useMemo<CanvasMeta>(
     () => ({
@@ -1034,6 +1091,7 @@ export function useProjectCanvas(
           );
           const selectNode = () => {
             frontCanvasNode(node);
+            setCanvasAction(null).catch(() => undefined);
             setSelectedEdge(null);
             setWorkloadPane(nextWorkloadPane).catch(() => undefined);
             setDatabasePane(nextDatabasePane).catch(() => undefined);
@@ -1061,6 +1119,7 @@ export function useProjectCanvas(
         },
         onEdgeClick: (_, edge: Edge) => {
           requestSettingsLeave("switch", () => {
+            setCanvasAction(null).catch(() => undefined);
             setSelectedEdge(edge);
             setServiceUid(null).catch(() => undefined);
             setDatabasePane(null).catch(() => undefined);
@@ -1092,6 +1151,7 @@ export function useProjectCanvas(
       readOnly,
       requestSettingsLeave,
       serviceUid,
+      setCanvasAction,
       setDatabasePane,
       setEntryPane,
       setSelectedEdge,
@@ -1102,7 +1162,9 @@ export function useProjectCanvas(
   );
 
   return {
+    canvasAction,
     clearSelection,
+    closeCanvasActionSurface,
     closeResourcePane,
     connectionOrigin,
     databasePane,

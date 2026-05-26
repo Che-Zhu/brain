@@ -12,6 +12,7 @@ import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
+import { CanvasActionSurface } from "@/lib/project-canvas/actions/canvas-action-surface";
 import {
   addPendingApDbCanvasReferences,
   type PendingApDbCanvasReference,
@@ -122,7 +123,9 @@ export default function ProjectUidPage() {
   ]);
 
   const {
+    canvasAction,
     closeResourcePane,
+    closeCanvasActionSurface,
     connectionOrigin,
     databasePane,
     entryPane,
@@ -152,16 +155,19 @@ export default function ProjectUidPage() {
     [selectedNode]
   );
   const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
+  const canvasActionSurfaceOpen = canvasAction != null;
   const canvasResourcePaneOpen = Boolean(
     workloadPane ?? databasePane ?? entryPane
   );
-  const canvasSidePaneEntry = resolveProjectCanvasSidePaneEntry({
-    databaseDeploymentPaneOpen,
-    dockerDeploymentPaneOpen,
-    githubDeploymentPaneOpen,
-    preferredEntry: preferredCanvasSidePaneEntry,
-    resourcePaneOpen: canvasResourcePaneOpen,
-  });
+  const canvasSidePaneEntry = canvasActionSurfaceOpen
+    ? null
+    : resolveProjectCanvasSidePaneEntry({
+        databaseDeploymentPaneOpen,
+        dockerDeploymentPaneOpen,
+        githubDeploymentPaneOpen,
+        preferredEntry: preferredCanvasSidePaneEntry,
+        resourcePaneOpen: canvasResourcePaneOpen,
+      });
   const closeDatabaseDeploymentPane = useCallback(() => {
     Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
       () => undefined
@@ -348,6 +354,11 @@ export default function ProjectUidPage() {
                       />
                     }
                     resourcePane={canvasResourcePane}
+                  />
+                  <CanvasActionSurface
+                    action={canvasAction}
+                    onClose={closeCanvasActionSurface}
+                    selectedDatabaseData={selectedDatabaseData}
                   />
                   {settingsLeaveGuardDialog}
                 </Canvas.Flow>
