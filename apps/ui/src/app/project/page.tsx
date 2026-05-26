@@ -2,6 +2,7 @@
 
 import { ProjectExplorer } from "@workspace/ui/components/project-explorer/project-explorer";
 import { SidePanePresence } from "@workspace/ui/components/side-pane";
+import { cn } from "@workspace/ui/lib/utils";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -75,7 +76,12 @@ export default function ProjectIndexPage() {
           }}
         />
       </div>
-      <div className="relative flex min-h-0 flex-1 flex-col items-center gap-4 px-[52px] pt-[52px] pb-6">
+      <div
+        className={cn(
+          "relative flex min-h-0 flex-1 flex-col items-center gap-4 px-[52px] pt-[52px] pb-6 transition-[padding] duration-200 ease-out motion-reduce:transition-none",
+          creationPaneOpen && "xl:pr-[40rem]"
+        )}
+      >
         <ProjectExplorer.Root actions={explorerActions} states={states}>
           <ProjectExplorer.Variant1
             className="w-full min-w-0 max-w-6xl flex-1"
