@@ -1,5 +1,5 @@
 export interface ProjectSidePaneAssistantIntent {
-  type: "github";
+  type: "database" | "github";
 }
 
 export type ProjectSidePaneIntentResult =

@@ -14,6 +14,14 @@ test("Project List translates assistant GitHub intent to GitHub direct project c
   });
 });
 
+test("Project List translates assistant database intent to database direct project creation", () => {
+  assert.deepEqual(projectListEntryForAssistantIntent({ type: "database" }), {
+    entryMode: "databaseDirect",
+    kind: "projectCreation",
+    placement: "reserved",
+  });
+});
+
 test("Project Canvas translates assistant GitHub intent to deployment in the current Project", () => {
   assert.deepEqual(
     projectCanvasEntryForAssistantIntent(
@@ -22,6 +30,20 @@ test("Project Canvas translates assistant GitHub intent to deployment in the cur
     ),
     {
       kind: "githubDeployment",
+      placement: "overlay",
+      projectUid: "project-1",
+    }
+  );
+});
+
+test("Project Canvas translates assistant database intent to deployment in the current Project", () => {
+  assert.deepEqual(
+    projectCanvasEntryForAssistantIntent(
+      { type: "database" },
+      { projectUid: "project-1" }
+    ),
+    {
+      kind: "databaseDeployment",
       placement: "overlay",
       projectUid: "project-1",
     }

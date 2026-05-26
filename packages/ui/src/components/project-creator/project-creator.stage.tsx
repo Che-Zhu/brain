@@ -1,14 +1,7 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from "@workspace/ui/components/combobox";
+import { DatabaseDeployer } from "@workspace/ui/components/database-deployer";
 import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -100,12 +93,6 @@ function DatabasePanel({
   databaseOptions: ProjectCreatorDatabaseChoice[];
 }) {
   const { actions, states } = useProjectCreator();
-
-  const [selected, setSelected] = useState<ProjectCreatorDatabaseChoice | null>(
-    null
-  );
-
-  const items = databaseOptions;
   const busy = states.confirmApplying;
   const projectDisplayName = states.projectDisplayName.trim();
 
@@ -114,67 +101,17 @@ function DatabasePanel({
       className="flex min-w-0 flex-col gap-3"
       data-slot="project-creator-database"
     >
-      <Label className="sr-only" htmlFor="project-creator-db-combobox-input">
-        Database type
-      </Label>
-      <div className="w-full min-w-0">
-        <Combobox<ProjectCreatorDatabaseChoice>
-          autoHighlight
-          isItemEqualToValue={(a, b) => a.id === b.id}
-          items={items}
-          itemToStringLabel={(db) => db.label}
-          itemToStringValue={(db) => db.id}
-          onValueChange={(next) => setSelected(next)}
-          value={selected}
-        >
-          <ComboboxInput
-            className="w-full"
-            id="project-creator-db-combobox-input"
-            placeholder="Choose a database…"
-          />
-          <ComboboxContent>
-            <ComboboxEmpty>No matching database.</ComboboxEmpty>
-            <ComboboxList>
-              {(db) => (
-                <ComboboxItem key={db.id} value={db}>
-                  {db.iconUrl ? (
-                    <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                      <img
-                        alt=""
-                        className="size-4 object-contain"
-                        decoding="async"
-                        height={16}
-                        loading="lazy"
-                        src={db.iconUrl}
-                        width={16}
-                      />
-                    </span>
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate">{db.label}</span>
-                </ComboboxItem>
-              )}
-            </ComboboxList>
-          </ComboboxContent>
-        </Combobox>
-      </div>
-      <div className="flex justify-end">
-        <Button
-          aria-busy={busy}
-          disabled={selected == null || busy}
-          onClick={() => {
-            if (selected) {
-              actions.onDatabaseConfirm?.(selected.id, projectDisplayName);
-            }
-          }}
-          type="button"
-        >
-          {busy ? (
-            <Spinner aria-hidden className="size-4 shrink-0" />
-          ) : (
-            "Confirm"
-          )}
-        </Button>
-      </div>
+      <DatabaseDeployer
+        busy={busy}
+        databaseOptions={databaseOptions}
+        onDeploy={(settings) => {
+          const error = actions.validateProjectDisplayName(projectDisplayName);
+          if (error != null) {
+            return;
+          }
+          actions.onDatabaseConfirm?.(settings, projectDisplayName);
+        }}
+      />
     </div>
   );
 }

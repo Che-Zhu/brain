@@ -10,6 +10,11 @@ export type ProjectSidePaneEntry =
       placement: "reserved";
     }
   | {
+      kind: "databaseDeployment";
+      placement: "overlay";
+      projectUid: string;
+    }
+  | {
       kind: "githubDeployment";
       placement: "overlay";
       projectUid: string;
@@ -18,14 +23,21 @@ export type ProjectSidePaneEntry =
 export function projectListEntryForAssistantIntent(
   intent: ProjectSidePaneAssistantIntent
 ): ProjectSidePaneEntry | null {
-  if (intent.type !== "github") {
-    return null;
+  if (intent.type === "github") {
+    return {
+      entryMode: "githubDirect",
+      kind: "projectCreation",
+      placement: "reserved",
+    };
   }
-  return {
-    entryMode: "githubDirect",
-    kind: "projectCreation",
-    placement: "reserved",
-  };
+  if (intent.type === "database") {
+    return {
+      entryMode: "databaseDirect",
+      kind: "projectCreation",
+      placement: "reserved",
+    };
+  }
+  return null;
 }
 
 export function projectCanvasEntryForAssistantIntent(
@@ -33,7 +45,17 @@ export function projectCanvasEntryForAssistantIntent(
   { projectUid }: { projectUid: string }
 ): ProjectSidePaneEntry | null {
   const uid = projectUid.trim();
-  if (intent.type !== "github" || uid === "") {
+  if (uid === "") {
+    return null;
+  }
+  if (intent.type === "database") {
+    return {
+      kind: "databaseDeployment",
+      placement: "overlay",
+      projectUid: uid,
+    };
+  }
+  if (intent.type !== "github") {
     return null;
   }
   return {

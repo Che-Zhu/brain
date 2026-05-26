@@ -1,4 +1,8 @@
 import type {
+  DatabaseDeploymentChoice,
+  DatabaseDeploymentSettings,
+} from "../database-deployer";
+import type {
   GithubDeployerActions,
   GithubDeployerStates,
 } from "../github-deployer/github-deployer.types";
@@ -6,14 +10,7 @@ import type {
 /** First step for project creation (breadcrumb + body). */
 export type ProjectCreatorSourceKind = "github" | "docker-image" | "database";
 
-export interface ProjectCreatorDatabaseChoice {
-  /** Optional logo (e.g. Crossplane `meta.crossplane.io/icon-url`). */
-  iconUrl?: string;
-  id: string;
-  label: string;
-  /** Optional example claim YAML (`meta.crossplane.io/template`) when the cluster returns it. */
-  template?: string;
-}
+export type ProjectCreatorDatabaseChoice = DatabaseDeploymentChoice;
 
 export const PROJECT_CREATOR_SOURCE_LABEL: Record<
   ProjectCreatorSourceKind,
@@ -26,7 +23,7 @@ export const PROJECT_CREATOR_SOURCE_LABEL: Record<
 
 export interface ProjectCreatorActions {
   onDatabaseConfirm?: (
-    databaseId: string,
+    settings: DatabaseDeploymentSettings,
     projectDisplayName: string
   ) => void | Promise<void>;
   onDockerConfirm?: (
@@ -60,6 +57,7 @@ export interface ProjectCreatorValue {
     pick: (kind: ProjectCreatorSourceKind) => void;
     reset: () => void;
     setProjectDisplayName: (value: string) => void;
+    validateProjectDisplayName: (value?: string) => string | null;
   } & ProjectCreatorActions;
   meta: {
     databaseOptions: ProjectCreatorDatabaseChoice[];

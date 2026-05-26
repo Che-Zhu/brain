@@ -6,6 +6,7 @@ import { useAtomValue } from "jotai";
 import { useParams } from "next/navigation";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DatabaseDeploymentPane } from "@/components/database-deployment-pane";
 import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
@@ -32,6 +33,7 @@ import { projectCanvasEntryForAssistantIntent } from "@/lib/project-side-pane/su
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
+const DATABASE_DEPLOYMENT_PANE_QUERY_KEY = "databaseDeployment" as const;
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -95,10 +97,18 @@ export default function ProjectUidPage() {
     GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
     parseAsBoolean.withDefault(false)
   );
-  const replaceGithubDeploymentWithResourcePane = useCallback(() => {
+  const [databaseDeploymentPaneOpen, setDatabaseDeploymentPaneOpen] =
+    useQueryState(
+      DATABASE_DEPLOYMENT_PANE_QUERY_KEY,
+      parseAsBoolean.withDefault(false)
+    );
+  const replaceDeploymentWithResourcePane = useCallback(() => {
     setPreferredCanvasSidePaneEntry("resource");
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
-  }, [setGithubDeploymentPaneOpen]);
+    Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
+      () => undefined
+    );
+  }, [setDatabaseDeploymentPaneOpen, setGithubDeploymentPaneOpen]);
 
   const {
     closeResourcePane,
@@ -122,7 +132,7 @@ export default function ProjectUidPage() {
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodeStackOrderChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onPendingApDbReferencesStart: beginPendingApDbReferences,
-    onResourcePaneOpen: replaceGithubDeploymentWithResourcePane,
+    onResourcePaneOpen: replaceDeploymentWithResourcePane,
     refreshWorkloadLists,
     selectionReady: !isEmptyGraphLoading,
   });
@@ -135,19 +145,47 @@ export default function ProjectUidPage() {
     workloadPane ?? databasePane ?? entryPane
   );
   const canvasSidePaneEntry = resolveProjectCanvasSidePaneEntry({
+    databaseDeploymentPaneOpen,
     githubDeploymentPaneOpen,
     preferredEntry: preferredCanvasSidePaneEntry,
     resourcePaneOpen: canvasResourcePaneOpen,
   });
+  const closeDatabaseDeploymentPane = useCallback(() => {
+    Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
+      () => undefined
+    );
+  }, [setDatabaseDeploymentPaneOpen]);
   const closeGithubDeploymentPane = useCallback(() => {
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
   }, [setGithubDeploymentPaneOpen]);
+  const openDatabaseDeploymentPane = useCallback(() => {
+    requestResourcePaneReplacement(() => {
+      setPreferredCanvasSidePaneEntry("databaseDeployment");
+      Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setDatabaseDeploymentPaneOpen(true)).catch(
+        () => undefined
+      );
+    });
+  }, [
+    requestResourcePaneReplacement,
+    setDatabaseDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+  ]);
   const openGithubDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
       setPreferredCanvasSidePaneEntry("githubDeployment");
+      Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
       Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
     });
-  }, [requestResourcePaneReplacement, setGithubDeploymentPaneOpen]);
+  }, [
+    requestResourcePaneReplacement,
+    setDatabaseDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+  ]);
   const projectCanvasSidePaneSurface = useMemo<ProjectSidePaneSurface>(
     () => ({
       id: `project-canvas:${uid}`,
@@ -155,6 +193,10 @@ export default function ProjectUidPage() {
         const entry = projectCanvasEntryForAssistantIntent(intent, {
           projectUid: uid,
         });
+        if (entry?.kind === "databaseDeployment") {
+          openDatabaseDeploymentPane();
+          return { status: "handled" as const };
+        }
         if (entry?.kind !== "githubDeployment") {
           return { status: "ignored" as const };
         }
@@ -162,7 +204,7 @@ export default function ProjectUidPage() {
         return { status: "handled" as const };
       },
     }),
-    [openGithubDeploymentPane, uid]
+    [openDatabaseDeploymentPane, openGithubDeploymentPane, uid]
   );
   useProjectSidePaneSurface(projectCanvasSidePaneSurface);
   const canvasResourcePane = renderProjectCanvasResourcePaneContent({
@@ -232,6 +274,15 @@ export default function ProjectUidPage() {
                 ) : null}
                 <Canvas.Flow>
                   <ProjectCanvasSidePaneSlot
+                    databaseDeploymentPane={
+                      <DatabaseDeploymentPane
+                        kubeconfig={kubeconfig}
+                        namespace={namespace}
+                        onClose={closeDatabaseDeploymentPane}
+                        onDeployed={refreshWorkloadLists}
+                        projectUid={uid}
+                      />
+                    }
                     entry={canvasSidePaneEntry}
                     githubDeploymentPane={
                       <GitHubDeploymentPane

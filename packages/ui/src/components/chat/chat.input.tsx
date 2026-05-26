@@ -11,7 +11,7 @@ import {
 } from "@workspace/ui/components/popover";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
-import { Square } from "lucide-react";
+import { Database, Square } from "lucide-react";
 import { type ComponentProps, useEffect, useLayoutEffect, useRef } from "react";
 
 import type { ChatGithubDeployPopoverConfig } from "./chat.types";
@@ -28,6 +28,13 @@ export type ChatGithubDeployButtonProps = Omit<
   authLoading?: boolean;
   /** True when a PAT/token is available to the host (do not pass the secret itself). */
   isAuthorized?: boolean;
+  onComposerAction?: () => void;
+};
+
+export type ChatDatabaseDeployButtonProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
   onComposerAction?: () => void;
 };
 
@@ -342,6 +349,34 @@ export function ChatGithubDeployButton({
   );
 }
 
+/** Icon-only control for database deploy; omitted `onComposerAction` renders nothing. */
+export function ChatDatabaseDeployButton({
+  className,
+  "aria-label": ariaLabel = "Database deploy",
+  onComposerAction,
+  ...props
+}: ChatDatabaseDeployButtonProps) {
+  if (!onComposerAction) {
+    return null;
+  }
+
+  return (
+    <Button
+      aria-label={ariaLabel}
+      className={cn("hoverable shrink-0 cursor-pointer rounded-xl", className)}
+      data-slot="chat-database-deploy-button"
+      onClick={onComposerAction}
+      size="icon-lg"
+      title="Database deploy"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <Database aria-hidden className="size-4 text-foreground opacity-90" />
+    </Button>
+  );
+}
+
 export interface ChatComposerSendProps {
   className?: string;
   onPrimaryAction: () => void;
@@ -439,5 +474,6 @@ ChatComposerContextIndicator.displayName = "Chat.ContextIndicator";
 ChatComposerSend.displayName = "Chat.ComposerSend";
 ChatGithubMark.displayName = "Chat.GithubMark";
 ChatGithubDeployPopover.displayName = "Chat.GithubDeployPopover";
+ChatDatabaseDeployButton.displayName = "Chat.DatabaseDeployButton";
 ChatGithubDeployButton.displayName = "Chat.GithubDeployButton";
 ChatComposer.displayName = "Chat.Composer";

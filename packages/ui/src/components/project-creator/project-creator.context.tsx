@@ -33,10 +33,10 @@ export function useProjectCreator(
 }
 
 const DEFAULT_DATABASE_OPTIONS: ProjectCreatorDatabaseChoice[] = [
-  { id: "postgresql", label: "PostgreSQL" },
-  { id: "mysql", label: "MySQL" },
-  { id: "mongodb", label: "MongoDB" },
-  { id: "redis", label: "Redis" },
+  { engine: "postgresql", id: "postgresql", label: "PostgreSQL" },
+  { engine: "mysql", id: "mysql", label: "MySQL" },
+  { engine: "mongodb", id: "mongodb", label: "MongoDB" },
+  { engine: "redis", id: "redis", label: "Redis" },
 ];
 
 export interface ProjectCreatorRootProps {
@@ -50,6 +50,8 @@ export interface ProjectCreatorRootProps {
   existingProjectDisplayNames?: readonly string[];
   /** Wired into the GitHub step’s `GithubDeployer` (authorize + repos + deploy). */
   githubDeployer?: ProjectCreatorGithubDeployerSlot;
+  /** Optional initial source step for direct assistant/tool entry paths. */
+  initialStep?: ProjectCreatorSourceKind | null;
 }
 
 function normalizeProjectCreatorDisplayName(name: string): string {
@@ -63,13 +65,16 @@ export function ProjectCreatorRoot({
   databaseOptions,
   existingProjectDisplayNames = [],
   githubDeployer: githubDeployerProp,
+  initialStep = null,
 }: ProjectCreatorRootProps) {
-  const [step, setStep] = useState<ProjectCreatorSourceKind | null>(null);
+  const [step, setStep] = useState<ProjectCreatorSourceKind | null>(
+    initialStep
+  );
   const [projectDisplayName, setProjectDisplayNameState] = useState("");
   const [projectDisplayNameError, setProjectDisplayNameError] = useState<
     string | null
   >(null);
-  const reset = useCallback(() => setStep(null), []);
+  const reset = useCallback(() => setStep(initialStep), [initialStep]);
 
   const existingDisplayNameSet = useMemo(
     () =>
@@ -107,16 +112,24 @@ export function ProjectCreatorRoot({
     [validateProjectDisplayName]
   );
 
+  const validateAndSetProjectDisplayNameError = useCallback(
+    (value?: string): string | null => {
+      const error = validateProjectDisplayName(value ?? projectDisplayName);
+      setProjectDisplayNameError(error);
+      return error;
+    },
+    [projectDisplayName, validateProjectDisplayName]
+  );
+
   const pick = useCallback(
     (kind: ProjectCreatorSourceKind) => {
-      const error = validateProjectDisplayName(projectDisplayName);
-      setProjectDisplayNameError(error);
+      const error = validateAndSetProjectDisplayNameError(projectDisplayName);
       if (error != null) {
         return;
       }
       setStep(kind);
     },
-    [projectDisplayName, validateProjectDisplayName]
+    [projectDisplayName, validateAndSetProjectDisplayNameError]
   );
 
   useEffect(() => {
@@ -147,6 +160,7 @@ export function ProjectCreatorRoot({
         pick,
         reset,
         setProjectDisplayName,
+        validateProjectDisplayName: validateAndSetProjectDisplayNameError,
         onGithubConfirm: actionsProp?.onGithubConfirm,
         onDockerConfirm: actionsProp?.onDockerConfirm,
         onDatabaseConfirm: actionsProp?.onDatabaseConfirm,
@@ -164,6 +178,7 @@ export function ProjectCreatorRoot({
       projectDisplayName,
       projectDisplayNameError,
       setProjectDisplayName,
+      validateAndSetProjectDisplayNameError,
     ]
   );
 
