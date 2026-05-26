@@ -977,6 +977,16 @@ export function useProjectCanvas(
     setWorkloadPane,
   ]);
 
+  const requestResourcePaneReplacement = useCallback(
+    (continueReplace: () => void) => {
+      requestSettingsLeave("switch", () => {
+        clearSelectedResource();
+        continueReplace();
+      });
+    },
+    [clearSelectedResource, requestSettingsLeave]
+  );
+
   const clearSelection = useCallback(() => {
     requestSettingsLeave("close", clearSelectedResource);
   }, [clearSelectedResource, requestSettingsLeave]);
@@ -1091,6 +1101,7 @@ export function useProjectCanvas(
     meta,
     nodes,
     registerSettingsLeaveGuard,
+    requestResourcePaneReplacement,
     selectedEntryRef,
     selectedEdge,
     selectedNode,

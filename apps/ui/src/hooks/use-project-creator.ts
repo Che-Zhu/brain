@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import {
   initialProjectCreationPaneState,
+  type ProjectCreationPaneEntryMode,
   projectCreationPaneStateReducer,
 } from "@/components/project-creation-pane-state";
 import { useApCompositions } from "@/hooks/compositions/use-ap-composition";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/ap-yaml-merge-project";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
 import { fetchProjectUidByName } from "@/lib/fetch-project-uid";
+import { deriveGithubProjectDisplayName } from "@/lib/github-project-display-name";
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import { k8sApplyYaml } from "@/lib/project-canvas/k8s/http/apply-yaml";
 import { mergeProjectMetadataDisplayName } from "@/lib/project-yaml-metadata";
@@ -118,11 +120,12 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   creatorRootProps: CreatorRootPropsForCreationPane;
   creatorResetKey: number;
   creationPaneOpen: boolean;
+  creationPaneEntryMode: ProjectCreationPaneEntryMode;
   /** True while GitHub auth or repository list is loading for the deployer. */
   githubDeployerLoading: boolean;
   lastConfirmedKind: string | null;
   onCreationPaneOpenChange: (open: boolean) => void;
-  openCreationPane: () => void;
+  openCreationPane: (entryMode?: ProjectCreationPaneEntryMode) => void;
 } {
   const kubeconfig = options?.kubeconfig?.trim() ?? "";
   const namespace = options?.namespace?.trim() ?? "";
@@ -161,14 +164,17 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const { isLoading: githubReposLoading, repos: githubRepos } =
     useGithubRepos(githubToken);
 
-  const openCreationPane = useCallback(() => {
-    setConfirmApplying(false);
-    dispatchCreationPaneState({ type: "open" });
-  }, []);
+  const openCreationPane = useCallback(
+    (entryMode: ProjectCreationPaneEntryMode = "general") => {
+      setConfirmApplying(false);
+      dispatchCreationPaneState({ entryMode, type: "open" });
+    },
+    []
+  );
 
   const onCreationPaneOpenChange = useCallback((open: boolean) => {
     if (open) {
-      dispatchCreationPaneState({ type: "open" });
+      dispatchCreationPaneState({ entryMode: "general", type: "open" });
       return;
     }
     dispatchCreationPaneState({ type: "close" });
@@ -189,9 +195,23 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     );
   }, [dbCompositionRows, hasKubeconfig]);
 
-  const handleGithubDeploy = useCallback((_repo: GithubDeployerRepo) => {
-    toast.info("GitHub deploy isn’t ready yet — this feature is incomplete.");
-  }, []);
+  const handleGithubDeploy = useCallback(
+    (repo: GithubDeployerRepo) => {
+      const displayName = deriveGithubProjectDisplayName({
+        existingProjectDisplayNames: existingProjects.map(
+          (project) => project.name
+        ),
+        repository: repo,
+      });
+      setLastConfirmedKind(
+        `github:${repo.fullName ?? repo.name}:${displayName}`
+      );
+      toast.info(
+        `GitHub project creation for "${displayName}" isn’t ready yet — this feature is incomplete.`
+      );
+    },
+    [existingProjects]
+  );
 
   const githubDeployerLoading =
     githubAuthLoading || (!!githubToken?.trim() && githubReposLoading);
@@ -410,6 +430,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   );
 
   return {
+    creationPaneEntryMode: creationPaneState.entryMode,
     creationPaneOpen: creationPaneState.open,
     creatorRootProps,
     creatorResetKey: creationPaneState.resetKey,

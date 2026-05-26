@@ -7,7 +7,6 @@ import {
   downloadChatMessagesJson,
 } from "@workspace/ui/components/chat/chat";
 import type { ChatHeaderThreadHistory } from "@workspace/ui/components/chat/chat.types";
-import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -17,7 +16,7 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { parseAsBoolean, parseAsString, useQueryState } from "nuqs";
+import { parseAsString, useQueryState } from "nuqs";
 import {
   type ReactNode,
   useCallback,
@@ -27,7 +26,6 @@ import {
   useState,
 } from "react";
 import { useSWRConfig } from "swr";
-import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import {
@@ -41,6 +39,10 @@ import type {
   AssistantSessionPayload,
   AssistantThreadDTO,
 } from "@/lib/chat-persistence/types";
+import {
+  ProjectSidePaneProvider,
+  useProjectSidePaneController,
+} from "@/lib/project-side-pane/react";
 import {
   NAVIGATE_APP_TOOL_NAME,
   type NavigateAppToolOutput,
@@ -67,8 +69,6 @@ type AssistantClientToolSubmission =
       output: RefreshFrontendSwrCachesToolOutput;
     };
 
-const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
-
 function buildAssistantContextPayload(
   projectUid: string,
   selectedServiceUid: string
@@ -91,7 +91,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw,
   onAssistantStreamFinished,
   onCreateThread,
-  onGithubDeploymentOpen,
+  onGithubIntent,
   onSelectThread,
 }: {
   bootstrap: Pick<AssistantSessionPayload, "chatId" | "messages">;
@@ -100,7 +100,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
   onCreateThread: () => Promise<void>;
-  onGithubDeploymentOpen: () => void;
+  onGithubIntent: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
   const router = useRouter();
@@ -339,7 +339,7 @@ function ProjectAssistantChatSession({
                   <Chat.GithubDeployButton
                     authLoading={authLoading}
                     isAuthorized={isAuthorized}
-                    onComposerAction={onGithubDeploymentOpen}
+                    onComposerAction={onGithubIntent}
                   />
                 </div>
                 <Chat.ComposerSend
@@ -356,12 +356,9 @@ function ProjectAssistantChatSession({
   );
 }
 
-function ProjectAssistantChatPane({
-  onGithubDeploymentOpen,
-}: {
-  onGithubDeploymentOpen: () => void;
-}) {
+function ProjectAssistantChatPane() {
   const namespaceRaw = useAtomValue(namespaceAtom);
+  const sidePaneController = useProjectSidePaneController();
   const [creatingThread, setCreatingThread] = useState(false);
   const [session, setSession] = useState<AssistantSessionPayload | null>(null);
   const [sessionError, setSessionError] = useState(false);
@@ -431,6 +428,12 @@ function ProjectAssistantChatPane({
     setSession((prev) => (prev == null ? prev : { ...prev, threads }));
   }, [namespaceRaw]);
 
+  const openGithubIntent = useCallback(() => {
+    sidePaneController
+      .openAssistantIntent({ type: "github" })
+      .catch(() => undefined);
+  }, [sidePaneController]);
+
   if (sessionError) {
     return (
       <div
@@ -461,7 +464,7 @@ function ProjectAssistantChatPane({
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
       onCreateThread={createThread}
-      onGithubDeploymentOpen={onGithubDeploymentOpen}
+      onGithubIntent={openGithubIntent}
       onSelectThread={selectThread}
       threads={session.threads}
     />
@@ -501,27 +504,13 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
   );
 }
 
-/** Main project column + optional right assistant chat pane (`POST /api/chat` + AI SDK). */
-export default function ProjectChatPaneLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+/** Main project column + optional Project Assistant Pane (`POST /api/chat` + AI SDK). */
+function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
   const setRightPaneOpen = useSetAtom(rightPaneOpenAtom);
-  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
-    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
-    parseAsBoolean.withDefault(false)
-  );
   const toggleRightPane = useCallback(() => {
     setRightPaneOpen((open) => !open);
   }, [setRightPaneOpen]);
-  const openGithubDeploymentPane = useCallback(() => {
-    Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
-  }, [setGithubDeploymentPaneOpen]);
-  const closeGithubDeploymentPane = useCallback(() => {
-    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
-  }, [setGithubDeploymentPaneOpen]);
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -533,11 +522,6 @@ export default function ProjectChatPaneLayout({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
-        <SidePanePresence>
-          {githubDeploymentPaneOpen ? (
-            <GitHubDeploymentPane onClose={closeGithubDeploymentPane} />
-          ) : null}
-        </SidePanePresence>
       </section>
       <aside
         aria-hidden={!rightPaneOpen}
@@ -550,9 +534,7 @@ export default function ProjectChatPaneLayout({
         data-slot="project-right-pane"
         id="project-right-pane"
       >
-        <ProjectAssistantChatPane
-          onGithubDeploymentOpen={openGithubDeploymentPane}
-        />
+        <ProjectAssistantChatPane />
       </aside>
       <Button
         aria-controls="project-right-pane"
@@ -573,5 +555,17 @@ export default function ProjectChatPaneLayout({
         )}
       </Button>
     </div>
+  );
+}
+
+export default function ProjectWorkspaceLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <ProjectSidePaneProvider>
+      <ProjectWorkspaceLayoutContent>{children}</ProjectWorkspaceLayoutContent>
+    </ProjectSidePaneProvider>
   );
 }

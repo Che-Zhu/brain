@@ -1,10 +1,13 @@
 "use client";
 
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
+import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { useParams } from "next/navigation";
+import { parseAsBoolean, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
@@ -19,7 +22,12 @@ import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-no
 import { ProjectCanvasResourcePane } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
+import type { ProjectSidePaneSurface } from "@/lib/project-side-pane/controller";
+import { useProjectSidePaneSurface } from "@/lib/project-side-pane/react";
+import { projectCanvasEntryForAssistantIntent } from "@/lib/project-side-pane/surface-intents";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+
+const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -86,6 +94,7 @@ export default function ProjectUidPage() {
     meta: canvasMeta,
     nodes,
     registerSettingsLeaveGuard,
+    requestResourcePaneReplacement,
     selectedEntryRef,
     selectedEdge,
     selectedNode,
@@ -102,11 +111,52 @@ export default function ProjectUidPage() {
     refreshWorkloadLists,
     selectionReady: !isEmptyGraphLoading,
   });
+  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
+    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
   const selectedTelemetryTarget = useMemo(
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
   );
   const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
+  const canvasResourcePaneOpen = Boolean(
+    workloadPane ?? databasePane ?? entryPane
+  );
+  const closeGithubDeploymentPane = useCallback(() => {
+    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
+  const openGithubDeploymentPane = useCallback(() => {
+    requestResourcePaneReplacement(() => {
+      Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
+    });
+  }, [requestResourcePaneReplacement, setGithubDeploymentPaneOpen]);
+  const projectCanvasSidePaneSurface = useMemo<ProjectSidePaneSurface>(
+    () => ({
+      id: `project-canvas:${uid}`,
+      openAssistantIntent: (intent) => {
+        const entry = projectCanvasEntryForAssistantIntent(intent, {
+          projectUid: uid,
+        });
+        if (entry?.kind !== "githubDeployment") {
+          return { status: "ignored" as const };
+        }
+        openGithubDeploymentPane();
+        return { status: "handled" as const };
+      },
+    }),
+    [openGithubDeploymentPane, uid]
+  );
+  useProjectSidePaneSurface(projectCanvasSidePaneSurface);
+  useEffect(() => {
+    if (githubDeploymentPaneOpen && canvasResourcePaneOpen) {
+      setGithubDeploymentPaneOpen(false).catch(() => undefined);
+    }
+  }, [
+    canvasResourcePaneOpen,
+    githubDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+  ]);
   const meta = useMemo(
     () => ({
       ...canvasMeta,
@@ -173,6 +223,13 @@ export default function ProjectUidPage() {
                     selectedNode={selectedNode}
                     workloadPane={workloadPane}
                   />
+                  <SidePanePresence>
+                    {githubDeploymentPaneOpen && !canvasResourcePaneOpen ? (
+                      <GitHubDeploymentPane
+                        onClose={closeGithubDeploymentPane}
+                      />
+                    ) : null}
+                  </SidePanePresence>
                   {settingsLeaveGuardDialog}
                 </Canvas.Flow>
               </div>

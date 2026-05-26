@@ -10,6 +10,9 @@ import { useCallback, useMemo } from "react";
 import { ProjectCreationPane } from "@/components/project-creation-pane";
 import { useProjectCreator } from "@/hooks/use-project-creator";
 import { useProjectsExplorer } from "@/hooks/use-projects-explorer";
+import type { ProjectSidePaneSurface } from "@/lib/project-side-pane/controller";
+import { useProjectSidePaneSurface } from "@/lib/project-side-pane/react";
+import { projectListEntryForAssistantIntent } from "@/lib/project-side-pane/surface-intents";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 export default function ProjectIndexPage() {
@@ -33,6 +36,7 @@ export default function ProjectIndexPage() {
   );
 
   const {
+    creationPaneEntryMode,
     creationPaneOpen,
     creatorRootProps,
     creatorResetKey,
@@ -45,6 +49,22 @@ export default function ProjectIndexPage() {
     namespace: ns,
     onProjectCreated,
   });
+
+  const projectListSidePaneSurface = useMemo<ProjectSidePaneSurface>(
+    () => ({
+      id: "project-list",
+      openAssistantIntent: (intent) => {
+        const entry = projectListEntryForAssistantIntent(intent);
+        if (entry?.kind !== "projectCreation") {
+          return { status: "ignored" as const };
+        }
+        openCreationPane(entry.entryMode);
+        return { status: "handled" as const };
+      },
+    }),
+    [openCreationPane]
+  );
+  useProjectSidePaneSurface(projectListSidePaneSurface);
 
   const explorerActions = useMemo(
     () => ({ ...actions, onNewProject: openCreationPane }),
@@ -96,6 +116,7 @@ export default function ProjectIndexPage() {
           <ProjectCreationPane
             busy={githubDeployerLoading}
             creatorRootProps={creatorRootProps}
+            entryMode={creationPaneEntryMode}
             onClose={() => onCreationPaneOpenChange(false)}
             resetKey={creatorResetKey}
           />

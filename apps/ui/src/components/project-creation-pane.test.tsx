@@ -19,6 +19,9 @@ const DIALOG_ROLE_RE = /role="dialog"/;
 const PANE_LABEL_RE = /aria-label="Project creation pane"/;
 const PROJECT_NAME_RE = /Project Name/;
 const PROJECT_TITLE_RE = /Create New Project/;
+const REPO_SELECT_RE = /Search or choose repository/;
+const SCENARIO_RE = /Scenario/;
+const TRAIL_BACK_RE = />Back</;
 
 test("project creation pane is a non-modal side pane with the method picker", () => {
   const html = renderToStaticMarkup(
@@ -50,4 +53,37 @@ test("project creation pane is a non-modal side pane with the method picker", ()
   assert.ok(database !== -1, "Database method is visible");
   assert.ok(github < docker, "GitHub appears before Docker Image");
   assert.ok(docker < database, "Docker Image appears before Database");
+});
+
+test("project creation pane GitHub direct entry starts at repository selection", () => {
+  const html = renderToStaticMarkup(
+    <ProjectCreationPane
+      creatorRootProps={{
+        databaseOptions: [],
+        githubDeployer: {
+          states: {
+            deployedRepo: null,
+            githubToken: "gho_test",
+            isLoading: false,
+            repos: [
+              {
+                fullName: "acme/api",
+                id: "repo-1",
+                name: "api",
+              },
+            ],
+          },
+        },
+      }}
+      entryMode="githubDirect"
+      onClose={noop}
+      resetKey={1}
+    />
+  );
+
+  assert.match(html, PANE_LABEL_RE);
+  assert.match(html, REPO_SELECT_RE);
+  assert.doesNotMatch(html, PROJECT_NAME_RE);
+  assert.doesNotMatch(html, SCENARIO_RE);
+  assert.doesNotMatch(html, TRAIL_BACK_RE);
 });
