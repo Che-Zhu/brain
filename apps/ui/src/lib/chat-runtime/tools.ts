@@ -47,7 +47,7 @@ export interface ChatToolset {
  * Assemble the per-request tool registry + system prompt.
  *
  * - Skill index drives both the `loadSkill` tool and the discovery prompt addendum.
- * - Bash tool sandbox is created lazily; it does not start a Vercel Sandbox until the
+ * - Bash tool Devbox is created lazily; it does not start a runtime until the
  *   model actually invokes a bash subtool.
  */
 export async function buildChatToolset({
@@ -61,7 +61,7 @@ export async function buildChatToolset({
 }): Promise<ChatToolset> {
   const [skillIndex, { tools: bashTools }] = await Promise.all([
     discoverPublicSkills(),
-    createChatBashTool({ kubeconfig }),
+    createChatBashTool({ kubeconfig, namespace: kubernetesNamespace }),
   ]);
 
   const tools = {

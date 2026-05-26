@@ -1,0 +1,82 @@
+import { SignJWT } from "jose";
+
+export const DEVBOX_API_PREFIX = "/api/v1/devbox";
+
+const DEFAULT_DEVBOX_TOKEN_TTL_SECONDS = 4 * 60 * 60;
+const DNS_1123_LABEL_REGEX = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+const HTTP_PROTOCOL_REGEX = /^https?:\/\//;
+const TRAILING_SLASHES_REGEX = /\/+$/;
+
+export type DevboxEnv = Record<string, string | undefined>;
+
+function getRequiredEnv(env: DevboxEnv, name: keyof DevboxEnv): string {
+  const value = env[name];
+  if (value == null || value.trim() === "") {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value.trim();
+}
+
+function normalizeHost(host: string): string {
+  return host
+    .trim()
+    .replace(HTTP_PROTOCOL_REGEX, "")
+    .replace(TRAILING_SLASHES_REGEX, "");
+}
+
+export function getSealosHostFromEnv(env: DevboxEnv): string {
+  return normalizeHost(getRequiredEnv(env, "SEALOS_HOST"));
+}
+
+export function getDevboxBaseUrlFromEnv(env: DevboxEnv): string {
+  return `https://devbox-server.${getSealosHostFromEnv(env)}`;
+}
+
+export function getDevboxDefaultImageFromEnv(
+  env: DevboxEnv
+): string | undefined {
+  const image = env.DEVBOX_RUNTIME_IMAGE?.trim();
+  return image === "" ? undefined : image;
+}
+
+export function getDevboxArchiveAfterPauseTimeFromEnv(env: DevboxEnv): string {
+  return env.DEVBOX_ARCHIVE_AFTER_PAUSE_TIME?.trim() || "24h";
+}
+
+export function validateDevboxAuthNamespace(namespace: string): string {
+  const trimmed = namespace.trim();
+  if (!DNS_1123_LABEL_REGEX.test(trimmed)) {
+    throw new Error("Devbox auth namespace must be a valid DNS1123 label");
+  }
+  return trimmed;
+}
+
+export async function getDevboxAuthTokenFromEnv(
+  env: DevboxEnv,
+  namespace: string,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): Promise<string> {
+  const staticToken = env.DEVBOX_TOKEN?.trim();
+  if (staticToken != null && staticToken !== "") {
+    return staticToken;
+  }
+
+  const signingKey = getRequiredEnv(env, "DEVBOX_JWT_SIGNING_KEY");
+  const authNamespace = validateDevboxAuthNamespace(namespace);
+  const ttlSeconds = Number.parseInt(
+    env.DEVBOX_JWT_TTL_SECONDS ?? String(DEFAULT_DEVBOX_TOKEN_TTL_SECONDS),
+    10
+  );
+
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+    throw new Error("DEVBOX_JWT_TTL_SECONDS must be a positive integer");
+  }
+
+  const secret = new TextEncoder().encode(signingKey);
+
+  return await new SignJWT({ namespace: authNamespace })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(nowSeconds)
+    .setExpirationTime(nowSeconds + ttlSeconds)
+    .sign(secret);
+}
