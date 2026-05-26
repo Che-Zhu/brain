@@ -2,12 +2,14 @@ import fs from "node:fs";
 import { SignJWT } from "jose";
 import { parse } from "yaml";
 
+const DOTENV_ENTRY_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
 function readDotenv(path) {
   const envText = fs.readFileSync(path, "utf8");
   return Object.fromEntries(
     envText
       .split("\n")
-      .filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line))
+      .filter((line) => DOTENV_ENTRY_RE.test(line))
       .map((line) => {
         const i = line.indexOf("=");
         return [line.slice(0, i), line.slice(i + 1)];
