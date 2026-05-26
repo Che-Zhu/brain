@@ -30,7 +30,7 @@ import {
   PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
   projectsListToExplorerProjects,
 } from "@/lib/projects-to-explorer-projects";
-import { openRightPane } from "@/store/layout-store";
+import { openAssistantPane } from "@/store/layout-store";
 
 /**
  * Extracts `{ projectUid, phase, paused }` per workload from an AP or DB list
@@ -163,7 +163,7 @@ export function useProjectsExplorer(options: {
       onNewProjectOverride();
       return;
     }
-    openRightPane();
+    openAssistantPane();
   }, [onNewProjectOverride]);
 
   const onProjectRename = useCallback(

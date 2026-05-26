@@ -1,14 +1,14 @@
 import { atom, getDefaultStore } from "jotai";
 
-/** When true, the project layout shows the right auxiliary pane (~30% width). */
-export const rightPaneOpenAtom = atom(true);
+/** When true, the project layout shows the persistent Project Assistant Pane. */
+export const assistantPaneOpenAtom = atom(true);
 
-/** Toggle right pane visibility (uses app root default Jotai store). */
-export function toggleRightPaneVisibility() {
-  getDefaultStore().set(rightPaneOpenAtom, (open) => !open);
+/** Toggle Project Assistant Pane visibility (uses app root default Jotai store). */
+export function toggleAssistantPaneVisibility() {
+  getDefaultStore().set(assistantPaneOpenAtom, (open) => !open);
 }
 
-/** Open the project right pane (e.g. from canvas upper-right control). */
-export function openRightPane() {
-  getDefaultStore().set(rightPaneOpenAtom, true);
+/** Open the Project Assistant Pane. */
+export function openAssistantPane() {
+  getDefaultStore().set(assistantPaneOpenAtom, true);
 }

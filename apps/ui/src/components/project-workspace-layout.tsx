@@ -55,7 +55,7 @@ import {
 } from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
-import { rightPaneOpenAtom } from "@/store/layout-store";
+import { assistantPaneOpenAtom } from "@/store/layout-store";
 
 type AssistantClientToolSubmission =
   | {
@@ -471,7 +471,11 @@ function ProjectAssistantChatPane() {
   );
 }
 
-function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
+function ProjectRouteTopBar({
+  assistantPaneOpen,
+}: {
+  assistantPaneOpen: boolean;
+}) {
   const params = useParams<{ uid?: string }>();
   const projectUid = decodeURIComponent(params.uid ?? "");
   const kubeconfig = useAtomValue(kubeconfigAtom);
@@ -487,7 +491,7 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
     <header
       className={cn(
         "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-13 items-center gap-2 bg-transparent pr-2 pl-6",
-        !rightPaneOpen && "pr-12"
+        !assistantPaneOpen && "pr-12"
       )}
     >
       <div className="min-w-0 flex-1">
@@ -506,11 +510,11 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
 
 /** Main project column + optional Project Assistant Pane (`POST /api/chat` + AI SDK). */
 function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
-  const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
-  const setRightPaneOpen = useSetAtom(rightPaneOpenAtom);
-  const toggleRightPane = useCallback(() => {
-    setRightPaneOpen((open) => !open);
-  }, [setRightPaneOpen]);
+  const assistantPaneOpen = useAtomValue(assistantPaneOpenAtom);
+  const setAssistantPaneOpen = useSetAtom(assistantPaneOpenAtom);
+  const toggleAssistantPane = useCallback(() => {
+    setAssistantPaneOpen((open) => !open);
+  }, [setAssistantPaneOpen]);
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -518,37 +522,37 @@ function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         data-slot="project-main-pane"
       >
-        <ProjectRouteTopBar rightPaneOpen={rightPaneOpen} />
+        <ProjectRouteTopBar assistantPaneOpen={assistantPaneOpen} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
       </section>
       <aside
-        aria-hidden={!rightPaneOpen}
+        aria-hidden={!assistantPaneOpen}
         className={cn(
           "box-border flex min-h-0 shrink-0 flex-col overflow-hidden border-l bg-[#101219] transition-[width,min-width,opacity,transform,border-color] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-          rightPaneOpen
+          assistantPaneOpen
             ? "w-104 min-w-104 translate-x-0 border-border opacity-100"
             : "pointer-events-none w-0 min-w-0 translate-x-4 border-transparent opacity-0"
         )}
-        data-slot="project-right-pane"
-        id="project-right-pane"
+        data-slot="project-assistant-pane"
+        id="project-assistant-pane"
       >
         <ProjectAssistantChatPane />
       </aside>
       <Button
-        aria-controls="project-right-pane"
-        aria-expanded={rightPaneOpen}
+        aria-controls="project-assistant-pane"
+        aria-expanded={assistantPaneOpen}
         aria-label={
-          rightPaneOpen ? "Close assistant panel" : "Open assistant panel"
+          assistantPaneOpen ? "Close assistant panel" : "Open assistant panel"
         }
         className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
-        onClick={toggleRightPane}
+        onClick={toggleAssistantPane}
         size="icon-lg"
         type="button"
         variant="ghost"
       >
-        {rightPaneOpen ? (
+        {assistantPaneOpen ? (
           <PanelRightClose aria-hidden className="size-4" strokeWidth={2} />
         ) : (
           <PanelRightOpen aria-hidden className="size-4" strokeWidth={2} />

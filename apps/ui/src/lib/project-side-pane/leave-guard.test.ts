@@ -91,3 +91,21 @@ test("dirty side pane replacement stays active when save fails", async () => {
   assert.equal(replaced, false);
   assert.deepEqual(events, ["save"]);
 });
+
+test("dirty side pane replacement blocks save when the guard cannot save", async () => {
+  const events: string[] = [];
+  const guard = dirtyGuard(events, { canSave: false });
+  let replaced = false;
+
+  const result = await continueSidePaneLeave({
+    decision: "save",
+    guard,
+    onContinue: () => {
+      replaced = true;
+    },
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(replaced, false);
+  assert.deepEqual(events, []);
+});

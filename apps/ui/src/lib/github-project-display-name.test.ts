@@ -23,6 +23,16 @@ test("GitHub project display name trims repository names and falls back to name"
   );
 });
 
+test("GitHub project display name falls back when repository identity is blank", () => {
+  assert.equal(
+    deriveGithubProjectDisplayName({
+      existingProjectDisplayNames: ["GitHub Project"],
+      repository: { fullName: "  ", name: "  " },
+    }),
+    "GitHub Project-2"
+  );
+});
+
 test("GitHub project display name avoids case-insensitive repeated conflicts", () => {
   assert.equal(
     deriveGithubProjectDisplayName({

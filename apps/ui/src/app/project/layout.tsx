@@ -4,7 +4,7 @@ import {
   AppShellView,
 } from "@/components/app-shell";
 import AuthBootstrap, { SandboxBootstrap } from "@/components/auth-bootstrap";
-import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
+import ProjectWorkspaceLayout from "@/components/project-workspace-layout";
 import { fetchProjectCredentialsOrUnauthorized } from "@/lib/server-credentials";
 
 /** Request-bound (`cookies()`, env); avoids Full Route Cache skipping credentials on refresh. */
@@ -27,7 +27,7 @@ export default async function ProjectLayout({
       <SandboxBootstrap />
       <AppShellSidebar />
       <AppShellView className="min-w-0 flex-1 basis-0">
-        <ProjectChatPaneLayout>{children}</ProjectChatPaneLayout>
+        <ProjectWorkspaceLayout>{children}</ProjectWorkspaceLayout>
       </AppShellView>
     </AppShellChrome>
   );
