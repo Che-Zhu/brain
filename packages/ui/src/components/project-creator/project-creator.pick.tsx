@@ -3,7 +3,7 @@
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { cn } from "@workspace/ui/lib/utils";
-import { Database, GitBranch, Package } from "lucide-react";
+import { Database } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
 import { useProjectCreator } from "./project-creator.context";
@@ -26,10 +26,52 @@ const ICON: Record<
   ProjectCreatorSourceKind,
   ComponentType<SVGProps<SVGSVGElement>>
 > = {
-  github: GitBranch,
-  "docker-image": Package,
+  github: GithubMarkIcon,
+  "docker-image": DockerLogoIcon,
   database: Database,
 };
+
+const ICON_CLASS: Record<ProjectCreatorSourceKind, string> = {
+  github: "text-resource-pane-foreground",
+  "docker-image": "text-theme-blue",
+  database: "text-resource-pane-muted",
+};
+
+function GithubMarkIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <title>GitHub</title>
+      <path
+        d="M12 2c5.5228 0 10 4.47715 10 10 0 4.5716 -3.0686 8.4239 -7.2578 9.6162v-3.0117c0 -0.7275 -0.1595 -1.4465 -0.4678 -2.1055 2.1883 -0.7822 4.2783 -2.4447 4.2783 -4.4355 0 -1.2663 -0.4671 -2.75174 -1.5127 -3.63186V6l-2.9462 0.98828c-0.6589 -0.16036 -1.3628 -0.24706 -2.0938 -0.24707 -0.731 0 -1.4349 0.08673 -2.09375 0.24707L6.95996 6v2.43164c-1.04555 0.88009 -1.51163 2.36566 -1.51172 3.63186 0 1.9907 2.08913 3.6533 4.27735 4.4355 -0.26358 0.5635 -0.41862 1.1711 -0.45801 1.7901 -0.13854 0.0283 -0.25191 0.0415 -0.34473 0.04 -0.20756 -0.0033 -0.36606 -0.06 -0.51953 -0.1562 -1.11532 -0.7 -1.54401 -1.9835 -3.05566 -2.1543 -0.19076 -0.0214 -0.3474 0.1371 -0.34766 0.3291 0 0.1922 0.15921 0.3423 0.34473 0.3925 1.44216 0.39 1.42755 3.2266 3.54785 3.2598 0.11976 0.0019 0.24101 -0.0069 0.36426 -0.0186v1.6348C5.06807 20.4236 2 16.5713 2 12 2 6.47715 6.47715 2 12 2"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function DockerLogoIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 16 16"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <title>Docker</title>
+      <path
+        d="M3.21333 11.5167C2.75733 11.5167 2.344 11.1433 2.344 10.69C2.344 10.2367 2.71733 9.86133 3.214 9.86133C3.71267 9.86133 4.08733 10.2347 4.08733 10.6893C4.08733 11.144 3.67267 11.516 3.21733 11.516L3.21333 11.5167ZM13.888 7.008C13.798 6.34667 13.388 5.808 12.848 5.39467L12.638 5.228L12.4687 5.43467C12.1393 5.808 12.0087 6.47 12.0487 6.96467C12.0887 7.33933 12.2087 7.71133 12.418 8.00067C12.2487 8.08733 12.0393 8.16733 11.878 8.252C11.5161 8.36752 11.1379 8.4238 10.758 8.41867H0.0646667L0.0246667 8.66533C-0.0579994 9.4712 0.0711477 10.2847 0.399333 11.0253L0.562 11.3153V11.3553C1.562 13.0107 3.342 13.7553 5.28067 13.7553C9.01 13.7553 12.0687 12.142 13.5187 8.66667C14.4687 8.708 15.428 8.46 15.8787 7.54933L15.9987 7.34267L15.7987 7.218C15.2587 6.88867 14.5187 6.84467 13.8987 7.01133L13.8867 7.01267L13.888 7.008ZM8.54933 6.34667H6.93067V7.96H8.55067V6.34533L8.54933 6.34733V6.34667ZM8.54933 4.318H6.93067V5.93133H8.55067V4.32L8.54933 4.318ZM8.54933 2.24866H6.93067V3.862H8.55067V2.24866H8.54933ZM10.5293 6.34667H8.92V7.96H10.5333V6.34533L10.5287 6.34733L10.5293 6.34667ZM4.53067 6.34667H2.922V7.96H4.53667V6.34533L4.53 6.34733L4.53067 6.34667ZM6.55067 6.34667H4.95067V7.96H6.56V6.34533L6.55 6.34733L6.55067 6.34667ZM2.53067 6.34667H0.933333V7.96H2.552V6.34533L2.532 6.34733L2.53067 6.34667ZM6.55067 4.318H4.95067V5.93133H6.56V4.32L6.55 4.318H6.55067ZM4.52067 4.318H2.92467V5.93133H4.53333V4.32L4.52267 4.318H4.52067Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export function ProjectCreatorOptionPicker({
   className,
@@ -43,8 +85,13 @@ export function ProjectCreatorOptionPicker({
       className={cn("flex min-w-0 flex-col gap-4", className)}
       data-slot="project-creator-option-picker"
     >
-      <div className="flex min-w-0 flex-col gap-2">
-        <Label htmlFor="project-creator-display-name">Project Name</Label>
+      <div className="flex min-w-0 flex-col gap-2.5">
+        <Label
+          className="text-resource-pane-foreground leading-5"
+          htmlFor="project-creator-display-name"
+        >
+          Project Name
+        </Label>
         <Input
           aria-describedby={
             states.projectDisplayNameError
@@ -53,11 +100,12 @@ export function ProjectCreatorOptionPicker({
           }
           aria-invalid={states.projectDisplayNameError ? true : undefined}
           autoComplete="off"
+          className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
           id="project-creator-display-name"
           onChange={(event) =>
             actions.setProjectDisplayName(event.currentTarget.value)
           }
-          placeholder="Enter project name"
+          placeholder="Placeholder"
           value={states.projectDisplayName}
         />
         {states.projectDisplayNameError ? (
@@ -69,27 +117,31 @@ export function ProjectCreatorOptionPicker({
           </p>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="font-medium text-foreground text-sm leading-5">
+      <div className="flex min-w-0 flex-col gap-3">
+        <p className="font-medium text-resource-pane-foreground text-sm leading-5">
           Scenario
         </p>
-        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
           {ORDER.map((id) => {
             const Icon = ICON[id];
             return (
               <button
-                className="hoverable flex min-h-[76px] min-w-0 flex-col items-start gap-2 rounded-md border border-transparent p-2.5 text-left outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                className="flex min-h-[76px] min-w-0 flex-col items-start gap-2 rounded-md border border-transparent p-2.5 text-left outline-none transition-colors hover:bg-resource-pane-card focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 active:bg-resource-pane-card"
+                data-slot="project-creator-option"
                 key={id}
                 onClick={() => actions.pick(id)}
                 type="button"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <Icon aria-hidden className="size-4 shrink-0" />
-                  <span className="truncate font-medium text-primary text-sm leading-5">
+                  <Icon
+                    aria-hidden
+                    className={cn("size-4 shrink-0", ICON_CLASS[id])}
+                  />
+                  <span className="truncate font-medium text-resource-pane-foreground text-sm leading-5">
                     {PROJECT_CREATOR_SOURCE_LABEL[id]}
                   </span>
                 </span>
-                <span className="line-clamp-2 text-muted-foreground text-xs leading-4">
+                <span className="line-clamp-2 text-resource-pane-muted text-xs leading-4">
                   {DESCRIPTION[id]}
                 </span>
               </button>

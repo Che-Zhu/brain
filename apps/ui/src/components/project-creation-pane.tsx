@@ -27,7 +27,7 @@ export function ProjectCreationPane({
     <SidePane
       busy={busy}
       closeAriaLabel="Close project creation pane"
-      icon={<Plus aria-hidden className="size-4" />}
+      icon={<Plus aria-hidden className="size-4 text-theme-blue" />}
       label="Project creation pane"
       onClose={onClose}
       subtitle="Provide a project name and select the project creation method."

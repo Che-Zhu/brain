@@ -31,6 +31,7 @@ export interface SidePaneProps {
   children: ReactNode;
   className?: string;
   closeAriaLabel?: string;
+  headerClassName?: string;
   icon?: ReactNode;
   label?: string;
   onClose: () => void;
@@ -44,6 +45,7 @@ export function SidePane({
   children,
   className,
   closeAriaLabel = "Close side pane",
+  headerClassName,
   icon,
   label,
   onClose,
@@ -79,7 +81,12 @@ export function SidePane({
             bodyClassName
           )}
         >
-          <header className="flex shrink-0 items-start justify-between gap-3 px-2.5">
+          <header
+            className={cn(
+              "flex shrink-0 items-start justify-between gap-3",
+              headerClassName
+            )}
+          >
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <div className="flex min-w-0 items-center gap-2.5">
                 {icon == null ? null : (
