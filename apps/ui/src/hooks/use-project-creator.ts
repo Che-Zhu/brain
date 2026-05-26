@@ -8,9 +8,13 @@ import type {
 } from "@workspace/ui/components/project-creator/project-creator.types";
 import { randomNano } from "@workspace/ui/lib/generator";
 import { randomName } from "@workspace/ui/lib/random-name";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useReducer, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  initialProjectCreationPaneState,
+  projectCreationPaneStateReducer,
+} from "@/components/project-creation-pane-state";
 import { useApCompositions } from "@/hooks/compositions/use-ap-composition";
 import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 import { useProjectCompositions } from "@/hooks/compositions/use-project-composition";
@@ -86,19 +90,23 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     ProjectCreatorRootProps,
     "actions" | "confirmApplying" | "databaseOptions" | "githubDeployer"
   >;
-  dialogOpen: boolean;
+  creatorResetKey: number;
+  creationPaneOpen: boolean;
   /** True while GitHub auth or repository list is loading for the deployer. */
   githubDeployerLoading: boolean;
   lastConfirmedKind: string | null;
-  onDialogOpenChange: (open: boolean) => void;
-  openDialog: () => void;
+  onCreationPaneOpenChange: (open: boolean) => void;
+  openCreationPane: () => void;
 } {
   const kubeconfig = options?.kubeconfig?.trim() ?? "";
   const namespace = options?.namespace?.trim() ?? "";
   const onProjectCreated = options?.onProjectCreated;
   const hasKubeconfig = kubeconfig !== "";
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creationPaneState, dispatchCreationPaneState] = useReducer(
+    projectCreationPaneStateReducer,
+    initialProjectCreationPaneState
+  );
   const [confirmApplying, setConfirmApplying] = useState(false);
   const [lastConfirmedKind, setLastConfirmedKind] = useState<string | null>(
     null
@@ -126,15 +134,18 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const { isLoading: githubReposLoading, repos: githubRepos } =
     useGithubRepos(githubToken);
 
-  const openDialog = useCallback(() => {
-    setDialogOpen(true);
+  const openCreationPane = useCallback(() => {
+    setConfirmApplying(false);
+    dispatchCreationPaneState({ type: "open" });
   }, []);
 
-  const onDialogOpenChange = useCallback((open: boolean) => {
-    setDialogOpen(open);
-    if (!open) {
-      setConfirmApplying(false);
+  const onCreationPaneOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      dispatchCreationPaneState({ type: "open" });
+      return;
     }
+    dispatchCreationPaneState({ type: "close" });
+    setConfirmApplying(false);
   }, []);
 
   const databaseOptions = useMemo((): ProjectCreatorDatabaseChoice[] => {
@@ -252,7 +263,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             `Applied project "${projectClaimName}" and AP "${apClaimName}".`
           );
           setLastConfirmedKind(`docker:${trimmed}:${projectClaimName}`);
-          setDialogOpen(false);
+          dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
             kubeconfig,
             namespace,
@@ -306,7 +317,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           setLastConfirmedKind(
             `database:${compositionName}:${projectClaimName}`
           );
-          setDialogOpen(false);
+          dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
             kubeconfig,
             namespace,
@@ -338,11 +349,12 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   );
 
   return {
+    creationPaneOpen: creationPaneState.open,
     creatorRootProps,
-    dialogOpen,
+    creatorResetKey: creationPaneState.resetKey,
     githubDeployerLoading,
     lastConfirmedKind,
-    onDialogOpenChange,
-    openDialog,
+    onCreationPaneOpenChange,
+    openCreationPane,
   };
 }

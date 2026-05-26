@@ -19,7 +19,7 @@ export const PROJECT_CREATOR_SOURCE_LABEL: Record<
   ProjectCreatorSourceKind,
   string
 > = {
-  github: "Github",
+  github: "GitHub",
   "docker-image": "Docker Image",
   database: "Database",
 };

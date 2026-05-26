@@ -1,12 +1,12 @@
 "use client";
 
-import { Dialog, DialogContent } from "@workspace/ui/components/dialog";
-import { ProjectCreator } from "@workspace/ui/components/project-creator/project-creator";
 import { ProjectExplorer } from "@workspace/ui/components/project-explorer/project-explorer";
+import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
+import { ProjectCreationPane } from "@/components/project-creation-pane";
 import { useProjectCreator } from "@/hooks/use-project-creator";
 import { useProjectsExplorer } from "@/hooks/use-projects-explorer";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
@@ -32,11 +32,12 @@ export default function ProjectIndexPage() {
   );
 
   const {
+    creationPaneOpen,
     creatorRootProps,
-    dialogOpen,
+    creatorResetKey,
     githubDeployerLoading,
-    onDialogOpenChange,
-    openDialog,
+    onCreationPaneOpenChange,
+    openCreationPane,
   } = useProjectCreator({
     kubeconfig,
     namespace: ns,
@@ -44,8 +45,8 @@ export default function ProjectIndexPage() {
   });
 
   const explorerActions = useMemo(
-    () => ({ ...actions, onNewProject: openDialog }),
-    [actions, openDialog]
+    () => ({ ...actions, onNewProject: openCreationPane }),
+    [actions, openCreationPane]
   );
 
   return (
@@ -83,19 +84,16 @@ export default function ProjectIndexPage() {
         </ProjectExplorer.Root>
       </div>
 
-      <Dialog onOpenChange={onDialogOpenChange} open={dialogOpen}>
-        <DialogContent
-          aria-busy={dialogOpen && githubDeployerLoading}
-          className="border-none bg-transparent p-0 ring-0 sm:max-w-lg"
-        >
-          {/* <DialogHeader /> */}
-          {dialogOpen ? (
-            <ProjectCreator.Root {...creatorRootProps}>
-              <ProjectCreator.Variant1 className="min-w-0 rounded-xl border border-border bg-card p-4" />
-            </ProjectCreator.Root>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <SidePanePresence>
+        {creationPaneOpen ? (
+          <ProjectCreationPane
+            busy={githubDeployerLoading}
+            creatorRootProps={creatorRootProps}
+            onClose={() => onCreationPaneOpenChange(false)}
+            resetKey={creatorResetKey}
+          />
+        ) : null}
+      </SidePanePresence>
     </div>
   );
 }
