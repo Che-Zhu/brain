@@ -59,6 +59,14 @@ Crossplane composite resource (`example.crossplane.io/v1`, kind `AP`) that compo
 
 The primary UI surface for viewing and editing AP desired configuration, including image, resource capacity, Replica Strategy, environment, and network settings.
 
+### Docker Deployment Settings
+
+The creation-time choices for a new AP before the AP exists, including Docker image, runtime environment variables, App Listening Port, and whether to request a Platform Address. Docker Deployment Settings create an AP workload from an existing image, are independent of entry path, and should use Public Address or Network language rather than Ingress language in user-facing surfaces.
+
+### Docker Deployment Target
+
+The Project relationship selected for Docker Deployment Settings before AP creation. A Docker Deployment Target is either a new Project being created in the same flow or an existing Project that will own the new AP.
+
 ### EntryPoint Public Addresses Panel
 
 A narrow UI surface opened from an EntryPoint selection that presents the associated AP's Public Addresses. It is scoped to public routing and is not the full AP Settings surface.
@@ -195,7 +203,7 @@ The human-facing Project name shown in navigation, project chrome, and project c
 
 A non-modal right-side surface anchored in the project main pane for entering a new Project's initial user-facing identity and choosing how to create it before the Project resource exists. It is distinct from the Canvas Resource Pane and may coexist with the project assistant chat pane.
 
-The Project Creation Pane may also open in a source-specific entry path. In a GitHub direct creation path, the user starts at GitHub repository selection rather than the general creation picker; the Project Display Name is derived from the selected repository and de-duplicated within the namespace.
+The Project Creation Pane may also open in a source-specific entry path. In a GitHub direct creation path, the user starts at GitHub repository selection rather than the general creation picker; the Project Display Name is derived from the selected repository and de-duplicated within the namespace. In a Docker direct creation path, the Project Display Name is derived from the Docker image repository name and de-duplicated within the namespace.
 
 ### Custom Domain Binding
 
