@@ -7,6 +7,7 @@ import {
   downloadChatMessagesJson,
 } from "@workspace/ui/components/chat/chat";
 import type { ChatHeaderThreadHistory } from "@workspace/ui/components/chat/chat.types";
+import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -16,7 +17,7 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { parseAsString, useQueryState } from "nuqs";
+import { parseAsBoolean, parseAsString, useQueryState } from "nuqs";
 import {
   type ReactNode,
   useCallback,
@@ -26,9 +27,9 @@ import {
   useState,
 } from "react";
 import { useSWRConfig } from "swr";
-import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
+import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
-import { useGithubDeployer } from "@/hooks/use-github-deployer";
+import { useGithubAuth } from "@/hooks/use-github-auth";
 import {
   createAssistantThread,
   fetchAssistantSession,
@@ -66,6 +67,8 @@ type AssistantClientToolSubmission =
       output: RefreshFrontendSwrCachesToolOutput;
     };
 
+const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
+
 function buildAssistantContextPayload(
   projectUid: string,
   selectedServiceUid: string
@@ -88,6 +91,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw,
   onAssistantStreamFinished,
   onCreateThread,
+  onGithubDeploymentOpen,
   onSelectThread,
 }: {
   bootstrap: Pick<AssistantSessionPayload, "chatId" | "messages">;
@@ -96,6 +100,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
   onCreateThread: () => Promise<void>;
+  onGithubDeploymentOpen: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
   const router = useRouter();
@@ -165,81 +170,70 @@ function ProjectAssistantChatSession({
     [kubeconfig]
   );
 
-  const { messages, sendMessage, status, stop, setMessages, addToolOutput } =
-    useAIChat({
-      id: chatId,
-      messages: bootstrap.messages,
-      transport,
-      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-      async onFinish() {
-        await onAssistantStreamFinished?.();
-      },
-      onToolCall({ toolCall }) {
-        if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
-          const result = runNavigateAppTool(toolCall.input, router.push);
-          const submit = addToolOutputRef.current;
-          if (submit == null) {
+  const { messages, sendMessage, status, stop, addToolOutput } = useAIChat({
+    id: chatId,
+    messages: bootstrap.messages,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    async onFinish() {
+      await onAssistantStreamFinished?.();
+    },
+    onToolCall({ toolCall }) {
+      if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
+        const result = runNavigateAppTool(toolCall.input, router.push);
+        const submit = addToolOutputRef.current;
+        if (submit == null) {
+          return;
+        }
+        Promise.resolve(
+          submit({
+            tool: NAVIGATE_APP_TOOL_NAME,
+            toolCallId: toolCall.toolCallId,
+            output: result,
+          })
+        ).catch((err: unknown) => {
+          console.error("[navigateApp] addToolOutput failed:", err);
+        });
+        return;
+      }
+
+      if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
+        return;
+      }
+      const submitRefresh = addToolOutputRef.current;
+      runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
+        .then((output) => {
+          if (submitRefresh == null) {
             return;
           }
           Promise.resolve(
-            submit({
-              tool: NAVIGATE_APP_TOOL_NAME,
+            submitRefresh({
+              tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
               toolCallId: toolCall.toolCallId,
-              output: result,
+              output,
             })
           ).catch((err: unknown) => {
-            console.error("[navigateApp] addToolOutput failed:", err);
+            console.error(
+              "[refreshFrontendSwrCaches] addToolOutput failed:",
+              err
+            );
           });
-          return;
-        }
-
-        if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
-          return;
-        }
-        const submitRefresh = addToolOutputRef.current;
-        runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
-          .then((output) => {
-            if (submitRefresh == null) {
-              return;
-            }
-            Promise.resolve(
-              submitRefresh({
-                tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
-                toolCallId: toolCall.toolCallId,
-                output,
-              })
-            ).catch((err: unknown) => {
-              console.error(
-                "[refreshFrontendSwrCaches] addToolOutput failed:",
-                err
-              );
-            });
-          })
-          .catch((err: unknown) => {
-            console.error("[refreshFrontendSwrCaches] mutation failed:", err);
-          });
-      },
-    });
+        })
+        .catch((err: unknown) => {
+          console.error("[refreshFrontendSwrCaches] mutation failed:", err);
+        });
+    },
+  });
 
   // console.log("messages", messages);
 
   addToolOutputRef.current = addToolOutput;
   const [input, setInput] = useState("");
-  const {
-    authLoading,
-    clearTranscriptUi,
-    commitDeployToMessages,
-    githubToken,
-    initiateGithubAuth,
-    isAuthorized,
-    toggleTranscriptDeployer,
-    transcriptDeployerOpen,
-  } = useGithubDeployer({ setMessages });
+  const { isAuthorized, isLoading: authLoading } = useGithubAuth();
 
   const createThreadClicked = useCallback(() => {
-    clearTranscriptUi();
     onCreateThread().catch(() => undefined);
-  }, [clearTranscriptUi, onCreateThread]);
+  }, [onCreateThread]);
 
   const threadHistory = useMemo((): ChatHeaderThreadHistory | undefined => {
     if (threads.length === 0) {
@@ -257,11 +251,10 @@ function ProjectAssistantChatSession({
         updatedAtSource: t.updatedAt,
       })),
       onSelect: (threadId: string) => {
-        clearTranscriptUi();
         onSelectThread(threadId).catch(() => undefined);
       },
     };
-  }, [threads, chatId, clearTranscriptUi, onSelectThread]);
+  }, [threads, chatId, onSelectThread]);
 
   const threadLabel = useMemo(() => {
     const hit = threads.find((t) => t.id === chatId);
@@ -298,15 +291,6 @@ function ProjectAssistantChatSession({
     downloadChatMessagesJson(messages, { fileNameStem: threadLabel });
   }, [messages, threadLabel]);
 
-  const transcriptFooter = transcriptDeployerOpen ? (
-    <ProjectTranscriptGithubDeployer
-      authLoading={authLoading}
-      githubToken={githubToken}
-      onAuthorize={initiateGithubAuth}
-      onDeployed={commitDeployToMessages}
-    />
-  ) : null;
-
   return (
     <Chat.Root>
       <Chat className="h-full min-h-0 flex-1 border-0 bg-[#101219] shadow-none">
@@ -331,7 +315,6 @@ function ProjectAssistantChatSession({
           className="min-h-0 flex-1"
           messages={messages}
           status={status}
-          transcriptFooter={transcriptFooter}
         />
         <div className="group flex w-full shrink-0 flex-col p-2 pt-4">
           <div className="relative isolate w-full">
@@ -356,7 +339,7 @@ function ProjectAssistantChatSession({
                   <Chat.GithubDeployButton
                     authLoading={authLoading}
                     isAuthorized={isAuthorized}
-                    onComposerAction={toggleTranscriptDeployer}
+                    onComposerAction={onGithubDeploymentOpen}
                   />
                 </div>
                 <Chat.ComposerSend
@@ -373,7 +356,11 @@ function ProjectAssistantChatSession({
   );
 }
 
-function ProjectAssistantChatPane() {
+function ProjectAssistantChatPane({
+  onGithubDeploymentOpen,
+}: {
+  onGithubDeploymentOpen: () => void;
+}) {
   const namespaceRaw = useAtomValue(namespaceAtom);
   const [creatingThread, setCreatingThread] = useState(false);
   const [session, setSession] = useState<AssistantSessionPayload | null>(null);
@@ -474,6 +461,7 @@ function ProjectAssistantChatPane() {
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
       onCreateThread={createThread}
+      onGithubDeploymentOpen={onGithubDeploymentOpen}
       onSelectThread={selectThread}
       threads={session.threads}
     />
@@ -521,9 +509,19 @@ export default function ProjectChatPaneLayout({
 }) {
   const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
   const setRightPaneOpen = useSetAtom(rightPaneOpenAtom);
+  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
+    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
   const toggleRightPane = useCallback(() => {
     setRightPaneOpen((open) => !open);
   }, [setRightPaneOpen]);
+  const openGithubDeploymentPane = useCallback(() => {
+    Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
+  const closeGithubDeploymentPane = useCallback(() => {
+    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -535,6 +533,11 @@ export default function ProjectChatPaneLayout({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
+        <SidePanePresence>
+          {githubDeploymentPaneOpen ? (
+            <GitHubDeploymentPane onClose={closeGithubDeploymentPane} />
+          ) : null}
+        </SidePanePresence>
       </section>
       <aside
         aria-hidden={!rightPaneOpen}
@@ -547,7 +550,9 @@ export default function ProjectChatPaneLayout({
         data-slot="project-right-pane"
         id="project-right-pane"
       >
-        <ProjectAssistantChatPane />
+        <ProjectAssistantChatPane
+          onGithubDeploymentOpen={openGithubDeploymentPane}
+        />
       </aside>
       <Button
         aria-controls="project-right-pane"
