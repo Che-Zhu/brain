@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -45,8 +46,14 @@ export interface ProjectCreatorRootProps {
   confirmApplying?: boolean;
   /** Options for the database step combobox. */
   databaseOptions?: ProjectCreatorDatabaseChoice[];
+  /** Existing Project Display Names in the current namespace. */
+  existingProjectDisplayNames?: readonly string[];
   /** Wired into the GitHub step’s `GithubDeployer` (authorize + repos + deploy). */
   githubDeployer?: ProjectCreatorGithubDeployerSlot;
+}
+
+function normalizeProjectCreatorDisplayName(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 export function ProjectCreatorRoot({
@@ -54,14 +61,71 @@ export function ProjectCreatorRoot({
   confirmApplying = false,
   children,
   databaseOptions,
+  existingProjectDisplayNames = [],
   githubDeployer: githubDeployerProp,
 }: ProjectCreatorRootProps) {
   const [step, setStep] = useState<ProjectCreatorSourceKind | null>(null);
+  const [projectDisplayName, setProjectDisplayNameState] = useState("");
+  const [projectDisplayNameError, setProjectDisplayNameError] = useState<
+    string | null
+  >(null);
   const reset = useCallback(() => setStep(null), []);
-  const pick = useCallback(
-    (kind: ProjectCreatorSourceKind) => setStep(kind),
-    []
+
+  const existingDisplayNameSet = useMemo(
+    () =>
+      new Set(
+        existingProjectDisplayNames
+          .map(normalizeProjectCreatorDisplayName)
+          .filter(Boolean)
+      ),
+    [existingProjectDisplayNames]
   );
+
+  const validateProjectDisplayName = useCallback(
+    (value: string): string | null => {
+      const trimmed = value.trim();
+      if (trimmed === "") {
+        return "Project name is required.";
+      }
+      if (
+        existingDisplayNameSet.has(normalizeProjectCreatorDisplayName(value))
+      ) {
+        return `A project named "${trimmed}" already exists.`;
+      }
+      return null;
+    },
+    [existingDisplayNameSet]
+  );
+
+  const setProjectDisplayName = useCallback(
+    (value: string) => {
+      setProjectDisplayNameState(value);
+      setProjectDisplayNameError((current) =>
+        current == null ? null : validateProjectDisplayName(value)
+      );
+    },
+    [validateProjectDisplayName]
+  );
+
+  const pick = useCallback(
+    (kind: ProjectCreatorSourceKind) => {
+      const error = validateProjectDisplayName(projectDisplayName);
+      setProjectDisplayNameError(error);
+      if (error != null) {
+        return;
+      }
+      setStep(kind);
+    },
+    [projectDisplayName, validateProjectDisplayName]
+  );
+
+  useEffect(() => {
+    if (projectDisplayNameError != null) {
+      setProjectDisplayNameError(
+        validateProjectDisplayName(projectDisplayName)
+      );
+    }
+  }, [projectDisplayName, projectDisplayNameError, validateProjectDisplayName]);
 
   const dbOptions = useMemo(
     () =>
@@ -73,10 +137,16 @@ export function ProjectCreatorRoot({
 
   const value = useMemo<ProjectCreatorValue>(
     () => ({
-      states: { confirmApplying, step },
+      states: {
+        confirmApplying,
+        projectDisplayName,
+        projectDisplayNameError,
+        step,
+      },
       actions: {
         pick,
         reset,
+        setProjectDisplayName,
         onGithubConfirm: actionsProp?.onGithubConfirm,
         onDockerConfirm: actionsProp?.onDockerConfirm,
         onDatabaseConfirm: actionsProp?.onDatabaseConfirm,
@@ -91,6 +161,9 @@ export function ProjectCreatorRoot({
       actionsProp,
       dbOptions,
       githubDeployerProp,
+      projectDisplayName,
+      projectDisplayNameError,
+      setProjectDisplayName,
     ]
   );
 

@@ -155,11 +155,11 @@ A derived health tone for one Project row in the project list, computed from the
 
 ### Project Display Name
 
-The human-facing Project name shown in navigation and project chrome, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name.
+The human-facing Project name shown in navigation, project chrome, and project creation forms, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name. It is unique within a namespace after trimming surrounding whitespace and comparing case-insensitively. Avoid using Project name to mean the Project's Kubernetes resource name unless the resource identity is the topic.
 
 ### Project Creation Pane
 
-A non-modal right-side surface anchored in the project main pane for choosing how to create a new Project before the Project resource exists. It is distinct from the Canvas Resource Pane and may coexist with the project assistant chat pane.
+A non-modal right-side surface anchored in the project main pane for entering a new Project's initial user-facing identity and choosing how to create it before the Project resource exists. It is distinct from the Canvas Resource Pane and may coexist with the project assistant chat pane.
 
 ### Custom Domain Binding
 

@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@workspace/ui/components/breadcrumb";
+import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { ArrowLeft } from "lucide-react";
 
 import { useProjectCreator } from "./project-creator.context";
 import { PROJECT_CREATOR_SOURCE_LABEL } from "./project-creator.types";
@@ -19,29 +13,30 @@ export function ProjectCreatorTrail({ className }: { className?: string }) {
     states: { step },
   } = useProjectCreator("ProjectCreator.Trail");
 
+  if (step === null) {
+    return null;
+  }
+
   return (
-    <Breadcrumb className={cn("shrink-0", className)}>
-      <BreadcrumbList data-slot="project-creator-trail">
-        <BreadcrumbItem>
-          {step === null ? (
-            <BreadcrumbPage>New</BreadcrumbPage>
-          ) : (
-            <BreadcrumbLink onClick={reset} render={<button type="button" />}>
-              New
-            </BreadcrumbLink>
-          )}
-        </BreadcrumbItem>
-        {step === null ? null : (
-          <>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>
-                {PROJECT_CREATOR_SOURCE_LABEL[step]}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </>
-        )}
-      </BreadcrumbList>
-    </Breadcrumb>
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-between gap-3",
+        className
+      )}
+      data-slot="project-creator-trail"
+    >
+      <Button
+        className="-ml-2 text-muted-foreground hover:text-foreground"
+        onClick={reset}
+        type="button"
+        variant="ghost"
+      >
+        <ArrowLeft aria-hidden className="size-3.5" />
+        Back
+      </Button>
+      <p className="min-w-0 truncate font-medium text-muted-foreground text-xs">
+        {PROJECT_CREATOR_SOURCE_LABEL[step]}
+      </p>
+    </div>
   );
 }

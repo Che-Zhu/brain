@@ -26,6 +26,7 @@ import {
   type ProjectWorkloadStatusInput,
 } from "@/lib/project-aggregate-status";
 import {
+  isProjectDisplayNameTaken,
   PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
   projectsListToExplorerProjects,
 } from "@/lib/projects-to-explorer-projects";
@@ -171,6 +172,11 @@ export function useProjectsExplorer(options: {
         toast.error("Credentials are not ready yet.");
         throw new Error("not ready");
       }
+      if (isProjectDisplayNameTaken(projects, newDisplayName, p.id)) {
+        throw new Error(
+          `A project named "${newDisplayName.trim()}" already exists.`
+        );
+      }
       try {
         await fetcher({
           base: ApiUrl(),
@@ -201,7 +207,7 @@ export function useProjectsExplorer(options: {
         throw e;
       }
     },
-    [hasKubeconfig, kubeconfig, mutate, ns]
+    [hasKubeconfig, kubeconfig, mutate, ns, projects]
   );
 
   const onProjectDelete = useCallback(

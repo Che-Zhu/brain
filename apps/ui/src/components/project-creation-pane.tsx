@@ -14,7 +14,11 @@ export function ProjectCreationPane({
   busy?: boolean;
   creatorRootProps: Pick<
     ProjectCreatorRootProps,
-    "actions" | "confirmApplying" | "databaseOptions" | "githubDeployer"
+    | "actions"
+    | "confirmApplying"
+    | "databaseOptions"
+    | "existingProjectDisplayNames"
+    | "githubDeployer"
   >;
   onClose: () => void;
   resetKey: string | number;
@@ -26,8 +30,8 @@ export function ProjectCreationPane({
       icon={<Plus aria-hidden className="size-4" />}
       label="Project creation pane"
       onClose={onClose}
-      subtitle="Choose how to create a Project."
-      title="New Project"
+      subtitle="Provide a project name and select the project creation method."
+      title="Create New Project"
     >
       <ProjectCreator.Root key={resetKey} {...creatorRootProps}>
         <ProjectCreator.Variant1 className="min-w-0" />

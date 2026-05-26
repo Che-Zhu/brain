@@ -11,11 +11,14 @@ const noop = () => {
 const ASIDE_RE = /<aside/;
 const BUSY_RE = /aria-busy="true"/;
 const CLOSE_LABEL_RE = /aria-label="Close project creation pane"/;
-const DESCRIPTION_RE = /Choose how to create a Project/;
+const DESCRIPTION_FIELD_RE = /Description/;
+const DESCRIPTION_RE =
+  /Provide a project name and select the project creation method/;
 const DIALOG_OVERLAY_RE = /data-slot="dialog-overlay"/;
 const DIALOG_ROLE_RE = /role="dialog"/;
 const PANE_LABEL_RE = /aria-label="Project creation pane"/;
-const PROJECT_TITLE_RE = /New Project/;
+const PROJECT_NAME_RE = /Project Name/;
+const PROJECT_TITLE_RE = /Create New Project/;
 
 test("project creation pane is a non-modal side pane with the method picker", () => {
   const html = renderToStaticMarkup(
@@ -32,9 +35,11 @@ test("project creation pane is a non-modal side pane with the method picker", ()
   assert.match(html, BUSY_RE);
   assert.match(html, PROJECT_TITLE_RE);
   assert.match(html, DESCRIPTION_RE);
+  assert.match(html, PROJECT_NAME_RE);
   assert.match(html, CLOSE_LABEL_RE);
   assert.doesNotMatch(html, DIALOG_ROLE_RE);
   assert.doesNotMatch(html, DIALOG_OVERLAY_RE);
+  assert.doesNotMatch(html, DESCRIPTION_FIELD_RE);
 
   const github = html.indexOf("GitHub");
   const docker = html.indexOf("Docker Image");

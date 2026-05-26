@@ -40,6 +40,7 @@ export default function ProjectIndexPage() {
     onCreationPaneOpenChange,
     openCreationPane,
   } = useProjectCreator({
+    existingProjects: states.projects,
     kubeconfig,
     namespace: ns,
     onProjectCreated,
