@@ -27,7 +27,7 @@ func registerGet(grp huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/",
 		Summary:     "Get EntryPoint(s)",
-		Description: "Get a single EntryPoint by name or list EntryPoints in the namespace.\n\nEntryPoint is the Crossplane resource that represents public access for an AP. It exposes platform-assigned domains, target ports, aggregate status, and reserved custom-domain fields for future binding flows.",
+		Description: "Get a single EntryPoint by name or list EntryPoints in the namespace.\n\nEntryPoint is the Crossplane resource that represents public access for an AP. It exposes platform-assigned domains, target ports, aggregate status, and Custom Domain Binding status for DNS, routing, and certificate lifecycle.",
 		Tags:        []string{"EntryPoint"},
 	}, func(ctx context.Context, input *getInput) (*getOutput, error) {
 		_, cfg, err := middleware.RestConfigFromAuth(input.Authorization)
