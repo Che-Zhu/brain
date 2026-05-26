@@ -16,6 +16,10 @@ import type {
 } from "@workspace/ui/lib/settings-leave-guard";
 import { Save } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  continueSidePaneLeave,
+  shouldPromptSidePaneLeave,
+} from "@/lib/project-side-pane/leave-guard";
 
 export type {
   SettingsLeaveGuardAction,
@@ -39,10 +43,10 @@ export type SettingsLeaveResult =
 export function shouldPromptSettingsLeave(
   guard: SettingsLeaveGuardHandle | null | undefined
 ) {
-  return guard?.dirty === true;
+  return shouldPromptSidePaneLeave(guard);
 }
 
-export async function continueSettingsLeave({
+export function continueSettingsLeave({
   decision,
   guard,
   onContinue,
@@ -51,33 +55,7 @@ export async function continueSettingsLeave({
   guard: SettingsLeaveGuardHandle;
   onContinue: () => Promise<void> | void;
 }): Promise<SettingsLeaveResult> {
-  switch (decision) {
-    case "stay":
-      return { status: "stayed" };
-    case "discard":
-      guard.discard();
-      await onContinue();
-      return { status: "continued" };
-    case "save":
-      if (guard.canSave === false) {
-        return {
-          error: new Error("Settings draft cannot be saved yet."),
-          status: "blocked",
-        };
-      }
-      try {
-        await guard.save();
-        await onContinue();
-        return { status: "continued" };
-      } catch (error) {
-        return { error, status: "blocked" };
-      }
-    default:
-      return {
-        error: new Error("Unknown settings leave decision."),
-        status: "blocked",
-      };
-  }
+  return continueSidePaneLeave({ decision, guard, onContinue });
 }
 
 function settingsLeaveGuardTitle(scope: SettingsLeaveGuardScope) {

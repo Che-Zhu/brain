@@ -26,10 +26,11 @@ import {
   type ProjectWorkloadStatusInput,
 } from "@/lib/project-aggregate-status";
 import {
+  isProjectDisplayNameTaken,
   PROJECT_DISPLAY_NAME_ANNOTATION_KEY,
   projectsListToExplorerProjects,
 } from "@/lib/projects-to-explorer-projects";
-import { openRightPane } from "@/store/layout-store";
+import { openAssistantPane } from "@/store/layout-store";
 
 /**
  * Extracts `{ projectUid, phase, paused }` per workload from an AP or DB list
@@ -162,14 +163,21 @@ export function useProjectsExplorer(options: {
       onNewProjectOverride();
       return;
     }
-    openRightPane();
+    openAssistantPane();
   }, [onNewProjectOverride]);
 
   const onProjectRename = useCallback(
     async (p: ProjectExplorerProject, newDisplayName: string) => {
+      const displayName = newDisplayName.trim();
       if (!hasKubeconfig) {
         toast.error("Credentials are not ready yet.");
         throw new Error("not ready");
+      }
+      if (!displayName) {
+        throw new Error("Project name is required.");
+      }
+      if (isProjectDisplayNameTaken(projects, displayName, p.id)) {
+        throw new Error(`A project named "${displayName}" already exists.`);
       }
       try {
         await fetcher({
@@ -185,7 +193,7 @@ export function useProjectsExplorer(options: {
           body: {
             metadata: {
               annotations: {
-                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: newDisplayName,
+                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: displayName,
               },
             },
           },
@@ -194,14 +202,14 @@ export function useProjectsExplorer(options: {
           },
         });
         await mutate();
-        toast.success(`Project renamed to "${newDisplayName}".`);
+        toast.success(`Project renamed to "${displayName}".`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Rename failed";
         toast.error(msg);
         throw e;
       }
     },
-    [hasKubeconfig, kubeconfig, mutate, ns]
+    [hasKubeconfig, kubeconfig, mutate, ns, projects]
   );
 
   const onProjectDelete = useCallback(

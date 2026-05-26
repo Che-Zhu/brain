@@ -19,20 +19,33 @@ export const PROJECT_CREATOR_SOURCE_LABEL: Record<
   ProjectCreatorSourceKind,
   string
 > = {
-  github: "Github",
+  github: "GitHub",
   "docker-image": "Docker Image",
   database: "Database",
 };
 
 export interface ProjectCreatorActions {
-  onDatabaseConfirm?: (databaseId: string) => void | Promise<void>;
-  onDockerConfirm?: (imageRef: string) => void | Promise<void>;
-  onGithubConfirm?: (url: string) => void | Promise<void>;
+  onDatabaseConfirm?: (
+    databaseId: string,
+    projectDisplayName: string
+  ) => void | Promise<void>;
+  onDockerConfirm?: (
+    imageRef: string,
+    projectDisplayName: string
+  ) => void | Promise<void>;
+  onGithubConfirm?: (
+    url: string,
+    projectDisplayName: string
+  ) => void | Promise<void>;
 }
 
 export interface ProjectCreatorStates {
   /** When true after validation, disables Docker/DB Confirm and shows applying UI. */
   confirmApplying: boolean;
+  /** User-facing Project Display Name entered before choosing a creation source. */
+  projectDisplayName: string;
+  /** Field-level validation message for the Project Display Name entry. */
+  projectDisplayNameError: string | null;
   /** `null` shows the three-option column. */
   step: ProjectCreatorSourceKind | null;
 }
@@ -46,6 +59,7 @@ export interface ProjectCreatorValue {
   actions: {
     pick: (kind: ProjectCreatorSourceKind) => void;
     reset: () => void;
+    setProjectDisplayName: (value: string) => void;
   } & ProjectCreatorActions;
   meta: {
     databaseOptions: ProjectCreatorDatabaseChoice[];

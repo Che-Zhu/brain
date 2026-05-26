@@ -58,6 +58,26 @@ export function projectDisplayName(item: ProjectListItem): string | undefined {
   return undefined;
 }
 
+export function normalizeProjectDisplayName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+export function isProjectDisplayNameTaken(
+  projects: readonly ProjectExplorerProject[],
+  displayName: string,
+  ignoreProjectId?: string
+): boolean {
+  const normalized = normalizeProjectDisplayName(displayName);
+  if (normalized === "") {
+    return false;
+  }
+  return projects.some(
+    (project) =>
+      project.id !== ignoreProjectId &&
+      normalizeProjectDisplayName(project.name) === normalized
+  );
+}
+
 /**
  * Maps a Project list (or unknown k8s get / SWR `data` payload) into
  * {@link ProjectExplorerProject} rows for {@link ProjectExplorer}.

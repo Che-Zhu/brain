@@ -6,11 +6,17 @@ import type {
   ProjectCreatorActions,
   ProjectCreatorDatabaseChoice,
 } from "@workspace/ui/components/project-creator/project-creator.types";
+import type { ProjectExplorerProject } from "@workspace/ui/components/project-explorer/project-explorer";
 import { randomNano } from "@workspace/ui/lib/generator";
 import { randomName } from "@workspace/ui/lib/random-name";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useReducer, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  initialProjectCreationPaneState,
+  type ProjectCreationPaneEntryMode,
+  projectCreationPaneStateReducer,
+} from "@/components/project-creation-pane-state";
 import { useApCompositions } from "@/hooks/compositions/use-ap-composition";
 import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 import { useProjectCompositions } from "@/hooks/compositions/use-project-composition";
@@ -23,8 +29,11 @@ import {
 } from "@/lib/ap-yaml-merge-project";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
 import { fetchProjectUidByName } from "@/lib/fetch-project-uid";
+import { deriveGithubProjectDisplayName } from "@/lib/github-project-display-name";
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import { k8sApplyYaml } from "@/lib/project-canvas/k8s/http/apply-yaml";
+import { mergeProjectMetadataDisplayName } from "@/lib/project-yaml-metadata";
+import { isProjectDisplayNameTaken } from "@/lib/projects-to-explorer-projects";
 import {
   joinKubeYamlDocuments,
   renderCrossplaneCompositionTemplate,
@@ -34,6 +43,16 @@ import {
 const DEFAULT_PROJECT_COMPOSITION_NAME = "project-instance-go-templating";
 /** Matches {@link packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml}. */
 const DEFAULT_AP_COMPOSITION_NAME = "aps-deployment-ingress-go-templating";
+const EMPTY_PROJECTS: readonly ProjectExplorerProject[] = [];
+
+type CreatorRootPropsForCreationPane = Pick<
+  ProjectCreatorRootProps,
+  | "actions"
+  | "confirmApplying"
+  | "databaseOptions"
+  | "existingProjectDisplayNames"
+  | "githubDeployer"
+>;
 
 function pickProjectTemplate(
   rows: CompositionListItem[] | undefined
@@ -69,7 +88,23 @@ function childResourceName(projectName: string): string {
   return `${base}${tail}`;
 }
 
+function projectDisplayNameValidationError(
+  existingProjects: readonly ProjectExplorerProject[],
+  displayName: string
+): string | null {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    return "Project name is required.";
+  }
+  if (isProjectDisplayNameTaken(existingProjects, trimmed)) {
+    return `A project named "${trimmed}" already exists.`;
+  }
+  return null;
+}
+
 export interface UseProjectCreatorOptions {
+  /** Existing Project rows in the namespace, used for display-name uniqueness checks. */
+  existingProjects?: readonly ProjectExplorerProject[];
   /** Loads composition options from the API when set (same kubeconfig as explorer). */
   kubeconfig?: string;
   /** Target namespace for rendered claim `metadata.namespace`. */
@@ -82,23 +117,26 @@ export interface UseProjectCreatorOptions {
 }
 
 export function useProjectCreator(options?: UseProjectCreatorOptions): {
-  creatorRootProps: Pick<
-    ProjectCreatorRootProps,
-    "actions" | "confirmApplying" | "databaseOptions" | "githubDeployer"
-  >;
-  dialogOpen: boolean;
+  creatorRootProps: CreatorRootPropsForCreationPane;
+  creatorResetKey: number;
+  creationPaneOpen: boolean;
+  creationPaneEntryMode: ProjectCreationPaneEntryMode;
   /** True while GitHub auth or repository list is loading for the deployer. */
   githubDeployerLoading: boolean;
   lastConfirmedKind: string | null;
-  onDialogOpenChange: (open: boolean) => void;
-  openDialog: () => void;
+  onCreationPaneOpenChange: (open: boolean) => void;
+  openCreationPane: (entryMode?: ProjectCreationPaneEntryMode) => void;
 } {
   const kubeconfig = options?.kubeconfig?.trim() ?? "";
   const namespace = options?.namespace?.trim() ?? "";
   const onProjectCreated = options?.onProjectCreated;
+  const existingProjects = options?.existingProjects ?? EMPTY_PROJECTS;
   const hasKubeconfig = kubeconfig !== "";
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creationPaneState, dispatchCreationPaneState] = useReducer(
+    projectCreationPaneStateReducer,
+    initialProjectCreationPaneState
+  );
   const [confirmApplying, setConfirmApplying] = useState(false);
   const [lastConfirmedKind, setLastConfirmedKind] = useState<string | null>(
     null
@@ -126,15 +164,21 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const { isLoading: githubReposLoading, repos: githubRepos } =
     useGithubRepos(githubToken);
 
-  const openDialog = useCallback(() => {
-    setDialogOpen(true);
-  }, []);
-
-  const onDialogOpenChange = useCallback((open: boolean) => {
-    setDialogOpen(open);
-    if (!open) {
+  const openCreationPane = useCallback(
+    (entryMode: ProjectCreationPaneEntryMode = "general") => {
       setConfirmApplying(false);
+      dispatchCreationPaneState({ entryMode, type: "open" });
+    },
+    []
+  );
+
+  const onCreationPaneOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      dispatchCreationPaneState({ entryMode: "general", type: "open" });
+      return;
     }
+    dispatchCreationPaneState({ type: "close" });
+    setConfirmApplying(false);
   }, []);
 
   const databaseOptions = useMemo((): ProjectCreatorDatabaseChoice[] => {
@@ -151,9 +195,23 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     );
   }, [dbCompositionRows, hasKubeconfig]);
 
-  const handleGithubDeploy = useCallback((_repo: GithubDeployerRepo) => {
-    toast.info("GitHub deploy isn’t ready yet — this feature is incomplete.");
-  }, []);
+  const handleGithubDeploy = useCallback(
+    (repo: GithubDeployerRepo) => {
+      const displayName = deriveGithubProjectDisplayName({
+        existingProjectDisplayNames: existingProjects.map(
+          (project) => project.name
+        ),
+        repository: repo,
+      });
+      setLastConfirmedKind(
+        `github:${repo.fullName ?? repo.name}:${displayName}`
+      );
+      toast.info(
+        `GitHub project creation for "${displayName}" isn’t ready yet — this feature is incomplete.`
+      );
+    },
+    [existingProjects]
+  );
 
   const githubDeployerLoading =
     githubAuthLoading || (!!githubToken?.trim() && githubReposLoading);
@@ -196,10 +254,19 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
 
   const actions = useMemo<ProjectCreatorActions>(
     () => ({
-      onDockerConfirm: async (imageRef) => {
+      onDockerConfirm: async (imageRef, projectDisplayName) => {
         const trimmed = imageRef.trim();
+        const displayName = projectDisplayName.trim();
+        const displayNameError = projectDisplayNameValidationError(
+          existingProjects,
+          displayName
+        );
         if (!(kubeconfig && namespace)) {
           toast.error("Kubeconfig or namespace is missing.");
+          return;
+        }
+        if (displayNameError) {
+          toast.error(displayNameError);
           return;
         }
         if (!trimmed) {
@@ -238,10 +305,13 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         apYaml = mergeApSpecProjectName(apYaml, projectClaimName);
         apYaml = mergeApMetadataRegion(apYaml, routingDomain);
 
-        const projectYaml = renderCrossplaneCompositionTemplate(projectTpl, {
-          name: projectClaimName,
-          namespace,
-        });
+        const projectYaml = mergeProjectMetadataDisplayName(
+          renderCrossplaneCompositionTemplate(projectTpl, {
+            name: projectClaimName,
+            namespace,
+          }),
+          displayName
+        );
 
         await applyWithBusyState(async () => {
           await k8sApplyYaml(
@@ -249,10 +319,10 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             joinKubeYamlDocuments([projectYaml, apYaml])
           );
           toast.success(
-            `Applied project "${projectClaimName}" and AP "${apClaimName}".`
+            `Applied project "${displayName}" and AP "${apClaimName}".`
           );
           setLastConfirmedKind(`docker:${trimmed}:${projectClaimName}`);
-          setDialogOpen(false);
+          dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
             kubeconfig,
             namespace,
@@ -261,10 +331,19 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           await onProjectCreated?.(projectUid);
         });
       },
-      onDatabaseConfirm: async (compositionName) => {
+      onDatabaseConfirm: async (compositionName, projectDisplayName) => {
         const choice = databaseOptions.find((d) => d.id === compositionName);
+        const displayName = projectDisplayName.trim();
+        const displayNameError = projectDisplayNameValidationError(
+          existingProjects,
+          displayName
+        );
         if (!(kubeconfig && namespace)) {
           toast.error("Kubeconfig or namespace is missing.");
+          return;
+        }
+        if (displayNameError) {
+          toast.error(displayNameError);
           return;
         }
         if (!choice?.template?.trim()) {
@@ -284,10 +363,13 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         const dbClaimName = childResourceName(projectClaimName);
         const routingDomain = routingDomainFromKubeconfig(kubeconfig);
 
-        const projectYaml = renderCrossplaneCompositionTemplate(projectTpl, {
-          name: projectClaimName,
-          namespace,
-        });
+        const projectYaml = mergeProjectMetadataDisplayName(
+          renderCrossplaneCompositionTemplate(projectTpl, {
+            name: projectClaimName,
+            namespace,
+          }),
+          displayName
+        );
         let dbYaml = renderCrossplaneCompositionTemplate(choice.template, {
           name: dbClaimName,
           namespace,
@@ -301,12 +383,12 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             joinKubeYamlDocuments([projectYaml, dbYaml])
           );
           toast.success(
-            `Applied project "${projectClaimName}" and database "${dbClaimName}".`
+            `Applied project "${displayName}" and database "${dbClaimName}".`
           );
           setLastConfirmedKind(
             `database:${compositionName}:${projectClaimName}`
           );
-          setDialogOpen(false);
+          dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
             kubeconfig,
             namespace,
@@ -320,6 +402,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
       applyWithBusyState,
       apCompositionRows,
       databaseOptions,
+      existingProjects,
       kubeconfig,
       namespace,
       onProjectCreated,
@@ -332,17 +415,28 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
       actions,
       confirmApplying,
       databaseOptions,
+      existingProjectDisplayNames: existingProjects.map(
+        (project) => project.name
+      ),
       githubDeployer,
     }),
-    [actions, confirmApplying, databaseOptions, githubDeployer]
+    [
+      actions,
+      confirmApplying,
+      databaseOptions,
+      existingProjects,
+      githubDeployer,
+    ]
   );
 
   return {
+    creationPaneEntryMode: creationPaneState.entryMode,
+    creationPaneOpen: creationPaneState.open,
     creatorRootProps,
-    dialogOpen,
+    creatorResetKey: creationPaneState.resetKey,
     githubDeployerLoading,
     lastConfirmedKind,
-    onDialogOpenChange,
-    openDialog,
+    onCreationPaneOpenChange,
+    openCreationPane,
   };
 }

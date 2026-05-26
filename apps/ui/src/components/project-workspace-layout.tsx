@@ -26,9 +26,8 @@ import {
   useState,
 } from "react";
 import { useSWRConfig } from "swr";
-import { ProjectTranscriptGithubDeployer } from "@/components/project-transcript-github-deployer";
 import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
-import { useGithubDeployer } from "@/hooks/use-github-deployer";
+import { useGithubAuth } from "@/hooks/use-github-auth";
 import {
   createAssistantThread,
   fetchAssistantSession,
@@ -41,6 +40,10 @@ import type {
   AssistantThreadDTO,
 } from "@/lib/chat-persistence/types";
 import {
+  ProjectSidePaneProvider,
+  useProjectSidePaneController,
+} from "@/lib/project-side-pane/react";
+import {
   NAVIGATE_APP_TOOL_NAME,
   type NavigateAppToolOutput,
   runNavigateAppTool,
@@ -52,7 +55,7 @@ import {
 } from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
-import { rightPaneOpenAtom } from "@/store/layout-store";
+import { assistantPaneOpenAtom } from "@/store/layout-store";
 
 type AssistantClientToolSubmission =
   | {
@@ -88,6 +91,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw,
   onAssistantStreamFinished,
   onCreateThread,
+  onGithubIntent,
   onSelectThread,
 }: {
   bootstrap: Pick<AssistantSessionPayload, "chatId" | "messages">;
@@ -96,6 +100,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
   onCreateThread: () => Promise<void>;
+  onGithubIntent: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
   const router = useRouter();
@@ -165,81 +170,70 @@ function ProjectAssistantChatSession({
     [kubeconfig]
   );
 
-  const { messages, sendMessage, status, stop, setMessages, addToolOutput } =
-    useAIChat({
-      id: chatId,
-      messages: bootstrap.messages,
-      transport,
-      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-      async onFinish() {
-        await onAssistantStreamFinished?.();
-      },
-      onToolCall({ toolCall }) {
-        if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
-          const result = runNavigateAppTool(toolCall.input, router.push);
-          const submit = addToolOutputRef.current;
-          if (submit == null) {
+  const { messages, sendMessage, status, stop, addToolOutput } = useAIChat({
+    id: chatId,
+    messages: bootstrap.messages,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    async onFinish() {
+      await onAssistantStreamFinished?.();
+    },
+    onToolCall({ toolCall }) {
+      if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
+        const result = runNavigateAppTool(toolCall.input, router.push);
+        const submit = addToolOutputRef.current;
+        if (submit == null) {
+          return;
+        }
+        Promise.resolve(
+          submit({
+            tool: NAVIGATE_APP_TOOL_NAME,
+            toolCallId: toolCall.toolCallId,
+            output: result,
+          })
+        ).catch((err: unknown) => {
+          console.error("[navigateApp] addToolOutput failed:", err);
+        });
+        return;
+      }
+
+      if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
+        return;
+      }
+      const submitRefresh = addToolOutputRef.current;
+      runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
+        .then((output) => {
+          if (submitRefresh == null) {
             return;
           }
           Promise.resolve(
-            submit({
-              tool: NAVIGATE_APP_TOOL_NAME,
+            submitRefresh({
+              tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
               toolCallId: toolCall.toolCallId,
-              output: result,
+              output,
             })
           ).catch((err: unknown) => {
-            console.error("[navigateApp] addToolOutput failed:", err);
+            console.error(
+              "[refreshFrontendSwrCaches] addToolOutput failed:",
+              err
+            );
           });
-          return;
-        }
-
-        if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
-          return;
-        }
-        const submitRefresh = addToolOutputRef.current;
-        runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
-          .then((output) => {
-            if (submitRefresh == null) {
-              return;
-            }
-            Promise.resolve(
-              submitRefresh({
-                tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
-                toolCallId: toolCall.toolCallId,
-                output,
-              })
-            ).catch((err: unknown) => {
-              console.error(
-                "[refreshFrontendSwrCaches] addToolOutput failed:",
-                err
-              );
-            });
-          })
-          .catch((err: unknown) => {
-            console.error("[refreshFrontendSwrCaches] mutation failed:", err);
-          });
-      },
-    });
+        })
+        .catch((err: unknown) => {
+          console.error("[refreshFrontendSwrCaches] mutation failed:", err);
+        });
+    },
+  });
 
   // console.log("messages", messages);
 
   addToolOutputRef.current = addToolOutput;
   const [input, setInput] = useState("");
-  const {
-    authLoading,
-    clearTranscriptUi,
-    commitDeployToMessages,
-    githubToken,
-    initiateGithubAuth,
-    isAuthorized,
-    toggleTranscriptDeployer,
-    transcriptDeployerOpen,
-  } = useGithubDeployer({ setMessages });
+  const { isAuthorized, isLoading: authLoading } = useGithubAuth();
 
   const createThreadClicked = useCallback(() => {
-    clearTranscriptUi();
     onCreateThread().catch(() => undefined);
-  }, [clearTranscriptUi, onCreateThread]);
+  }, [onCreateThread]);
 
   const threadHistory = useMemo((): ChatHeaderThreadHistory | undefined => {
     if (threads.length === 0) {
@@ -257,11 +251,10 @@ function ProjectAssistantChatSession({
         updatedAtSource: t.updatedAt,
       })),
       onSelect: (threadId: string) => {
-        clearTranscriptUi();
         onSelectThread(threadId).catch(() => undefined);
       },
     };
-  }, [threads, chatId, clearTranscriptUi, onSelectThread]);
+  }, [threads, chatId, onSelectThread]);
 
   const threadLabel = useMemo(() => {
     const hit = threads.find((t) => t.id === chatId);
@@ -298,15 +291,6 @@ function ProjectAssistantChatSession({
     downloadChatMessagesJson(messages, { fileNameStem: threadLabel });
   }, [messages, threadLabel]);
 
-  const transcriptFooter = transcriptDeployerOpen ? (
-    <ProjectTranscriptGithubDeployer
-      authLoading={authLoading}
-      githubToken={githubToken}
-      onAuthorize={initiateGithubAuth}
-      onDeployed={commitDeployToMessages}
-    />
-  ) : null;
-
   return (
     <Chat.Root>
       <Chat className="h-full min-h-0 flex-1 border-0 bg-[#101219] shadow-none">
@@ -331,7 +315,6 @@ function ProjectAssistantChatSession({
           className="min-h-0 flex-1"
           messages={messages}
           status={status}
-          transcriptFooter={transcriptFooter}
         />
         <div className="group flex w-full shrink-0 flex-col p-2 pt-4">
           <div className="relative isolate w-full">
@@ -356,7 +339,7 @@ function ProjectAssistantChatSession({
                   <Chat.GithubDeployButton
                     authLoading={authLoading}
                     isAuthorized={isAuthorized}
-                    onComposerAction={toggleTranscriptDeployer}
+                    onComposerAction={onGithubIntent}
                   />
                 </div>
                 <Chat.ComposerSend
@@ -375,6 +358,7 @@ function ProjectAssistantChatSession({
 
 function ProjectAssistantChatPane() {
   const namespaceRaw = useAtomValue(namespaceAtom);
+  const sidePaneController = useProjectSidePaneController();
   const [creatingThread, setCreatingThread] = useState(false);
   const [session, setSession] = useState<AssistantSessionPayload | null>(null);
   const [sessionError, setSessionError] = useState(false);
@@ -444,6 +428,12 @@ function ProjectAssistantChatPane() {
     setSession((prev) => (prev == null ? prev : { ...prev, threads }));
   }, [namespaceRaw]);
 
+  const openGithubIntent = useCallback(() => {
+    sidePaneController
+      .openAssistantIntent({ type: "github" })
+      .catch(() => undefined);
+  }, [sidePaneController]);
+
   if (sessionError) {
     return (
       <div
@@ -474,13 +464,18 @@ function ProjectAssistantChatPane() {
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
       onCreateThread={createThread}
+      onGithubIntent={openGithubIntent}
       onSelectThread={selectThread}
       threads={session.threads}
     />
   );
 }
 
-function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
+function ProjectRouteTopBar({
+  assistantPaneOpen,
+}: {
+  assistantPaneOpen: boolean;
+}) {
   const params = useParams<{ uid?: string }>();
   const projectUid = decodeURIComponent(params.uid ?? "");
   const kubeconfig = useAtomValue(kubeconfigAtom);
@@ -496,7 +491,7 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
     <header
       className={cn(
         "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-13 items-center gap-2 bg-transparent pr-2 pl-6",
-        !rightPaneOpen && "pr-12"
+        !assistantPaneOpen && "pr-12"
       )}
     >
       <div className="min-w-0 flex-1">
@@ -513,17 +508,13 @@ function ProjectRouteTopBar({ rightPaneOpen }: { rightPaneOpen: boolean }) {
   );
 }
 
-/** Main project column + optional right assistant chat pane (`POST /api/chat` + AI SDK). */
-export default function ProjectChatPaneLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const rightPaneOpen = useAtomValue(rightPaneOpenAtom);
-  const setRightPaneOpen = useSetAtom(rightPaneOpenAtom);
-  const toggleRightPane = useCallback(() => {
-    setRightPaneOpen((open) => !open);
-  }, [setRightPaneOpen]);
+/** Main project column + optional Project Assistant Pane (`POST /api/chat` + AI SDK). */
+function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
+  const assistantPaneOpen = useAtomValue(assistantPaneOpenAtom);
+  const setAssistantPaneOpen = useSetAtom(assistantPaneOpenAtom);
+  const toggleAssistantPane = useCallback(() => {
+    setAssistantPaneOpen((open) => !open);
+  }, [setAssistantPaneOpen]);
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -531,42 +522,54 @@ export default function ProjectChatPaneLayout({
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         data-slot="project-main-pane"
       >
-        <ProjectRouteTopBar rightPaneOpen={rightPaneOpen} />
+        <ProjectRouteTopBar assistantPaneOpen={assistantPaneOpen} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
       </section>
       <aside
-        aria-hidden={!rightPaneOpen}
+        aria-hidden={!assistantPaneOpen}
         className={cn(
           "box-border flex min-h-0 shrink-0 flex-col overflow-hidden border-l bg-[#101219] transition-[width,min-width,opacity,transform,border-color] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-          rightPaneOpen
+          assistantPaneOpen
             ? "w-104 min-w-104 translate-x-0 border-border opacity-100"
             : "pointer-events-none w-0 min-w-0 translate-x-4 border-transparent opacity-0"
         )}
-        data-slot="project-right-pane"
-        id="project-right-pane"
+        data-slot="project-assistant-pane"
+        id="project-assistant-pane"
       >
         <ProjectAssistantChatPane />
       </aside>
       <Button
-        aria-controls="project-right-pane"
-        aria-expanded={rightPaneOpen}
+        aria-controls="project-assistant-pane"
+        aria-expanded={assistantPaneOpen}
         aria-label={
-          rightPaneOpen ? "Close assistant panel" : "Open assistant panel"
+          assistantPaneOpen ? "Close assistant panel" : "Open assistant panel"
         }
         className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
-        onClick={toggleRightPane}
+        onClick={toggleAssistantPane}
         size="icon-lg"
         type="button"
         variant="ghost"
       >
-        {rightPaneOpen ? (
+        {assistantPaneOpen ? (
           <PanelRightClose aria-hidden className="size-4" strokeWidth={2} />
         ) : (
           <PanelRightOpen aria-hidden className="size-4" strokeWidth={2} />
         )}
       </Button>
     </div>
+  );
+}
+
+export default function ProjectWorkspaceLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <ProjectSidePaneProvider>
+      <ProjectWorkspaceLayoutContent>{children}</ProjectWorkspaceLayoutContent>
+    </ProjectSidePaneProvider>
   );
 }

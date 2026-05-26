@@ -38,9 +38,11 @@ export default function ProjectCreatorPreview() {
         <div className="flex flex-col gap-4">
           <ProjectCreator.Root
             actions={{
-              onDatabaseConfirm: (id) => setLast(`database:${id}`),
-              onDockerConfirm: (ref) => setLast(`docker:${ref}`),
+              onDatabaseConfirm: (id, name) =>
+                setLast(`database:${name}:${id}`),
+              onDockerConfirm: (ref, name) => setLast(`docker:${name}:${ref}`),
             }}
+            existingProjectDisplayNames={["Existing Project"]}
             githubDeployer={githubDeployer}
           >
             <ProjectCreator.Variant1 className="w-full min-w-0 max-w-md rounded-xl border border-border bg-card p-4" />
@@ -52,7 +54,7 @@ export default function ProjectCreatorPreview() {
             </p>
           ) : (
             <p className="text-muted-foreground text-xs">
-              Pick a source, confirm, or reset with the &quot;New&quot; crumb.
+              Enter a project name, pick a source, confirm, or go back.
             </p>
           )}
         </div>

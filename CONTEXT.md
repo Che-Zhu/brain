@@ -141,6 +141,24 @@ A canvas edge that represents an established runtime dependency between resource
 
 A right-side canvas surface opened from a selected AP or DB node to inspect or change resource-scoped details such as settings, metrics, logs, or history. It is distinct from the project assistant chat pane.
 
+### Side Pane
+
+A non-modal, right-side temporary surface opened over the project main area to host focused project work. Side Panes share the same chrome and close behavior while their contents differ by purpose, such as Project creation, GitHub deployment, or Canvas Resource details.
+
+A Side Pane is distinct from the Project Assistant Pane: the Project Assistant Pane is a persistent layout region for chat, while a Side Pane is a temporary surface triggered by a user action or assistant action.
+
+Within one project surface, Side Pane is single-active: opening one Side Pane replaces the currently open Side Pane instead of stacking multiple Side Panes.
+
+Different project surfaces may place a Side Pane differently. A canvas-oriented surface may overlay the Side Pane above the canvas, while a list-oriented surface may reserve layout space for the Side Pane. Placement does not change the Side Pane's shared chrome, close behavior, or single-active semantics.
+
+A Side Pane is scoped to the currently visible project surface. Project Assistant Pane controls can open or replace the current surface's active Side Pane, but they do not own a separate assistant-specific Side Pane stack.
+
+When a Side Pane contains unsaved user edits, closing it or replacing it with another Side Pane must first resolve the edit state. The user can stay on the current Side Pane, discard the edits, or save successfully before the Side Pane closes or is replaced.
+
+### Project Assistant Pane
+
+The persistent right-side project layout region that hosts assistant chat and related chat controls. It can trigger Side Panes, but is not itself a Side Pane.
+
 ### Connecting Edge
 
 A temporary canvas interaction created when a user drags a line between canvas nodes. A Connecting Edge may become a domain command only when its endpoints match a supported resource relationship, regardless of drag direction.
@@ -155,11 +173,13 @@ A derived health tone for one Project row in the project list, computed from the
 
 ### Project Display Name
 
-The human-facing Project name shown in navigation and project chrome, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name.
+The human-facing Project name shown in navigation, project chrome, and project creation forms, preferred from `metadata.annotations.displayName` and falling back to the Project's Kubernetes resource name. It is unique within a namespace after trimming surrounding whitespace and comparing case-insensitively. Avoid using Project name to mean the Project's Kubernetes resource name unless the resource identity is the topic.
 
 ### Project Creation Pane
 
-A non-modal right-side surface anchored in the project main pane for choosing how to create a new Project before the Project resource exists. It is distinct from the Canvas Resource Pane and may coexist with the project assistant chat pane.
+A non-modal right-side surface anchored in the project main pane for entering a new Project's initial user-facing identity and choosing how to create it before the Project resource exists. It is distinct from the Canvas Resource Pane and may coexist with the project assistant chat pane.
+
+The Project Creation Pane may also open in a source-specific entry path. In a GitHub direct creation path, the user starts at GitHub repository selection rather than the general creation picker; the Project Display Name is derived from the selected repository and de-duplicated within the namespace.
 
 ### Custom Domain Binding
 

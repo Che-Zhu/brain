@@ -4,7 +4,9 @@ import { Canvas } from "@workspace/ui/components/canvas/canvas";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { useParams } from "next/navigation";
+import { parseAsBoolean, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
@@ -16,10 +18,20 @@ import {
 } from "@/lib/project-canvas/flow/pending-connections";
 import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
-import { ProjectCanvasResourcePane } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
+import { renderProjectCanvasResourcePaneContent } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
+import {
+  type ProjectCanvasSidePanePreferredEntry,
+  ProjectCanvasSidePaneSlot,
+  resolveProjectCanvasSidePaneEntry,
+} from "@/lib/project-canvas/panels/project-canvas-side-pane-slot";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
+import type { ProjectSidePaneSurface } from "@/lib/project-side-pane/controller";
+import { useProjectSidePaneSurface } from "@/lib/project-side-pane/react";
+import { projectCanvasEntryForAssistantIntent } from "@/lib/project-side-pane/surface-intents";
 import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
+
+const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -29,6 +41,8 @@ export default function ProjectUidPage() {
   const [pendingApDbReferences, setPendingApDbReferences] = useState<
     PendingApDbCanvasReference[]
   >([]);
+  const [preferredCanvasSidePaneEntry, setPreferredCanvasSidePaneEntry] =
+    useState<ProjectCanvasSidePanePreferredEntry | null>(null);
   const projectCanvasLayout = useProjectCanvasLayout({
     enabled: kubeconfig.trim() !== "",
     namespace,
@@ -77,6 +91,14 @@ export default function ProjectUidPage() {
       ? canvasState.edges
       : [...canvasState.edges, ...pendingEdges];
   }, [canvasState.edges, canvasState.nodes, pendingApDbReferences]);
+  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
+    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
+  const replaceGithubDeploymentWithResourcePane = useCallback(() => {
+    setPreferredCanvasSidePaneEntry("resource");
+    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
 
   const {
     closeResourcePane,
@@ -86,6 +108,7 @@ export default function ProjectUidPage() {
     meta: canvasMeta,
     nodes,
     registerSettingsLeaveGuard,
+    requestResourcePaneReplacement,
     selectedEntryRef,
     selectedEdge,
     selectedNode,
@@ -99,6 +122,7 @@ export default function ProjectUidPage() {
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodeStackOrderChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onPendingApDbReferencesStart: beginPendingApDbReferences,
+    onResourcePaneOpen: replaceGithubDeploymentWithResourcePane,
     refreshWorkloadLists,
     selectionReady: !isEmptyGraphLoading,
   });
@@ -107,6 +131,52 @@ export default function ProjectUidPage() {
     [selectedNode]
   );
   const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
+  const canvasResourcePaneOpen = Boolean(
+    workloadPane ?? databasePane ?? entryPane
+  );
+  const canvasSidePaneEntry = resolveProjectCanvasSidePaneEntry({
+    githubDeploymentPaneOpen,
+    preferredEntry: preferredCanvasSidePaneEntry,
+    resourcePaneOpen: canvasResourcePaneOpen,
+  });
+  const closeGithubDeploymentPane = useCallback(() => {
+    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
+  const openGithubDeploymentPane = useCallback(() => {
+    requestResourcePaneReplacement(() => {
+      setPreferredCanvasSidePaneEntry("githubDeployment");
+      Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
+    });
+  }, [requestResourcePaneReplacement, setGithubDeploymentPaneOpen]);
+  const projectCanvasSidePaneSurface = useMemo<ProjectSidePaneSurface>(
+    () => ({
+      id: `project-canvas:${uid}`,
+      openAssistantIntent: (intent) => {
+        const entry = projectCanvasEntryForAssistantIntent(intent, {
+          projectUid: uid,
+        });
+        if (entry?.kind !== "githubDeployment") {
+          return { status: "ignored" as const };
+        }
+        openGithubDeploymentPane();
+        return { status: "handled" as const };
+      },
+    }),
+    [openGithubDeploymentPane, uid]
+  );
+  useProjectSidePaneSurface(projectCanvasSidePaneSurface);
+  const canvasResourcePane = renderProjectCanvasResourcePaneContent({
+    databasePane,
+    entryPane,
+    kubeconfig,
+    onClose: closeResourcePane,
+    onSettingsLeaveGuardChange: registerSettingsLeaveGuard,
+    onUpdated: refreshWorkloadLists,
+    selectedDatabaseData,
+    selectedEntryRef,
+    selectedNode,
+    workloadPane,
+  });
   const meta = useMemo(
     () => ({
       ...canvasMeta,
@@ -161,17 +231,14 @@ export default function ProjectUidPage() {
                   </div>
                 ) : null}
                 <Canvas.Flow>
-                  <ProjectCanvasResourcePane
-                    databasePane={databasePane}
-                    entryPane={entryPane}
-                    kubeconfig={kubeconfig}
-                    onClose={closeResourcePane}
-                    onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
-                    onUpdated={refreshWorkloadLists}
-                    selectedDatabaseData={selectedDatabaseData}
-                    selectedEntryRef={selectedEntryRef}
-                    selectedNode={selectedNode}
-                    workloadPane={workloadPane}
+                  <ProjectCanvasSidePaneSlot
+                    entry={canvasSidePaneEntry}
+                    githubDeploymentPane={
+                      <GitHubDeploymentPane
+                        onClose={closeGithubDeploymentPane}
+                      />
+                    }
+                    resourcePane={canvasResourcePane}
                   />
                   {settingsLeaveGuardDialog}
                 </Canvas.Flow>

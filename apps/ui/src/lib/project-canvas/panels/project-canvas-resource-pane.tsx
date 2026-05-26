@@ -22,20 +22,7 @@ function isWorkloadPaneMode(mode: string | null | undefined): boolean {
   );
 }
 
-export function ProjectCanvasResourcePane({
-  databasePane,
-  entryPane,
-  kubeconfig,
-  onClose,
-  onSettingsLeaveGuardChange,
-  onUpdated,
-  readOnly = false,
-  selectedDatabaseData,
-  selectedEntryRef,
-  selectedNode,
-  shareToken,
-  workloadPane,
-}: {
+export interface ProjectCanvasResourcePaneContentProps {
   databasePane: string | null | undefined;
   entryPane: string | null | undefined;
   kubeconfig?: string;
@@ -48,11 +35,24 @@ export function ProjectCanvasResourcePane({
   selectedNode: Node | null;
   shareToken?: string;
   workloadPane: string | null | undefined;
-}) {
-  let pane: ReactNode = null;
+}
 
+export function renderProjectCanvasResourcePaneContent({
+  databasePane,
+  entryPane,
+  kubeconfig,
+  onClose,
+  onSettingsLeaveGuardChange,
+  onUpdated,
+  readOnly = false,
+  selectedDatabaseData,
+  selectedEntryRef,
+  selectedNode,
+  shareToken,
+  workloadPane,
+}: ProjectCanvasResourcePaneContentProps): ReactNode {
   if (selectedNode != null && isWorkloadPaneMode(workloadPane)) {
-    pane = (
+    return (
       <WorkloadResourcePane
         mode={workloadPane}
         node={selectedNode}
@@ -60,11 +60,10 @@ export function ProjectCanvasResourcePane({
         onSettingsLeaveGuardChange={onSettingsLeaveGuardChange}
       />
     );
-  } else if (
-    databasePane === DATABASE_PANE.metrics &&
-    selectedDatabaseData != null
-  ) {
-    pane = (
+  }
+
+  if (databasePane === DATABASE_PANE.metrics && selectedDatabaseData != null) {
+    return (
       <DatabaseMetricsPane
         kubeconfig={kubeconfig}
         node={selectedNode}
@@ -72,11 +71,10 @@ export function ProjectCanvasResourcePane({
         open
       />
     );
-  } else if (
-    databasePane === DATABASE_PANE.settings &&
-    selectedDatabaseData != null
-  ) {
-    pane = (
+  }
+
+  if (databasePane === DATABASE_PANE.settings && selectedDatabaseData != null) {
+    return (
       <DatabaseSettingsPane
         data={selectedDatabaseData}
         kubeconfig={kubeconfig}
@@ -85,8 +83,10 @@ export function ProjectCanvasResourcePane({
         onUpdated={onUpdated}
       />
     );
-  } else if (entryPane === ENTRY_PANE.settings && selectedEntryRef != null) {
-    pane = (
+  }
+
+  if (entryPane === ENTRY_PANE.settings && selectedEntryRef != null) {
+    return (
       <EntryPointSettingsPane
         kubeconfig={kubeconfig}
         onClose={onClose}
@@ -99,5 +99,15 @@ export function ProjectCanvasResourcePane({
     );
   }
 
-  return <CanvasResourcePanePresence>{pane}</CanvasResourcePanePresence>;
+  return null;
+}
+
+export function ProjectCanvasResourcePane(
+  props: ProjectCanvasResourcePaneContentProps
+) {
+  return (
+    <CanvasResourcePanePresence>
+      {renderProjectCanvasResourcePaneContent(props)}
+    </CanvasResourcePanePresence>
+  );
 }

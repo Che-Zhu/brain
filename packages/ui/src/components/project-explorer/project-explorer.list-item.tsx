@@ -55,12 +55,14 @@ export function ProjectExplorerListItem({
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState(project.name);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [renameBusy, setRenameBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (renameOpen) {
       setRenameDraft(project.name);
+      setRenameError(null);
     }
   }, [renameOpen, project.name]);
 
@@ -93,9 +95,14 @@ export function ProjectExplorerListItem({
       return;
     }
     setRenameBusy(true);
+    setRenameError(null);
     try {
       await actions.onProjectRename(project, next);
       setRenameOpen(false);
+    } catch (error) {
+      setRenameError(
+        error instanceof Error ? error.message : "Project rename failed."
+      );
     } finally {
       setRenameBusy(false);
     }
@@ -219,9 +226,18 @@ export function ProjectExplorerListItem({
           <div className="flex flex-col gap-2">
             <Label htmlFor={`project-rename-${project.id}`}>Name</Label>
             <Input
+              aria-describedby={
+                renameError ? `project-rename-${project.id}-error` : undefined
+              }
+              aria-invalid={renameError ? true : undefined}
               autoComplete="off"
               id={`project-rename-${project.id}`}
-              onChange={(e) => setRenameDraft(e.target.value)}
+              onChange={(e) => {
+                setRenameDraft(e.target.value);
+                if (renameError) {
+                  setRenameError(null);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -230,6 +246,14 @@ export function ProjectExplorerListItem({
               }}
               value={renameDraft}
             />
+            {renameError ? (
+              <p
+                className="text-destructive text-xs leading-4"
+                id={`project-rename-${project.id}-error`}
+              >
+                {renameError}
+              </p>
+            ) : null}
           </div>
           <DialogFooter className="gap-2">
             <Button

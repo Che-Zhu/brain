@@ -58,6 +58,7 @@ function DockerPanel() {
   const [value, setValue] = useState("");
 
   const trimmed = value.trim();
+  const projectDisplayName = states.projectDisplayName.trim();
   const busy = states.confirmApplying;
   const disabled = trimmed.length === 0 || busy;
 
@@ -79,7 +80,7 @@ function DockerPanel() {
         <Button
           aria-busy={busy}
           disabled={disabled}
-          onClick={() => actions.onDockerConfirm?.(trimmed)}
+          onClick={() => actions.onDockerConfirm?.(trimmed, projectDisplayName)}
           type="button"
         >
           {busy ? (
@@ -106,6 +107,7 @@ function DatabasePanel({
 
   const items = databaseOptions;
   const busy = states.confirmApplying;
+  const projectDisplayName = states.projectDisplayName.trim();
 
   return (
     <div
@@ -161,7 +163,7 @@ function DatabasePanel({
           disabled={selected == null || busy}
           onClick={() => {
             if (selected) {
-              actions.onDatabaseConfirm?.(selected.id);
+              actions.onDatabaseConfirm?.(selected.id, projectDisplayName);
             }
           }}
           type="button"
