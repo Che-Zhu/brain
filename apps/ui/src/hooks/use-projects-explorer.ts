@@ -168,14 +168,16 @@ export function useProjectsExplorer(options: {
 
   const onProjectRename = useCallback(
     async (p: ProjectExplorerProject, newDisplayName: string) => {
+      const displayName = newDisplayName.trim();
       if (!hasKubeconfig) {
         toast.error("Credentials are not ready yet.");
         throw new Error("not ready");
       }
-      if (isProjectDisplayNameTaken(projects, newDisplayName, p.id)) {
-        throw new Error(
-          `A project named "${newDisplayName.trim()}" already exists.`
-        );
+      if (!displayName) {
+        throw new Error("Project name is required.");
+      }
+      if (isProjectDisplayNameTaken(projects, displayName, p.id)) {
+        throw new Error(`A project named "${displayName}" already exists.`);
       }
       try {
         await fetcher({
@@ -191,7 +193,7 @@ export function useProjectsExplorer(options: {
           body: {
             metadata: {
               annotations: {
-                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: newDisplayName,
+                [PROJECT_DISPLAY_NAME_ANNOTATION_KEY]: displayName,
               },
             },
           },
@@ -200,7 +202,7 @@ export function useProjectsExplorer(options: {
           },
         });
         await mutate();
-        toast.success(`Project renamed to "${newDisplayName}".`);
+        toast.success(`Project renamed to "${displayName}".`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Rename failed";
         toast.error(msg);

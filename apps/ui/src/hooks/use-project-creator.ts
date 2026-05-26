@@ -41,6 +41,16 @@ import {
 const DEFAULT_PROJECT_COMPOSITION_NAME = "project-instance-go-templating";
 /** Matches {@link packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml}. */
 const DEFAULT_AP_COMPOSITION_NAME = "aps-deployment-ingress-go-templating";
+const EMPTY_PROJECTS: readonly ProjectExplorerProject[] = [];
+
+type CreatorRootPropsForCreationPane = Pick<
+  ProjectCreatorRootProps,
+  | "actions"
+  | "confirmApplying"
+  | "databaseOptions"
+  | "existingProjectDisplayNames"
+  | "githubDeployer"
+>;
 
 function pickProjectTemplate(
   rows: CompositionListItem[] | undefined
@@ -76,6 +86,20 @@ function childResourceName(projectName: string): string {
   return `${base}${tail}`;
 }
 
+function projectDisplayNameValidationError(
+  existingProjects: readonly ProjectExplorerProject[],
+  displayName: string
+): string | null {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    return "Project name is required.";
+  }
+  if (isProjectDisplayNameTaken(existingProjects, trimmed)) {
+    return `A project named "${trimmed}" already exists.`;
+  }
+  return null;
+}
+
 export interface UseProjectCreatorOptions {
   /** Existing Project rows in the namespace, used for display-name uniqueness checks. */
   existingProjects?: readonly ProjectExplorerProject[];
@@ -91,10 +115,7 @@ export interface UseProjectCreatorOptions {
 }
 
 export function useProjectCreator(options?: UseProjectCreatorOptions): {
-  creatorRootProps: Pick<
-    ProjectCreatorRootProps,
-    "actions" | "confirmApplying" | "databaseOptions" | "githubDeployer"
-  >;
+  creatorRootProps: CreatorRootPropsForCreationPane;
   creatorResetKey: number;
   creationPaneOpen: boolean;
   /** True while GitHub auth or repository list is loading for the deployer. */
@@ -106,7 +127,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
   const kubeconfig = options?.kubeconfig?.trim() ?? "";
   const namespace = options?.namespace?.trim() ?? "";
   const onProjectCreated = options?.onProjectCreated;
-  const existingProjects = options?.existingProjects ?? [];
+  const existingProjects = options?.existingProjects ?? EMPTY_PROJECTS;
   const hasKubeconfig = kubeconfig !== "";
 
   const [creationPaneState, dispatchCreationPaneState] = useReducer(
@@ -216,16 +237,16 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
       onDockerConfirm: async (imageRef, projectDisplayName) => {
         const trimmed = imageRef.trim();
         const displayName = projectDisplayName.trim();
+        const displayNameError = projectDisplayNameValidationError(
+          existingProjects,
+          displayName
+        );
         if (!(kubeconfig && namespace)) {
           toast.error("Kubeconfig or namespace is missing.");
           return;
         }
-        if (!displayName) {
-          toast.error("Project name is required.");
-          return;
-        }
-        if (isProjectDisplayNameTaken(existingProjects, displayName)) {
-          toast.error(`A project named "${displayName}" already exists.`);
+        if (displayNameError) {
+          toast.error(displayNameError);
           return;
         }
         if (!trimmed) {
@@ -293,16 +314,16 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
       onDatabaseConfirm: async (compositionName, projectDisplayName) => {
         const choice = databaseOptions.find((d) => d.id === compositionName);
         const displayName = projectDisplayName.trim();
+        const displayNameError = projectDisplayNameValidationError(
+          existingProjects,
+          displayName
+        );
         if (!(kubeconfig && namespace)) {
           toast.error("Kubeconfig or namespace is missing.");
           return;
         }
-        if (!displayName) {
-          toast.error("Project name is required.");
-          return;
-        }
-        if (isProjectDisplayNameTaken(existingProjects, displayName)) {
-          toast.error(`A project named "${displayName}" already exists.`);
+        if (displayNameError) {
+          toast.error(displayNameError);
           return;
         }
         if (!choice?.template?.trim()) {
