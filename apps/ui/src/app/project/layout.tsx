@@ -3,7 +3,7 @@ import {
   AppShellSidebar,
   AppShellView,
 } from "@/components/app-shell";
-import AuthBootstrap, { SandboxBootstrap } from "@/components/auth-bootstrap";
+import AuthBootstrap, { DevboxBootstrap } from "@/components/auth-bootstrap";
 import ProjectChatPaneLayout from "@/components/project-chat-pane-layout";
 import { fetchProjectCredentialsOrUnauthorized } from "@/lib/server-credentials";
 
@@ -24,7 +24,7 @@ export default async function ProjectLayout({
         serverEncodedKubeconfig={serverEncodedKubeconfig}
         serverNamespace={serverNamespace}
       />
-      <SandboxBootstrap />
+      <DevboxBootstrap />
       <AppShellSidebar />
       <AppShellView className="min-w-0 flex-1 basis-0">
         <ProjectChatPaneLayout>{children}</ProjectChatPaneLayout>

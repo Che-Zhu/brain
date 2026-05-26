@@ -78,7 +78,7 @@ function rejectClientNamespaceMismatch(
  * - **Sealos session:** `fetchServerCredentials()` kubeconfig must match the request body;
  *   namespace comes from the region token API (fallback: kubeconfig context).
  * - **Dev bypass:** optional match against `NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG`;
- *   namespace from `NEXT_PUBLIC_DEV_NS` or kubeconfig context.
+ *   namespace from kubeconfig context.
  * - Otherwise **401**.
  */
 export async function resolveAuthoritativeChatNamespace(options: {

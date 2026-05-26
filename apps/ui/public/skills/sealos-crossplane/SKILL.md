@@ -7,8 +7,8 @@ description: >-
   `project-instance-go-templating`), and `DB` (provision a KubeBlocks database Cluster via one of
   four engine-specific compositions: postgresql / mysql / mongodb / redis), all
   `example.crossplane.io/v1`, namespaced. Lists every configurable spec field, a few valid claim
-  examples, and the bash commands the chat sandbox needs (KUBECONFIG=/tmp/kubeconfig, kubectl on
-  PATH) to pick the namespace and derive the ingress base host before applying.
+  examples, and the bash commands the chat Devbox runtime needs (kubectl on PATH) to pick the
+  namespace and derive the ingress base host before applying.
   Use when authoring or applying AP/Project/DB manifests against a Kubernetes cluster.
 ---
 
@@ -400,15 +400,13 @@ user-managed Secret, base64), `connectionStringPrivate`, `connectionStringPublic
 
 ---
 
-## 4. Sandbox runtime (chat agent)
+## 4. Devbox runtime (chat agent)
 
-The chat backend runs your `bash` calls inside a Vercel Sandbox MicroVM with the user's
-kubeconfig pre-mounted:
+The chat backend runs your `bash` calls inside a Sealos Devbox runtime with namespace Kubernetes
+access enabled:
 
-- `KUBECONFIG=/tmp/kubeconfig` is exported for every command.
-- `kubectl` is on `PATH` (also at `/tmp/kubectl`); first invocation may pause briefly while it
-  self-installs from `dl.k8s.io`.
-- `bash`, `readFile`, `writeFile` tools all share the same VM. Use `writeFile` to drop a
+- `kubectl` must already be on `PATH` in the Devbox image.
+- `bash`, `readFile`, `writeFile` tools all share the same runtime. Use `writeFile` to drop a
   manifest at e.g. `/tmp/ap.yaml`, then `bash` `kubectl apply -f /tmp/ap.yaml`.
 - Standard GNU userland is available (`grep`, `sed`, `awk`, `find`, `curl`, coreutils).
 
