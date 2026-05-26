@@ -98,6 +98,7 @@ export interface UseProjectCanvasOptions {
   onPendingApDbReferencesStart?: (
     references: readonly PendingApDbCanvasReference[]
   ) => (() => void) | undefined;
+  onResourcePaneOpen?: () => void;
   readOnly?: boolean;
   /** Refetch workload list(s) after PATCH/POST/DELETE lifecycle calls. */
   refreshWorkloadLists?: () => Promise<unknown>;
@@ -303,6 +304,7 @@ export function useProjectCanvas(
   const onNodeExpansionChange = options?.onNodeExpansionChange;
   const onNodePositionChange = options?.onNodePositionChange;
   const onNodeStackOrderChange = options?.onNodeStackOrderChange;
+  const onResourcePaneOpen = options?.onResourcePaneOpen;
   const dbDsnReferenceSources = useMemo(
     () =>
       dbDsnReferenceSourcesFromDbsData(options?.dbsData, options?.namespace),
@@ -980,8 +982,8 @@ export function useProjectCanvas(
   const requestResourcePaneReplacement = useCallback(
     (continueReplace: () => void) => {
       requestSettingsLeave("switch", () => {
-        clearSelectedResource();
         continueReplace();
+        clearSelectedResource();
       });
     },
     [clearSelectedResource, requestSettingsLeave]
@@ -1027,6 +1029,9 @@ export function useProjectCanvas(
           const nextDatabasePane = databasePaneModeForNodeClick(node);
           const nextEntryPane = entryPaneModeForNodeClick(node);
           const nextServiceUid = projectCanvasNodeServiceUid(node);
+          const nextResourcePaneOpen = Boolean(
+            nextWorkloadPane ?? nextDatabasePane ?? nextEntryPane
+          );
           const selectNode = () => {
             frontCanvasNode(node);
             setSelectedEdge(null);
@@ -1034,6 +1039,9 @@ export function useProjectCanvas(
             setDatabasePane(nextDatabasePane).catch(() => undefined);
             setEntryPane(nextEntryPane).catch(() => undefined);
             setServiceUid(nextServiceUid).catch(() => undefined);
+            if (nextResourcePaneOpen) {
+              onResourcePaneOpen?.();
+            }
           };
 
           if (
@@ -1079,6 +1087,7 @@ export function useProjectCanvas(
       handleConnectStart,
       isValidCanvasConnection,
       onNodePositionChange,
+      onResourcePaneOpen,
       projectCanvasConnectionLine,
       readOnly,
       requestSettingsLeave,

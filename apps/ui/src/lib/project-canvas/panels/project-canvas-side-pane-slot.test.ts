@@ -1,0 +1,72 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import {
+  ProjectCanvasSidePaneSlot,
+  resolveProjectCanvasSidePaneEntry,
+} from "./project-canvas-side-pane-slot";
+
+const GITHUB_DEPLOYMENT_RE = /GitHub deployment/;
+const RESOURCE_SETTINGS_RE = /Resource settings/;
+
+test("github deployment stays active while resource selection is being cleared", () => {
+  assert.deepEqual(
+    resolveProjectCanvasSidePaneEntry({
+      githubDeploymentPaneOpen: true,
+      preferredEntry: "githubDeployment",
+      resourcePaneOpen: true,
+    }),
+    { kind: "githubDeployment" }
+  );
+});
+
+test("canvas resource pane replaces github deployment after a canvas resource request", () => {
+  assert.deepEqual(
+    resolveProjectCanvasSidePaneEntry({
+      githubDeploymentPaneOpen: true,
+      preferredEntry: "resource",
+      resourcePaneOpen: true,
+    }),
+    { kind: "resource" }
+  );
+});
+
+test("canvas resource pane is active when no replacement pane is requested", () => {
+  assert.deepEqual(
+    resolveProjectCanvasSidePaneEntry({
+      githubDeploymentPaneOpen: false,
+      resourcePaneOpen: true,
+    }),
+    { kind: "resource" }
+  );
+});
+
+test("canvas side pane is absent when no pane is requested", () => {
+  assert.equal(
+    resolveProjectCanvasSidePaneEntry({
+      githubDeploymentPaneOpen: false,
+      resourcePaneOpen: false,
+    }),
+    null
+  );
+});
+
+test("canvas side pane slot renders the replacement pane while both candidates exist", () => {
+  const entry = resolveProjectCanvasSidePaneEntry({
+    githubDeploymentPaneOpen: true,
+    resourcePaneOpen: true,
+  });
+
+  const html = renderToStaticMarkup(
+    createElement(ProjectCanvasSidePaneSlot, {
+      entry,
+      githubDeploymentPane: createElement("aside", null, "GitHub deployment"),
+      resourcePane: createElement("aside", null, "Resource settings"),
+    })
+  );
+
+  assert.match(html, GITHUB_DEPLOYMENT_RE);
+  assert.doesNotMatch(html, RESOURCE_SETTINGS_RE);
+});

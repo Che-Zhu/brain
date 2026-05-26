@@ -1,7 +1,6 @@
 "use client";
 
 import { Canvas } from "@workspace/ui/components/canvas/canvas";
-import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { useAtomValue } from "jotai";
 import { useParams } from "next/navigation";
@@ -19,7 +18,12 @@ import {
 } from "@/lib/project-canvas/flow/pending-connections";
 import { isCanvasNodeGeneratedPosition } from "@/lib/project-canvas/layout/placement";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
-import { ProjectCanvasResourcePane } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
+import { renderProjectCanvasResourcePaneContent } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
+import {
+  type ProjectCanvasSidePanePreferredEntry,
+  ProjectCanvasSidePaneSlot,
+  resolveProjectCanvasSidePaneEntry,
+} from "@/lib/project-canvas/panels/project-canvas-side-pane-slot";
 import { telemetryTargetFromCanvasNode } from "@/lib/project-canvas/telemetry/workload-telemetry-node";
 import { WorkloadTelemetryProvider } from "@/lib/project-canvas/telemetry/workload-telemetry-react";
 import type { ProjectSidePaneSurface } from "@/lib/project-side-pane/controller";
@@ -37,6 +41,8 @@ export default function ProjectUidPage() {
   const [pendingApDbReferences, setPendingApDbReferences] = useState<
     PendingApDbCanvasReference[]
   >([]);
+  const [preferredCanvasSidePaneEntry, setPreferredCanvasSidePaneEntry] =
+    useState<ProjectCanvasSidePanePreferredEntry | null>(null);
   const projectCanvasLayout = useProjectCanvasLayout({
     enabled: kubeconfig.trim() !== "",
     namespace,
@@ -85,6 +91,14 @@ export default function ProjectUidPage() {
       ? canvasState.edges
       : [...canvasState.edges, ...pendingEdges];
   }, [canvasState.edges, canvasState.nodes, pendingApDbReferences]);
+  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
+    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
+  const replaceGithubDeploymentWithResourcePane = useCallback(() => {
+    setPreferredCanvasSidePaneEntry("resource");
+    Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setGithubDeploymentPaneOpen]);
 
   const {
     closeResourcePane,
@@ -108,13 +122,10 @@ export default function ProjectUidPage() {
     onNodePositionChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onNodeStackOrderChange: projectCanvasLayout.scheduleNodeLayoutSave,
     onPendingApDbReferencesStart: beginPendingApDbReferences,
+    onResourcePaneOpen: replaceGithubDeploymentWithResourcePane,
     refreshWorkloadLists,
     selectionReady: !isEmptyGraphLoading,
   });
-  const [githubDeploymentPaneOpen, setGithubDeploymentPaneOpen] = useQueryState(
-    GITHUB_DEPLOYMENT_PANE_QUERY_KEY,
-    parseAsBoolean.withDefault(false)
-  );
   const selectedTelemetryTarget = useMemo(
     () => telemetryTargetFromCanvasNode(selectedNode),
     [selectedNode]
@@ -123,11 +134,17 @@ export default function ProjectUidPage() {
   const canvasResourcePaneOpen = Boolean(
     workloadPane ?? databasePane ?? entryPane
   );
+  const canvasSidePaneEntry = resolveProjectCanvasSidePaneEntry({
+    githubDeploymentPaneOpen,
+    preferredEntry: preferredCanvasSidePaneEntry,
+    resourcePaneOpen: canvasResourcePaneOpen,
+  });
   const closeGithubDeploymentPane = useCallback(() => {
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
   }, [setGithubDeploymentPaneOpen]);
   const openGithubDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
+      setPreferredCanvasSidePaneEntry("githubDeployment");
       Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
     });
   }, [requestResourcePaneReplacement, setGithubDeploymentPaneOpen]);
@@ -148,15 +165,18 @@ export default function ProjectUidPage() {
     [openGithubDeploymentPane, uid]
   );
   useProjectSidePaneSurface(projectCanvasSidePaneSurface);
-  useEffect(() => {
-    if (githubDeploymentPaneOpen && canvasResourcePaneOpen) {
-      setGithubDeploymentPaneOpen(false).catch(() => undefined);
-    }
-  }, [
-    canvasResourcePaneOpen,
-    githubDeploymentPaneOpen,
-    setGithubDeploymentPaneOpen,
-  ]);
+  const canvasResourcePane = renderProjectCanvasResourcePaneContent({
+    databasePane,
+    entryPane,
+    kubeconfig,
+    onClose: closeResourcePane,
+    onSettingsLeaveGuardChange: registerSettingsLeaveGuard,
+    onUpdated: refreshWorkloadLists,
+    selectedDatabaseData,
+    selectedEntryRef,
+    selectedNode,
+    workloadPane,
+  });
   const meta = useMemo(
     () => ({
       ...canvasMeta,
@@ -211,25 +231,15 @@ export default function ProjectUidPage() {
                   </div>
                 ) : null}
                 <Canvas.Flow>
-                  <ProjectCanvasResourcePane
-                    databasePane={databasePane}
-                    entryPane={entryPane}
-                    kubeconfig={kubeconfig}
-                    onClose={closeResourcePane}
-                    onSettingsLeaveGuardChange={registerSettingsLeaveGuard}
-                    onUpdated={refreshWorkloadLists}
-                    selectedDatabaseData={selectedDatabaseData}
-                    selectedEntryRef={selectedEntryRef}
-                    selectedNode={selectedNode}
-                    workloadPane={workloadPane}
-                  />
-                  <SidePanePresence>
-                    {githubDeploymentPaneOpen && !canvasResourcePaneOpen ? (
+                  <ProjectCanvasSidePaneSlot
+                    entry={canvasSidePaneEntry}
+                    githubDeploymentPane={
                       <GitHubDeploymentPane
                         onClose={closeGithubDeploymentPane}
                       />
-                    ) : null}
-                  </SidePanePresence>
+                    }
+                    resourcePane={canvasResourcePane}
+                  />
                   {settingsLeaveGuardDialog}
                 </Canvas.Flow>
               </div>
