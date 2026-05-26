@@ -4,6 +4,7 @@ import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import type { ReactNode } from "react";
 
 export type ProjectCanvasSidePaneEntry =
+  | { kind: "databaseDeployment" }
   | { kind: "githubDeployment" }
   | { kind: "resource" }
   | null;
@@ -14,14 +15,20 @@ export type ProjectCanvasSidePanePreferredEntry = Exclude<
 >["kind"];
 
 export function resolveProjectCanvasSidePaneEntry({
+  databaseDeploymentPaneOpen,
   githubDeploymentPaneOpen,
   preferredEntry,
   resourcePaneOpen,
 }: {
+  databaseDeploymentPaneOpen?: boolean;
   githubDeploymentPaneOpen: boolean;
   preferredEntry?: ProjectCanvasSidePanePreferredEntry | null;
   resourcePaneOpen: boolean;
 }): ProjectCanvasSidePaneEntry {
+  if (preferredEntry === "databaseDeployment" && databaseDeploymentPaneOpen) {
+    return { kind: "databaseDeployment" };
+  }
+
   if (preferredEntry === "githubDeployment" && githubDeploymentPaneOpen) {
     return { kind: "githubDeployment" };
   }
@@ -34,6 +41,10 @@ export function resolveProjectCanvasSidePaneEntry({
     return { kind: "githubDeployment" };
   }
 
+  if (databaseDeploymentPaneOpen) {
+    return { kind: "databaseDeployment" };
+  }
+
   if (resourcePaneOpen) {
     return { kind: "resource" };
   }
@@ -42,17 +53,21 @@ export function resolveProjectCanvasSidePaneEntry({
 }
 
 export function ProjectCanvasSidePaneSlot({
+  databaseDeploymentPane,
   entry,
   githubDeploymentPane,
   resourcePane,
 }: {
+  databaseDeploymentPane?: ReactNode;
   entry: ProjectCanvasSidePaneEntry;
   githubDeploymentPane: ReactNode;
   resourcePane: ReactNode;
 }) {
   let pane: ReactNode = null;
 
-  if (entry?.kind === "githubDeployment") {
+  if (entry?.kind === "databaseDeployment") {
+    pane = databaseDeploymentPane;
+  } else if (entry?.kind === "githubDeployment") {
     pane = githubDeploymentPane;
   } else if (entry?.kind === "resource") {
     pane = resourcePane;

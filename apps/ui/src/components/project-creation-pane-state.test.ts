@@ -44,6 +44,17 @@ test("project creation pane can open directly into GitHub creation", () => {
   assert.equal(generalOpen.resetKey, 2);
 });
 
+test("project creation pane can open directly into database creation", () => {
+  const directOpen = projectCreationPaneStateReducer(
+    initialProjectCreationPaneState,
+    { entryMode: "databaseDirect", type: "open" }
+  );
+
+  assert.equal(directOpen.open, true);
+  assert.equal(directOpen.entryMode, "databaseDirect");
+  assert.equal(directOpen.resetKey, 1);
+});
+
 test("project creation pane close hides the pane without mutating the next reset key", () => {
   const open = projectCreationPaneStateReducer(
     initialProjectCreationPaneState,

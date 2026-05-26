@@ -39,6 +39,55 @@ export function ProjectCreationPane({
 }) {
   const githubDeployer = creatorRootProps.githubDeployer;
   const directGithubEntry = entryMode === "githubDirect";
+  const directDatabaseEntry = entryMode === "databaseDirect";
+  let subtitle =
+    "Provide a project name and select the project creation method.";
+  if (directGithubEntry) {
+    subtitle = "Select a GitHub repository to create a project.";
+  } else if (directDatabaseEntry) {
+    subtitle = "Provide a project name and database deployment settings.";
+  }
+
+  let content = (
+    <ProjectCreator.Root key={resetKey} {...creatorRootProps}>
+      <ProjectCreator.Variant1 className="min-w-0" />
+    </ProjectCreator.Root>
+  );
+  if (directGithubEntry) {
+    content = (
+      <div
+        className="min-w-0"
+        data-slot="project-creation-pane-github-direct"
+        key={resetKey}
+      >
+        <GithubDeployer.Root
+          actions={githubDeployer?.actions}
+          states={githubDeployer?.states ?? EMPTY_GITHUB_DEPLOYER_STATES}
+        >
+          <GithubDeployer.Shell className="gap-3">
+            <GithubDeployer.Title />
+            <GithubDeployer.Subtitle />
+            <GithubDeployer.AuthButton />
+            <GithubDeployer.RepoSelect />
+            <GithubDeployer.Complete />
+          </GithubDeployer.Shell>
+        </GithubDeployer.Root>
+      </div>
+    );
+  } else if (directDatabaseEntry) {
+    content = (
+      <ProjectCreator.Root
+        initialStep="database"
+        key={resetKey}
+        {...creatorRootProps}
+      >
+        <ProjectCreator.Shell className="min-w-0">
+          <ProjectCreator.ProjectNameField />
+          <ProjectCreator.Stage />
+        </ProjectCreator.Shell>
+      </ProjectCreator.Root>
+    );
+  }
 
   return (
     <SidePane
@@ -47,37 +96,10 @@ export function ProjectCreationPane({
       icon={<Plus aria-hidden className="size-4 text-theme-blue" />}
       label="Project creation pane"
       onClose={onClose}
-      subtitle={
-        directGithubEntry
-          ? "Select a GitHub repository to create a project."
-          : "Provide a project name and select the project creation method."
-      }
+      subtitle={subtitle}
       title="Create New Project"
     >
-      {directGithubEntry ? (
-        <div
-          className="min-w-0"
-          data-slot="project-creation-pane-github-direct"
-          key={resetKey}
-        >
-          <GithubDeployer.Root
-            actions={githubDeployer?.actions}
-            states={githubDeployer?.states ?? EMPTY_GITHUB_DEPLOYER_STATES}
-          >
-            <GithubDeployer.Shell className="gap-3">
-              <GithubDeployer.Title />
-              <GithubDeployer.Subtitle />
-              <GithubDeployer.AuthButton />
-              <GithubDeployer.RepoSelect />
-              <GithubDeployer.Complete />
-            </GithubDeployer.Shell>
-          </GithubDeployer.Root>
-        </div>
-      ) : (
-        <ProjectCreator.Root key={resetKey} {...creatorRootProps}>
-          <ProjectCreator.Variant1 className="min-w-0" />
-        </ProjectCreator.Root>
-      )}
+      {content}
     </SidePane>
   );
 }

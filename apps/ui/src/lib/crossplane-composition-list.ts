@@ -29,6 +29,7 @@ export interface CompositionListItem {
   kind: string;
   metadata: {
     compositionName: string;
+    engine?: string;
     compositionUid?: string;
   };
   name: string;
@@ -231,6 +232,10 @@ export function compositionsRawToListItems(
       kind: xrKind,
       metadata: {
         compositionName: name,
+        engine:
+          typeof getAt(item, "metadata.labels.engine") === "string"
+            ? (getAt(item, "metadata.labels.engine") as string)
+            : undefined,
         compositionUid:
           typeof getAt(item, "metadata.uid") === "string"
             ? (getAt(item, "metadata.uid") as string)

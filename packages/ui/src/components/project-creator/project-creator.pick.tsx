@@ -41,50 +41,60 @@ const ICON_CLASS: Record<ProjectCreatorSourceKind, string> = {
   database: "text-resource-pane-muted",
 };
 
+export function ProjectCreatorProjectNameField() {
+  const { actions, states } = useProjectCreator(
+    "ProjectCreator.ProjectNameField"
+  );
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <Label
+        className="text-resource-pane-foreground leading-5"
+        htmlFor="project-creator-display-name"
+      >
+        Project Name
+      </Label>
+      <Input
+        aria-describedby={
+          states.projectDisplayNameError
+            ? "project-creator-display-name-error"
+            : undefined
+        }
+        aria-invalid={states.projectDisplayNameError ? true : undefined}
+        autoComplete="off"
+        className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
+        id="project-creator-display-name"
+        onChange={(event) =>
+          actions.setProjectDisplayName(event.currentTarget.value)
+        }
+        placeholder="Placeholder"
+        value={states.projectDisplayName}
+      />
+      {states.projectDisplayNameError ? (
+        <p
+          className="text-destructive text-xs leading-4"
+          id="project-creator-display-name-error"
+        >
+          {states.projectDisplayNameError}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProjectCreatorOptionPicker({
   className,
 }: {
   className?: string;
 }) {
-  const { actions, states } = useProjectCreator("ProjectCreator.OptionPicker");
+  const { actions } = useProjectCreator("ProjectCreator.OptionPicker");
 
   return (
     <div
       className={cn("flex min-w-0 flex-col gap-4", className)}
       data-slot="project-creator-option-picker"
     >
-      <div className="flex min-w-0 flex-col gap-2.5">
-        <Label
-          className="text-resource-pane-foreground leading-5"
-          htmlFor="project-creator-display-name"
-        >
-          Project Name
-        </Label>
-        <Input
-          aria-describedby={
-            states.projectDisplayNameError
-              ? "project-creator-display-name-error"
-              : undefined
-          }
-          aria-invalid={states.projectDisplayNameError ? true : undefined}
-          autoComplete="off"
-          className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
-          id="project-creator-display-name"
-          onChange={(event) =>
-            actions.setProjectDisplayName(event.currentTarget.value)
-          }
-          placeholder="Placeholder"
-          value={states.projectDisplayName}
-        />
-        {states.projectDisplayNameError ? (
-          <p
-            className="text-destructive text-xs leading-4"
-            id="project-creator-display-name-error"
-          >
-            {states.projectDisplayNameError}
-          </p>
-        ) : null}
-      </div>
+      <ProjectCreatorProjectNameField />
       <div className="flex min-w-0 flex-col gap-3">
         <p className="font-medium text-resource-pane-foreground text-sm leading-5">
           Scenario

@@ -90,6 +90,7 @@ function ProjectAssistantChatSession({
   threads,
   assistantNamespaceRaw,
   onAssistantStreamFinished,
+  onDatabaseIntent,
   onCreateThread,
   onGithubIntent,
   onSelectThread,
@@ -99,6 +100,7 @@ function ProjectAssistantChatSession({
   threads: AssistantThreadDTO[];
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
+  onDatabaseIntent: () => void;
   onCreateThread: () => Promise<void>;
   onGithubIntent: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
@@ -341,6 +343,9 @@ function ProjectAssistantChatSession({
                     isAuthorized={isAuthorized}
                     onComposerAction={onGithubIntent}
                   />
+                  <Chat.DatabaseDeployButton
+                    onComposerAction={onDatabaseIntent}
+                  />
                 </div>
                 <Chat.ComposerSend
                   onPrimaryAction={onPrimaryAction}
@@ -433,6 +438,11 @@ function ProjectAssistantChatPane() {
       .openAssistantIntent({ type: "github" })
       .catch(() => undefined);
   }, [sidePaneController]);
+  const openDatabaseIntent = useCallback(() => {
+    sidePaneController
+      .openAssistantIntent({ type: "database" })
+      .catch(() => undefined);
+  }, [sidePaneController]);
 
   if (sessionError) {
     return (
@@ -464,6 +474,7 @@ function ProjectAssistantChatPane() {
       key={session.chatId}
       onAssistantStreamFinished={refreshThreads}
       onCreateThread={createThread}
+      onDatabaseIntent={openDatabaseIntent}
       onGithubIntent={openGithubIntent}
       onSelectThread={selectThread}
       threads={session.threads}
@@ -544,7 +555,7 @@ function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
         aria-controls="project-assistant-pane"
         aria-expanded={assistantPaneOpen}
         aria-label={
-          assistantPaneOpen ? "Close assistant panel" : "Open assistant panel"
+          assistantPaneOpen ? "Close assistant pane" : "Open assistant pane"
         }
         className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
         onClick={toggleAssistantPane}

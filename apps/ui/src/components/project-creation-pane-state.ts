@@ -1,4 +1,7 @@
-export type ProjectCreationPaneEntryMode = "general" | "githubDirect";
+export type ProjectCreationPaneEntryMode =
+  | "general"
+  | "githubDirect"
+  | "databaseDirect";
 
 export interface ProjectCreationPaneState {
   entryMode: ProjectCreationPaneEntryMode;

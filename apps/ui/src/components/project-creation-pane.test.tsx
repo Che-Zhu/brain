@@ -22,6 +22,7 @@ const PROJECT_TITLE_RE = /Create New Project/;
 const REPO_SELECT_RE = /Search or choose repository/;
 const SCENARIO_RE = /Scenario/;
 const TRAIL_BACK_RE = />Back</;
+const DATABASE_DEPLOYER_RE = /data-slot="database-deployer"/;
 
 test("project creation pane is a non-modal side pane with the method picker", () => {
   const html = renderToStaticMarkup(
@@ -84,6 +85,23 @@ test("project creation pane GitHub direct entry starts at repository selection",
   assert.match(html, PANE_LABEL_RE);
   assert.match(html, REPO_SELECT_RE);
   assert.doesNotMatch(html, PROJECT_NAME_RE);
+  assert.doesNotMatch(html, SCENARIO_RE);
+  assert.doesNotMatch(html, TRAIL_BACK_RE);
+});
+
+test("project creation pane database direct entry keeps project naming and opens deployment settings", () => {
+  const html = renderToStaticMarkup(
+    <ProjectCreationPane
+      creatorRootProps={{ databaseOptions: [] }}
+      entryMode="databaseDirect"
+      onClose={noop}
+      resetKey={1}
+    />
+  );
+
+  assert.match(html, PANE_LABEL_RE);
+  assert.match(html, PROJECT_NAME_RE);
+  assert.match(html, DATABASE_DEPLOYER_RE);
   assert.doesNotMatch(html, SCENARIO_RE);
   assert.doesNotMatch(html, TRAIL_BACK_RE);
 });

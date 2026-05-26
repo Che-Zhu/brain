@@ -91,6 +91,22 @@ An AP Replica Strategy where the platform automatically adjusts AP replicas betw
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
 
+### DB Deployment Settings
+
+The creation-time choices for a new DB before the DB exists, including database engine, instance preset, and replica count. DB Deployment Settings are independent of entry path: they may create a DB together with a new Project or add a DB to an existing Project.
+
+### DB Deployment Target
+
+The Project relationship selected for a DB before creation. A DB Deployment Target is either a new Project being created in the same flow or an existing Project that will own the new DB.
+
+### DB Instance Preset
+
+A user-facing resource-size choice for DB Deployment Settings. Each DB Instance Preset maps to one DB quota value; avoid exposing internal SKU-like labels such as `db.mysql.small` as the primary UI language.
+
+### DB Settings
+
+The primary UI surface for viewing and editing an existing DB's desired configuration after it has been created.
+
 ### DB Configuration Draft
 
 A DB-specific Settings Draft retained as legacy wording.

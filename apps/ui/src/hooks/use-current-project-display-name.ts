@@ -50,19 +50,26 @@ export function useCurrentProjectDisplayName(options: {
       })
   );
 
-  const displayName = useMemo(() => {
+  const currentProject = useMemo(() => {
     const hit = (projectItemsFromK8sGetResponse(data) ?? []).find(
       (item) => item.metadata?.uid === projectUid
     );
     if (hit == null) {
-      return undefined;
+      return {
+        displayName: undefined,
+        resourceName: undefined,
+      };
     }
-    return projectDisplayName(hit) ?? hit.metadata?.name;
+    return {
+      displayName: projectDisplayName(hit) ?? hit.metadata?.name,
+      resourceName: hit.metadata?.name,
+    };
   }, [data, projectUid]);
 
   return {
-    displayName,
+    displayName: currentProject.displayName,
     error: error instanceof Error ? error : undefined,
     isLoading: enabled && isLoading,
+    resourceName: currentProject.resourceName,
   };
 }

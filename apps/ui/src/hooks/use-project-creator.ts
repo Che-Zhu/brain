@@ -1,5 +1,6 @@
 "use client";
 
+import type { DatabaseDeploymentSettings } from "@workspace/ui/components/database-deployer";
 import type { GithubDeployerRepo } from "@workspace/ui/components/github-deployer/github-deployer.types";
 import type { ProjectCreatorRootProps } from "@workspace/ui/components/project-creator/project-creator.context";
 import type {
@@ -7,7 +8,6 @@ import type {
   ProjectCreatorDatabaseChoice,
 } from "@workspace/ui/components/project-creator/project-creator.types";
 import type { ProjectExplorerProject } from "@workspace/ui/components/project-explorer/project-explorer";
-import { randomNano } from "@workspace/ui/lib/generator";
 import { randomName } from "@workspace/ui/lib/random-name";
 import { useCallback, useMemo, useReducer, useState } from "react";
 import { toast } from "sonner";
@@ -25,13 +25,15 @@ import { useGithubRepos } from "@/hooks/use-github-repos";
 import {
   mergeApMetadataRegion,
   mergeApSpecProjectName,
-  mergeDbSpecProjectName,
 } from "@/lib/ap-yaml-merge-project";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
+import { dbDeploymentChoicesFromCompositionRows } from "@/lib/db-composition-options";
+import { renderDbDeploymentYaml } from "@/lib/db-deployment-yaml";
 import { fetchProjectUidByName } from "@/lib/fetch-project-uid";
 import { deriveGithubProjectDisplayName } from "@/lib/github-project-display-name";
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
 import { k8sApplyYaml } from "@/lib/project-canvas/k8s/http/apply-yaml";
+import { childResourceName } from "@/lib/project-child-resource-name";
 import { mergeProjectMetadataDisplayName } from "@/lib/project-yaml-metadata";
 import { isProjectDisplayNameTaken } from "@/lib/projects-to-explorer-projects";
 import {
@@ -72,20 +74,6 @@ function pickApTemplate(
       (r) => r.metadata.compositionName === DEFAULT_AP_COMPOSITION_NAME
     )?.template ?? rows?.find((r) => r.kind === "AP")?.template
   );
-}
-
-/** Child claim name: `{projectName}-{randomNano}` (≤63 chars, DNS label). */
-function childResourceName(projectName: string): string {
-  const nano = randomNano();
-  const max = 63;
-  const sep = "-";
-  const tail = `${sep}${nano}`;
-  const cap = max - tail.length;
-  const base =
-    projectName.length <= cap
-      ? projectName
-      : projectName.slice(0, cap).replace(/-+$/g, "");
-  return `${base}${tail}`;
 }
 
 function projectDisplayNameValidationError(
@@ -185,14 +173,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     if (!hasKubeconfig) {
       return [];
     }
-    return (
-      dbCompositionRows?.map((row) => ({
-        iconUrl: row.iconUrl,
-        id: row.metadata.compositionName,
-        label: row.name,
-        template: row.template,
-      })) ?? []
-    );
+    return dbDeploymentChoicesFromCompositionRows(dbCompositionRows);
   }, [dbCompositionRows, hasKubeconfig]);
 
   const handleGithubDeploy = useCallback(
@@ -331,8 +312,13 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           await onProjectCreated?.(projectUid);
         });
       },
-      onDatabaseConfirm: async (compositionName, projectDisplayName) => {
-        const choice = databaseOptions.find((d) => d.id === compositionName);
+      onDatabaseConfirm: async (
+        settings: DatabaseDeploymentSettings,
+        projectDisplayName
+      ) => {
+        const choice = databaseOptions.find(
+          (d) => d.id === settings.databaseId
+        );
         const displayName = projectDisplayName.trim();
         const displayNameError = projectDisplayNameValidationError(
           existingProjects,
@@ -346,8 +332,8 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           toast.error(displayNameError);
           return;
         }
-        if (!choice?.template?.trim()) {
-          toast.error("No embedded template for this database composition.");
+        if (choice == null) {
+          toast.error("Choose a database engine.");
           return;
         }
 
@@ -361,7 +347,6 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
 
         const projectClaimName = randomName();
         const dbClaimName = childResourceName(projectClaimName);
-        const routingDomain = routingDomainFromKubeconfig(kubeconfig);
 
         const projectYaml = mergeProjectMetadataDisplayName(
           renderCrossplaneCompositionTemplate(projectTpl, {
@@ -370,12 +355,16 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           }),
           displayName
         );
-        let dbYaml = renderCrossplaneCompositionTemplate(choice.template, {
+        const dbYaml = renderDbDeploymentYaml({
+          compositionName: choice.id,
+          engine: choice.engine,
           name: dbClaimName,
           namespace,
-          region: routingDomain,
+          projectName: projectClaimName,
+          quota: settings.instancePreset,
+          replicas: settings.replicas,
+          template: choice.template,
         });
-        dbYaml = mergeDbSpecProjectName(dbYaml, projectClaimName);
 
         await applyWithBusyState(async () => {
           await k8sApplyYaml(
@@ -386,7 +375,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
             `Applied project "${displayName}" and database "${dbClaimName}".`
           );
           setLastConfirmedKind(
-            `database:${compositionName}:${projectClaimName}`
+            `database:${settings.databaseId}:${projectClaimName}`
           );
           dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
