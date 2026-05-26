@@ -1,15 +1,18 @@
 "use client";
 
-import { Button } from "@workspace/ui/components/button";
 import { DatabaseDeployer } from "@workspace/ui/components/database-deployer";
+import {
+  DockerDeployer,
+  type DockerDeploymentSettings,
+} from "@workspace/ui/components/docker-deployer";
 import { GithubDeployer } from "@workspace/ui/components/github-deployer/github-deployer";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
-import { Spinner } from "@workspace/ui/components/spinner";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useProjectCreator } from "./project-creator.context";
-import { ProjectCreatorOptionPicker } from "./project-creator.pick";
+import {
+  ProjectCreatorOptionPicker,
+  ProjectCreatorProjectNameField,
+} from "./project-creator.pick";
 import type {
   ProjectCreatorDatabaseChoice,
   ProjectCreatorSourceKind,
@@ -47,42 +50,55 @@ function GithubPanel() {
 }
 
 function DockerPanel() {
-  const { actions, states } = useProjectCreator();
-  const [value, setValue] = useState("");
+  const { actions, meta, states } = useProjectCreator();
+  const [dockerImage, setDockerImage] = useState("");
+  const { deriveDockerProjectDisplayName, setProjectDisplayName } = actions;
 
-  const trimmed = value.trim();
-  const projectDisplayName = states.projectDisplayName.trim();
   const busy = states.confirmApplying;
-  const disabled = trimmed.length === 0 || busy;
+  const updateDockerImage = useCallback(
+    (settings: DockerDeploymentSettings) => {
+      setDockerImage(settings.image);
+    },
+    []
+  );
+
+  useEffect(() => {
+    const imageRef = dockerImage.trim();
+    if (!meta.dockerDirect || imageRef === "") {
+      return;
+    }
+    setProjectDisplayName(
+      deriveDockerProjectDisplayName?.(imageRef) ?? "Docker Project"
+    );
+  }, [
+    deriveDockerProjectDisplayName,
+    dockerImage,
+    meta.dockerDirect,
+    setProjectDisplayName,
+  ]);
 
   return (
     <div
       className="flex min-w-0 flex-col gap-3"
       data-slot="project-creator-docker"
     >
-      <Label htmlFor="project-creator-docker-ref">Docker image</Label>
-      <Input
-        autoComplete="off"
-        className="w-full min-w-0"
-        id="project-creator-docker-ref"
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="ghcr.io/org/image:tag"
-        value={value}
+      <DockerDeployer
+        busy={busy}
+        childrenBeforeDeploy={
+          meta.dockerDirect && dockerImage.trim() !== "" ? (
+            <ProjectCreatorProjectNameField />
+          ) : null
+        }
+        onDeploy={(settings) => {
+          const projectDisplayName = states.projectDisplayName.trim();
+          const error = actions.validateProjectDisplayName(projectDisplayName);
+          if (error != null) {
+            return;
+          }
+          actions.onDockerConfirm?.(settings, projectDisplayName);
+        }}
+        onSettingsChange={updateDockerImage}
       />
-      <div className="flex justify-end">
-        <Button
-          aria-busy={busy}
-          disabled={disabled}
-          onClick={() => actions.onDockerConfirm?.(trimmed, projectDisplayName)}
-          type="button"
-        >
-          {busy ? (
-            <Spinner aria-hidden className="size-4 shrink-0" />
-          ) : (
-            "Confirm"
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 
 const GITHUB_DEPLOYMENT_RE = /GitHub deployment/;
 const DATABASE_DEPLOYMENT_RE = /Database deployment/;
+const DOCKER_DEPLOYMENT_RE = /Docker deployment/;
 const RESOURCE_SETTINGS_RE = /Resource settings/;
 
 test("github deployment stays active while resource selection is being cleared", () => {
@@ -32,6 +33,18 @@ test("database deployment stays active while resource selection is being cleared
       resourcePaneOpen: true,
     }),
     { kind: "databaseDeployment" }
+  );
+});
+
+test("docker deployment stays active while resource selection is being cleared", () => {
+  assert.deepEqual(
+    resolveProjectCanvasSidePaneEntry({
+      dockerDeploymentPaneOpen: true,
+      githubDeploymentPaneOpen: false,
+      preferredEntry: "dockerDeployment",
+      resourcePaneOpen: true,
+    }),
+    { kind: "dockerDeployment" }
   );
 });
 
@@ -80,6 +93,7 @@ test("canvas side pane slot renders the replacement pane while both candidates e
         null,
         "Database deployment"
       ),
+      dockerDeploymentPane: createElement("aside", null, "Docker deployment"),
       githubDeploymentPane: createElement("aside", null, "GitHub deployment"),
       resourcePane: createElement("aside", null, "Resource settings"),
     })
@@ -87,5 +101,6 @@ test("canvas side pane slot renders the replacement pane while both candidates e
 
   assert.match(html, GITHUB_DEPLOYMENT_RE);
   assert.doesNotMatch(html, DATABASE_DEPLOYMENT_RE);
+  assert.doesNotMatch(html, DOCKER_DEPLOYMENT_RE);
   assert.doesNotMatch(html, RESOURCE_SETTINGS_RE);
 });

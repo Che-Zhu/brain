@@ -16,6 +16,8 @@ const DESCRIPTION_RE =
   /Provide a project name and select the project creation method/;
 const DIALOG_OVERLAY_RE = /data-slot="dialog-overlay"/;
 const DIALOG_ROLE_RE = /role="dialog"/;
+const DOCKER_IMAGE_RE = /Docker image/;
+const AUTO_GENERATED_PUBLIC_ADDRESS_RE = /Auto-generated Public Address/;
 const PANE_LABEL_RE = /aria-label="Project creation pane"/;
 const PROJECT_NAME_RE = /Project Name/;
 const PROJECT_TITLE_RE = /Create New Project/;
@@ -23,6 +25,7 @@ const REPO_SELECT_RE = /Search or choose repository/;
 const SCENARIO_RE = /Scenario/;
 const TRAIL_BACK_RE = />Back</;
 const DATABASE_DEPLOYER_RE = /data-slot="database-deployer"/;
+const DOCKER_DEPLOYER_RE = /data-slot="docker-deployer"/;
 
 test("project creation pane is a non-modal side pane with the method picker", () => {
   const html = renderToStaticMarkup(
@@ -102,6 +105,30 @@ test("project creation pane database direct entry keeps project naming and opens
   assert.match(html, PANE_LABEL_RE);
   assert.match(html, PROJECT_NAME_RE);
   assert.match(html, DATABASE_DEPLOYER_RE);
+  assert.doesNotMatch(html, SCENARIO_RE);
+  assert.doesNotMatch(html, TRAIL_BACK_RE);
+});
+
+test("project creation pane Docker direct entry opens Docker deployment settings without generic project naming first", () => {
+  const html = renderToStaticMarkup(
+    <ProjectCreationPane
+      creatorRootProps={{
+        actions: {
+          deriveDockerProjectDisplayName: () => "api",
+        },
+        databaseOptions: [],
+      }}
+      entryMode="dockerDirect"
+      onClose={noop}
+      resetKey={1}
+    />
+  );
+
+  assert.match(html, PANE_LABEL_RE);
+  assert.match(html, DOCKER_DEPLOYER_RE);
+  assert.match(html, DOCKER_IMAGE_RE);
+  assert.match(html, AUTO_GENERATED_PUBLIC_ADDRESS_RE);
+  assert.doesNotMatch(html, PROJECT_NAME_RE);
   assert.doesNotMatch(html, SCENARIO_RE);
   assert.doesNotMatch(html, TRAIL_BACK_RE);
 });

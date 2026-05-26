@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 export type ProjectCanvasSidePaneEntry =
   | { kind: "databaseDeployment" }
+  | { kind: "dockerDeployment" }
   | { kind: "githubDeployment" }
   | { kind: "resource" }
   | null;
@@ -16,17 +17,23 @@ export type ProjectCanvasSidePanePreferredEntry = Exclude<
 
 export function resolveProjectCanvasSidePaneEntry({
   databaseDeploymentPaneOpen,
+  dockerDeploymentPaneOpen,
   githubDeploymentPaneOpen,
   preferredEntry,
   resourcePaneOpen,
 }: {
   databaseDeploymentPaneOpen?: boolean;
+  dockerDeploymentPaneOpen?: boolean;
   githubDeploymentPaneOpen: boolean;
   preferredEntry?: ProjectCanvasSidePanePreferredEntry | null;
   resourcePaneOpen: boolean;
 }): ProjectCanvasSidePaneEntry {
   if (preferredEntry === "databaseDeployment" && databaseDeploymentPaneOpen) {
     return { kind: "databaseDeployment" };
+  }
+
+  if (preferredEntry === "dockerDeployment" && dockerDeploymentPaneOpen) {
+    return { kind: "dockerDeployment" };
   }
 
   if (preferredEntry === "githubDeployment" && githubDeploymentPaneOpen) {
@@ -45,6 +52,10 @@ export function resolveProjectCanvasSidePaneEntry({
     return { kind: "databaseDeployment" };
   }
 
+  if (dockerDeploymentPaneOpen) {
+    return { kind: "dockerDeployment" };
+  }
+
   if (resourcePaneOpen) {
     return { kind: "resource" };
   }
@@ -54,11 +65,13 @@ export function resolveProjectCanvasSidePaneEntry({
 
 export function ProjectCanvasSidePaneSlot({
   databaseDeploymentPane,
+  dockerDeploymentPane,
   entry,
   githubDeploymentPane,
   resourcePane,
 }: {
   databaseDeploymentPane?: ReactNode;
+  dockerDeploymentPane?: ReactNode;
   entry: ProjectCanvasSidePaneEntry;
   githubDeploymentPane: ReactNode;
   resourcePane: ReactNode;
@@ -67,6 +80,8 @@ export function ProjectCanvasSidePaneSlot({
 
   if (entry?.kind === "databaseDeployment") {
     pane = databaseDeploymentPane;
+  } else if (entry?.kind === "dockerDeployment") {
+    pane = dockerDeploymentPane;
   } else if (entry?.kind === "githubDeployment") {
     pane = githubDeploymentPane;
   } else if (entry?.kind === "resource") {

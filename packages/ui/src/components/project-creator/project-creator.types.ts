@@ -2,6 +2,7 @@ import type {
   DatabaseDeploymentChoice,
   DatabaseDeploymentSettings,
 } from "../database-deployer";
+import type { DockerDeploymentSettings } from "../docker-deployer";
 import type {
   GithubDeployerActions,
   GithubDeployerStates,
@@ -22,12 +23,13 @@ export const PROJECT_CREATOR_SOURCE_LABEL: Record<
 };
 
 export interface ProjectCreatorActions {
+  deriveDockerProjectDisplayName?: (imageRef: string) => string;
   onDatabaseConfirm?: (
     settings: DatabaseDeploymentSettings,
     projectDisplayName: string
   ) => void | Promise<void>;
   onDockerConfirm?: (
-    imageRef: string,
+    settings: DockerDeploymentSettings,
     projectDisplayName: string
   ) => void | Promise<void>;
   onGithubConfirm?: (
@@ -61,6 +63,7 @@ export interface ProjectCreatorValue {
   } & ProjectCreatorActions;
   meta: {
     databaseOptions: ProjectCreatorDatabaseChoice[];
+    dockerDirect: boolean;
     /** Enables `GithubDeployer` in the GitHub step (`ProjectCreatorStage`). Omit for an empty/disabled-looking deploy shell. */
     githubDeployer?: ProjectCreatorGithubDeployerSlot;
   };

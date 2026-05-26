@@ -1,6 +1,7 @@
 "use client";
 
 import type { DatabaseDeploymentSettings } from "@workspace/ui/components/database-deployer";
+import type { DockerDeploymentSettings } from "@workspace/ui/components/docker-deployer";
 import type { GithubDeployerRepo } from "@workspace/ui/components/github-deployer/github-deployer.types";
 import type { ProjectCreatorRootProps } from "@workspace/ui/components/project-creator/project-creator.context";
 import type {
@@ -8,6 +9,7 @@ import type {
   ProjectCreatorDatabaseChoice,
 } from "@workspace/ui/components/project-creator/project-creator.types";
 import type { ProjectExplorerProject } from "@workspace/ui/components/project-explorer/project-explorer";
+import { validateDockerDeploymentSettings } from "@workspace/ui/lib/docker-deployment-settings";
 import { randomName } from "@workspace/ui/lib/random-name";
 import { useCallback, useMemo, useReducer, useState } from "react";
 import { toast } from "sonner";
@@ -22,13 +24,14 @@ import { useDbCompositions } from "@/hooks/compositions/use-db-compositions";
 import { useProjectCompositions } from "@/hooks/compositions/use-project-composition";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useGithubRepos } from "@/hooks/use-github-repos";
-import {
-  mergeApMetadataRegion,
-  mergeApSpecProjectName,
-} from "@/lib/ap-yaml-merge-project";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
 import { dbDeploymentChoicesFromCompositionRows } from "@/lib/db-composition-options";
 import { renderDbDeploymentYaml } from "@/lib/db-deployment-yaml";
+import {
+  DEFAULT_DOCKER_AP_COMPOSITION_NAME,
+  renderDockerDeploymentYaml,
+} from "@/lib/docker-deployment-yaml";
+import { deriveDockerProjectDisplayName } from "@/lib/docker-project-display-name";
 import { fetchProjectUidByName } from "@/lib/fetch-project-uid";
 import { deriveGithubProjectDisplayName } from "@/lib/github-project-display-name";
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
@@ -43,8 +46,6 @@ import {
 
 /** Matches {@link packages/crossplane/public/service/project/project-instance-composition.yaml}. */
 const DEFAULT_PROJECT_COMPOSITION_NAME = "project-instance-go-templating";
-/** Matches {@link packages/crossplane/public/service/ap/aps-deployment-ingress-go-templating.yaml}. */
-const DEFAULT_AP_COMPOSITION_NAME = "aps-deployment-ingress-go-templating";
 const EMPTY_PROJECTS: readonly ProjectExplorerProject[] = [];
 
 type CreatorRootPropsForCreationPane = Pick<
@@ -71,7 +72,7 @@ function pickApTemplate(
 ): string | undefined {
   return (
     rows?.find(
-      (r) => r.metadata.compositionName === DEFAULT_AP_COMPOSITION_NAME
+      (r) => r.metadata.compositionName === DEFAULT_DOCKER_AP_COMPOSITION_NAME
     )?.template ?? rows?.find((r) => r.kind === "AP")?.template
   );
 }
@@ -235,13 +236,23 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
 
   const actions = useMemo<ProjectCreatorActions>(
     () => ({
-      onDockerConfirm: async (imageRef, projectDisplayName) => {
-        const trimmed = imageRef.trim();
+      deriveDockerProjectDisplayName: (imageRef: string) =>
+        deriveDockerProjectDisplayName({
+          existingProjectDisplayNames: existingProjects.map(
+            (project) => project.name
+          ),
+          imageRef,
+        }),
+      onDockerConfirm: async (
+        settings: DockerDeploymentSettings,
+        projectDisplayName
+      ) => {
         const displayName = projectDisplayName.trim();
         const displayNameError = projectDisplayNameValidationError(
           existingProjects,
           displayName
         );
+        const settingsValidation = validateDockerDeploymentSettings(settings);
         if (!(kubeconfig && namespace)) {
           toast.error("Kubeconfig or namespace is missing.");
           return;
@@ -250,8 +261,11 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           toast.error(displayNameError);
           return;
         }
-        if (!trimmed) {
-          toast.error("Image reference is empty.");
+        if (!settingsValidation.valid) {
+          toast.error(
+            settingsValidation.errors[0]?.message ??
+              "Docker deployment settings are invalid."
+          );
           return;
         }
 
@@ -275,17 +289,6 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
         const apClaimName = childResourceName(projectClaimName);
         const routingDomain = routingDomainFromKubeconfig(kubeconfig);
 
-        const vars = {
-          image: trimmed,
-          name: apClaimName,
-          namespace,
-          region: routingDomain,
-        };
-
-        let apYaml = renderCrossplaneCompositionTemplate(apTpl, vars);
-        apYaml = mergeApSpecProjectName(apYaml, projectClaimName);
-        apYaml = mergeApMetadataRegion(apYaml, routingDomain);
-
         const projectYaml = mergeProjectMetadataDisplayName(
           renderCrossplaneCompositionTemplate(projectTpl, {
             name: projectClaimName,
@@ -293,6 +296,14 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           }),
           displayName
         );
+        const apYaml = renderDockerDeploymentYaml({
+          name: apClaimName,
+          namespace,
+          projectName: projectClaimName,
+          routingDomain,
+          settings,
+          template: apTpl,
+        });
 
         await applyWithBusyState(async () => {
           await k8sApplyYaml(
@@ -302,7 +313,7 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
           toast.success(
             `Applied project "${displayName}" and AP "${apClaimName}".`
           );
-          setLastConfirmedKind(`docker:${trimmed}:${projectClaimName}`);
+          setLastConfirmedKind(`docker:${settings.image}:${projectClaimName}`);
           dispatchCreationPaneState({ type: "close" });
           const projectUid = await fetchProjectUidByName(
             kubeconfig,

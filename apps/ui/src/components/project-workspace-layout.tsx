@@ -91,6 +91,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw,
   onAssistantStreamFinished,
   onDatabaseIntent,
+  onDockerIntent,
   onCreateThread,
   onGithubIntent,
   onSelectThread,
@@ -101,6 +102,7 @@ function ProjectAssistantChatSession({
   assistantNamespaceRaw: string;
   onAssistantStreamFinished?: () => Promise<void>;
   onDatabaseIntent: () => void;
+  onDockerIntent: () => void;
   onCreateThread: () => Promise<void>;
   onGithubIntent: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
@@ -343,6 +345,7 @@ function ProjectAssistantChatSession({
                     isAuthorized={isAuthorized}
                     onComposerAction={onGithubIntent}
                   />
+                  <Chat.DockerDeployButton onComposerAction={onDockerIntent} />
                   <Chat.DatabaseDeployButton
                     onComposerAction={onDatabaseIntent}
                   />
@@ -443,6 +446,11 @@ function ProjectAssistantChatPane() {
       .openAssistantIntent({ type: "database" })
       .catch(() => undefined);
   }, [sidePaneController]);
+  const openDockerIntent = useCallback(() => {
+    sidePaneController
+      .openAssistantIntent({ type: "docker" })
+      .catch(() => undefined);
+  }, [sidePaneController]);
 
   if (sessionError) {
     return (
@@ -475,6 +483,7 @@ function ProjectAssistantChatPane() {
       onAssistantStreamFinished={refreshThreads}
       onCreateThread={createThread}
       onDatabaseIntent={openDatabaseIntent}
+      onDockerIntent={openDockerIntent}
       onGithubIntent={openGithubIntent}
       onSelectThread={selectThread}
       threads={session.threads}

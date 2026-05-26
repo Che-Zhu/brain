@@ -15,6 +15,11 @@ export type ProjectSidePaneEntry =
       projectUid: string;
     }
   | {
+      kind: "dockerDeployment";
+      placement: "overlay";
+      projectUid: string;
+    }
+  | {
       kind: "githubDeployment";
       placement: "overlay";
       projectUid: string;
@@ -37,6 +42,13 @@ export function projectListEntryForAssistantIntent(
       placement: "reserved",
     };
   }
+  if (intent.type === "docker") {
+    return {
+      entryMode: "dockerDirect",
+      kind: "projectCreation",
+      placement: "reserved",
+    };
+  }
   return null;
 }
 
@@ -51,6 +63,13 @@ export function projectCanvasEntryForAssistantIntent(
   if (intent.type === "database") {
     return {
       kind: "databaseDeployment",
+      placement: "overlay",
+      projectUid: uid,
+    };
+  }
+  if (intent.type === "docker") {
+    return {
+      kind: "dockerDeployment",
       placement: "overlay",
       projectUid: uid,
     };

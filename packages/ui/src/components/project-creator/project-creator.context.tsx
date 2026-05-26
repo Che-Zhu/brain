@@ -46,6 +46,8 @@ export interface ProjectCreatorRootProps {
   confirmApplying?: boolean;
   /** Options for the database step combobox. */
   databaseOptions?: ProjectCreatorDatabaseChoice[];
+  /** Direct Docker entry derives the Project Display Name from the image first. */
+  dockerDirect?: boolean;
   /** Existing Project Display Names in the current namespace. */
   existingProjectDisplayNames?: readonly string[];
   /** Wired into the GitHub step’s `GithubDeployer` (authorize + repos + deploy). */
@@ -63,6 +65,7 @@ export function ProjectCreatorRoot({
   confirmApplying = false,
   children,
   databaseOptions,
+  dockerDirect = false,
   existingProjectDisplayNames = [],
   githubDeployer: githubDeployerProp,
   initialStep = null,
@@ -161,11 +164,17 @@ export function ProjectCreatorRoot({
         reset,
         setProjectDisplayName,
         validateProjectDisplayName: validateAndSetProjectDisplayNameError,
+        deriveDockerProjectDisplayName:
+          actionsProp?.deriveDockerProjectDisplayName,
         onGithubConfirm: actionsProp?.onGithubConfirm,
         onDockerConfirm: actionsProp?.onDockerConfirm,
         onDatabaseConfirm: actionsProp?.onDatabaseConfirm,
       },
-      meta: { databaseOptions: dbOptions, githubDeployer: githubDeployerProp },
+      meta: {
+        databaseOptions: dbOptions,
+        dockerDirect,
+        githubDeployer: githubDeployerProp,
+      },
     }),
     [
       confirmApplying,
@@ -174,6 +183,7 @@ export function ProjectCreatorRoot({
       pick,
       actionsProp,
       dbOptions,
+      dockerDirect,
       githubDeployerProp,
       projectDisplayName,
       projectDisplayNameError,

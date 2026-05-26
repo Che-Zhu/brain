@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DatabaseDeploymentPane } from "@/components/database-deployment-pane";
+import { DockerDeploymentPane } from "@/components/docker-deployment-pane";
 import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
@@ -34,6 +35,7 @@ import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 
 const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
 const DATABASE_DEPLOYMENT_PANE_QUERY_KEY = "databaseDeployment" as const;
+const DOCKER_DEPLOYMENT_PANE_QUERY_KEY = "dockerDeployment" as const;
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -102,13 +104,22 @@ export default function ProjectUidPage() {
       DATABASE_DEPLOYMENT_PANE_QUERY_KEY,
       parseAsBoolean.withDefault(false)
     );
+  const [dockerDeploymentPaneOpen, setDockerDeploymentPaneOpen] = useQueryState(
+    DOCKER_DEPLOYMENT_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
   const replaceDeploymentWithResourcePane = useCallback(() => {
     setPreferredCanvasSidePaneEntry("resource");
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
     Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
       () => undefined
     );
-  }, [setDatabaseDeploymentPaneOpen, setGithubDeploymentPaneOpen]);
+    Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [
+    setDatabaseDeploymentPaneOpen,
+    setDockerDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+  ]);
 
   const {
     closeResourcePane,
@@ -146,6 +157,7 @@ export default function ProjectUidPage() {
   );
   const canvasSidePaneEntry = resolveProjectCanvasSidePaneEntry({
     databaseDeploymentPaneOpen,
+    dockerDeploymentPaneOpen,
     githubDeploymentPaneOpen,
     preferredEntry: preferredCanvasSidePaneEntry,
     resourcePaneOpen: canvasResourcePaneOpen,
@@ -158,9 +170,15 @@ export default function ProjectUidPage() {
   const closeGithubDeploymentPane = useCallback(() => {
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
   }, [setGithubDeploymentPaneOpen]);
+  const closeDockerDeploymentPane = useCallback(() => {
+    Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(() => undefined);
+  }, [setDockerDeploymentPaneOpen]);
   const openDatabaseDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
       setPreferredCanvasSidePaneEntry("databaseDeployment");
+      Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
       Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
         () => undefined
       );
@@ -171,6 +189,24 @@ export default function ProjectUidPage() {
   }, [
     requestResourcePaneReplacement,
     setDatabaseDeploymentPaneOpen,
+    setDockerDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+  ]);
+  const openDockerDeploymentPane = useCallback(() => {
+    requestResourcePaneReplacement(() => {
+      setPreferredCanvasSidePaneEntry("dockerDeployment");
+      Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setDockerDeploymentPaneOpen(true)).catch(() => undefined);
+    });
+  }, [
+    requestResourcePaneReplacement,
+    setDatabaseDeploymentPaneOpen,
+    setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
   ]);
   const openGithubDeploymentPane = useCallback(() => {
@@ -179,11 +215,15 @@ export default function ProjectUidPage() {
       Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
         () => undefined
       );
+      Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
       Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
     });
   }, [
     requestResourcePaneReplacement,
     setDatabaseDeploymentPaneOpen,
+    setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
   ]);
   const projectCanvasSidePaneSurface = useMemo<ProjectSidePaneSurface>(
@@ -197,6 +237,10 @@ export default function ProjectUidPage() {
           openDatabaseDeploymentPane();
           return { status: "handled" as const };
         }
+        if (entry?.kind === "dockerDeployment") {
+          openDockerDeploymentPane();
+          return { status: "handled" as const };
+        }
         if (entry?.kind !== "githubDeployment") {
           return { status: "ignored" as const };
         }
@@ -204,7 +248,12 @@ export default function ProjectUidPage() {
         return { status: "handled" as const };
       },
     }),
-    [openDatabaseDeploymentPane, openGithubDeploymentPane, uid]
+    [
+      openDatabaseDeploymentPane,
+      openDockerDeploymentPane,
+      openGithubDeploymentPane,
+      uid,
+    ]
   );
   useProjectSidePaneSurface(projectCanvasSidePaneSurface);
   const canvasResourcePane = renderProjectCanvasResourcePaneContent({
@@ -279,6 +328,15 @@ export default function ProjectUidPage() {
                         kubeconfig={kubeconfig}
                         namespace={namespace}
                         onClose={closeDatabaseDeploymentPane}
+                        onDeployed={refreshWorkloadLists}
+                        projectUid={uid}
+                      />
+                    }
+                    dockerDeploymentPane={
+                      <DockerDeploymentPane
+                        kubeconfig={kubeconfig}
+                        namespace={namespace}
+                        onClose={closeDockerDeploymentPane}
                         onDeployed={refreshWorkloadLists}
                         projectUid={uid}
                       />

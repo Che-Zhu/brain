@@ -14,6 +14,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Database, Square } from "lucide-react";
 import { type ComponentProps, useEffect, useLayoutEffect, useRef } from "react";
 
+import { ProjectSourceDockerIcon } from "../../assets/project-source-icons";
 import type { ChatGithubDeployPopoverConfig } from "./chat.types";
 
 /** GitHub invertocat path (matches common monochrome mark). */
@@ -32,6 +33,13 @@ export type ChatGithubDeployButtonProps = Omit<
 };
 
 export type ChatDatabaseDeployButtonProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onComposerAction?: () => void;
+};
+
+export type ChatDockerDeployButtonProps = Omit<
   ComponentProps<typeof Button>,
   "children" | "onClick" | "size" | "type" | "variant"
 > & {
@@ -377,6 +385,37 @@ export function ChatDatabaseDeployButton({
   );
 }
 
+/** Icon-only control for Docker deploy; omitted `onComposerAction` renders nothing. */
+export function ChatDockerDeployButton({
+  className,
+  "aria-label": ariaLabel = "Docker deploy",
+  onComposerAction,
+  ...props
+}: ChatDockerDeployButtonProps) {
+  if (!onComposerAction) {
+    return null;
+  }
+
+  return (
+    <Button
+      aria-label={ariaLabel}
+      className={cn("hoverable shrink-0 cursor-pointer rounded-xl", className)}
+      data-slot="chat-docker-deploy-button"
+      onClick={onComposerAction}
+      size="icon-lg"
+      title="Docker deploy"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <ProjectSourceDockerIcon
+        aria-hidden
+        className="size-4 text-foreground opacity-90"
+      />
+    </Button>
+  );
+}
+
 export interface ChatComposerSendProps {
   className?: string;
   onPrimaryAction: () => void;
@@ -454,6 +493,8 @@ export function ChatComposer({
         <ChatComposerFooter>
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <ChatGithubDeployButton onComposerAction={onComposerAction} />
+            <ChatDockerDeployButton onComposerAction={onComposerAction} />
+            <ChatDatabaseDeployButton onComposerAction={onComposerAction} />
           </div>
           <ChatComposerSend
             onPrimaryAction={onPrimaryAction}
@@ -475,5 +516,6 @@ ChatComposerSend.displayName = "Chat.ComposerSend";
 ChatGithubMark.displayName = "Chat.GithubMark";
 ChatGithubDeployPopover.displayName = "Chat.GithubDeployPopover";
 ChatDatabaseDeployButton.displayName = "Chat.DatabaseDeployButton";
+ChatDockerDeployButton.displayName = "Chat.DockerDeployButton";
 ChatGithubDeployButton.displayName = "Chat.GithubDeployButton";
 ChatComposer.displayName = "Chat.Composer";

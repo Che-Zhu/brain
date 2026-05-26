@@ -39,11 +39,14 @@ export function ProjectCreationPane({
 }) {
   const githubDeployer = creatorRootProps.githubDeployer;
   const directGithubEntry = entryMode === "githubDirect";
+  const directDockerEntry = entryMode === "dockerDirect";
   const directDatabaseEntry = entryMode === "databaseDirect";
   let subtitle =
     "Provide a project name and select the project creation method.";
   if (directGithubEntry) {
     subtitle = "Select a GitHub repository to create a project.";
+  } else if (directDockerEntry) {
+    subtitle = "Provide Docker deployment settings.";
   } else if (directDatabaseEntry) {
     subtitle = "Provide a project name and database deployment settings.";
   }
@@ -73,6 +76,19 @@ export function ProjectCreationPane({
           </GithubDeployer.Shell>
         </GithubDeployer.Root>
       </div>
+    );
+  } else if (directDockerEntry) {
+    content = (
+      <ProjectCreator.Root
+        dockerDirect
+        initialStep="docker-image"
+        key={resetKey}
+        {...creatorRootProps}
+      >
+        <ProjectCreator.Shell className="min-w-0">
+          <ProjectCreator.Stage />
+        </ProjectCreator.Shell>
+      </ProjectCreator.Root>
     );
   } else if (directDatabaseEntry) {
     content = (

@@ -1,6 +1,7 @@
 export type ProjectCreationPaneEntryMode =
   | "general"
   | "githubDirect"
+  | "dockerDirect"
   | "databaseDirect";
 
 export interface ProjectCreationPaneState {
