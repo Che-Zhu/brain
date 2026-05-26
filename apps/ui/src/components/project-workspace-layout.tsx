@@ -544,7 +544,7 @@ function ProjectWorkspaceLayoutContent({ children }: { children: ReactNode }) {
         aria-controls="project-assistant-pane"
         aria-expanded={assistantPaneOpen}
         aria-label={
-          assistantPaneOpen ? "Close assistant panel" : "Open assistant panel"
+          assistantPaneOpen ? "Close assistant pane" : "Open assistant pane"
         }
         className="hoverable aria-expanded:!bg-transparent absolute top-2 right-2 z-20 size-9 rounded-xl"
         onClick={toggleAssistantPane}
