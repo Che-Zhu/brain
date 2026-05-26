@@ -3,6 +3,7 @@ import "server-only";
 import { API_ROUTES } from "@workspace/api/constants";
 import { cookies } from "next/headers";
 import { unauthorized } from "next/navigation";
+import { namespaceFromKubeconfigText } from "@/lib/chat-runtime/kubeconfig-namespace-core";
 
 /** Region JWT cookie (desktop / cluster auth). */
 export const SEALOS_AUTH_TOKEN_COOKIE = "sealos_auth_token" as const;
@@ -37,13 +38,10 @@ function envTrimDecoded(raw: string | undefined): string {
 
 /**
  * Matches client {@link AuthBootstrap}: local dev can skip SealOS cookies when
- * `NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG` or `NEXT_PUBLIC_DEV_NS` is set.
+ * `NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG` is set.
  */
 export function hasDevCredentialBypass(): boolean {
-  return (
-    envTrimDecoded(process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG) !== "" ||
-    (process.env.NEXT_PUBLIC_DEV_NS ?? "").trim() !== ""
-  );
+  return envTrimDecoded(process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG) !== "";
 }
 
 /** Local dev overrides (`AuthBootstrap`); not used in production auth. */
@@ -51,11 +49,12 @@ export function devCredentialsFromEnv(): {
   encodedKubeconfig: string;
   namespace: string;
 } {
+  const encodedKubeconfig = envTrimDecoded(
+    process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG
+  );
   return {
-    encodedKubeconfig: envTrimDecoded(
-      process.env.NEXT_PUBLIC_DEV_ENCODED_KUBECONFIG
-    ),
-    namespace: (process.env.NEXT_PUBLIC_DEV_NS ?? "").trim(),
+    encodedKubeconfig,
+    namespace: namespaceFromKubeconfigText(encodedKubeconfig) ?? "",
   };
 }
 

@@ -1,48 +1,14 @@
 import "server-only";
 
-import { parse } from "yaml";
-
-interface KubeconfigContext {
-  cluster?: string;
-  namespace?: string;
-  user?: string;
-}
-
-interface KubeconfigYaml {
-  contexts?: Array<{ name: string; context?: KubeconfigContext }>;
-  "current-context"?: string;
-}
-
-/** Kubernetes default when the active context omits `namespace`. */
-export const KUBECONFIG_DEFAULT_NAMESPACE = "default";
+import {
+  KUBECONFIG_DEFAULT_NAMESPACE as DEFAULT_NAMESPACE,
+  namespaceFromKubeconfigText as parseNamespaceFromKubeconfigText,
+} from "./kubeconfig-namespace-core";
 
 /**
  * Namespace from the kubeconfig's `current-context` entry (YAML parse only).
  * For authenticated chat/quota, use {@link resolveAuthoritativeChatNamespace}.
  * Returns `default` when the context has no explicit namespace.
  */
-export function namespaceFromKubeconfigText(yamlText: string): string | null {
-  let doc: unknown;
-  try {
-    doc = parse(yamlText);
-  } catch {
-    return null;
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return null;
-  }
-
-  const kc = doc as KubeconfigYaml;
-  const current = kc["current-context"]?.trim();
-  if (!current) {
-    return null;
-  }
-
-  const contextEntry = kc.contexts?.find((c) => c.name === current);
-  if (contextEntry == null) {
-    return null;
-  }
-
-  const ns = contextEntry.context?.namespace?.trim();
-  return ns && ns.length > 0 ? ns : KUBECONFIG_DEFAULT_NAMESPACE;
-}
+export const KUBECONFIG_DEFAULT_NAMESPACE = DEFAULT_NAMESPACE;
+export const namespaceFromKubeconfigText = parseNamespaceFromKubeconfigText;

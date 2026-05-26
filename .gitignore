@@ -51,3 +51,6 @@ packages/crossplane/public/service/ap/templates/.venv-sync/
 main
 
 .sandcastle
+CONTEXT.md
+specs
+.playwright-mcp
