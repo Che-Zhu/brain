@@ -38,8 +38,10 @@ export default function ProjectCreatorPreview() {
         <div className="flex flex-col gap-4">
           <ProjectCreator.Root
             actions={{
-              onDatabaseConfirm: (id, name) =>
-                setLast(`database:${name}:${id}`),
+              onDatabaseConfirm: (settings, name) =>
+                setLast(
+                  `database:${name}:${settings.databaseId}:${settings.instancePreset}:${settings.replicas}`
+                ),
               onDockerConfirm: (ref, name) => setLast(`docker:${name}:${ref}`),
             }}
             existingProjectDisplayNames={["Existing Project"]}

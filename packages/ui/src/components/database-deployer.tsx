@@ -114,7 +114,7 @@ function DeploymentCard({
 }: {
   children: ReactNode;
   description: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
 }) {
   return (

@@ -42,7 +42,9 @@ const ICON_CLASS: Record<ProjectCreatorSourceKind, string> = {
 };
 
 export function ProjectCreatorProjectNameField() {
-  const { actions, states } = useProjectCreator("ProjectCreator.OptionPicker");
+  const { actions, states } = useProjectCreator(
+    "ProjectCreator.ProjectNameField"
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-2.5">

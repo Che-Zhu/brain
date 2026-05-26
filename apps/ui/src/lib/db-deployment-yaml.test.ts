@@ -72,3 +72,40 @@ spec:
     "dbs-postgresql-kubeblocks-go-templating"
   );
 });
+
+test("renderDbDeploymentYaml resolves DB template placeholders before parsing", () => {
+  const out = YAML.parse(
+    renderDbDeploymentYaml({
+      compositionName: "dbs-mysql-kubeblocks-go-templating",
+      engine: "mysql",
+      name: "project-a-mysql",
+      namespace: "ns-admin",
+      projectName: "project-a",
+      quota: "m",
+      replicas: 1,
+      template: `
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: {{ name }}
+  namespace: {{ namespace }}
+  labels:
+    app.kubernetes.io/name: {{ name }}
+spec:
+  crossplane:
+    compositionRef:
+      name: old
+  engine: mysql
+  quota: xs
+`,
+    })
+  );
+
+  assert.equal(out.metadata.name, "project-a-mysql");
+  assert.equal(out.metadata.namespace, "ns-admin");
+  assert.equal(
+    out.metadata.labels["app.kubernetes.io/name"],
+    "project-a-mysql"
+  );
+  assert.equal(out.spec.quota, "m");
+});

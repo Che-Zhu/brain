@@ -1,5 +1,6 @@
 import type { DatabaseInstancePreset } from "@workspace/ui/components/database-deployer";
 import YAML from "yaml";
+import { renderCrossplaneCompositionTemplate } from "./render-crossplane-template";
 
 interface RenderDbDeploymentYamlOptions {
   compositionName: string;
@@ -61,7 +62,14 @@ function removePrivateOnlyRegionLabel(doc: Record<string, unknown>) {
 export function renderDbDeploymentYaml(
   options: RenderDbDeploymentYamlOptions
 ): string {
-  const doc = parseTemplate(options.template) ?? baseDbClaim(options);
+  const template =
+    options.template == null
+      ? undefined
+      : renderCrossplaneCompositionTemplate(options.template, {
+          name: options.name,
+          namespace: options.namespace,
+        });
+  const doc = parseTemplate(template) ?? baseDbClaim(options);
   doc.apiVersion = "example.crossplane.io/v1";
   doc.kind = "DB";
 
