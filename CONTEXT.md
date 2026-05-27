@@ -131,10 +131,6 @@ A runtime dependency where an AP is configured to consume one DB's connection cr
 
 A read-only resource workflow for inspecting a DB's objects and data without exposing its connection credentials. DB Access is distinct from DB Settings: DB Settings changes a DB's desired configuration, while DB Access explores the contents exposed by that DB.
 
-### DB Access Workbench
-
-The DB Access surface for browsing one DB's objects and data within a Canvas Action Surface. It is a focused read workspace, not DB Settings, Database Binding, or chat.
-
 ### Container Node
 
 A canvas node that represents an AP workload. The name is retained as a product/UI term, but it does not mean an individual Kubernetes container.

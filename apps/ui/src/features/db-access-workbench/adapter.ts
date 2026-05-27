@@ -111,24 +111,21 @@ export function createDbAccessHttpAdapter({
   namespace,
   projectUid,
 }: CreateDbAccessHttpAdapterOptions): DbAccessAdapter {
-  const request = (
-    operation: string,
-    body: Record<string, unknown> = {}
-  ): Promise<Response> =>
-    fetchImpl(new URL(accessPath(dbName, operation), baseUrl), {
-      body: JSON.stringify({ namespace, projectUid, ...body }),
-      headers: {
-        Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    });
-
   const requestJson = async <T>(
     operation: string,
     body: Record<string, unknown> = {}
   ): Promise<T> => {
-    const response = await request(operation, body);
+    const response = await fetchImpl(
+      new URL(accessPath(dbName, operation), baseUrl),
+      {
+        body: JSON.stringify({ namespace, projectUid, ...body }),
+        headers: {
+          Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      }
+    );
     if (!response.ok) {
       throw await adapterErrorFromResponse(response, operation);
     }
@@ -139,7 +136,17 @@ export function createDbAccessHttpAdapter({
     operation: string,
     body: Record<string, unknown>
   ): Promise<DbAccessExportResult> => {
-    const response = await request(operation, body);
+    const response = await fetchImpl(
+      new URL(accessPath(dbName, operation), baseUrl),
+      {
+        body: JSON.stringify({ namespace, projectUid, ...body }),
+        headers: {
+          Authorization: `Bearer ${encodeURIComponent(kubeconfig)}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      }
+    );
     if (!response.ok) {
       throw await adapterErrorFromResponse(response, operation);
     }

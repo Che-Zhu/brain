@@ -31,7 +31,7 @@ const databaseData = {
   },
 } satisfies CanvasDatabaseNodeData;
 
-test("canvas action surface renders shared chrome and DB Access body", () => {
+test("canvas action surface renders shared chrome and empty body slot", () => {
   const html = renderToStaticMarkup(
     <CanvasActionSurface
       action={CANVAS_ACTION.dbAccess}
