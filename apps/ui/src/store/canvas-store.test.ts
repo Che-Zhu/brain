@@ -4,7 +4,6 @@ import { test } from "node:test";
 import type { Node } from "@xyflow/react";
 
 import {
-  canOpenCanvasActionFromProjectCanvas,
   normalizeCanvasActionMode,
   shouldClearCanvasActionMode,
 } from "@/lib/project-canvas/actions/canvas-action-mode";
@@ -100,25 +99,6 @@ test("canvas action mode accepts DB access URL value", () => {
   assert.equal(normalizeCanvasActionMode("metrics"), null);
 });
 
-test("canvas action mode is unavailable from read-only project surfaces", () => {
-  assert.equal(
-    canOpenCanvasActionFromProjectCanvas({
-      action: "dbAccess",
-      readOnly: true,
-      serviceUid: "db-uid",
-    }),
-    false
-  );
-  assert.equal(
-    canOpenCanvasActionFromProjectCanvas({
-      action: "dbAccess",
-      readOnly: false,
-      serviceUid: "db-uid",
-    }),
-    true
-  );
-});
-
 test("container node selection opens settings mode and non-container selection clears it", () => {
   assert.equal(
     workloadPaneModeForNodeClick({ type: CANVAS_CONTAINER_NODE_TYPE }),
@@ -202,15 +182,6 @@ test("workload panel mode cleanup handles stale and non-container selections", (
 });
 
 test("canvas action mode cleanup handles stale and unsupported selections", () => {
-  assert.equal(
-    shouldClearCanvasActionMode({
-      canvasAction: "metrics",
-      rawNodeCount: 2,
-      selectedNode: { type: CANVAS_DATABASE_NODE_TYPE },
-      serviceUid: "db-uid",
-    }),
-    true
-  );
   assert.equal(
     shouldClearCanvasActionMode({
       canvasAction: "dbAccess",

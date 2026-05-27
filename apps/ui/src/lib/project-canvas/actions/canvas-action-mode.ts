@@ -27,20 +27,6 @@ export function canvasActionSupportsNode(
   }
 }
 
-export function canOpenCanvasActionFromProjectCanvas(input: {
-  action: CanvasActionMode;
-  readOnly: boolean;
-  serviceUid: string | null | undefined;
-}): boolean {
-  if (input.readOnly) {
-    return false;
-  }
-  if (input.serviceUid == null || input.serviceUid.trim() === "") {
-    return false;
-  }
-  return input.action === CANVAS_ACTION.dbAccess;
-}
-
 export function shouldClearCanvasActionMode(input: {
   canvasAction: string | null | undefined;
   rawNodeCount: number;
