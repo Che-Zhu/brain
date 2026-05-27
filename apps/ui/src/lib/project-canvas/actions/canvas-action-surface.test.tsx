@@ -16,6 +16,7 @@ const NAME_RE = /orders-db/;
 const RESOURCE_PANE_SURFACE_RE = /resource-pane-surface/;
 const SLOT_RE = /data-slot="canvas-action-surface-body"/;
 const SUBTITLE_RE = /Database PostgreSQL 16.4/;
+const WORKBENCH_RE = /aria-label="DB Access Workbench"/;
 
 const databaseData = {
   connections: [],
@@ -30,7 +31,7 @@ const databaseData = {
   },
 } satisfies CanvasDatabaseNodeData;
 
-test("canvas action surface renders shared chrome and empty body slot", () => {
+test("canvas action surface renders shared chrome and DB Access Workbench body", () => {
   const html = renderToStaticMarkup(
     <CanvasActionSurface
       action={CANVAS_ACTION.dbAccess}
@@ -45,6 +46,7 @@ test("canvas action surface renders shared chrome and empty body slot", () => {
   assert.match(html, CLOSE_LABEL_RE);
   assert.match(html, RESOURCE_PANE_SURFACE_RE);
   assert.match(html, SLOT_RE);
+  assert.match(html, WORKBENCH_RE);
 });
 
 test("canvas action surface stays absent without supported action data", () => {

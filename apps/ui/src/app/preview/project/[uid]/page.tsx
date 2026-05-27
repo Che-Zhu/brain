@@ -14,7 +14,6 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
-import { CanvasActionSurface } from "@/lib/project-canvas/actions/canvas-action-surface";
 import { apMetricsLookupFromSnapshot } from "@/lib/project-canvas/flow/ap-list-to-canvas-state";
 import { databaseNodeDataFromNode } from "@/lib/project-canvas/nodes/database-node-data";
 import { ProjectCanvasResourcePane } from "@/lib/project-canvas/panels/project-canvas-resource-pane";
@@ -147,8 +146,6 @@ export default function PreviewProjectPage() {
     });
 
   const {
-    canvasAction,
-    closeCanvasActionSurface,
     closeResourcePane,
     connectionOrigin,
     databasePane,
@@ -211,11 +208,6 @@ export default function PreviewProjectPage() {
               selectedNode={selectedNode}
               shareToken={shareToken}
               workloadPane={workloadPane}
-            />
-            <CanvasActionSurface
-              action={canvasAction}
-              onClose={closeCanvasActionSurface}
-              selectedDatabaseData={selectedDatabaseData}
             />
             {settingsLeaveGuardDialog}
           </Canvas.Flow>

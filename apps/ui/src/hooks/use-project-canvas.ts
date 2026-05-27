@@ -24,7 +24,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { routingDomainFromKubeconfig } from "@/lib/kubeconfig-routing-domain";
-import { shouldClearCanvasActionMode } from "@/lib/project-canvas/actions/canvas-action-mode";
+import {
+  canOpenCanvasActionFromProjectCanvas,
+  shouldClearCanvasActionMode,
+} from "@/lib/project-canvas/actions/canvas-action-mode";
 import {
   canvasNodeGeometryFromNode,
   selectCanvasAnchorPair,
@@ -423,6 +426,13 @@ export function useProjectCanvas(
       const displayName = data.states.name || name;
       const uid = data.uid?.trim();
       const hasUrlActions = uid != null && uid !== "";
+      const canOpenDbAccess = canOpenCanvasActionFromProjectCanvas({
+        action: CANVAS_ACTION.dbAccess,
+        readOnly,
+        serviceUid: uid,
+      });
+      const dbAccessServiceUid =
+        canOpenDbAccess && uid != null ? uid : null;
       const lifecycleActions = canUseLifecycle
         ? {
             delete: dbLifecycleAction(
@@ -466,13 +476,15 @@ export function useProjectCanvas(
             quickActions: {
               ...(data.actions?.quickActions ?? {}),
               dbAccess: {
-                disabled: !hasUrlActions,
-                onClick: hasUrlActions
-                  ? () => {
+                disabled: dbAccessServiceUid == null,
+                onClick: dbAccessServiceUid == null
+                  ? undefined
+                  : () => {
+                      const nextServiceUid = dbAccessServiceUid;
                       requestSettingsLeave("switch", () => {
                         onResourcePaneOpen?.();
                         setSelectedEdge(null);
-                        setServiceUid(uid).catch(() => undefined);
+                        setServiceUid(nextServiceUid).catch(() => undefined);
                         setEntryPane(null).catch(() => undefined);
                         setWorkloadPane(null).catch(() => undefined);
                         setDatabasePane(null).catch(() => undefined);
@@ -480,8 +492,7 @@ export function useProjectCanvas(
                           () => undefined
                         );
                       });
-                    }
-                  : undefined,
+                    },
               },
               metrics: {
                 disabled: !hasUrlActions,

@@ -9,6 +9,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DatabaseDeploymentPane } from "@/components/database-deployment-pane";
 import { DockerDeploymentPane } from "@/components/docker-deployment-pane";
 import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
+import {
+  createBrainDbAccessAdapter,
+  createBrowserDbAccessRequest,
+} from "@/features/db-access-workbench";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
@@ -155,6 +159,26 @@ export default function ProjectUidPage() {
     [selectedNode]
   );
   const selectedDatabaseData = databaseNodeDataFromNode(selectedNode);
+  const dbAccessRequest = useMemo(() => createBrowserDbAccessRequest(), []);
+  const dbAccessAdapter = useMemo(() => {
+    const dbName = selectedDatabaseData?.workload.name.trim() ?? "";
+    const dbNamespace = selectedDatabaseData?.workload.namespace.trim() ?? "";
+    if (
+      dbName === "" ||
+      dbNamespace === "" ||
+      kubeconfig.trim() === "" ||
+      uid.trim() === ""
+    ) {
+      return undefined;
+    }
+    return createBrainDbAccessAdapter({
+      dbName,
+      kubeconfig,
+      namespace: dbNamespace,
+      projectUid: uid,
+      request: dbAccessRequest,
+    });
+  }, [dbAccessRequest, kubeconfig, selectedDatabaseData, uid]);
   const canvasActionSurfaceOpen = canvasAction != null;
   const canvasResourcePaneOpen = Boolean(
     workloadPane ?? databasePane ?? entryPane
@@ -357,6 +381,7 @@ export default function ProjectUidPage() {
                   />
                   <CanvasActionSurface
                     action={canvasAction}
+                    dbAccessAdapter={dbAccessAdapter}
                     onClose={closeCanvasActionSurface}
                     selectedDatabaseData={selectedDatabaseData}
                   />

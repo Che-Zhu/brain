@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { Node } from "@xyflow/react";
 
 import {
+  canOpenCanvasActionFromProjectCanvas,
   normalizeCanvasActionMode,
   shouldClearCanvasActionMode,
 } from "@/lib/project-canvas/actions/canvas-action-mode";
@@ -97,6 +98,25 @@ test("entry panel mode only accepts settings URL value", () => {
 test("canvas action mode accepts DB access URL value", () => {
   assert.equal(normalizeCanvasActionMode("dbAccess"), "dbAccess");
   assert.equal(normalizeCanvasActionMode("metrics"), null);
+});
+
+test("canvas action mode is unavailable from read-only project surfaces", () => {
+  assert.equal(
+    canOpenCanvasActionFromProjectCanvas({
+      action: "dbAccess",
+      readOnly: true,
+      serviceUid: "db-uid",
+    }),
+    false
+  );
+  assert.equal(
+    canOpenCanvasActionFromProjectCanvas({
+      action: "dbAccess",
+      readOnly: false,
+      serviceUid: "db-uid",
+    }),
+    true
+  );
 });
 
 test("container node selection opens settings mode and non-container selection clears it", () => {

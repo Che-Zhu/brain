@@ -4,17 +4,23 @@ import { Button } from "@workspace/ui/components/button";
 import { Database, X } from "lucide-react";
 import { useEffect } from "react";
 
+import {
+  type DbAccessAdapter,
+  DbAccessWorkbench,
+} from "@/features/db-access-workbench";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { CANVAS_ACTION } from "@/store/canvas-store";
 
 export interface CanvasActionSurfaceProps {
   action: string | null | undefined;
+  dbAccessAdapter?: DbAccessAdapter;
   onClose: () => void;
   selectedDatabaseData: CanvasDatabaseNodeData | null;
 }
 
 export function CanvasActionSurface({
   action,
+  dbAccessAdapter,
   onClose,
   selectedDatabaseData,
 }: CanvasActionSurfaceProps) {
@@ -81,7 +87,17 @@ export function CanvasActionSurface({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body" />
+      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body">
+        <DbAccessWorkbench
+          adapter={dbAccessAdapter}
+          context={{
+            databaseName: states.name,
+            engine: states.displayEngine,
+            namespace: selectedDatabaseData.workload.namespace,
+            version: states.formattedVersion,
+          }}
+        />
+      </div>
     </section>
   );
 }
