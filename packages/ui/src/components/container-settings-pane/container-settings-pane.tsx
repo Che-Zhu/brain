@@ -7,6 +7,7 @@ import {
 } from "@workspace/crossplane/lib/platform-address";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { CanvasNode } from "@workspace/ui/components/canvas-node/canvas-node";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,11 @@ import {
   SlidingToggle,
   type SlidingToggleOption,
 } from "@workspace/ui/components/sliding-toggle";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 import {
   addContainerEnvDbDsnReferenceRow,
   addContainerEnvRow,
@@ -1246,9 +1252,9 @@ function publicAddressStatusLabel(
   return address.status?.trim() || "Pending";
 }
 
-function publicAddressStatusDotClass(
+function publicAddressStatusDotClasses(
   address: ContainerNetworkPublicAddress
-): string {
+): { inner: string; outer: string } {
   const status = address.status?.trim().toLowerCase();
 
   if (
@@ -1257,7 +1263,7 @@ function publicAddressStatusDotClass(
     status === "ready" ||
     status === "running"
   ) {
-    return "bg-theme-green ring-theme-green/20";
+    return { inner: "bg-theme-green", outer: "bg-theme-green/30" };
   }
 
   if (
@@ -1266,7 +1272,7 @@ function publicAddressStatusDotClass(
     status === "verifying" ||
     status === "creating"
   ) {
-    return "bg-theme-yellow ring-theme-yellow/20";
+    return { inner: "bg-theme-yellow", outer: "bg-theme-yellow/30" };
   }
 
   if (
@@ -1276,14 +1282,74 @@ function publicAddressStatusDotClass(
     status === "inaccessible" ||
     status === "unavailable"
   ) {
-    return "bg-theme-red ring-theme-red/20";
+    return { inner: "bg-theme-red", outer: "bg-theme-red/30" };
   }
 
-  return "bg-theme-gray ring-theme-gray/20";
+  return { inner: "bg-theme-gray", outer: "bg-theme-gray/30" };
 }
 
 function customDomainStatusLabel(domain: ContainerNetworkCustomDomain): string {
   return domain.status?.trim() || "Pending";
+}
+
+interface PublicAddressStatusDotProps {
+  address: Pick<ContainerNetworkPublicAddress, "status">;
+  ariaLabel: string;
+  className?: string;
+  tooltip?: ReactNode;
+}
+
+function PublicAddressStatusDot({
+  address,
+  ariaLabel,
+  className,
+  tooltip,
+}: PublicAddressStatusDotProps) {
+  const classes = publicAddressStatusDotClasses({
+    port: 1,
+    status: address.status,
+  });
+  const dot = (
+    <span
+      className={cn(
+        "flex size-3.5 shrink-0 items-center justify-center rounded-full",
+        classes.outer
+      )}
+    >
+      <span className={cn("size-2 rounded-full", classes.inner)} />
+    </span>
+  );
+
+  if (tooltip == null) {
+    return (
+      <span
+        aria-label={ariaLabel}
+        className={className}
+        role="img"
+        title={ariaLabel}
+      >
+        {dot}
+      </span>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        aria-label={ariaLabel}
+        className={cn(
+          "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          className
+        )}
+        type="button"
+      >
+        {dot}
+      </TooltipTrigger>
+      <TooltipContent align="start" className="max-w-72 text-left">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function publicAddressKey(
@@ -1344,6 +1410,7 @@ interface PublicAddressRowProps {
   onBindCustomDomain?: () => void;
   onDelete?: () => void | Promise<void>;
   readOnly: boolean;
+  rowKey: string;
 }
 
 function PublicAddressRow({
@@ -1351,16 +1418,11 @@ function PublicAddressRow({
   onBindCustomDomain,
   onDelete,
   readOnly,
+  rowKey,
 }: PublicAddressRowProps) {
   const [pending, setPending] = useState(false);
   const value = publicAddressValue(address);
-
-  const handleCopy = async () => {
-    if (value === "") {
-      return;
-    }
-    await navigator.clipboard?.writeText(value);
-  };
+  const copyable = value !== "";
 
   const handleDelete = async () => {
     if (onDelete == null) {
@@ -1375,64 +1437,78 @@ function PublicAddressRow({
   };
 
   return (
-    <div className="flex min-h-17 min-w-0 items-center gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
-      <span
-        aria-label={`Public Address status: ${publicAddressStatusLabel(address)}`}
-        className={cn(
-          "size-3 shrink-0 rounded-full ring-4",
-          publicAddressStatusDotClass(address)
-        )}
-        role="img"
-      />
-      <div className="grid min-w-0 flex-1 gap-1">
-        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
-          {value === "" ? "Pending domain" : value}
-        </div>
-        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
-          {address.port}
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <Button
-          aria-label="Copy Public Address"
-          className="h-9"
-          disabled={value === ""}
-          onClick={handleCopy}
-          size="icon-lg"
-          title="Copy Public Address"
-          type="button"
-          variant="ghost"
-        >
-          <Copy aria-hidden />
-        </Button>
-        {readOnly || onBindCustomDomain == null ? null : (
-          <Button
-            aria-label="Bind Custom Domain"
-            className="h-9 min-w-16 px-3 text-sm"
-            disabled={value === ""}
-            onClick={onBindCustomDomain}
-            size="lg"
-            type="button"
-            variant="secondary"
+    <CanvasNode.CopyableRow
+      className={cn(
+        "relative flex min-h-17 min-w-0 items-center justify-between gap-2 rounded-lg bg-resource-pane-card px-2.5 py-2 transition-colors",
+        copyable && "hover:bg-resource-pane-input"
+      )}
+      copyAriaLabel="Copy Public Address"
+      copyable={copyable}
+      copyValue={value}
+      rowKey={rowKey}
+      title={copyable ? value : undefined}
+    >
+      {({ copied, copyable: rowCopyable }) => (
+        <>
+          <div
+            aria-hidden={rowCopyable ? true : undefined}
+            className={cn(
+              "relative z-10 flex min-w-0 flex-1 items-center gap-1.5",
+              rowCopyable ? "pointer-events-none" : "pointer-events-auto"
+            )}
           >
-            CNAME
-          </Button>
-        )}
-        {readOnly || onDelete == null ? null : (
-          <Button
-            aria-label="Delete Public Address"
-            className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            disabled={pending}
-            onClick={handleDelete}
-            size="icon-lg"
-            type="button"
-            variant="ghost"
-          >
-            <Trash2 aria-hidden />
-          </Button>
-        )}
-      </div>
-    </div>
+            <PublicAddressStatusDot
+              address={address}
+              ariaLabel={`Public Address status: ${publicAddressStatusLabel(address)}`}
+            />
+            <div className="grid min-w-0 flex-1 gap-1">
+              <div className="flex min-w-0 items-center gap-1.5 text-resource-pane-foreground text-sm leading-5">
+                <span className="min-w-0 truncate">
+                  {value === "" ? "Pending domain" : value}
+                </span>
+                <CanvasNode.CopyableRowIndicator
+                  className={cn(
+                    "text-resource-pane-muted",
+                    copied && "text-theme-green"
+                  )}
+                />
+              </div>
+              <div className="min-w-0 truncate text-resource-pane-muted text-sm leading-5">
+                {address.port}
+              </div>
+            </div>
+          </div>
+          <CanvasNode.CopyableRowControl className="relative z-20 flex shrink-0 items-center gap-2">
+            {readOnly || onBindCustomDomain == null ? null : (
+              <Button
+                aria-label="Bind Custom Domain"
+                className="h-9 min-w-20 rounded-lg bg-resource-pane-card px-4 text-resource-pane-foreground text-sm hover:bg-resource-pane-input"
+                disabled={value === ""}
+                onClick={onBindCustomDomain}
+                size="lg"
+                type="button"
+                variant="ghost"
+              >
+                CNAME
+              </Button>
+            )}
+            {readOnly || onDelete == null ? null : (
+              <Button
+                aria-label="Delete Public Address"
+                className="size-9 rounded-lg bg-resource-pane-card text-resource-pane-foreground hover:bg-resource-pane-input hover:text-destructive"
+                disabled={pending}
+                onClick={handleDelete}
+                size="icon-lg"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 aria-hidden />
+              </Button>
+            )}
+          </CanvasNode.CopyableRowControl>
+        </>
+      )}
+    </CanvasNode.CopyableRow>
   );
 }
 
@@ -1461,24 +1537,46 @@ function lifecycleDetailText(
   return reason || message;
 }
 
-function CustomDomainLifecycleDetail({
-  detail,
-  label,
+function customDomainLifecycleDetails(
+  domain: ContainerNetworkCustomDomain
+): string[] {
+  return [
+    ["DNS", domain.dns] as const,
+    ["Certificate", domain.certificate] as const,
+    ["Routing", domain.routing] as const,
+  ].map(([label, detail]) => {
+    const summary = lifecycleDetailLabel(label, detail);
+    const text = lifecycleDetailText(detail);
+    return text === "" ? summary : `${summary}: ${text}`;
+  });
+}
+
+function customDomainStatusAriaLabel(
+  domain: ContainerNetworkCustomDomain
+): string {
+  return [
+    `Custom Domain status: ${customDomainStatusLabel(domain)}`,
+    ...customDomainLifecycleDetails(domain),
+  ].join("; ");
+}
+
+function CustomDomainStatusTooltip({
+  domain,
 }: {
-  detail: ContainerNetworkCustomDomainDetail | undefined;
-  label: string;
+  domain: ContainerNetworkCustomDomain;
 }) {
-  const text = lifecycleDetailText(detail);
+  const details = customDomainLifecycleDetails(domain);
+
   return (
-    <div className="grid min-w-0 gap-0.5">
-      <Badge className="justify-self-start" variant="outline">
-        {lifecycleDetailLabel(label, detail)}
-      </Badge>
-      {text === "" ? null : (
-        <span className="min-w-0 truncate text-resource-pane-muted text-xs">
-          {text}
-        </span>
-      )}
+    <div className="grid gap-1">
+      <div className="font-medium">
+        Custom Domain status: {customDomainStatusLabel(domain)}
+      </div>
+      {details.map((detail) => (
+        <div className="text-background/80" key={detail}>
+          {detail}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1501,40 +1599,30 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
     domain.cnameTarget == null || domain.cnameTarget.trim() === ""
       ? domain.platformAddressId
       : domain.cnameTarget.trim();
+  const detailText = targetPort == null ? targetText : String(targetPort);
+  const statusAriaLabel = customDomainStatusAriaLabel(domain);
 
   return (
-    <div className="flex min-h-17 min-w-0 items-start gap-3 rounded-md bg-resource-pane-card px-2.5 py-2">
-      <span
-        aria-label={`Custom Domain status: ${customDomainStatusLabel(domain)}`}
-        className={cn(
-          "mt-1 size-3 shrink-0 rounded-full ring-4",
-          publicAddressStatusDotClass({ port: 1, status: domain.status })
-        )}
-        role="img"
-      />
-      <div className="grid min-w-0 flex-1 gap-2">
-        <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
-          {domain.domain}
-        </div>
-        <div className="min-w-0 truncate font-mono text-resource-pane-muted text-sm leading-5">
-          {targetPort == null ? targetText : `${targetText} -> ${targetPort}`}
-        </div>
-        <div className="grid min-w-0 gap-1 sm:grid-cols-3">
-          <CustomDomainLifecycleDetail detail={domain.dns} label="DNS" />
-          <CustomDomainLifecycleDetail
-            detail={domain.certificate}
-            label="Certificate"
-          />
-          <CustomDomainLifecycleDetail
-            detail={domain.routing}
-            label="Routing"
-          />
+    <div className="flex min-h-17 min-w-0 items-center justify-between gap-2 rounded-lg bg-resource-pane-card px-2.5 py-2">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <PublicAddressStatusDot
+          address={{ status: domain.status }}
+          ariaLabel={statusAriaLabel}
+          tooltip={<CustomDomainStatusTooltip domain={domain} />}
+        />
+        <div className="grid min-w-0 flex-1 gap-1">
+          <div className="min-w-0 truncate text-resource-pane-foreground text-sm leading-5">
+            {domain.domain}
+          </div>
+          <div className="min-w-0 truncate text-resource-pane-muted text-sm leading-5">
+            {detailText}
+          </div>
         </div>
       </div>
       {readOnly || onUnbind == null ? null : (
         <Button
           aria-label="Unbind Custom Domain"
-          className="h-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="size-9 rounded-lg bg-resource-pane-card text-resource-pane-foreground hover:bg-resource-pane-input hover:text-destructive"
           disabled={pending}
           onClick={handleUnbind}
           size="icon-lg"
@@ -1542,7 +1630,7 @@ function CustomDomainRow({ domain, onUnbind, readOnly }: CustomDomainRowProps) {
           type="button"
           variant="ghost"
         >
-          <X aria-hidden />
+          <Trash2 aria-hidden />
         </Button>
       )}
     </div>
@@ -1951,13 +2039,13 @@ function DomainListSection({
       {readOnly ? null : (
         <Button
           aria-label="Add Public Address"
-          className="h-9 w-full bg-resource-pane-card text-resource-pane-primary text-sm hover:bg-resource-pane-input"
+          className="h-9 w-full rounded-lg bg-resource-pane-card text-resource-pane-primary text-sm hover:bg-resource-pane-input"
           disabled={addOpen || !canMutateNetwork}
           onClick={onOpenAddPublicAddress}
           type="button"
           variant="secondary"
         >
-          <Plus aria-hidden className="text-blue-500" />
+          <Plus aria-hidden />
           Add Public Address
         </Button>
       )}
@@ -1974,35 +2062,41 @@ function DomainListSection({
           No public addresses yet
         </div>
       ) : (
-        <div className="grid gap-2">
-          {visibleDomainRows.customDomains.map((domain, index) => (
-            <CustomDomainRow
-              domain={domain}
-              key={customDomainKey(domain, index)}
-              onUnbind={
-                canMutateNetwork
-                  ? () => onUnbindCustomDomain(domain)
-                  : undefined
-              }
-              readOnly={readOnly}
-            />
-          ))}
-          {visiblePublicAddresses.map((address, index) => (
-            <PublicAddressRow
-              address={address}
-              key={publicAddressKey(address, index)}
-              onBindCustomDomain={
-                canMutateNetwork ? () => onBindAddress(address) : undefined
-              }
-              onDelete={
-                canMutateNetwork
-                  ? () => onDeletePublicAddress(index)
-                  : undefined
-              }
-              readOnly={readOnly}
-            />
-          ))}
-        </div>
+        <CanvasNode.CopyFeedbackScope>
+          <div className="grid gap-2">
+            {visibleDomainRows.customDomains.map((domain, index) => (
+              <CustomDomainRow
+                domain={domain}
+                key={customDomainKey(domain, index)}
+                onUnbind={
+                  canMutateNetwork
+                    ? () => onUnbindCustomDomain(domain)
+                    : undefined
+                }
+                readOnly={readOnly}
+              />
+            ))}
+            {visiblePublicAddresses.map((address, index) => {
+              const key = publicAddressKey(address, index);
+              return (
+                <PublicAddressRow
+                  address={address}
+                  key={key}
+                  onBindCustomDomain={
+                    canMutateNetwork ? () => onBindAddress(address) : undefined
+                  }
+                  onDelete={
+                    canMutateNetwork
+                      ? () => onDeletePublicAddress(index)
+                      : undefined
+                  }
+                  readOnly={readOnly}
+                  rowKey={key}
+                />
+              );
+            })}
+          </div>
+        </CanvasNode.CopyFeedbackScope>
       )}
       {hiddenPublicAddressCount > 0 ? (
         <Button
