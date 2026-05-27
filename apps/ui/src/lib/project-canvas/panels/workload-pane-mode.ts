@@ -10,6 +10,7 @@ export function normalizeWorkloadPaneMode(
   value: string | null | undefined
 ): WorkloadPaneMode | null {
   if (
+    value === WORKLOAD_PANE.events ||
     value === WORKLOAD_PANE.history ||
     value === WORKLOAD_PANE.logs ||
     value === WORKLOAD_PANE.metrics ||

@@ -42,6 +42,8 @@ export const API_ROUTES = {
     base: "/api/ap/v1alpha1",
     /** GET list/get, PUT create, PATCH update, DELETE — group root. */
     root: "/api/ap/v1alpha1",
+    /** Recent Kubernetes events for one AP workload. */
+    events: "/api/ap/v1alpha1/events",
     /** Rollout-restart the composed Deployment (same name as the AP). */
     restart: "/api/ap/v1alpha1/restart",
   },

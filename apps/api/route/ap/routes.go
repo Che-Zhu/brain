@@ -20,4 +20,5 @@ func Register(api huma.API) {
 	registerUpdate(grp)
 	registerDelete(grp)
 	registerRestart(grp)
+	registerEvents(grp)
 }

@@ -27,6 +27,7 @@ export const DATABASE_PANE_QUERY_KEY = "dbPane" as const;
 export const ENTRY_PANE_QUERY_KEY = "entryPane" as const;
 
 export const WORKLOAD_PANE = {
+  events: "events",
   history: "history",
   logs: "logs",
   metrics: "metrics",

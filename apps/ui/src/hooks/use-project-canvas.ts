@@ -608,6 +608,12 @@ export function useProjectCanvas(
           disabled: !hasUrlActions,
           onClick: hasUrlActions ? () => select(WORKLOAD_PANE.logs) : undefined,
         },
+        events: {
+          disabled: !hasUrlActions,
+          onClick: hasUrlActions
+            ? () => select(WORKLOAD_PANE.events)
+            : undefined,
+        },
         metrics: {
           disabled: !hasUrlActions,
           onClick: hasUrlActions

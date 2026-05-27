@@ -12,6 +12,7 @@ import {
   Cpu,
   FileText,
   Layers,
+  ListTree,
   MemoryStick,
   Pause,
   Play,
@@ -41,6 +42,7 @@ const QUICK_ACTION_ITEMS = [
   { icon: SquareTerminal, key: "console", label: "Open console" },
   { icon: FileText, key: "logs", label: "Open logs" },
   { icon: CalendarDays, key: "calendar", label: "Open calendar" },
+  { icon: ListTree, key: "events", label: "Open workload events" },
 ] as const satisfies readonly {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   key: ContainerNodeQuickActionKey;

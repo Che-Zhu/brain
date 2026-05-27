@@ -1,9 +1,17 @@
-// biome-ignore lint/performance/noBarrelFile: package public API export surface.
+// biome-ignore-all lint/performance/noBarrelFile: package public API export surface.
 export {
   type ApLifecycleWorkloadRef,
   type UseApLifecycleOptions,
   useApLifecycleOperations,
 } from "./use-ap-lifecycle";
+export {
+  type APWorkloadEventInvolvedObject,
+  type APWorkloadEventItem,
+  type APWorkloadEventsResponse,
+  type APWorkloadEventsTarget,
+  buildAPWorkloadEventsRequest,
+  useAPWorkloadEvents,
+} from "./use-ap-workload-events";
 export { useApsK8sList } from "./use-aps-k8s-list";
 export {
   type DbLifecycleActionKey,

@@ -4,6 +4,7 @@ import type { Node } from "@xyflow/react";
 
 import { WORKLOAD_PANE } from "@/store/canvas-store";
 import type { SettingsLeaveGuardRegistration } from "./settings-leave-guard";
+import { WorkloadEventsPane } from "./workload-events-panel";
 import { WorkloadHistoryPane } from "./workload-history-panel";
 import { WorkloadLogsPane } from "./workload-logs-panel";
 import { WorkloadMetricsPane } from "./workload-metrics-panel";
@@ -25,6 +26,8 @@ export function WorkloadResourcePane({
   }
 
   switch (mode) {
+    case WORKLOAD_PANE.events:
+      return <WorkloadEventsPane node={node} onClose={onClose} />;
     case WORKLOAD_PANE.settings:
       return (
         <WorkloadSettingsPane

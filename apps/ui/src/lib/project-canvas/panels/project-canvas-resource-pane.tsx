@@ -15,6 +15,7 @@ import { WorkloadResourcePane } from "./workload-resource-pane";
 
 function isWorkloadPaneMode(mode: string | null | undefined): boolean {
   return (
+    mode === WORKLOAD_PANE.events ||
     mode === WORKLOAD_PANE.settings ||
     mode === WORKLOAD_PANE.metrics ||
     mode === WORKLOAD_PANE.logs ||
