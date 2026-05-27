@@ -44,4 +44,42 @@ test("DB Access health errors normalize to recoverable surface states", () => {
       title: "Project ownership mismatch",
     }
   );
+  assert.deepEqual(
+    normalizeDbAccessHealthError(
+      new Error("API 409: DB is missing project ownership metadata")
+    ),
+    {
+      code: "ownership",
+      message: "This database does not belong to the current Project.",
+      retryable: false,
+      title: "Project ownership mismatch",
+    }
+  );
+  assert.deepEqual(
+    normalizeDbAccessHealthError(new Error("API 409: DB is not ready")),
+    {
+      code: "db-not-ready",
+      message: "The database is not ready for browsing yet.",
+      retryable: true,
+      title: "Database not ready",
+    }
+  );
+  assert.deepEqual(
+    normalizeDbAccessHealthError(new Error("API 404: DB not found")),
+    {
+      code: "not-found",
+      message: "The selected database was not found.",
+      retryable: false,
+      title: "Database not found",
+    }
+  );
+  assert.deepEqual(
+    normalizeDbAccessHealthError(new Error("API 504: WhoDB request timed out")),
+    {
+      code: "timeout",
+      message: "The DB Access readiness check timed out.",
+      retryable: true,
+      title: "DB Access timed out",
+    }
+  );
 });

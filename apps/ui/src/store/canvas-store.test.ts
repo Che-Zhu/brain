@@ -204,6 +204,15 @@ test("workload panel mode cleanup handles stale and non-container selections", (
 test("canvas action mode cleanup handles stale and unsupported selections", () => {
   assert.equal(
     shouldClearCanvasActionMode({
+      canvasAction: "metrics",
+      rawNodeCount: 2,
+      selectedNode: { type: CANVAS_DATABASE_NODE_TYPE },
+      serviceUid: "db-uid",
+    }),
+    true
+  );
+  assert.equal(
+    shouldClearCanvasActionMode({
       canvasAction: "dbAccess",
       rawNodeCount: 2,
       selectedNode: null,

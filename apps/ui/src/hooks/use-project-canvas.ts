@@ -13,6 +13,7 @@ import type {
 import type { CanvasNodeConnectionSide } from "@workspace/ui/components/canvas-node/canvas-node";
 import type { ContainerSettingsPaneAddDbDsnReferenceIntent } from "@workspace/ui/components/container-settings-pane/container-settings-pane";
 import type {
+  DatabaseNodeAction,
   DatabaseNodeCopyConnectionHandler,
   DatabaseNodeLifecycleActionKey,
   DatabaseNodeTogglePublicConnectionHandler,
@@ -144,6 +145,48 @@ function connectionOriginFromHandle(
   return {
     nodeId: handle.nodeId,
     side: handle.id as CanvasNodeConnectionSide,
+  };
+}
+
+function databaseNodeDbAccessAction({
+  onOpen,
+  readOnly,
+  serviceUid,
+}: {
+  onOpen: (serviceUid: string) => void;
+  readOnly: boolean;
+  serviceUid: string | null | undefined;
+}): DatabaseNodeAction {
+  const enabledServiceUid =
+    canOpenCanvasActionFromProjectCanvas({
+      action: CANVAS_ACTION.dbAccess,
+      readOnly,
+      serviceUid,
+    }) && serviceUid != null
+      ? serviceUid
+      : null;
+
+  return {
+    disabled: enabledServiceUid == null,
+    onClick:
+      enabledServiceUid == null ? undefined : () => onOpen(enabledServiceUid),
+  };
+}
+
+function databaseNodeMetricsAction({
+  onOpen,
+  serviceUid,
+}: {
+  onOpen: (serviceUid: string) => void;
+  serviceUid: string | null | undefined;
+}): DatabaseNodeAction {
+  const enabledServiceUid =
+    serviceUid == null || serviceUid === "" ? null : serviceUid;
+
+  return {
+    disabled: enabledServiceUid == null,
+    onClick:
+      enabledServiceUid == null ? undefined : () => onOpen(enabledServiceUid),
   };
 }
 
@@ -377,6 +420,52 @@ export function useProjectCanvas(
     []
   );
 
+  const openDatabaseAccess = useCallback(
+    (nextServiceUid: string) => {
+      requestSettingsLeave("switch", () => {
+        onResourcePaneOpen?.();
+        setSelectedEdge(null);
+        setServiceUid(nextServiceUid).catch(() => undefined);
+        setEntryPane(null).catch(() => undefined);
+        setWorkloadPane(null).catch(() => undefined);
+        setDatabasePane(null).catch(() => undefined);
+        setCanvasAction(CANVAS_ACTION.dbAccess).catch(() => undefined);
+      });
+    },
+    [
+      onResourcePaneOpen,
+      requestSettingsLeave,
+      setCanvasAction,
+      setDatabasePane,
+      setEntryPane,
+      setSelectedEdge,
+      setServiceUid,
+      setWorkloadPane,
+    ]
+  );
+
+  const openDatabaseMetrics = useCallback(
+    (nextServiceUid: string) => {
+      requestSettingsLeave("switch", () => {
+        setCanvasAction(null).catch(() => undefined);
+        setSelectedEdge(null);
+        setServiceUid(nextServiceUid).catch(() => undefined);
+        setEntryPane(null).catch(() => undefined);
+        setWorkloadPane(null).catch(() => undefined);
+        setDatabasePane(DATABASE_PANE.metrics).catch(() => undefined);
+      });
+    },
+    [
+      requestSettingsLeave,
+      setCanvasAction,
+      setDatabasePane,
+      setEntryPane,
+      setSelectedEdge,
+      setServiceUid,
+      setWorkloadPane,
+    ]
+  );
+
   const decorateDatabaseNode = useCallback(
     (node: Node): Node => {
       const data = node.data as CanvasDatabaseNodeData;
@@ -425,14 +514,15 @@ export function useProjectCanvas(
       });
       const displayName = data.states.name || name;
       const uid = data.uid?.trim();
-      const hasUrlActions = uid != null && uid !== "";
-      const canOpenDbAccess = canOpenCanvasActionFromProjectCanvas({
-        action: CANVAS_ACTION.dbAccess,
+      const dbAccessAction = databaseNodeDbAccessAction({
+        onOpen: openDatabaseAccess,
         readOnly,
         serviceUid: uid,
       });
-      const dbAccessServiceUid =
-        canOpenDbAccess && uid != null ? uid : null;
+      const metricsAction = databaseNodeMetricsAction({
+        onOpen: openDatabaseMetrics,
+        serviceUid: uid,
+      });
       const lifecycleActions = canUseLifecycle
         ? {
             delete: dbLifecycleAction(
@@ -475,42 +565,8 @@ export function useProjectCanvas(
             ...(lifecycleActions === undefined ? {} : { lifecycleActions }),
             quickActions: {
               ...(data.actions?.quickActions ?? {}),
-              dbAccess: {
-                disabled: dbAccessServiceUid == null,
-                onClick: dbAccessServiceUid == null
-                  ? undefined
-                  : () => {
-                      const nextServiceUid = dbAccessServiceUid;
-                      requestSettingsLeave("switch", () => {
-                        onResourcePaneOpen?.();
-                        setSelectedEdge(null);
-                        setServiceUid(nextServiceUid).catch(() => undefined);
-                        setEntryPane(null).catch(() => undefined);
-                        setWorkloadPane(null).catch(() => undefined);
-                        setDatabasePane(null).catch(() => undefined);
-                        setCanvasAction(CANVAS_ACTION.dbAccess).catch(
-                          () => undefined
-                        );
-                      });
-                    },
-              },
-              metrics: {
-                disabled: !hasUrlActions,
-                onClick: hasUrlActions
-                  ? () => {
-                      requestSettingsLeave("switch", () => {
-                        setCanvasAction(null).catch(() => undefined);
-                        setSelectedEdge(null);
-                        setServiceUid(uid).catch(() => undefined);
-                        setEntryPane(null).catch(() => undefined);
-                        setWorkloadPane(null).catch(() => undefined);
-                        setDatabasePane(DATABASE_PANE.metrics).catch(
-                          () => undefined
-                        );
-                      });
-                    }
-                  : undefined,
-              },
+              dbAccess: dbAccessAction,
+              metrics: metricsAction,
             },
           },
           connections,
@@ -528,20 +584,14 @@ export function useProjectCanvas(
       deleteDbWorkload,
       getPublicAccessPendingTarget,
       isDbLifecycleLoading,
-      onResourcePaneOpen,
+      openDatabaseAccess,
+      openDatabaseMetrics,
       restartDbWorkload,
       runMutationThenRefresh,
       readOnly,
-      requestSettingsLeave,
       routingDomain,
-      setCanvasAction,
-      setDatabasePane,
-      setEntryPane,
-      setWorkloadPane,
       startDbWorkload,
       stopDbWorkload,
-      setSelectedEdge,
-      setServiceUid,
       togglePublicAccess,
       options?.shareToken,
     ]

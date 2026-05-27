@@ -46,7 +46,10 @@ export function normalizeDbAccessHealthError(
     };
   }
 
-  if (lower.includes("does not belong to project")) {
+  if (
+    lower.includes("does not belong to project") ||
+    lower.includes("missing project ownership metadata")
+  ) {
     return {
       code: "ownership",
       message: "This database does not belong to the current Project.",
