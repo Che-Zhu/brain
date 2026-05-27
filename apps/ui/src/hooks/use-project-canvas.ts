@@ -423,7 +423,6 @@ export function useProjectCanvas(
       const displayName = data.states.name || name;
       const uid = data.uid?.trim();
       const hasUrlActions = uid != null && uid !== "";
-      const hasDbAccessAction = hasUrlActions && !readOnly;
       const lifecycleActions = canUseLifecycle
         ? {
             delete: dbLifecycleAction(
@@ -467,8 +466,8 @@ export function useProjectCanvas(
             quickActions: {
               ...(data.actions?.quickActions ?? {}),
               dbAccess: {
-                disabled: !hasDbAccessAction,
-                onClick: hasDbAccessAction
+                disabled: !hasUrlActions,
+                onClick: hasUrlActions
                   ? () => {
                       requestSettingsLeave("switch", () => {
                         onResourcePaneOpen?.();

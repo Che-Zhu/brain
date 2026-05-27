@@ -1,40 +1,25 @@
 "use client";
 
-import { ApiUrl } from "@workspace/api/utils";
 import { Button } from "@workspace/ui/components/button";
 import { Database, X } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
-import {
-  createDbAccessHttpAdapter,
-  DbAccessWorkbench,
-} from "@/features/db-access-workbench";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { CANVAS_ACTION } from "@/store/canvas-store";
 
 export interface CanvasActionSurfaceProps {
   action: string | null | undefined;
-  dbAccessAvailable?: boolean;
-  kubeconfig?: string;
-  namespace?: string;
   onClose: () => void;
-  projectUid?: string;
   selectedDatabaseData: CanvasDatabaseNodeData | null;
 }
 
 export function CanvasActionSurface({
   action,
-  dbAccessAvailable = true,
-  kubeconfig = "",
-  namespace,
   onClose,
-  projectUid = "",
   selectedDatabaseData,
 }: CanvasActionSurfaceProps) {
   const open =
-    action === CANVAS_ACTION.dbAccess &&
-    dbAccessAvailable &&
-    selectedDatabaseData != null;
+    action === CANVAS_ACTION.dbAccess && selectedDatabaseData != null;
 
   useEffect(() => {
     if (!open) {
@@ -51,22 +36,8 @@ export function CanvasActionSurface({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, open]);
-  const resolvedNamespace =
-    namespace ?? selectedDatabaseData?.workload.namespace ?? "";
-  const selectedDbName = selectedDatabaseData?.workload.name ?? "";
-  const adapter = useMemo(
-    () =>
-      createDbAccessHttpAdapter({
-        baseUrl: ApiUrl(),
-        dbName: selectedDbName,
-        kubeconfig,
-        namespace: resolvedNamespace,
-        projectUid,
-      }),
-    [kubeconfig, projectUid, resolvedNamespace, selectedDbName]
-  );
 
-  if (!open || selectedDatabaseData == null) {
+  if (!open) {
     return null;
   }
 
@@ -110,16 +81,7 @@ export function CanvasActionSurface({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body">
-        <DbAccessWorkbench
-          adapter={adapter}
-          database={{
-            displayEngine: states.displayEngine,
-            formattedVersion: states.formattedVersion,
-            name: states.name,
-          }}
-        />
-      </div>
+      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body" />
     </section>
   );
 }

@@ -357,10 +357,7 @@ export default function ProjectUidPage() {
                   />
                   <CanvasActionSurface
                     action={canvasAction}
-                    kubeconfig={kubeconfig}
-                    namespace={namespace}
                     onClose={closeCanvasActionSurface}
-                    projectUid={uid}
                     selectedDatabaseData={selectedDatabaseData}
                   />
                   {settingsLeaveGuardDialog}

@@ -16,7 +16,6 @@ const NAME_RE = /orders-db/;
 const RESOURCE_PANE_SURFACE_RE = /resource-pane-surface/;
 const SLOT_RE = /data-slot="canvas-action-surface-body"/;
 const SUBTITLE_RE = /Database PostgreSQL 16.4/;
-const WORKBENCH_RE = /data-slot="db-access-workbench"/;
 
 const databaseData = {
   connections: [],
@@ -35,10 +34,7 @@ test("canvas action surface renders shared chrome and empty body slot", () => {
   const html = renderToStaticMarkup(
     <CanvasActionSurface
       action={CANVAS_ACTION.dbAccess}
-      kubeconfig="apiVersion: v1"
-      namespace="default"
       onClose={noop}
-      projectUid="project-1"
       selectedDatabaseData={databaseData}
     />
   );
@@ -49,7 +45,6 @@ test("canvas action surface renders shared chrome and empty body slot", () => {
   assert.match(html, CLOSE_LABEL_RE);
   assert.match(html, RESOURCE_PANE_SURFACE_RE);
   assert.match(html, SLOT_RE);
-  assert.match(html, WORKBENCH_RE);
 });
 
 test("canvas action surface stays absent without supported action data", () => {
@@ -58,22 +53,6 @@ test("canvas action surface stays absent without supported action data", () => {
       action={CANVAS_ACTION.dbAccess}
       onClose={noop}
       selectedDatabaseData={null}
-    />
-  );
-
-  assert.equal(html, "");
-});
-
-test("canvas action surface excludes DB Access when the host disables it", () => {
-  const html = renderToStaticMarkup(
-    <CanvasActionSurface
-      action={CANVAS_ACTION.dbAccess}
-      dbAccessAvailable={false}
-      kubeconfig="apiVersion: v1"
-      namespace="default"
-      onClose={noop}
-      projectUid="project-1"
-      selectedDatabaseData={databaseData}
     />
   );
 
