@@ -1,0 +1,6 @@
+apiVersion: v2
+name: brain-system
+description: Helm chart for deploying the SealAI brain-system stack.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,44 @@
+# Copy this file to a private path, for example:
+#   cp charts/brain-system/values.local.example.yaml /tmp/brain-system.values.yaml
+# Then replace every placeholder before running helm upgrade --install.
+
+global:
+  region: 192.168.10.189.nip.io
+
+api:
+  env:
+    VMSELECT_URL: "http://vmselect-vm-stack-victoria-metrics-k8s-stack.vm.svc:8481/select/0/prometheus"
+    VLSELECT_URL: "http://usr-vlc-victoria-logs-cluster-vlselect.vlc.svc:9471"
+    # Generate from the target admin kubeconfig:
+    # node -e 'console.log(encodeURIComponent(require("fs").readFileSync(process.env.KUBECONFIG, "utf8")))'
+    ENCODED_ADMIN_KUBECONFIG: "REPLACE_ME_URL_ENCODED_ADMIN_KUBECONFIG"
+    WHODB_URL: "http://whodb.brain-system.svc:11000"
+
+ui:
+  env:
+    # Server-side UI calls should use the in-cluster API service, not the public Ingress host.
+    API_URL: "http://sealai-api-staging-service.brain-system.svc:9000"
+    # For the chart-created brain-pg DB, compose this from the generated brain-pg-conn-credential secret.
+    DATABASE_URL: "postgresql://postgres:REPLACE_ME_PASSWORD@brain-pg-postgresql.brain-system.svc:5432/postgres"
+    GITHUB_OAUTH_CLIENT_ID: "REPLACE_ME"
+    GITHUB_OAUTH_CLIENT_SECRET: "REPLACE_ME"
+    # Platform-paid free turns. Set FREE_CHAT_TURNS to "0" to disable.
+    SYSTEM_OPENAI_API_KEY: "REPLACE_ME_OPENAI_COMPATIBLE_KEY"
+    SYSTEM_OPENAI_API_BASE_URL: "https://api.openai.com/v1"
+    FREE_CHAT_TURNS: "5"
+    # User-billed turns use the Sealos AI proxy.
+    AI_PROXY_TOKEN_NAME: "sealos-brain"
+    # Chat shell/file tools run in Sealos Devbox. Use DEVBOX_TOKEN, or leave it blank and set DEVBOX_JWT_SIGNING_KEY.
+    SEALOS_HOST: "192.168.10.189.nip.io"
+    DEVBOX_TOKEN: ""
+    DEVBOX_JWT_SIGNING_KEY: "REPLACE_ME_DEVBOX_JWT_SIGNING_KEY"
+    DEVBOX_RUNTIME_IMAGE: ""
+    DEVBOX_ARCHIVE_AFTER_PAUSE_TIME: "24h"
+    DEVBOX_JWT_TTL_SECONDS: "14400"
+
+imagePullSecret:
+  # The AP composition references ghcr-cred. Keep this true unless the secret already exists.
+  create: true
+  useForWhodb: false
+  name: ghcr-cred
+  dockerConfigJson: '{"auths":{}}'

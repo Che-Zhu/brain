@@ -28,36 +28,64 @@ spec:
           secretKeyRef:
             key: GITHUB_OAUTH_CLIENT_SECRET
             name: sealai-ui-staging-env
-      - name: VERCEL_TEAM_ID
-        valueFrom:
-          secretKeyRef:
-            key: VERCEL_TEAM_ID
-            name: sealai-ui-staging-env
-      - name: VERCEL_PROJECT_ID
-        valueFrom:
-          secretKeyRef:
-            key: VERCEL_PROJECT_ID
-            name: sealai-ui-staging-env
-      - name: VERCEL_TOKEN
-        valueFrom:
-          secretKeyRef:
-            key: VERCEL_TOKEN
-            name: sealai-ui-staging-env
       - name: DATABASE_URL
         valueFrom:
           secretKeyRef:
             key: DATABASE_URL
             name: sealai-ui-staging-env
-      - name: SANDBOX_PROXY
+      - name: SYSTEM_OPENAI_API_KEY
         valueFrom:
           secretKeyRef:
-            key: SANDBOX_PROXY
+            key: SYSTEM_OPENAI_API_KEY
             name: sealai-ui-staging-env
             optional: true
-      - name: NODE_TLS_REJECT_UNAUTHORIZED
+      - name: SYSTEM_OPENAI_API_BASE_URL
         valueFrom:
           secretKeyRef:
-            key: NODE_TLS_REJECT_UNAUTHORIZED
+            key: SYSTEM_OPENAI_API_BASE_URL
+            name: sealai-ui-staging-env
+      - name: FREE_CHAT_TURNS
+        valueFrom:
+          secretKeyRef:
+            key: FREE_CHAT_TURNS
+            name: sealai-ui-staging-env
+      - name: AI_PROXY_TOKEN_NAME
+        valueFrom:
+          secretKeyRef:
+            key: AI_PROXY_TOKEN_NAME
+            name: sealai-ui-staging-env
+      - name: SEALOS_HOST
+        valueFrom:
+          secretKeyRef:
+            key: SEALOS_HOST
+            name: sealai-ui-staging-env
+      - name: DEVBOX_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: DEVBOX_TOKEN
+            name: sealai-ui-staging-env
+            optional: true
+      - name: DEVBOX_JWT_SIGNING_KEY
+        valueFrom:
+          secretKeyRef:
+            key: DEVBOX_JWT_SIGNING_KEY
+            name: sealai-ui-staging-env
+            optional: true
+      - name: DEVBOX_RUNTIME_IMAGE
+        valueFrom:
+          secretKeyRef:
+            key: DEVBOX_RUNTIME_IMAGE
+            name: sealai-ui-staging-env
+            optional: true
+      - name: DEVBOX_ARCHIVE_AFTER_PAUSE_TIME
+        valueFrom:
+          secretKeyRef:
+            key: DEVBOX_ARCHIVE_AFTER_PAUSE_TIME
+            name: sealai-ui-staging-env
+      - name: DEVBOX_JWT_TTL_SECONDS
+        valueFrom:
+          secretKeyRef:
+            key: DEVBOX_JWT_TTL_SECONDS
             name: sealai-ui-staging-env
     network:
       privatePort: 3000
@@ -96,4 +124,3 @@ spec:
     requests:
       cpu: 500m
       memory: 1024Mi
-

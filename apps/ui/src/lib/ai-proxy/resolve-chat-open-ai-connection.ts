@@ -6,7 +6,7 @@ import { fetchOrCreateAiProxyToken } from "./create-token";
 import { aiProxyOpenAiBaseUrl } from "./endpoints";
 import { clusterHostnameFromKubeconfigText } from "./kubeconfig-hostname";
 
-/** Default POST /tokens `{ name }` when not using DEV_OPENAI_* env. Idempotent server-side when name exists in group. */
+/** Default POST /tokens `{ name }` for user-billed AI proxy turns. Idempotent server-side when name exists in group. */
 const DEFAULT_AI_PROXY_TOKEN_NAME = "sealos-brain";
 
 export type ResolveChatOpenAiOutcome =
@@ -19,18 +19,6 @@ export type ChatBillingMode = "free" | "user";
 function trimmedEnv(value: string | undefined): string | undefined {
   const t = value?.trim();
   return t && t.length > 0 ? t : undefined;
-}
-
-function resolveDevOpenAiConnection(): ResolveChatOpenAiOutcome | null {
-  const devApiKey = trimmedEnv(process.env.DEV_OPENAI_API_KEY);
-  const devBaseUrl = trimmedEnv(process.env.DEV_OPENAI_API_BASE_URL);
-  if (devApiKey && devBaseUrl) {
-    return {
-      ok: true,
-      connection: { apiKey: devApiKey, baseURL: devBaseUrl },
-    };
-  }
-  return null;
 }
 
 function resolveSystemOpenAiConnection(): ResolveChatOpenAiOutcome {
@@ -50,18 +38,13 @@ function resolveSystemOpenAiConnection(): ResolveChatOpenAiOutcome {
 /**
  * Resolves `{ apiKey, baseURL }` for OpenAI-compatible chat:
  * - `billing: "free"` → `SYSTEM_OPENAI_*` (platform token).
- * - `billing: "user"` → AI proxy token from kubeconfig (or `DEV_OPENAI_*` when set).
+ * - `billing: "user"` → AI proxy token from kubeconfig.
  */
 export async function resolveChatOpenAiConnection(options: {
   encodedKubeconfig: string | undefined;
   kubeconfigText: string;
   billing: ChatBillingMode;
 }): Promise<ResolveChatOpenAiOutcome> {
-  const dev = resolveDevOpenAiConnection();
-  if (dev != null) {
-    return dev;
-  }
-
   if (options.billing === "free") {
     return resolveSystemOpenAiConnection();
   }
@@ -71,8 +54,7 @@ export async function resolveChatOpenAiConnection(options: {
     return {
       ok: false,
       status: 400,
-      message:
-        "Missing kubeconfig credential for AI proxy (set DEV_OPENAI_API_KEY and DEV_OPENAI_API_BASE_URL for local dev).",
+      message: "Missing kubeconfig credential for AI proxy.",
     };
   }
 

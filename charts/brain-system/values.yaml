@@ -1,0 +1,193 @@
+global:
+  region: 192.168.12.53.nip.io
+  labels: {}
+  annotations: {}
+
+imagePullSecret:
+  create: false
+  useForWhodb: false
+  name: ghcr-cred
+  dockerConfigJson: '{"auths":{}}'
+
+secrets:
+  create: true
+  apiName: sealai-api-staging-env
+  uiName: sealai-ui-staging-env
+
+database:
+  enabled: true
+  name: brain-pg
+  compositionRef: dbs-postgresql-kubeblocks-go-templating
+  engine: postgresql
+  quota: xs
+  replicas: 1
+  exposeNodePort: true
+  terminationPolicy: Delete
+  paused: false
+  restartRequest: 0
+  storageSize: ""
+  storageClassName: ""
+  cpuRequest: ""
+  memoryRequest: ""
+  cpuLimit: ""
+  memoryLimit: ""
+  scheduledBackup:
+    enabled: true
+    cronExpression: "13 10 * * *"
+    retentionPeriod: 14d
+    repoName: backuprepo-s3
+
+api:
+  enabled: true
+  name: sealai-api-staging
+  compositionRef: aps-deployment-ingress-go-templating
+  image: aimerite/sealai-api:latest
+  imagePullPolicy: Always
+  port: 9000
+  paused: false
+  restartRequest: 0
+  platformAddresses:
+    - id: pa_stagingapi1
+      port: 9000
+    - id: pa_stagingapi2
+      port: 9000
+  env:
+    VMSELECT_URL: "http://vmselect-vm-stack-victoria-metrics-k8s-stack.vm.svc:8481/select/0/prometheus"
+    VLSELECT_URL: "http://usr-vlc-victoria-logs-cluster-vlselect.vlc.svc:9471"
+    ENCODED_ADMIN_KUBECONFIG: ""
+    WHODB_URL: "http://whodb.brain-system.svc:11000"
+  staticEnv:
+    SEALOS_DESKTOP_SKIP_TLS_VERIFY: "1"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+    replicas: 1
+  probes:
+    startup:
+      httpGet:
+        path: /health
+        port: 9000
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      httpGet:
+        path: /health
+        port: 9000
+      failureThreshold: 3
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    liveness:
+      httpGet:
+        path: /health
+        port: 9000
+      failureThreshold: 3
+      initialDelaySeconds: 15
+      periodSeconds: 10
+
+ui:
+  enabled: true
+  name: sealai-ui-staging
+  compositionRef: aps-deployment-ingress-go-templating
+  image: aimerite/sealai-ui:latest
+  imagePullPolicy: Always
+  port: 3000
+  paused: false
+  restartRequest: 0
+  platformAddresses:
+    - id: pa_uistaging1
+      port: 3000
+    - id: pa_uistaging2
+      port: 3000
+  env:
+    API_URL: ""
+    DATABASE_URL: ""
+    GITHUB_OAUTH_CLIENT_ID: ""
+    GITHUB_OAUTH_CLIENT_SECRET: ""
+    SYSTEM_OPENAI_API_KEY: ""
+    SYSTEM_OPENAI_API_BASE_URL: "https://api.openai.com/v1"
+    FREE_CHAT_TURNS: "5"
+    AI_PROXY_TOKEN_NAME: "sealos-brain"
+    SEALOS_HOST: ""
+    DEVBOX_TOKEN: ""
+    DEVBOX_JWT_SIGNING_KEY: ""
+    DEVBOX_RUNTIME_IMAGE: ""
+    DEVBOX_ARCHIVE_AFTER_PAUSE_TIME: "24h"
+    DEVBOX_JWT_TTL_SECONDS: "14400"
+  optionalSecretKeys:
+    - SYSTEM_OPENAI_API_KEY
+    - DEVBOX_TOKEN
+    - DEVBOX_JWT_SIGNING_KEY
+    - DEVBOX_RUNTIME_IMAGE
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+    limits:
+      cpu: 2000m
+      memory: 2048Mi
+    replicas: 1
+  probes:
+    startup:
+      httpGet:
+        path: /
+        port: 3000
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      httpGet:
+        path: /
+        port: 3000
+      failureThreshold: 3
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      httpGet:
+        path: /
+        port: 3000
+      failureThreshold: 3
+      initialDelaySeconds: 15
+      periodSeconds: 15
+
+registry:
+  enabled: true
+  name: sealai-registry
+  compositionRef: aps-deployment-ingress-go-templating
+  image: puddlecat/sealai-registry:latest
+  imagePullPolicy: Always
+  port: 10000
+  paused: false
+  restartRequest: 0
+  platformAddresses:
+    - id: pa_registry1
+      port: 10000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+    limits:
+      cpu: 1500m
+      memory: 1536Mi
+    replicas: 1
+
+whodb:
+  enabled: true
+  name: whodb
+  image: docker.io/aimerite/whodb:whodb-integration-2026.509.021621
+  imagePullPolicy: Always
+  port: 11000
+  replicas: 1
+  env:
+    WHODB_LOG_LEVEL: warn
+    WHODB_LOG_FORMAT: json
+    WHODB_DISABLE_UPDATE_CHECK: "true"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

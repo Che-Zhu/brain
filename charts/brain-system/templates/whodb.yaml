@@ -1,0 +1,97 @@
+{{- if .Values.whodb.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.whodb.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brain-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: whodb
+  {{- with (include "brain-system.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.whodb.replicas }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: whodb
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "brain-system.labels" . | nindent 8 }}
+        app.kubernetes.io/component: whodb
+    spec:
+      automountServiceAccountToken: false
+      {{- if and .Values.imagePullSecret.useForWhodb .Values.imagePullSecret.name }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret.name }}
+      {{- end }}
+      containers:
+        - name: whodb
+          image: {{ .Values.whodb.image | quote }}
+          imagePullPolicy: {{ .Values.whodb.imagePullPolicy }}
+          env:
+            - name: PORT
+              value: {{ .Values.whodb.port | quote }}
+            {{- range $key, $value := .Values.whodb.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.whodb.port }}
+              name: http
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            {{- toYaml .Values.whodb.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.whodb.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brain-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: whodb
+  {{- with (include "brain-system.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: whodb
+  ports:
+    - name: http
+      port: {{ .Values.whodb.port }}
+      protocol: TCP
+      targetPort: http
+{{- end }}

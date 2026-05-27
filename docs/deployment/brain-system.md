@@ -1,6 +1,6 @@
 # brain-system Deployment Runbook
 
-This document defines the deployment goal, resource boundary, bootstrap order, release flow, rollback flow, and verification commands for the `brain-system` namespace.
+This document defines the deployment goal, resource boundary, bootstrap order, Helm release flow, rollback flow, and verification commands for the `brain-system` namespace.
 
 The target state is not "some YAML files exist". The target state is: an engineer can start from an empty compatible Kubernetes cluster, install the platform dependencies, apply the SealAI control-plane resources, deploy the application workloads, verify health, and know which resources are safe to edit.
 
@@ -94,7 +94,6 @@ Edit AP fields for desired changes:
 - `spec.input.imagePullPolicy`
 - `spec.input.network.privatePort`
 - `spec.input.network.platformAddresses`
-- `spec.input.network.customDomains`
 - `spec.input.env`
 - `spec.input.probes`
 - `spec.resource.requests`
@@ -104,6 +103,8 @@ Edit AP fields for desired changes:
 - `spec.restartRequest`
 
 Do not patch the generated `Deployment` or `Ingress` as a durable change. Crossplane can overwrite it on the next reconcile.
+
+For a one-off cluster hostname override, patch the generated `Ingress` only after pausing that AP's Crossplane reconcile. This is an operational override for the live cluster, not part of the Helm release values.
 
 ### Crossplane-managed DB workload
 
@@ -185,7 +186,16 @@ The repo also contains Dockerfiles for deployable app images:
 | API | `apps/api/Dockerfile` | `aimerite/sealai-api` |
 | Registry | `apps/registry/Dockerfile` | `puddlecat/sealai-registry` |
 
-The deployable `brain-system` configuration lives under `deploy/brain-system/`:
+The preferred deployable `brain-system` configuration is the Helm chart:
+
+| Purpose | Path |
+| --- | --- |
+| Helm chart entrypoint | `charts/brain-system/Chart.yaml` |
+| Default values | `charts/brain-system/values.yaml` |
+| Private values template | `charts/brain-system/values.local.example.yaml` |
+| Chart README | `charts/brain-system/README.md` |
+
+The raw manifest reference lives under `deploy/brain-system/`:
 
 | Purpose | Path |
 | --- | --- |
@@ -210,13 +220,13 @@ Use this sequence for a cluster that does not already have the platform installe
 ```bash
 export KUBECONFIG=/path/to/admin-kubeconfig
 export NAMESPACE=brain-system
-export REGION_DOMAIN=192.168.12.53.nip.io
+export REGION_DOMAIN=192.168.10.189.nip.io
 ```
 
 The current operational kubeconfig path on this machine is:
 
 ```bash
-export KUBECONFIG=/Users/jingyang/.kube/53-admin-config
+export KUBECONFIG=/Users/jingyang/.kube/192.168.10.189-admin-config
 ```
 
 ### 2. Install platform controllers
@@ -287,47 +297,40 @@ kubectl get composition aps-deployment-ingress-go-templating
 kubectl get composition dbs-postgresql-kubeblocks-go-templating
 ```
 
-### 5. Create namespace and base secrets
+### 5. Prepare private Helm values
 
-Create namespace:
+Create a private values file outside the repo:
 
 ```bash
-kubectl apply -f deploy/brain-system/namespace.yaml
+cp charts/brain-system/values.local.example.yaml /tmp/brain-system.values.yaml
 ```
 
-Create image pull secret if private images are used:
+Edit `/tmp/brain-system.values.yaml`.
+
+Generate `api.env.ENCODED_ADMIN_KUBECONFIG` from the target kubeconfig:
 
 ```bash
-kubectl -n "${NAMESPACE}" create secret docker-registry ghcr-cred \
-  --docker-server=ghcr.io \
-  --docker-username="${GHCR_USERNAME}" \
-  --docker-password="${GHCR_TOKEN}" \
-  --dry-run=client -o yaml | kubectl apply -f -
+node -e 'console.log(encodeURIComponent(require("fs").readFileSync(process.env.KUBECONFIG, "utf8")))'
 ```
 
-The current cluster has `ghcr-cred`, but the active images are public Docker Hub style images. Keep the secret because the AP composition already references image pull secrets.
+The chart can create the app environment Secrets directly from values. If you want to manage Secrets outside Helm, set:
 
-Create application environment secrets without committing values. Use `deploy/brain-system/secrets/*.example.yaml` only as key templates; do not apply them unchanged:
+```yaml
+secrets:
+  create: false
+  apiName: sealai-api-staging-env
+  uiName: sealai-ui-staging-env
+```
 
-```bash
-kubectl -n "${NAMESPACE}" create secret generic sealai-api-staging-env \
-  --from-literal=VMSELECT_URL="${VMSELECT_URL}" \
-  --from-literal=VLSELECT_URL="${VLSELECT_URL}" \
-  --from-literal=ENCODED_ADMIN_KUBECONFIG="${ENCODED_ADMIN_KUBECONFIG}" \
-  --from-literal=WHODB_URL="${WHODB_URL}" \
-  --dry-run=client -o yaml | kubectl apply -f -
+Then create those Secrets yourself before installing the AP resources.
 
-kubectl -n "${NAMESPACE}" create secret generic sealai-ui-staging-env \
-  --from-literal=API_URL="${API_URL}" \
-  --from-literal=GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID}" \
-  --from-literal=GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET}" \
-  --from-literal=VERCEL_TEAM_ID="${VERCEL_TEAM_ID}" \
-  --from-literal=VERCEL_PROJECT_ID="${VERCEL_PROJECT_ID}" \
-  --from-literal=VERCEL_TOKEN="${VERCEL_TOKEN}" \
-  --from-literal=DATABASE_URL="${DATABASE_URL}" \
-  --from-literal=SANDBOX_PROXY="${SANDBOX_PROXY}" \
-  --from-literal=NODE_TLS_REJECT_UNAUTHORIZED="${NODE_TLS_REJECT_UNAUTHORIZED:-0}" \
-  --dry-run=client -o yaml | kubectl apply -f -
+The AP composition currently references `imagePullSecrets: [{name: ghcr-cred}]`. On a new cluster, keep this in your private values unless the Secret already exists:
+
+```yaml
+imagePullSecret:
+  create: true
+  name: ghcr-cred
+  dockerConfigJson: '{"auths":{}}'
 ```
 
 Secret keys currently expected:
@@ -335,18 +338,33 @@ Secret keys currently expected:
 | Secret | Keys |
 | --- | --- |
 | `sealai-api-staging-env` | `VMSELECT_URL`, `VLSELECT_URL`, `ENCODED_ADMIN_KUBECONFIG`, `WHODB_URL` |
-| `sealai-ui-staging-env` | `API_URL`, `DATABASE_URL`, `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`, `VERCEL_TOKEN`, `SANDBOX_PROXY`, `NODE_TLS_REJECT_UNAUTHORIZED` |
-| `brain-pg-conn-credential` | Generated by KubeBlocks/Crossplane; do not create manually unless restoring |
+| `sealai-ui-staging-env` | `API_URL`, `DATABASE_URL`, `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `SYSTEM_OPENAI_API_KEY`, `SYSTEM_OPENAI_API_BASE_URL`, `FREE_CHAT_TURNS`, `AI_PROXY_TOKEN_NAME`, `SEALOS_HOST`, `DEVBOX_TOKEN`, `DEVBOX_JWT_SIGNING_KEY`, `DEVBOX_RUNTIME_IMAGE`, `DEVBOX_ARCHIVE_AFTER_PAUSE_TIME`, `DEVBOX_JWT_TTL_SECONDS` |
+| `brain-pg-conn-credential` | Generated by KubeBlocks/Crossplane; use it to compose `DATABASE_URL` |
 
-### 6. Deploy database claim
+Use `SYSTEM_OPENAI_API_KEY` and `SYSTEM_OPENAI_API_BASE_URL` for platform-paid free turns in every environment. User-billed turns use the Sealos AI proxy token path controlled by `AI_PROXY_TOKEN_NAME`.
 
-Apply the DB claim:
+### 6. Install or upgrade with Helm
+
+If `ui.env.DATABASE_URL` is already known, install everything in one command:
 
 ```bash
-kubectl apply -f deploy/brain-system/database/brain-pg.yaml
+helm upgrade --install brain-system charts/brain-system \
+  -n "${NAMESPACE}" \
+  --create-namespace \
+  -f /tmp/brain-system.values.yaml
 ```
 
-Wait:
+For a brand-new cluster where the DB password does not exist yet, install DB/API/registry/WhoDB first and hold UI:
+
+```bash
+helm upgrade --install brain-system charts/brain-system \
+  -n "${NAMESPACE}" \
+  --create-namespace \
+  -f /tmp/brain-system.values.yaml \
+  --set ui.enabled=false
+```
+
+Wait for the database Secret:
 
 ```bash
 kubectl -n "${NAMESPACE}" get db brain-pg
@@ -355,47 +373,24 @@ kubectl -n "${NAMESPACE}" wait pod/brain-pg-postgresql-0 --for=condition=Ready -
 kubectl -n "${NAMESPACE}" get secret brain-pg-conn-credential
 ```
 
-Use the generated secret to compose `DATABASE_URL`; do not copy a live password into docs or Git.
+Use the generated password to fill `ui.env.DATABASE_URL` in `/tmp/brain-system.values.yaml`; do not copy live passwords into Git.
 
-### 7. Deploy application claims
-
-Apply AP claims equivalent to the current state. Use immutable version tags when possible:
+Then enable UI:
 
 ```bash
-kubectl apply -f deploy/brain-system/apps/sealai-api-staging.yaml
-kubectl apply -f deploy/brain-system/apps/sealai-ui-staging.yaml
-kubectl apply -f deploy/brain-system/apps/sealai-registry.yaml
+helm upgrade --install brain-system charts/brain-system \
+  -n "${NAMESPACE}" \
+  --create-namespace \
+  -f /tmp/brain-system.values.yaml
 ```
 
-Or apply all application/database resources together after secrets are in place:
-
-```bash
-kubectl apply -k deploy/brain-system
-```
-
-Wait:
+Wait for application resources:
 
 ```bash
 kubectl -n "${NAMESPACE}" wait ap/sealai-ui-staging --for=condition=Ready --timeout=10m
 kubectl -n "${NAMESPACE}" wait ap/sealai-api-staging --for=condition=Ready --timeout=10m
 kubectl -n "${NAMESPACE}" wait ap/sealai-registry --for=condition=Ready --timeout=10m
 
-kubectl -n "${NAMESPACE}" rollout status deploy/sealai-ui-staging --timeout=10m
-kubectl -n "${NAMESPACE}" rollout status deploy/sealai-api-staging --timeout=10m
-kubectl -n "${NAMESPACE}" rollout status deploy/sealai-registry --timeout=10m
-```
-
-### 8. Deploy WhoDB
-
-Apply the native Deployment and Service:
-
-```bash
-kubectl apply -f deploy/brain-system/apps/whodb.yaml
-```
-
-Wait:
-
-```bash
 kubectl -n "${NAMESPACE}" rollout status deploy/whodb --timeout=5m
 ```
 
@@ -593,7 +588,7 @@ The current hosts use the `192.168.12.53.nip.io` pattern and TLS secret `wildcar
 
 - Commit documentation and desired-state changes before applying them to production-like clusters.
 - Use immutable image tags for deploys; avoid relying on `latest` for rollback.
-- Never commit real Secret values, kubeconfigs, database passwords, GitHub OAuth secrets, Vercel tokens, or OpenAI/API keys.
+- Never commit real Secret values, kubeconfigs, database passwords, GitHub OAuth secrets, Devbox tokens/signing keys, or OpenAI/API keys.
 - Patch AP/DB claims for durable changes; inspect generated resources for debugging.
 - Treat `brain-pg` as stateful. Any storage, backup, restore, or termination policy change needs a separate review.
 - Before claiming a deployment is done, verify both controller-level readiness (`AP`/`DB`) and runtime readiness (`Deployment`/`InstanceSet`/HTTP checks).

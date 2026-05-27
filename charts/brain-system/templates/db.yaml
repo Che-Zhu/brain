@@ -1,0 +1,50 @@
+{{- if .Values.database.enabled }}
+apiVersion: example.crossplane.io/v1
+kind: DB
+metadata:
+  name: {{ .Values.database.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brain-system.labels" . | nindent 4 }}
+    {{- include "brain-system.regionLabel" . | nindent 4 }}
+  {{- with (include "brain-system.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  crossplane:
+    compositionRef:
+      name: {{ .Values.database.compositionRef }}
+  engine: {{ .Values.database.engine }}
+  exposeNodePort: {{ .Values.database.exposeNodePort }}
+  quota: {{ .Values.database.quota }}
+  replicas: {{ .Values.database.replicas }}
+  terminationPolicy: {{ .Values.database.terminationPolicy }}
+  paused: {{ .Values.database.paused }}
+  restartRequest: {{ .Values.database.restartRequest }}
+  {{- with .Values.database.storageSize }}
+  storageSize: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.cpuRequest }}
+  cpuRequest: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.memoryRequest }}
+  memoryRequest: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.cpuLimit }}
+  cpuLimit: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.memoryLimit }}
+  memoryLimit: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.database.scheduledBackup }}
+  scheduledBackup:
+    enabled: {{ .enabled }}
+    cronExpression: {{ .cronExpression | quote }}
+    retentionPeriod: {{ .retentionPeriod | quote }}
+    repoName: {{ .repoName | quote }}
+  {{- end }}
+{{- end }}
