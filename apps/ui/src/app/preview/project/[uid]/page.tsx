@@ -214,6 +214,7 @@ export default function PreviewProjectPage() {
             />
             <CanvasActionSurface
               action={canvasAction}
+              dbAccessAvailable={false}
               onClose={closeCanvasActionSurface}
               selectedDatabaseData={selectedDatabaseData}
             />
