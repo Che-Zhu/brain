@@ -562,6 +562,10 @@ function WorkbenchDataView({
   onRetry: () => void;
   rows: DbAccessRowsResult | undefined;
 }) {
+  const columns = rows?.columns ?? [];
+  const pageOffset = rows?.pageOffset ?? 0;
+  const pageSize = rows?.pageSize ?? 100;
+
   if (error) {
     return (
       <div
@@ -620,7 +624,7 @@ function WorkbenchDataView({
               >
                 {" "}
               </th>
-              {(rows?.columns ?? []).map((column) => (
+              {columns.map((column) => (
                 <th
                   className="sticky top-0 z-40 border-border/50 border-r border-b bg-background px-4 py-2 text-left font-semibold text-muted-foreground text-xs"
                   key={column.name}
@@ -634,8 +638,8 @@ function WorkbenchDataView({
           </thead>
           <tbody className="bg-background">
             {(rows?.rows ?? []).map((row, index) => {
-              const rowNumber = (rows?.pageOffset ?? 0) + index + 1;
-              const rowKey = `${activeTab.id}:${row.join("\u001f")}`;
+              const rowNumber = pageOffset + index + 1;
+              const rowKey = `${activeTab.id}:${rowNumber}:${row.join("\u001f")}`;
               return (
                 <tr
                   className="group transition-colors hover:bg-muted/50"
@@ -647,7 +651,7 @@ function WorkbenchDataView({
                   >
                     {rowNumber}
                   </td>
-                  {(rows?.columns ?? []).map((column, cellIndex) => {
+                  {columns.map((column, cellIndex) => {
                     const value = row[cellIndex];
                     return (
                       <td
@@ -681,10 +685,7 @@ function WorkbenchDataView({
         className="flex h-10 shrink-0 items-center justify-between border-t px-3 text-muted-foreground text-xs"
         data-slot="db-access-pagination"
       >
-        <span>
-          Page{" "}
-          {Math.floor((rows?.pageOffset ?? 0) / (rows?.pageSize ?? 100)) + 1}
-        </span>
+        <span>Page {Math.floor(pageOffset / pageSize) + 1}</span>
         <span>{rows?.totalCount ?? 0} rows</span>
       </div>
     </>
