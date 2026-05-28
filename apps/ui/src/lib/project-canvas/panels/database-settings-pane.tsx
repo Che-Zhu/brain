@@ -193,7 +193,7 @@ function DatabaseSettingsConnectionAddressRow({
   return (
     <CanvasNode.CopyableRow
       className={cn(
-        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-resource-pane-card p-2.5 shadow-sm transition-colors",
+        "relative flex min-w-0 flex-col gap-2 rounded-lg bg-resource-pane-card p-4 shadow-sm transition-colors",
         displayValue ? "min-h-20" : "min-h-11"
       )}
       copyAriaLabel={`Copy ${displayLabel}`}

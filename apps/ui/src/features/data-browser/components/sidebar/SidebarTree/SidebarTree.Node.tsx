@@ -1,0 +1,208 @@
+import { cn } from "@data-browser/lib/utils";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
+  CircleDot,
+  Database,
+  Eye,
+  Files,
+  Folder,
+  Hash,
+  ListOrdered,
+  ListTree,
+  Loader2,
+  Table,
+  Type,
+} from "lucide-react";
+import type React from "react";
+import { createContext, use } from "react";
+import { useSidebarTree } from "./SidebarTreeProvider";
+import type { NodeType, TreeNodeData } from "./types";
+import { DB_ICONS, EXPANDABLE_TYPES } from "./types";
+
+/** Interaction context passed by Sidebar to each service tree. */
+export interface TreeNodeContextValue {
+  dbServiceEngineType: string;
+  onContextMenu: (e: React.MouseEvent, node: TreeNodeData) => void;
+  onItemClick: (node: TreeNodeData) => void;
+  onToggle: (node: TreeNodeData) => void;
+  selectedItemId: string | null;
+}
+
+const TreeNodeCtx = createContext<TreeNodeContextValue | null>(null);
+
+export const TreeNodeProvider = TreeNodeCtx.Provider;
+
+function useTreeNodeContext(): TreeNodeContextValue {
+  const ctx = use(TreeNodeCtx);
+  if (!ctx) {
+    throw new Error("TreeNode must be used within TreeNodeProvider");
+  }
+  return ctx;
+}
+
+const NODE_ICONS: Record<
+  NodeType,
+  React.ComponentType<{ className?: string }>
+> = {
+  db_service: Database,
+  database: Database,
+  schema: ListTree,
+  table_folder: Folder,
+  view_folder: Folder,
+  table: Table,
+  view: Eye,
+  collection: Files,
+  redis_keys_folder: Folder,
+  redis_key: Type,
+};
+
+const REDIS_TYPE_ICONS: Record<
+  string,
+  React.ComponentType<{ className?: string }>
+> = {
+  string: Type,
+  hash: Hash,
+  list: ListOrdered,
+  set: CircleDot,
+  zset: ArrowUpDown,
+};
+
+interface TreeNodeProps {
+  depth: number;
+  node: TreeNodeData;
+}
+
+export function TreeNode({ node, depth }: TreeNodeProps) {
+  const { expandedItems, isLoading: loadingItems, treeData } = useSidebarTree();
+  const {
+    dbServiceEngineType,
+    selectedItemId,
+    onItemClick,
+    onToggle,
+    onContextMenu,
+  } = useTreeNodeContext();
+
+  const isExpandable = EXPANDABLE_TYPES.has(node.type);
+  const isRoot = depth === 0;
+  const isExpanded = expandedItems.has(node.id);
+  const isSelected = selectedItemId === node.id;
+  const nodeIsLoading = !!loadingItems[node.id];
+  const children = treeData[node.id];
+
+  const Icon =
+    node.type === "redis_key" && node.metadata.redisKeyType
+      ? (REDIS_TYPE_ICONS[node.metadata.redisKeyType] ?? NODE_ICONS[node.type])
+      : NODE_ICONS[node.type];
+  const brandIcon = isRoot ? DB_ICONS[dbServiceEngineType] : null;
+
+  return (
+    <div>
+      <div
+        className={cn(
+          "group flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+          isSelected
+            ? "bg-resource-pane-input font-medium text-resource-pane-foreground"
+            : "text-resource-pane-primary hover:bg-resource-pane-input hover:text-resource-pane-foreground"
+        )}
+        data-qa-database={node.metadata.database}
+        data-qa-db-service-key={node.dbServiceKey || node.id}
+        data-qa-module="database"
+        data-qa-object="sidebar-node"
+        data-qa-resource-id={node.id}
+        data-qa-resource-type={node.type}
+        data-qa-schema={node.metadata.schema}
+        data-qa-state={[
+          isSelected ? "selected" : "idle",
+          isExpandable ? (isExpanded ? "expanded" : "collapsed") : "leaf",
+          nodeIsLoading ? "loading" : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        data-testid="database.sidebar.tree-node"
+        onClick={() => onItemClick(node)}
+        onContextMenu={(e) => onContextMenu(e, node)}
+      >
+        {isExpandable ? (
+          <button
+            className={cn(
+              "rounded p-0.5 transition-colors",
+              isSelected
+                ? "text-blue-400 hover:bg-resource-pane-input"
+                : "text-resource-pane-primary hover:bg-resource-pane-input"
+            )}
+            data-qa-action={isExpanded ? "collapse" : "expand"}
+            data-qa-module="database"
+            data-qa-object="sidebar-node"
+            data-qa-resource-id={node.id}
+            data-qa-resource-type={node.type}
+            data-qa-state={
+              nodeIsLoading ? "loading" : isExpanded ? "expanded" : "collapsed"
+            }
+            data-testid="database.sidebar.tree-node-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(node);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 opacity-70" />
+            ) : (
+              <ChevronRight className="h-4 w-4 opacity-70" />
+            )}
+          </button>
+        ) : (
+          <span className="p-0.5">
+            <ChevronRight className="h-4 w-4 opacity-0" />
+          </span>
+        )}
+
+        {brandIcon ? (
+          <img
+            alt={dbServiceEngineType}
+            className="h-4 w-4 shrink-0"
+            src={brandIcon}
+          />
+        ) : (
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              isSelected ? "text-blue-400" : "text-resource-pane-primary"
+            )}
+          />
+        )}
+
+        <span className="flex-1 truncate">{node.name}</span>
+
+        {nodeIsLoading && (
+          <Loader2
+            className="h-3 w-3 animate-spin text-resource-pane-primary"
+            data-qa-module="database"
+            data-qa-object="sidebar-node"
+            data-qa-resource-id={node.id}
+            data-qa-resource-type={node.type}
+            data-qa-state="loading"
+            data-testid="database.sidebar.tree-node-loading"
+          />
+        )}
+      </div>
+
+      {isExpanded && children && children.length > 0 && (
+        <div
+          className="mt-1 ml-3 space-y-0.5 border-resource-pane-border border-l pl-3"
+          data-qa-module="database"
+          data-qa-object="sidebar-node-children"
+          data-qa-resource-id={node.id}
+          data-qa-resource-type={node.type}
+          data-qa-state="expanded"
+          data-testid="database.sidebar.tree-node-children"
+        >
+          {children.map((child) => (
+            <TreeNode depth={depth + 1} key={child.id} node={child} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

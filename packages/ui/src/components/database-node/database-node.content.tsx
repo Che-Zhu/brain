@@ -17,6 +17,7 @@ import {
   Play,
   RotateCcw,
   SquareTerminal,
+  TableProperties,
   Trash2,
 } from "lucide-react";
 import { type ComponentType, type SVGProps, useState } from "react";
@@ -46,6 +47,7 @@ const METRIC_ITEMS = [
 
 const QUICK_ACTION_ITEMS = [
   { icon: Activity, key: "metrics", label: "Open metrics" },
+  { icon: TableProperties, key: "dbAccess", label: "Open database access" },
   { icon: SquareTerminal, key: "console", label: "Open database console" },
   { icon: FileText, key: "logs", label: "Open logs" },
 ] as const satisfies readonly {

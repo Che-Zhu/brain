@@ -105,7 +105,11 @@ export type DatabaseNodeTogglePublicConnectionHandler = (
   nextEnabled: boolean
 ) => Promise<void> | void;
 
-export type DatabaseNodeQuickActionKey = "console" | "logs" | "metrics";
+export type DatabaseNodeQuickActionKey =
+  | "console"
+  | "dbAccess"
+  | "logs"
+  | "metrics";
 
 export type DatabaseNodeLifecycleActionKey =
   | "delete"

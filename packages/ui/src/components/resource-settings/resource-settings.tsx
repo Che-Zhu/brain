@@ -52,7 +52,10 @@ export function ResourceSettingsInset({
 }: ComponentPropsWithoutRef<"div">) {
   return (
     <div
-      className={cn("rounded-lg bg-resource-pane-card p-2.5", className)}
+      className={cn(
+        "rounded-lg bg-resource-pane-card px-3 pt-2.5 pb-3",
+        className
+      )}
       {...props}
     >
       {children}

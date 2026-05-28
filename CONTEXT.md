@@ -99,6 +99,14 @@ An AP Replica Strategy where the platform automatically adjusts AP replicas betw
 
 Crossplane composite resource (`example.crossplane.io/v1`, kind `DB`) that represents a managed database workload available to APs in the same Project.
 
+### DB Service
+
+The user-facing database service represented by one DB resource and one database node on the Project Canvas. A DB Service may expose multiple engine-level Logical Databases through DB Access.
+
+### Logical Database
+
+An engine-level database namespace exposed inside one DB Service, such as a PostgreSQL database, MySQL database, MongoDB database, or Redis database index. A Logical Database is an object browsed inside DB Access, not a Project Canvas DB resource.
+
 ### DB Deployment Settings
 
 The creation-time choices for a new DB before the DB exists, including database engine, instance preset, and replica count. DB Deployment Settings are independent of entry path: they may create a DB together with a new Project or add a DB to an existing Project.
@@ -126,6 +134,14 @@ A local set of pending AP or DB settings changes that is submitted only when the
 ### Database Binding
 
 A runtime dependency where an AP is configured to consume one DB's connection credentials.
+
+### DB Access
+
+A read-only resource workflow for inspecting one DB Service's objects and data without exposing its connection credentials. DB Access is distinct from DB Settings: DB Settings changes a DB's desired configuration, while DB Access explores the Logical Databases and objects exposed by that DB Service.
+
+### DB Access Session
+
+One active DB Access browsing session for a single DB Service. A DB Access Session keeps object selection and open object tabs while browsing multiple Logical Databases within that DB Service, while closing DB Access or switching to a different DB Service starts a separate session.
 
 ### Container Node
 
@@ -164,6 +180,14 @@ A canvas edge that represents an established runtime dependency between resource
 ### Canvas Resource Pane
 
 A right-side canvas surface opened from a selected AP or DB node to inspect or change resource-scoped details such as settings, metrics, logs, or history. It is distinct from the project assistant chat pane.
+
+### Canvas Action Surface
+
+A temporary canvas surface opened from a node action for focused resource work, occupying the project main area rather than the Project Assistant Pane. A Canvas Action Surface is distinct from a Canvas Resource Pane because it is not a right-side inspection surface and may host different action-specific experiences over time.
+
+Within one project canvas, a Canvas Action Surface replaces the currently open temporary project surface instead of stacking with a Side Pane or Canvas Resource Pane.
+
+A Canvas Action Surface follows the project main area's available width when the Project Assistant Pane is opened or closed.
 
 ### Side Pane
 

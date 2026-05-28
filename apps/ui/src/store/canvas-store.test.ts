@@ -4,6 +4,10 @@ import { test } from "node:test";
 import type { Node } from "@xyflow/react";
 
 import {
+  normalizeCanvasActionMode,
+  shouldClearCanvasActionMode,
+} from "@/lib/project-canvas/actions/canvas-action-mode";
+import {
   CANVAS_CONTAINER_NODE_TYPE,
   CANVAS_DATABASE_NODE_TYPE,
   CANVAS_ENTRY_NODE_TYPE,
@@ -91,6 +95,11 @@ test("entry panel mode only accepts settings URL value", () => {
   assert.equal(normalizeEntryPaneMode("metrics"), null);
 });
 
+test("canvas action mode accepts DB access URL value", () => {
+  assert.equal(normalizeCanvasActionMode("dbAccess"), "dbAccess");
+  assert.equal(normalizeCanvasActionMode("metrics"), null);
+});
+
 test("container node selection opens settings mode and non-container selection clears it", () => {
   assert.equal(
     workloadPaneModeForNodeClick({ type: CANVAS_CONTAINER_NODE_TYPE }),
@@ -168,6 +177,36 @@ test("workload panel mode cleanup handles stale and non-container selections", (
       selectedNode: { type: CANVAS_CONTAINER_NODE_TYPE },
       serviceUid: "ap-uid",
       workloadPane: "history",
+    }),
+    false
+  );
+});
+
+test("canvas action mode cleanup handles stale and unsupported selections", () => {
+  assert.equal(
+    shouldClearCanvasActionMode({
+      canvasAction: "dbAccess",
+      rawNodeCount: 2,
+      selectedNode: null,
+      serviceUid: "stale-db-uid",
+    }),
+    true
+  );
+  assert.equal(
+    shouldClearCanvasActionMode({
+      canvasAction: "dbAccess",
+      rawNodeCount: 2,
+      selectedNode: { type: CANVAS_CONTAINER_NODE_TYPE },
+      serviceUid: "ap-uid",
+    }),
+    true
+  );
+  assert.equal(
+    shouldClearCanvasActionMode({
+      canvasAction: "dbAccess",
+      rawNodeCount: 2,
+      selectedNode: { type: CANVAS_DATABASE_NODE_TYPE },
+      serviceUid: "db-uid",
     }),
     false
   );

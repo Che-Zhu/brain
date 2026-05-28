@@ -24,6 +24,69 @@
       }
     },
     {
+      // DataFlow migration shim preserves the old `useI18n` call-site name from the plan.
+      "includes": ["apps/ui/src/features/data-browser/i18n/useI18n.ts"],
+      "linter": {
+        "rules": {
+          "style": { "useFilenamingConvention": "off" }
+        }
+      }
+    },
+    {
+      // DataFlow browser migration preserves copied shell/components for parity.
+      "includes": ["apps/ui/src/features/data-browser/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noLabelWithoutControl": "off",
+            "noNoninteractiveElementInteractions": "off",
+            "noStaticElementInteractions": "off",
+            "useButtonType": "off",
+            "useKeyWithClickEvents": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off",
+            "noForEach": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off",
+            "useImageSize": "off"
+          },
+          "performance": {
+            "noBarrelFile": "off",
+            "noDelete": "off",
+            "noImgElement": "off",
+            "noNamespaceImport": "off",
+            "useTopLevelRegex": "off"
+          },
+          "style": {
+            "noNestedTernary": "off",
+            "noNonNullAssertion": "off",
+            "noSubstr": "off",
+            "useCollapsedIf": "off",
+            "useConsistentArrayType": "off",
+            "useConsistentTypeDefinitions": "off",
+            "useDefaultSwitchClause": "off",
+            "useFilenamingConvention": "off",
+            "useForOf": "off",
+            "useTemplate": "off"
+          },
+          "suspicious": {
+            "noArrayIndexKey": "off",
+            "noAssignInExpressions": "off",
+            "noBitwiseOperators": "off",
+            "noEvolvingTypes": "off",
+            "noExplicitAny": "off",
+            "noGlobalIsNan": "off",
+            "noImplicitAnyLet": "off",
+            "noShadowRestrictedNames": "off",
+            "useAwait": "off",
+            "useIterableCallbackReturn": "off"
+          }
+        }
+      }
+    },
+    {
       // Compound facade for `@workspace/ui` ports-table module (dot-notation API).
       "includes": ["packages/ui/src/components/ports-table/ports-table.tsx"],
       "linter": {

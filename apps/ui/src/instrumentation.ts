@@ -20,6 +20,14 @@ export async function register() {
     for (const schemaName of [ASSISTANT_DB_SCHEMA, PROJECT_DB_SCHEMA]) {
       await pool.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
     }
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+    console.warn(
+      "[instrumentation] skipped app Postgres schema bootstrap:",
+      error
+    );
   } finally {
     await pool.end();
   }

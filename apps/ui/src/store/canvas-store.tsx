@@ -26,6 +26,9 @@ export const DATABASE_PANE_QUERY_KEY = "dbPane" as const;
 /** nuqs key for the EntryPoint action pane (`?entryPane=settings`). */
 export const ENTRY_PANE_QUERY_KEY = "entryPane" as const;
 
+/** nuqs key for the full-width canvas action surface (`?canvasAction=dbAccess`). */
+export const CANVAS_ACTION_QUERY_KEY = "canvasAction" as const;
+
 export const WORKLOAD_PANE = {
   events: "events",
   history: "history",
@@ -42,6 +45,10 @@ export const DATABASE_PANE = {
 
 export const ENTRY_PANE = {
   settings: "settings",
+} as const;
+
+export const CANVAS_ACTION = {
+  dbAccess: "dbAccess",
 } as const;
 
 /**
