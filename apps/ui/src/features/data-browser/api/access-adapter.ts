@@ -199,7 +199,10 @@ function fallbackExportFilename(
   ref: AccessObjectRef,
   format: AccessExportFormat
 ) {
-  const basename = ref.path.at(-1) || ref.kind;
+  const rawBasename = ref.path.at(-1) || ref.kind;
+  const basename =
+    rawBasename.replace(/[^a-z0-9._-]+/gi, "_").replace(/^_+|_+$/g, "") ||
+    "export";
   return `${basename}.${format === "ndjson" ? "ndjson" : "csv"}`;
 }
 

@@ -3,6 +3,7 @@ import { afterEach, test } from "node:test";
 
 import {
   accessRowsToDataFlowTableData,
+  DATA_BROWSER_EXPORT_FORMATS,
   exportObject,
   getRows,
 } from "./access-adapter";
@@ -154,6 +155,34 @@ test("visible export helper does not send selected rows or query-backed payload"
   assert.equal("query" in capturedBody, false);
   assert.equal("where" in capturedBody, false);
   assert.equal("filter" in capturedBody, false);
+});
+
+test("visible export formats are limited to backend-safe formats", () => {
+  assert.deepEqual([...DATA_BROWSER_EXPORT_FORMATS], ["csv", "ndjson"]);
+});
+
+test("visible export falls back to a safe filename when header is absent", async () => {
+  const restoreFetch = installFetch((_url, _init) => {
+    return new Response("{}", {
+      headers: {
+        "Content-Type": "application/x-ndjson",
+      },
+    });
+  });
+
+  try {
+    const result = await exportObject({
+      runtime,
+      ref: {
+        kind: "collection",
+        path: ["sales/db", "events 2026"],
+      },
+      format: "ndjson",
+    });
+    assert.equal(result.filename, "events_2026.ndjson");
+  } finally {
+    restoreFetch();
+  }
 });
 
 test("rows conversion preserves columns, types, primary and foreign keys", () => {

@@ -185,9 +185,11 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       const existingConnection = state.connections.find(
         (connection) => connection.id === VIRTUAL_CONNECTION_ID
       );
-      const connection = runtimeConnectionMatches(existingConnection, runtime)
-        ? existingConnection
-        : connectionFromRuntime(runtime);
+      const connection =
+        existingConnection &&
+        runtimeConnectionMatches(existingConnection, runtime)
+          ? existingConnection
+          : connectionFromRuntime(runtime);
       const selectedItem =
         state.selectedItem?.connectionId === VIRTUAL_CONNECTION_ID ||
         state.selectedItem?.id === VIRTUAL_CONNECTION_ID
