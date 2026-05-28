@@ -1,5 +1,5 @@
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { List } from "lucide-react";
 import {
   createContext,
@@ -156,7 +156,7 @@ export function RedisKeyProvider({
   initialData,
   children,
 }: RedisKeyProviderProps): JSX.Element {
-  const { createTable } = useConnectionStore();
+  const { createTable } = useDbAccessReadOnlyActions();
   const [draft, setDraft] = useState<RedisKeyDraft>(() =>
     normalizeDraft(initialData)
   );

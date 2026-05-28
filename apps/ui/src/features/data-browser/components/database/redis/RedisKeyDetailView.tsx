@@ -27,7 +27,10 @@ import {
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
 import { cn } from "@data-browser/lib/utils";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessRefresh,
+  useDbAccessRuntime,
+} from "@data-browser/state/db-access-session";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
 import {
   ArrowDownAZ,
@@ -83,20 +86,21 @@ function FindBarConsumer({
 // ---------------------------------------------------------------------------
 
 interface RedisKeyDetailViewProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   keyName: string;
   objectRef: AccessObjectRef;
 }
 
 /** Displays and allows inline editing of a single Redis key's contents. */
 export function RedisKeyDetailView({
-  connectionId,
   databaseName,
+  dbServiceKey,
   keyName,
   objectRef,
 }: RedisKeyDetailViewProps) {
-  const { connections, tableRefreshKey } = useConnectionStore();
+  const runtime = useDbAccessRuntime();
+  const { tableRefreshKey } = useDbAccessRefresh();
 
   // ---- Data state ----
   const [data, setData] = useState<TableData | null>(null);
@@ -145,13 +149,6 @@ export function RedisKeyDetailView({
   // =========================================================================
 
   const fetchData = useCallback(async () => {
-    const conn = connections.find((c) => c.id === connectionId);
-    if (!conn?.runtime) {
-      setError("Connection not found");
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -170,7 +167,7 @@ export function RedisKeyDetailView({
 
     try {
       const result = await getRows({
-        runtime: conn.runtime,
+        runtime,
         ref: objectRef,
         sort,
         pageSize,
@@ -203,15 +200,7 @@ export function RedisKeyDetailView({
         setLoading(false);
       }
     }
-  }, [
-    connections,
-    connectionId,
-    sortColumn,
-    sortDirection,
-    pageSize,
-    currentPage,
-    objectRef,
-  ]);
+  }, [runtime, sortColumn, sortDirection, pageSize, currentPage, objectRef]);
 
   useEffect(() => {
     fetchData();
@@ -339,8 +328,8 @@ export function RedisKeyDetailView({
     return (
       <div
         className="flex flex-1 items-center justify-center"
-        data-qa-connection-id={connectionId}
         data-qa-database={databaseName}
+        data-qa-db-service-key={dbServiceKey}
         data-qa-loading="true"
         data-qa-module="redis"
         data-qa-object="key-detail"
@@ -358,8 +347,8 @@ export function RedisKeyDetailView({
     <FindBar.Provider columns={columns} rows={rows}>
       <div
         className="flex h-full flex-col bg-background"
-        data-qa-connection-id={connectionId}
         data-qa-database={databaseName}
+        data-qa-db-service-key={dbServiceKey}
         data-qa-key-type={keyType}
         data-qa-loading={loading ? "true" : "false"}
         data-qa-module="redis"

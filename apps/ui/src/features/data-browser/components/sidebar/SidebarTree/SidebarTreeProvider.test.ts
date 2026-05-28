@@ -9,9 +9,9 @@ import {
   dataBrowserPostgresSchemaFolders,
   dataBrowserRedisKeysFolder,
 } from "./SidebarTreeProvider";
-import type { TreeNodeData } from "./types";
+import { dbServiceToNode, type TreeNodeData } from "./types";
 
-const connectionId = "data-browser-runtime";
+const dbServiceKey = "project-uid:database-system:postgres-main";
 
 function object(
   kind: string,
@@ -26,7 +26,29 @@ function object(
   };
 }
 
-test("tree maps access object refs to legacy node types", () => {
+test("DB Service root node uses db_service type", () => {
+  const node = dbServiceToNode({
+    databaseName: "app",
+    dbServiceKey,
+    displayName: "postgres-main",
+    engineType: "POSTGRES",
+    runtime: {
+      database: { displayEngine: "PostgreSQL", name: "app" },
+      databaseWorkloadName: "postgres-main",
+      databaseWorkloadNamespace: "database-system",
+      engine: "POSTGRES",
+      kubeconfig: "kube",
+      namespace: "project-ns",
+      projectUid: "project-uid",
+    },
+  });
+
+  assert.equal(node.type, "db_service");
+  assert.equal(node.id, dbServiceKey);
+  assert.equal(node.dbServiceKey, dbServiceKey);
+});
+
+test("tree maps access object refs to DB Service scoped node types", () => {
   const cases = [
     [object("database", ["app"]), "database"],
     [object("schema", ["app", "public"]), "schema"],
@@ -38,16 +60,17 @@ test("tree maps access object refs to legacy node types", () => {
 
   for (const [accessObject, type] of cases) {
     const node = dataBrowserObjectToTreeNode({
-      connectionId,
+      dbServiceKey,
       object: accessObject,
       parentId: "parent",
     });
 
     assert.equal(node?.type, type);
+    assert.equal(node?.dbServiceKey, dbServiceKey);
     assert.deepEqual(node?.metadata.objectRef, accessObject.ref);
     assert.equal(
       node?.id,
-      dataBrowserObjectNodeId(connectionId, accessObject.ref)
+      dataBrowserObjectNodeId(dbServiceKey, accessObject.ref)
     );
   }
 });
@@ -55,7 +78,7 @@ test("tree maps access object refs to legacy node types", () => {
 test("postgres schema children are Tables and Views virtual folders", () => {
   const schemaRef = { kind: "schema", path: ["app", "public"] };
   const schemaNode: TreeNodeData = {
-    connectionId,
+    dbServiceKey,
     id: "schema-node",
     metadata: {
       database: "app",
@@ -67,7 +90,7 @@ test("postgres schema children are Tables and Views virtual folders", () => {
     type: "schema",
   };
 
-  const folders = dataBrowserPostgresSchemaFolders(schemaNode, (key) => key);
+  const folders = dataBrowserPostgresSchemaFolders(schemaNode);
 
   assert.deepEqual(
     folders.map((folder) => folder.type),
@@ -81,12 +104,16 @@ test("postgres schema children are Tables and Views virtual folders", () => {
     folders.map((folder) => folder.metadata.parentRef),
     [schemaRef, schemaRef]
   );
+  assert.deepEqual(
+    folders.map((folder) => folder.dbServiceKey),
+    [dbServiceKey, dbServiceKey]
+  );
 });
 
 test("redis database child is Keys virtual folder", () => {
   const databaseRef = { kind: "database", path: ["redis"] };
   const databaseNode: TreeNodeData = {
-    connectionId,
+    dbServiceKey,
     id: "redis-db",
     metadata: {
       database: "redis",
@@ -96,10 +123,11 @@ test("redis database child is Keys virtual folder", () => {
     type: "database",
   };
 
-  const folders = dataBrowserRedisKeysFolder(databaseNode, (key) => key);
+  const folders = dataBrowserRedisKeysFolder(databaseNode);
 
   assert.equal(folders.length, 1);
   assert.equal(folders[0]?.type, "redis_keys_folder");
+  assert.equal(folders[0]?.dbServiceKey, dbServiceKey);
   assert.deepEqual(folders[0]?.metadata.kindFilter, ["key"]);
   assert.deepEqual(folders[0]?.metadata.parentRef, databaseRef);
 });
@@ -107,15 +135,9 @@ test("redis database child is Keys virtual folder", () => {
 test("expanded tree localStorage key is scoped by project and service", () => {
   assert.equal(
     dataBrowserExpandedStorageKey({
-      runtime: {
-        database: { displayEngine: "PostgreSQL", name: "app" },
-        databaseWorkloadName: "postgres-main",
-        databaseWorkloadNamespace: "database-system",
-        engine: "POSTGRES",
-        kubeconfig: "kube",
-        namespace: "project-ns",
-        projectUid: "project-uid",
-      },
+      databaseWorkloadName: "postgres-main",
+      databaseWorkloadNamespace: "database-system",
+      projectUid: "project-uid",
     }),
     "data-browser:expanded:project-uid:database-system:postgres-main"
   );

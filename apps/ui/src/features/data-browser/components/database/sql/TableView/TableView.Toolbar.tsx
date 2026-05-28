@@ -9,15 +9,15 @@ import { Download, RefreshCw } from "lucide-react";
 import { useTableView } from "./TableViewProvider";
 
 interface TableViewToolbarProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   schema?: string;
   tableName: string;
 }
 
 export function TableViewToolbar({
-  connectionId,
   databaseName,
+  dbServiceKey,
   tableName,
   schema,
 }: TableViewToolbarProps) {
@@ -25,8 +25,8 @@ export function TableViewToolbar({
   return (
     <div
       className="flex h-12 items-center justify-between px-2"
-      data-qa-connection-id={connectionId}
       data-qa-database={databaseName}
+      data-qa-db-service-key={dbServiceKey}
       data-qa-module="sql"
       data-qa-object="table-toolbar"
       data-qa-resource-id={tableName}

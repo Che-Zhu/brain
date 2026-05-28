@@ -5,7 +5,7 @@ import {
   RadioGroupItem,
 } from "@data-browser/components/ui/radio-group";
 import { cn } from "@data-browser/lib/utils";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { Eraser } from "lucide-react";
 import {
   createContext,
@@ -56,7 +56,7 @@ function ClearTableDataProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { clearTableData } = useConnectionStore();
+  const { clearTableData } = useDbAccessReadOnlyActions();
   const [mode, setMode] = useState<"truncate" | "delete">("truncate");
 
   const handleSubmit = useCallback(async () => {

@@ -4,7 +4,7 @@ import {
   useDeleteRowMutation,
   useUpdateStorageUnitMutation,
 } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
 import { useCallback, useMemo, useReducer } from "react";
@@ -18,7 +18,6 @@ import type {
 } from "./types";
 
 interface UseChangesetManagerParams {
-  connectionId: string;
   data: TableData | null;
   databaseName: string;
   pageOffset: number;
@@ -456,7 +455,6 @@ function toRecordInputs(values: Record<string, ChangesetCellValue>) {
 }
 
 export function useChangesetManager({
-  connectionId,
   databaseName,
   schema,
   tableName,
@@ -467,7 +465,7 @@ export function useChangesetManager({
   refresh,
   showAlert,
 }: UseChangesetManagerParams) {
-  const { connections } = useConnectionStore();
+  const dbService = useDbAccessService();
   const [addRowMutation] = useAddRowMutation();
   const [deleteRowMutation] = useDeleteRowMutation();
   const [updateStorageUnitMutation] = useUpdateStorageUnitMutation();
@@ -730,14 +728,15 @@ export function useChangesetManager({
   }, []);
 
   const submitChanges = useCallback(async () => {
-    const conn = connections.find(
-      (connection) => connection.id === connectionId
-    );
-    if (!conn || state.changes.size === 0) {
+    if (state.changes.size === 0) {
       return;
     }
 
-    const graphqlSchema = resolveSchemaParam(conn.type, databaseName, schema);
+    const graphqlSchema = resolveSchemaParam(
+      dbService.engineType,
+      databaseName,
+      schema
+    );
     const successfulRowKeys: ChangesetRowKey[] = [];
     const failedMessages: string[] = [];
     const orderedEntries = [...state.changes.entries()].sort(
@@ -816,9 +815,8 @@ export function useChangesetManager({
     showAlert("Error", `${summary}\n\n${details}`, "error");
   }, [
     addRowMutation,
-    connectionId,
-    connections,
     databaseName,
+    dbService.engineType,
     deleteRowMutation,
     refresh,
     schema,

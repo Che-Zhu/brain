@@ -8,8 +8,8 @@ import {
 } from "./CreateCollectionProvider";
 
 interface CreateCollectionModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   open: boolean;
@@ -19,7 +19,7 @@ interface CreateCollectionModalProps {
 export function CreateCollectionModal({
   open,
   onOpenChange,
-  connectionId,
+  dbServiceKey,
   databaseName,
   onSuccess,
 }: CreateCollectionModalProps) {
@@ -32,8 +32,8 @@ export function CreateCollectionModal({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent>
         <CreateCollectionProvider
-          connectionId={connectionId}
           databaseName={databaseName}
+          dbServiceKey={dbServiceKey}
           onSuccess={handleSuccess}
         >
           <ModalForm.Header />

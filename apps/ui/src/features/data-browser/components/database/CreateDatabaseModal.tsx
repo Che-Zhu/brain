@@ -1,7 +1,10 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessReadOnlyActions,
+  useDbAccessService,
+} from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { Database } from "lucide-react";
 import {
@@ -19,7 +22,7 @@ import {
 interface CreateDatabaseCtxValue {
   dbName: string;
   initialCollectionName: string;
-  isMongoConnection: boolean;
+  isMongoDbService: boolean;
   setDbName: (v: string) => void;
   setInitialCollectionName: (v: string) => void;
 }
@@ -42,29 +45,28 @@ function useCreateDatabaseCtx(): CreateDatabaseCtxValue {
 
 /** Owns business logic for creating a new database. */
 function CreateDatabaseProvider({
-  connectionId,
   onSuccess,
   children,
 }: {
-  connectionId: string;
+  dbServiceKey: string;
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { connections, createDatabase, createTable } = useConnectionStore();
+  const { createDatabase, createTable } = useDbAccessReadOnlyActions();
+  const dbService = useDbAccessService();
   const [dbName, setDbName] = useState("");
   const [initialCollectionName, setInitialCollectionName] = useState("");
-  const connection = connections.find((item) => item.id === connectionId);
-  const isMongoConnection = connection?.type === "MONGODB";
+  const isMongoDbService = dbService.engineType === "MONGODB";
 
   const handleSubmit = useCallback(async () => {
     if (!dbName) {
       return;
     }
-    if (isMongoConnection) {
+    if (isMongoDbService) {
       if (!initialCollectionName) {
         return;
       }
-      const schemaParam = resolveSchemaParam(connection?.type, dbName);
+      const schemaParam = resolveSchemaParam(dbService.engineType, dbName);
       const result = await createTable(
         dbName,
         schemaParam,
@@ -86,12 +88,12 @@ function CreateDatabaseProvider({
       throw new Error(result.message ?? "Unknown error");
     }
   }, [
-    connection?.type,
     createDatabase,
     createTable,
+    dbService.engineType,
     dbName,
     initialCollectionName,
-    isMongoConnection,
+    isMongoDbService,
     onSuccess,
   ]);
 
@@ -102,7 +104,7 @@ function CreateDatabaseProvider({
         setDbName,
         initialCollectionName,
         setInitialCollectionName,
-        isMongoConnection,
+        isMongoDbService,
       }}
     >
       <ModalForm.Provider
@@ -126,7 +128,7 @@ function CreateDatabaseFields() {
     setDbName,
     initialCollectionName,
     setInitialCollectionName,
-    isMongoConnection,
+    isMongoDbService,
   } = useCreateDatabaseCtx();
   const { state } = useModalForm();
 
@@ -144,7 +146,7 @@ function CreateDatabaseFields() {
         />
       </div>
 
-      {isMongoConnection && (
+      {isMongoDbService && (
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-foreground text-sm">
             {"Collection name"}
@@ -163,9 +165,9 @@ function CreateDatabaseFields() {
 
 /** Submit button disabled when database name is empty. */
 function CreateSubmitButton() {
-  const { dbName, initialCollectionName, isMongoConnection } =
+  const { dbName, initialCollectionName, isMongoDbService } =
     useCreateDatabaseCtx();
-  const isDisabled = !dbName || (isMongoConnection && !initialCollectionName);
+  const isDisabled = !dbName || (isMongoDbService && !initialCollectionName);
   return (
     <ModalForm.SubmitButton disabled={isDisabled} label={"Create database"} />
   );
@@ -176,7 +178,7 @@ function CreateSubmitButton() {
 // ---------------------------------------------------------------------------
 
 interface CreateDatabaseModalProps {
-  connectionId: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   open: boolean;
@@ -186,7 +188,7 @@ interface CreateDatabaseModalProps {
 export function CreateDatabaseModal({
   open,
   onOpenChange,
-  connectionId,
+  dbServiceKey,
   onSuccess,
 }: CreateDatabaseModalProps) {
   const handleSuccess = useCallback(() => {
@@ -198,7 +200,7 @@ export function CreateDatabaseModal({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent>
         <CreateDatabaseProvider
-          connectionId={connectionId}
+          dbServiceKey={dbServiceKey}
           onSuccess={handleSuccess}
         >
           <ModalForm.Header />

@@ -3,7 +3,12 @@ import type { ContextMenuItem } from "@data-browser/components/ui/ContextMenu";
 import { Download, RefreshCw } from "lucide-react";
 import React from "react";
 
-type ConnectionType = "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CLICKHOUSE";
+type DbServiceEngineType =
+  | "MYSQL"
+  | "POSTGRES"
+  | "MONGODB"
+  | "REDIS"
+  | "CLICKHOUSE";
 
 interface MenuCallbacks {
   onAction: (action: string) => void;
@@ -41,8 +46,8 @@ function exportItem(
   ];
 }
 
-export function getConnectionMenuItems(
-  _connectionType: ConnectionType,
+export function getDbServiceMenuItems(
+  _dbServiceEngineType: DbServiceEngineType,
   callbacks: MenuCallbacks,
   _systemObjectsState?: SystemObjectsState
 ): ContextMenuItem[] {
@@ -51,7 +56,7 @@ export function getConnectionMenuItems(
 }
 
 export function getDatabaseMenuItems(
-  _connectionType: ConnectionType,
+  _dbServiceEngineType: DbServiceEngineType,
   callbacks: MenuCallbacks,
   _systemObjectsState?: SystemObjectsState
 ): ContextMenuItem[] {
@@ -81,7 +86,7 @@ export function getViewFolderMenuItems(
 }
 
 export function getTableMenuItems(
-  _connectionType: ConnectionType,
+  _dbServiceEngineType: DbServiceEngineType,
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
   const { onAction } = callbacks;

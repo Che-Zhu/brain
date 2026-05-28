@@ -3,8 +3,8 @@ import { test } from "node:test";
 
 import {
   getCollectionMenuItems,
-  getConnectionMenuItems,
   getDatabaseMenuItems,
+  getDbServiceMenuItems,
   getRedisKeyMenuItems,
   getSchemaMenuItems,
   getTableMenuItems,
@@ -33,7 +33,7 @@ const forbiddenActions = new Set([
 function actionsFor(items: ReturnType<typeof getSchemaMenuItems>): string[] {
   const actions: string[] = [];
   for (const item of items) {
-    if (item.onClick) {
+    if (!("separator" in item) && item.onClick) {
       item.onClick();
     }
   }
@@ -48,7 +48,7 @@ function callbacks(actions: string[]) {
 
 test("context menus expose only refresh and single-object export actions", () => {
   const menuFactories = [
-    () => getConnectionMenuItems("POSTGRES", callbacks(actions)),
+    () => getDbServiceMenuItems("POSTGRES", callbacks(actions)),
     () => getDatabaseMenuItems("POSTGRES", callbacks(actions)),
     () => getSchemaMenuItems(callbacks(actions)),
     () => getTableMenuItems("POSTGRES", callbacks(actions)),

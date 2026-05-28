@@ -2,7 +2,10 @@ import { getRows } from "@data-browser/api/access-adapter";
 import type { AccessObjectRef } from "@data-browser/api/access-types";
 import type { FlatMongoFilter } from "@data-browser/components/database/mongodb/filter-collection.types";
 import type { Alert } from "@data-browser/components/database/shared/types";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessRefresh,
+  useDbAccessRuntime,
+} from "@data-browser/state/db-access-session";
 import {
   createContext,
   type ReactNode,
@@ -32,8 +35,8 @@ export function useCollectionView(): CollectionViewContextValue {
 interface CollectionViewProviderProps {
   children: ReactNode;
   collectionName: string;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   objectRef: AccessObjectRef;
 }
 
@@ -62,11 +65,11 @@ const READ_ONLY_DOCUMENT_ACTIONS = {
 
 /** Provider that owns all CollectionDetailView state, GraphQL operations, and handlers. */
 export function CollectionViewProvider({
-  connectionId,
   objectRef,
   children,
 }: CollectionViewProviderProps) {
-  const { connections, collectionRefreshKey } = useConnectionStore();
+  const runtime = useDbAccessRuntime();
+  const { collectionRefreshKey } = useDbAccessRefresh();
 
   // ---- Core state ----
   const [loading, setLoading] = useState(true);
@@ -190,16 +193,9 @@ export function CollectionViewProvider({
       setLoading(true);
       setError(null);
 
-      const conn = connections.find((c) => c.id === connectionId);
-      if (!conn?.runtime) {
-        setError("Connection not found");
-        setLoading(false);
-        return;
-      }
-
       try {
         const result = await getRows({
-          runtime: conn.runtime,
+          runtime,
           ref: objectRef,
           pageSize,
           pageOffset: (currentPage - 1) * pageSize,
@@ -224,13 +220,12 @@ export function CollectionViewProvider({
 
     fetchData();
   }, [
-    connectionId,
-    connections,
     collectionRefreshKey,
     currentPage,
     pageSize,
     objectRef,
     refreshKey,
+    runtime,
   ]);
 
   // ---- Page change ----

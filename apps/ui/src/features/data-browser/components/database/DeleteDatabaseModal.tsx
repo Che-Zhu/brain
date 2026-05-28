@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { AlertTriangle } from "lucide-react";
 import {
   createContext,
@@ -48,7 +48,7 @@ function DeleteDatabaseProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { deleteDatabase } = useConnectionStore();
+  const { deleteDatabase } = useDbAccessReadOnlyActions();
   const [confirmName, setConfirmName] = useState("");
   const canDelete = confirmName === databaseName;
 
@@ -135,8 +135,8 @@ function DeleteSubmitButton() {
 // ---------------------------------------------------------------------------
 
 interface DeleteDatabaseModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   open: boolean;

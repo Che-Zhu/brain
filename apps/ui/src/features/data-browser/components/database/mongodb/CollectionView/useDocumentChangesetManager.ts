@@ -4,7 +4,7 @@ import {
   useRawExecuteLazyQuery,
   useUpdateStorageUnitMutation,
 } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import {
   buildMongoInsertOneCommand,
@@ -377,7 +377,6 @@ function buildInsertedRowKey(counter: number): DocumentChangesetRowKey {
 
 interface UseDocumentChangesetManagerParams {
   collectionName: string;
-  connectionId: string;
   databaseName: string;
   documents: any[];
   pageOffset: number;
@@ -386,7 +385,6 @@ interface UseDocumentChangesetManagerParams {
 }
 
 export function useDocumentChangesetManager({
-  connectionId,
   databaseName,
   collectionName,
   documents,
@@ -394,7 +392,7 @@ export function useDocumentChangesetManager({
   refresh,
   showAlert,
 }: UseDocumentChangesetManagerParams) {
-  const { connections } = useConnectionStore();
+  const dbService = useDbAccessService();
   const [deleteRowMutation] = useDeleteRowMutation();
   const [updateStorageUnitMutation] = useUpdateStorageUnitMutation();
   const [rawExecute] = useRawExecuteLazyQuery({ fetchPolicy: "no-cache" });
@@ -626,12 +624,14 @@ export function useDocumentChangesetManager({
   // ---- Submit ----
 
   const submitChanges = useCallback(async () => {
-    const conn = connections.find((c) => c.id === connectionId);
-    if (!conn || state.changes.size === 0) {
+    if (state.changes.size === 0) {
       return;
     }
 
-    const graphqlSchema = resolveSchemaParam(conn.type, databaseName);
+    const graphqlSchema = resolveSchemaParam(
+      dbService.engineType,
+      databaseName
+    );
     const successfulRowKeys: DocumentChangesetRowKey[] = [];
     const failedMessages: string[] = [];
 
@@ -732,9 +732,8 @@ export function useDocumentChangesetManager({
     showAlert("Error", `${summary}\n\n${details}`, "error");
   }, [
     collectionName,
-    connectionId,
-    connections,
     databaseName,
+    dbService.engineType,
     deleteRowMutation,
     rawExecute,
     refresh,

@@ -47,8 +47,8 @@ export function simplifyColumnType(typeStr: string): string {
 
 interface TableViewProviderProps {
   children: ReactNode;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   objectRef: AccessObjectRef;
   schema?: string;
   tableName: string;
@@ -96,7 +96,7 @@ const READ_ONLY_CHANGESET_ACTIONS = {
 
 /** Provider that owns all TableDetailView state, GraphQL operations, and handlers. */
 export function TableViewProvider({
-  connectionId,
+  dbServiceKey,
   databaseName,
   tableName,
   objectRef,
@@ -138,7 +138,6 @@ export function TableViewProvider({
 
   // ---- Data query (GraphQL fetch, loading/error, race condition prevention) ----
   const { state: queryState, actions: queryActions } = useDataQuery({
-    connectionId,
     currentPage,
     pageSize,
     sortColumn,
@@ -220,7 +219,7 @@ export function TableViewProvider({
 
   // ---- Table switch: reset state ----
   useEffect(() => {
-    const currentTableKey = `${connectionId}:${databaseName}:${schema || ""}:${tableName}`;
+    const currentTableKey = `${dbServiceKey}:${databaseName}:${schema || ""}:${tableName}`;
     if (lastTableRef.current !== currentTableKey) {
       lastTableRef.current = currentTableKey;
       setVisibleColumns([]);
@@ -231,7 +230,7 @@ export function TableViewProvider({
       setCurrentPage(1);
       changesetActions.discardChanges();
     }
-  }, [changesetActions, connectionId, databaseName, schema, tableName]);
+  }, [changesetActions, dbServiceKey, databaseName, schema, tableName]);
 
   useEffect(() => {
     if (!changesetState.hasPendingChanges) {

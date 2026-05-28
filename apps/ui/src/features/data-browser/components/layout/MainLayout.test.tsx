@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { test } from "node:test";
 
-import type { AccessObjectRef } from "@data-browser/api/access-types";
-import { objectTabId, useTabStore } from "@data-browser/stores/useTabStore";
+import type {
+  AccessObjectRef,
+  DataBrowserHostContext,
+} from "@data-browser/api/access-types";
+import { DbAccessSessionProvider } from "@data-browser/state/db-access-session";
+import { dbAccessObjectTabId } from "@data-browser/state/session";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MainLayout } from "./MainLayout";
 
@@ -11,36 +15,46 @@ const tableRef = {
   path: ["orders", "public", "users"],
 } satisfies AccessObjectRef;
 
-afterEach(() => {
-  const initialState = useTabStore.getInitialState();
-  initialState.activeTabId = null;
-  initialState.tabs = [];
-  useTabStore.setState({ activeTabId: null, tabs: [] });
-});
+const runtime = {
+  database: {
+    displayEngine: "PostgreSQL",
+    formattedVersion: "16.4",
+    name: "orders",
+  },
+  databaseWorkloadName: "orders-db",
+  databaseWorkloadNamespace: "database-system",
+  engine: "POSTGRES",
+  kubeconfig: "kube",
+  namespace: "project-ns",
+  projectUid: "project-uid",
+} satisfies DataBrowserHostContext;
 
 test("layout provides tooltip context for tab controls", () => {
-  const tabId = objectTabId(tableRef);
-  const stateWithOpenTab = {
-    activeTabId: null,
-    tabs: [
-      {
-        connectionId: "data-browser-runtime",
-        databaseName: "orders",
-        id: tabId,
-        objectRef: tableRef,
-        schemaName: "public",
-        tableName: "users",
-        title: "orders.users",
-        type: "table",
-      },
-    ],
-  };
-  Object.assign(useTabStore.getInitialState(), stateWithOpenTab);
-  useTabStore.setState(stateWithOpenTab);
-
   let html = "";
   assert.doesNotThrow(() => {
-    html = renderToStaticMarkup(<MainLayout />);
+    html = renderToStaticMarkup(
+      <DbAccessSessionProvider
+        initialSession={{
+          activeTabId: dbAccessObjectTabId(tableRef),
+          dbServiceKey: "project-uid:database-system:orders-db",
+          tabs: [
+            {
+              databaseName: "orders",
+              dbServiceKey: "project-uid:database-system:orders-db",
+              id: dbAccessObjectTabId(tableRef),
+              objectRef: tableRef,
+              schemaName: "public",
+              tableName: "users",
+              title: "orders.users",
+              type: "table",
+            },
+          ],
+        }}
+        runtime={runtime}
+      >
+        <MainLayout />
+      </DbAccessSessionProvider>
+    );
   });
   assert.match(html, /data-testid="layout\.tab\.close-button"/);
 });

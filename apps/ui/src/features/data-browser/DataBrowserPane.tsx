@@ -1,8 +1,7 @@
 "use client";
 
 import { MainLayout } from "@data-browser/components/layout/MainLayout";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { useEffect } from "react";
+import { DbAccessSessionProvider } from "@data-browser/state/db-access-session";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { isDataBrowserEngineVisible } from "./capabilities";
 import { DataBrowserRuntimeProvider, useDataBrowserRuntime } from "./runtime";
@@ -17,15 +16,6 @@ export interface DataBrowserPaneProps {
 function DataBrowserPaneBody() {
   const runtime = useDataBrowserRuntime();
   const engineVisible = isDataBrowserEngineVisible(runtime.engine);
-  const initializeRuntimeConnection = useConnectionStore(
-    (state) => state.initializeRuntimeConnection
-  );
-
-  useEffect(() => {
-    if (engineVisible) {
-      initializeRuntimeConnection(runtime);
-    }
-  }, [engineVisible, initializeRuntimeConnection, runtime]);
 
   if (!engineVisible) {
     return (
@@ -44,7 +34,11 @@ function DataBrowserPaneBody() {
     );
   }
 
-  return <MainLayout />;
+  return (
+    <DbAccessSessionProvider runtime={runtime}>
+      <MainLayout />
+    </DbAccessSessionProvider>
+  );
 }
 
 export function DataBrowserPane({

@@ -2,12 +2,15 @@ import { CollectionDetailView } from "@data-browser/components/database/mongodb/
 import { RedisKeyDetailView } from "@data-browser/components/database/redis/RedisKeyDetailView";
 import { TableDetailView } from "@data-browser/components/database/sql/TableDetailView";
 import { SQLEditorView } from "@data-browser/components/editor/SQLEditorView";
-import { type Tab, useTabStore } from "@data-browser/stores/useTabStore";
+import {
+  type DbAccessTab,
+  useDbAccessTabs,
+} from "@data-browser/state/db-access-session";
 import { Database } from "lucide-react";
 import { useMemo } from "react";
 
 export function TabContent() {
-  const { tabs, activeTabId, updateTab } = useTabStore();
+  const { tabs, activeTabId, updateTab } = useDbAccessTabs();
 
   const activeTab = useMemo(() => {
     return tabs.find((t) => t.id === activeTabId);
@@ -33,13 +36,13 @@ export function TabContent() {
   }
 
   // Render content based on tab type
-  const renderTabContent = (tab: Tab) => {
+  const renderTabContent = (tab: DbAccessTab) => {
     switch (tab.type) {
       case "query":
         return (
           <SQLEditorView
             context={{
-              connectionId: tab.connectionId,
+              dbServiceKey: tab.dbServiceKey,
               databaseName: tab.databaseName,
               schemaName: tab.schemaName,
             }}
@@ -61,8 +64,8 @@ export function TabContent() {
         }
         return (
           <TableDetailView
-            connectionId={tab.connectionId}
             databaseName={tab.databaseName}
+            dbServiceKey={tab.dbServiceKey}
             key={tab.id}
             objectRef={tab.objectRef}
             schema={tab.schemaName}
@@ -80,8 +83,8 @@ export function TabContent() {
         return (
           <CollectionDetailView
             collectionName={tab.collectionName}
-            connectionId={tab.connectionId}
             databaseName={tab.databaseName}
+            dbServiceKey={tab.dbServiceKey}
             key={tab.id}
             objectRef={tab.objectRef}
           />
@@ -96,8 +99,8 @@ export function TabContent() {
         }
         return (
           <RedisKeyDetailView
-            connectionId={tab.connectionId}
             databaseName={tab.databaseName}
+            dbServiceKey={tab.dbServiceKey}
             key={tab.id}
             keyName={tab.tableName}
             objectRef={tab.objectRef}
@@ -123,8 +126,8 @@ export function TabContent() {
               ? "flex flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background"
               : "hidden"
           }
-          data-qa-connection-id={tab.connectionId}
           data-qa-database={tab.databaseName}
+          data-qa-db-service-key={tab.dbServiceKey}
           data-qa-module="layout"
           data-qa-object="tab-content"
           data-qa-resource-id={tab.id}

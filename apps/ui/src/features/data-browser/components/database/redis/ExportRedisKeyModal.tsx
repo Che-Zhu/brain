@@ -10,7 +10,7 @@ import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { useGetStorageUnitRowsLazyQuery } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import {
   downloadBlob,
@@ -75,23 +75,17 @@ function useExportRedisKeyCtx(): ExportRedisKeyCtxValue {
 // ---------------------------------------------------------------------------
 
 function ExportRedisKeyProvider({
-  connectionId,
   databaseName,
   keyName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   keyName: string;
   children: ReactNode;
 }) {
   return (
     <ModalForm.Provider meta={{ title: "Export Redis key", icon: Download }}>
-      <ExportRedisKeyBridge
-        connectionId={connectionId}
-        databaseName={databaseName}
-        keyName={keyName}
-      >
+      <ExportRedisKeyBridge databaseName={databaseName} keyName={keyName}>
         {children}
       </ExportRedisKeyBridge>
     </ModalForm.Provider>
@@ -99,12 +93,10 @@ function ExportRedisKeyProvider({
 }
 
 function ExportRedisKeyBridge({
-  connectionId,
   databaseName,
   keyName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   keyName: string;
   children: ReactNode;
@@ -114,7 +106,7 @@ function ExportRedisKeyBridge({
   const [isSuccess, setIsSuccess] = useState(false);
   const { actions } = useModalForm();
   const [getRows] = useGetStorageUnitRowsLazyQuery({ fetchPolicy: "no-cache" });
-  const connections = useConnectionStore((s) => s.connections);
+  const dbService = useDbAccessService();
 
   const handleExport = useCallback(async () => {
     actions.setSubmitting(true);
@@ -122,12 +114,7 @@ function ExportRedisKeyBridge({
     setIsSuccess(false);
 
     try {
-      const conn = connections.find((c) => c.id === connectionId);
-      if (!conn) {
-        throw new Error("Connection not found");
-      }
-
-      const schema = resolveSchemaParam(conn.type, databaseName);
+      const schema = resolveSchemaParam(dbService.engineType, databaseName);
       const pageSize = rowLimit === "" ? 100_000 : rowLimit;
 
       const { data: result, error: gqlError } = await getRows({
@@ -176,9 +163,8 @@ function ExportRedisKeyBridge({
     }
   }, [
     actions,
-    connectionId,
-    connections,
     databaseName,
+    dbService.engineType,
     format,
     getRows,
     keyName,
@@ -256,8 +242,8 @@ function ExportRedisKeyFooterBridge() {
 // ---------------------------------------------------------------------------
 
 interface ExportRedisKeyModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   keyName: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -266,18 +252,13 @@ interface ExportRedisKeyModalProps {
 export function ExportRedisKeyModal({
   open,
   onOpenChange,
-  connectionId,
   databaseName,
   keyName,
 }: ExportRedisKeyModalProps) {
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-lg">
-        <ExportRedisKeyProvider
-          connectionId={connectionId}
-          databaseName={databaseName}
-          keyName={keyName}
-        >
+        <ExportRedisKeyProvider databaseName={databaseName} keyName={keyName}>
           <ModalForm.Header />
           <ExportRedisKeyFields />
           <ModalForm.Alert />

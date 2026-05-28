@@ -28,8 +28,8 @@ import {
 
 interface CollectionDetailViewProps {
   collectionName: string;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   objectRef: AccessObjectRef;
 }
 
@@ -46,7 +46,7 @@ export function CollectionDetailView(props: CollectionDetailViewProps) {
 function CollectionDetailViewContent({
   databaseName,
   collectionName,
-  connectionId,
+  dbServiceKey,
   objectRef,
 }: CollectionDetailViewProps) {
   const { state, actions } = useCollectionView();
@@ -71,8 +71,8 @@ function CollectionDetailViewContent({
     return (
       <div
         className="flex h-full"
-        data-qa-connection-id={connectionId}
         data-qa-database={databaseName}
+        data-qa-db-service-key={dbServiceKey}
         data-qa-loading="true"
         data-qa-module="mongodb"
         data-qa-object="collection-detail"
@@ -89,8 +89,8 @@ function CollectionDetailViewContent({
   return (
     <div
       className="flex h-full flex-col bg-background"
-      data-qa-connection-id={connectionId}
       data-qa-database={databaseName}
+      data-qa-db-service-key={dbServiceKey}
       data-qa-loading={state.loading ? "true" : "false"}
       data-qa-module="mongodb"
       data-qa-object="collection-detail"
@@ -103,8 +103,8 @@ function CollectionDetailViewContent({
     >
       <CollectionViewToolbar
         collectionName={collectionName}
-        connectionId={connectionId}
         databaseName={databaseName}
+        dbServiceKey={dbServiceKey}
       />
 
       {state.error ? (

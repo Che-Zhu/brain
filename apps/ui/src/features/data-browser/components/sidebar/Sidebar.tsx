@@ -1,14 +1,18 @@
 import type { AccessObjectRef } from "@data-browser/api/access-types";
 import { DATA_BROWSER_CAPABILITIES } from "@data-browser/capabilities";
 import type { Alert } from "@data-browser/components/ui/types";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { useTabStore } from "@data-browser/stores/useTabStore";
+import {
+  useDbAccessRefresh,
+  useDbAccessSelection,
+  useDbAccessService,
+  useDbAccessTabs,
+} from "@data-browser/state/db-access-session";
 import { type MouseEvent, useCallback, useReducer, useState } from "react";
 import { ContextMenu } from "../ui/ContextMenu";
 import {
   getCollectionMenuItems,
-  getConnectionMenuItems,
   getDatabaseMenuItems,
+  getDbServiceMenuItems,
   getRedisKeyMenuItems,
   getRedisKeysFolderMenuItems,
   getSchemaMenuItems,
@@ -25,13 +29,13 @@ import {
   useSidebarTree,
 } from "./SidebarTree";
 import type { TreeNodeData } from "./SidebarTree/types";
-import { connectionToNode, EXPANDABLE_TYPES } from "./SidebarTree/types";
+import { dbServiceToNode, EXPANDABLE_TYPES } from "./SidebarTree/types";
 
 export type ModalState =
   | {
       type: "export_data";
       params: {
-        connectionId: string;
+        dbServiceKey: string;
         databaseName: string;
         schema: string | null;
         tableName: string;
@@ -41,7 +45,7 @@ export type ModalState =
   | {
       type: "export_collection";
       params: {
-        connectionId: string;
+        dbServiceKey: string;
         databaseName: string;
         collectionName: string;
         objectRef: AccessObjectRef;
@@ -50,7 +54,7 @@ export type ModalState =
   | {
       type: "export_redis_key";
       params: {
-        connectionId: string;
+        dbServiceKey: string;
         databaseName: string;
         keyName: string;
         objectRef: AccessObjectRef;
@@ -70,14 +74,11 @@ function modalReducer(
 }
 
 function SidebarInner() {
-  const {
-    connections,
-    selectedItem,
-    selectItem,
-    triggerCollectionRefresh,
-    triggerTableRefresh,
-  } = useConnectionStore();
-  const { openTab } = useTabStore();
+  const dbService = useDbAccessService();
+  const { selectedItem, selectItem } = useDbAccessSelection();
+  const { triggerCollectionRefresh, triggerTableRefresh } =
+    useDbAccessRefresh();
+  const { openTab } = useDbAccessTabs();
 
   const {
     expandedItems,
@@ -117,12 +118,12 @@ function SidebarInner() {
         try {
           await toggleItem(node);
         } catch (error) {
-          if (node.type === "connection") {
+          if (node.type === "db_service") {
             showAlert(
-              "Connection failed",
+              "DB Service failed",
               error instanceof Error
                 ? error.message
-                : "Failed to load connection.",
+                : "Failed to load DB Service.",
               "error"
             );
           }
@@ -137,8 +138,8 @@ function SidebarInner() {
           ? `${node.metadata.database} / ${node.name}`
           : node.name;
         openTab({
-          connectionId: node.connectionId,
           databaseName: node.metadata.database,
+          dbServiceKey: node.dbServiceKey,
           objectRef: node.metadata.objectRef,
           schemaName: node.metadata.schema,
           tableName: node.name,
@@ -151,8 +152,8 @@ function SidebarInner() {
           : node.name;
         openTab({
           collectionName: node.name,
-          connectionId: node.connectionId,
           databaseName: node.metadata.database,
+          dbServiceKey: node.dbServiceKey,
           objectRef: node.metadata.objectRef,
           title: collectionTitle,
           type: "collection",
@@ -161,8 +162,8 @@ function SidebarInner() {
       } else if (node.type === "redis_key" && node.metadata.objectRef) {
         const redisDatabase = node.metadata.database ?? "";
         openTab({
-          connectionId: node.connectionId,
           databaseName: redisDatabase,
+          dbServiceKey: node.dbServiceKey,
           objectRef: node.metadata.objectRef,
           tableName: node.name,
           title: `${redisDatabase} / ${node.name}`,
@@ -197,8 +198,8 @@ function SidebarInner() {
           ) {
             openModal({
               params: {
-                connectionId: node.connectionId,
                 databaseName: node.metadata.database ?? "",
+                dbServiceKey: node.dbServiceKey,
                 objectRef: node.metadata.objectRef,
                 schema: node.metadata.schema ?? null,
                 tableName: node.name,
@@ -215,8 +216,8 @@ function SidebarInner() {
             openModal({
               params: {
                 collectionName: node.name,
-                connectionId: node.connectionId,
                 databaseName: node.metadata.database ?? "",
+                dbServiceKey: node.dbServiceKey,
                 objectRef: node.metadata.objectRef,
               },
               type: "export_collection",
@@ -230,8 +231,8 @@ function SidebarInner() {
           ) {
             openModal({
               params: {
-                connectionId: node.connectionId,
                 databaseName: node.metadata.database ?? "",
+                dbServiceKey: node.dbServiceKey,
                 keyName: node.name,
                 objectRef: node.metadata.objectRef,
               },
@@ -278,15 +279,13 @@ function SidebarInner() {
     const callbacks = {
       onAction: handleContextMenuAction,
     };
-    const connectionType =
-      connections.find((connection) => connection.id === node.connectionId)
-        ?.type ?? "POSTGRES";
+    const dbServiceEngineType = dbService.engineType;
 
     switch (node.type) {
-      case "connection":
-        return getConnectionMenuItems(connectionType, callbacks);
+      case "db_service":
+        return getDbServiceMenuItems(dbServiceEngineType, callbacks);
       case "database":
-        return getDatabaseMenuItems(connectionType, callbacks);
+        return getDatabaseMenuItems(dbServiceEngineType, callbacks);
       case "schema":
         return getSchemaMenuItems(callbacks);
       case "table_folder":
@@ -294,7 +293,7 @@ function SidebarInner() {
       case "view_folder":
         return getViewFolderMenuItems(callbacks);
       case "table":
-        return getTableMenuItems(connectionType, callbacks);
+        return getTableMenuItems(dbServiceEngineType, callbacks);
       case "view":
         return getViewMenuItems(callbacks);
       case "collection":
@@ -332,24 +331,21 @@ function SidebarInner() {
       <div
         className="flex-1 overflow-y-auto p-2"
         data-qa-module="database"
-        data-qa-object="connection-tree"
-        data-qa-state={connections.length > 0 ? "ready" : "empty"}
+        data-qa-object="db-service-tree"
+        data-qa-state="ready"
         data-testid="database.sidebar.tree"
       >
-        {connections.map((connection) => (
-          <TreeNodeProvider
-            key={connection.id}
-            value={{
-              connectionDbType: connection.type,
-              onContextMenu: handleContextMenu,
-              onItemClick: handleItemClick,
-              onToggle: toggleItem,
-              selectedItemId: selectedItem?.id ?? null,
-            }}
-          >
-            <TreeNode depth={0} node={connectionToNode(connection)} />
-          </TreeNodeProvider>
-        ))}
+        <TreeNodeProvider
+          value={{
+            dbServiceEngineType: dbService.engineType,
+            onContextMenu: handleContextMenu,
+            onItemClick: handleItemClick,
+            onToggle: toggleItem,
+            selectedItemId: selectedItem?.id ?? null,
+          }}
+        >
+          <TreeNode depth={0} node={dbServiceToNode(dbService)} />
+        </TreeNodeProvider>
       </div>
 
       {contextMenu && (

@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { Table } from "lucide-react";
 import {
   createContext,
@@ -52,7 +52,7 @@ function RenameTableProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { renameTable } = useConnectionStore();
+  const { renameTable } = useDbAccessReadOnlyActions();
   const [newName, setNewName] = useState(tableName);
 
   const handleSubmit = useCallback(async () => {

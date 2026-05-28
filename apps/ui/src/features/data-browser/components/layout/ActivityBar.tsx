@@ -1,20 +1,24 @@
 import { Button } from "@data-browser/components/ui/Button";
 import { cn } from "@data-browser/lib/utils";
-import type { ActivityTab } from "@data-browser/stores/useLayoutStore";
+import type { DbAccessActivityTab } from "@data-browser/state/db-access-session";
 import { Database, LayoutDashboard } from "lucide-react";
 import type React from "react";
 
 interface ActivityBarProps {
-  activeTab: ActivityTab;
-  onTabChange: (tab: ActivityTab) => void;
+  activeTab: DbAccessActivityTab;
+  onTabChange: (tab: DbAccessActivityTab) => void;
 }
 
 export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps) {
-  const tabs: { id: ActivityTab; icon: React.ElementType; label: string }[] = [
+  const tabs: {
+    id: DbAccessActivityTab;
+    icon: React.ElementType;
+    label: string;
+  }[] = [
     {
-      id: "connections",
+      id: "db_service",
       icon: Database,
-      label: "Connections",
+      label: "DB Service",
     },
     {
       id: "analysis",
@@ -24,7 +28,7 @@ export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps) {
   ];
 
   const renderTab = (tab: {
-    id: ActivityTab;
+    id: DbAccessActivityTab;
     icon: React.ElementType;
     label: string;
   }) => {

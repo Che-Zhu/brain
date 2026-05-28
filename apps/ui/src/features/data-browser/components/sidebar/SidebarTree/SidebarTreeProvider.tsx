@@ -4,7 +4,11 @@ import type {
   AccessObjectRef,
 } from "@data-browser/api/access-types";
 import { DATA_BROWSER_CAPABILITIES } from "@data-browser/capabilities";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessRefresh,
+  useDbAccessService,
+} from "@data-browser/state/db-access-session";
+import { dbAccessExpandedStorageKey } from "@data-browser/state/db-service";
 import {
   createContext,
   use,
@@ -15,7 +19,7 @@ import {
   useState,
 } from "react";
 import type { NodeType, TreeNodeData } from "./types";
-import { connectionToNode } from "./types";
+import { dbServiceToNode } from "./types";
 
 interface SidebarTreeContextValue {
   collapseNode: (nodeId: string) => void;
@@ -38,22 +42,9 @@ export function useSidebarTree(): SidebarTreeContextValue {
 }
 
 function scopedStorageKey(
-  connection:
-    | {
-        runtime?: {
-          projectUid: string;
-          databaseWorkloadNamespace: string;
-          databaseWorkloadName: string;
-        };
-      }
-    | undefined
+  runtime: Parameters<typeof dbAccessExpandedStorageKey>[0]
 ) {
-  const runtime = connection?.runtime;
-  if (!runtime) {
-    return "data-browser:expanded:uninitialized";
-  }
-
-  return `data-browser:expanded:${runtime.projectUid}:${runtime.databaseWorkloadNamespace}:${runtime.databaseWorkloadName}`;
+  return dbAccessExpandedStorageKey(runtime);
 }
 
 function nodeTypeForObject(object: AccessObject): NodeType | null {
@@ -78,16 +69,16 @@ function nodeTypeForObject(object: AccessObject): NodeType | null {
   return null;
 }
 
-function objectNodeId(connectionId: string, ref: AccessObjectRef): string {
-  return `${connectionId}:${ref.kind}:${JSON.stringify(ref.path)}`;
+function objectNodeId(dbServiceKey: string, ref: AccessObjectRef): string {
+  return `${dbServiceKey}:${ref.kind}:${JSON.stringify(ref.path)}`;
 }
 
 function objectToNode({
-  connectionId,
+  dbServiceKey,
   object,
   parentId,
 }: {
-  connectionId: string;
+  dbServiceKey: string;
   object: AccessObject;
   parentId: string;
 }): TreeNodeData | null {
@@ -101,8 +92,8 @@ function objectToNode({
     object.displayName || object.name || object.ref.path.at(-1) || object.kind;
 
   return {
-    connectionId,
-    id: objectNodeId(connectionId, object.ref),
+    dbServiceKey,
+    id: objectNodeId(dbServiceKey, object.ref),
     metadata: {
       database,
       objectRef: object.ref,
@@ -120,7 +111,7 @@ function objectToNode({
 }
 
 export function dataBrowserObjectToTreeNode(params: {
-  connectionId: string;
+  dbServiceKey: string;
   object: AccessObject;
   parentId: string;
 }): TreeNodeData | null {
@@ -137,7 +128,7 @@ export function dataBrowserPostgresSchemaFolders(
 
   return [
     {
-      connectionId: node.connectionId,
+      dbServiceKey: node.dbServiceKey,
       id: `${node.id}:tables`,
       metadata: {
         database: node.metadata.database,
@@ -150,7 +141,7 @@ export function dataBrowserPostgresSchemaFolders(
       type: "table_folder",
     },
     {
-      connectionId: node.connectionId,
+      dbServiceKey: node.dbServiceKey,
       id: `${node.id}:views`,
       metadata: {
         database: node.metadata.database,
@@ -173,7 +164,7 @@ export function dataBrowserRedisKeysFolder(node: TreeNodeData): TreeNodeData[] {
 
   return [
     {
-      connectionId: node.connectionId,
+      dbServiceKey: node.dbServiceKey,
       id: `${node.id}:keys`,
       metadata: {
         database: node.name,
@@ -196,12 +187,12 @@ export function SidebarTreeProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const connections = useConnectionStore((state) => state.connections);
+  const dbService = useDbAccessService();
+  const { sidebarRefreshKey } = useDbAccessRefresh();
 
-  const activeConnection = connections[0];
   const storageKey = useMemo(
-    () => scopedStorageKey(activeConnection),
-    [activeConnection]
+    () => scopedStorageKey(dbService.runtime),
+    [dbService.runtime]
   );
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -221,21 +212,19 @@ export function SidebarTreeProvider({
 
   const buildChildren = useCallback(
     async (node: TreeNodeData): Promise<TreeNodeData[]> => {
-      const connection = connections.find(
-        (candidate) => candidate.id === node.connectionId
-      );
-      const runtime = connection?.runtime;
+      const runtime =
+        node.dbServiceKey === dbService.dbServiceKey ? dbService.runtime : null;
 
       if (!runtime) {
         return [];
       }
 
-      if (node.type === "connection") {
+      if (node.type === "db_service") {
         const result = await listObjects({ runtime });
         return compactNodes(
           result.objects.map((object) =>
             objectToNode({
-              connectionId: node.connectionId,
+              dbServiceKey: node.dbServiceKey,
               object,
               parentId: node.id,
             })
@@ -247,7 +236,7 @@ export function SidebarTreeProvider({
         return dataBrowserPostgresSchemaFolders(node);
       }
 
-      if (node.type === "database" && connection.type === "REDIS") {
+      if (node.type === "database" && dbService.engineType === "REDIS") {
         return dataBrowserRedisKeysFolder(node);
       }
 
@@ -269,7 +258,7 @@ export function SidebarTreeProvider({
         return compactNodes(
           result.objects.map((object) =>
             objectToNode({
-              connectionId: node.connectionId,
+              dbServiceKey: node.dbServiceKey,
               object,
               parentId: node.id,
             })
@@ -287,7 +276,7 @@ export function SidebarTreeProvider({
         return compactNodes(
           result.objects.map((object) =>
             objectToNode({
-              connectionId: node.connectionId,
+              dbServiceKey: node.dbServiceKey,
               object,
               parentId: node.id,
             })
@@ -297,7 +286,7 @@ export function SidebarTreeProvider({
 
       return [];
     },
-    [connections]
+    [dbService]
   );
 
   const fetchNodeChildren = useCallback(
@@ -325,7 +314,7 @@ export function SidebarTreeProvider({
         newExpanded.delete(node.id);
       } else {
         newExpanded.add(node.id);
-        if (!treeData[node.id] || node.type !== "connection") {
+        if (!treeData[node.id] || node.type !== "db_service") {
           await fetchNodeChildren(node);
         }
       }
@@ -370,9 +359,6 @@ export function SidebarTreeProvider({
   }, []);
 
   useEffect(() => {
-    if (connections.length === 0) {
-      return;
-    }
     if (restoredStorageKey.current === storageKey) {
       return;
     }
@@ -415,7 +401,7 @@ export function SidebarTreeProvider({
           }
         };
 
-        await fetchRecursively(connections.map(connectionToNode));
+        await fetchRecursively([dbServiceToNode(dbService)]);
       } catch (error) {
         console.error("Failed to restore expanded items", error);
       }
@@ -425,23 +411,19 @@ export function SidebarTreeProvider({
 
     restoredStorageKey.current = storageKey;
     restoreState();
-  }, [buildChildren, connections, storageKey]);
+  }, [buildChildren, dbService, storageKey]);
 
-  const sidebarRefreshKey = useConnectionStore(
-    (state) => state.sidebarRefreshKey
-  );
   const previousRefreshKey = useRef(sidebarRefreshKey);
   useEffect(() => {
     if (sidebarRefreshKey === previousRefreshKey.current) {
       return;
     }
     previousRefreshKey.current = sidebarRefreshKey;
-    for (const node of connections.map(connectionToNode)) {
-      if (expandedItems.has(node.id)) {
-        refreshNode(node);
-      }
+    const rootNode = dbServiceToNode(dbService);
+    if (expandedItems.has(rootNode.id)) {
+      refreshNode(rootNode);
     }
-  }, [connections, expandedItems, refreshNode, sidebarRefreshKey]);
+  }, [dbService, expandedItems, refreshNode, sidebarRefreshKey]);
 
   return (
     <SidebarTreeContext

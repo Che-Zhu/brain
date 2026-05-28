@@ -10,21 +10,21 @@ import { useCollectionView } from "./CollectionViewProvider";
 
 interface CollectionViewToolbarProps {
   collectionName: string;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
 }
 
 export function CollectionViewToolbar({
-  connectionId,
   databaseName,
+  dbServiceKey,
   collectionName,
 }: CollectionViewToolbarProps) {
   const { state, actions } = useCollectionView();
   return (
     <div
       className="flex h-12 items-center justify-between px-2"
-      data-qa-connection-id={connectionId}
       data-qa-database={databaseName}
+      data-qa-db-service-key={dbServiceKey}
       data-qa-module="mongodb"
       data-qa-object="collection-toolbar"
       data-qa-resource-id={collectionName}

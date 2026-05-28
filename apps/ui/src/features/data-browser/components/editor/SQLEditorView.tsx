@@ -17,8 +17,12 @@ import {
   useRawExecuteLazyQuery,
 } from "@data-browser/generated/graphql";
 import { cn } from "@data-browser/lib/utils";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { useTabStore } from "@data-browser/stores/useTabStore";
+import {
+  useDbAccessReadOnlyActions,
+  useDbAccessRefresh,
+  useDbAccessService,
+  useDbAccessTabs,
+} from "@data-browser/state/db-access-session";
 import {
   getEditorLanguage,
   getUnsupportedRedisCommand,
@@ -59,7 +63,7 @@ const IS_MAC =
 
 interface SQLEditorViewProps {
   context?: {
-    connectionId: string;
+    dbServiceKey: string;
     databaseName?: string;
     schemaName?: string;
   } | null;
@@ -92,9 +96,8 @@ export function SQLEditorView({
   onSqlChange,
   onQueryResults,
 }: SQLEditorViewProps) {
-  const { connections } = useConnectionStore();
-  const connectionType =
-    connections.find((c) => c.id === context?.connectionId)?.type ?? "POSTGRES";
+  const dbService = useDbAccessService();
+  const dbServiceEngineType = dbService.engineType;
   const [rawExecute] = useRawExecuteLazyQuery({ fetchPolicy: "no-cache" });
   const [fetchStorageUnits] = useGetStorageUnitsLazyQuery({
     fetchPolicy: "no-cache",
@@ -115,8 +118,9 @@ export function SQLEditorView({
   const [monacoInstance, setMonacoInstance] = useState<typeof Monaco | null>(
     null
   );
-  const { updateTab } = useTabStore();
-  const { fetchDatabases, fetchSchemas } = useConnectionStore();
+  const { updateTab } = useDbAccessTabs();
+  const { triggerSidebarRefresh } = useDbAccessRefresh();
+  const { fetchDatabases, fetchSchemas } = useDbAccessReadOnlyActions();
   const [databases, setDatabases] = useState<string[]>([]);
   const [schemas, setSchemas] = useState<string[]>([]);
   const [selectedDatabase, setSelectedDatabase] = useState(
@@ -128,26 +132,24 @@ export function SQLEditorView({
 
   // Fetch databases on mount
   useEffect(() => {
-    if (!context?.connectionId) {
+    if (!context?.dbServiceKey) {
       return;
     }
-    fetchDatabases(context.connectionId)
-      .then(setDatabases)
-      .catch(console.error);
-  }, [context?.connectionId, fetchDatabases]);
+    fetchDatabases().then(setDatabases).catch(console.error);
+  }, [context?.dbServiceKey, fetchDatabases]);
 
   // Fetch schemas when database changes (Postgres only), default to "public" or first available
   useEffect(() => {
     if (
       !(
-        context?.connectionId &&
+        context?.dbServiceKey &&
         selectedDatabase &&
-        supportsSchema(connectionType)
+        supportsSchema(dbServiceEngineType)
       )
     ) {
       return;
     }
-    fetchSchemas(context.connectionId, selectedDatabase)
+    fetchSchemas()
       .then((result) => {
         setSchemas(result);
         if (!selectedSchema && result.length > 0) {
@@ -160,11 +162,16 @@ export function SQLEditorView({
         }
       })
       .catch(console.error);
-  }, [context?.connectionId, selectedDatabase, connectionType, fetchSchemas]);
+  }, [
+    context?.dbServiceKey,
+    selectedDatabase,
+    dbServiceEngineType,
+    fetchSchemas,
+  ]);
 
   // Register SQL completion provider when schema metadata is available
   useEffect(() => {
-    if (getEditorLanguage(connectionType) !== "sql") {
+    if (getEditorLanguage(dbServiceEngineType) !== "sql") {
       return;
     }
     if (!monacoInstance) {
@@ -172,7 +179,7 @@ export function SQLEditorView({
     }
 
     const schemaParam = resolveSchemaParam(
-      connectionType,
+      dbServiceEngineType,
       selectedDatabase,
       selectedSchema
     );
@@ -233,7 +240,7 @@ export function SQLEditorView({
       disposable?.dispose();
     };
   }, [
-    connectionType,
+    dbServiceEngineType,
     selectedDatabase,
     selectedSchema,
     monacoInstance,
@@ -243,7 +250,7 @@ export function SQLEditorView({
 
   const handleDatabaseChange = (db: string) => {
     setSelectedDatabase(db);
-    if (supportsSchema(connectionType)) {
+    if (supportsSchema(dbServiceEngineType)) {
       setSelectedSchema("");
       updateTab(tabId, { databaseName: db, schemaName: undefined });
     } else {
@@ -257,7 +264,7 @@ export function SQLEditorView({
   };
 
   const handleRun = async () => {
-    const upperType = connectionType.toUpperCase();
+    const upperType = dbServiceEngineType.toUpperCase();
     const statements =
       upperType === "REDIS"
         ? splitRedisCommands(query)
@@ -353,7 +360,10 @@ export function SQLEditorView({
           const raw = data.RawExecute;
           const columns = raw.Columns.map((c) => c.Name);
 
-          if (isReadOperation(connectionType, sql) || raw.Rows.length > 0) {
+          if (
+            isReadOperation(dbServiceEngineType, sql) ||
+            raw.Rows.length > 0
+          ) {
             const rows = raw.Rows.map((row) =>
               Object.fromEntries(columns.map((col, i) => [col, row[i] ?? ""]))
             );
@@ -408,10 +418,10 @@ export function SQLEditorView({
 
     // Refresh sidebar tree when a write operation succeeded (DDL/DML may change schema objects)
     const hasSuccessfulWrite = results.some(
-      (r) => !(r.isError || isReadOperation(connectionType, r.sql))
+      (r) => !(r.isError || isReadOperation(dbServiceEngineType, r.sql))
     );
     if (hasSuccessfulWrite) {
-      useConnectionStore.getState().triggerSidebarRefresh();
+      triggerSidebarRefresh();
     }
 
     setIsExecuting(false);
@@ -484,8 +494,8 @@ export function SQLEditorView({
   return (
     <div
       className="flex h-full flex-col overflow-hidden bg-background"
-      data-qa-connection-id={context?.connectionId}
       data-qa-database={selectedDatabase || context?.databaseName}
+      data-qa-db-service-key={context?.dbServiceKey}
       data-qa-loading={isExecuting ? "true" : "false"}
       data-qa-module="sql"
       data-qa-object="editor"
@@ -538,7 +548,7 @@ export function SQLEditorView({
               {"Run"} ({IS_MAC ? "⌘↩" : "Ctrl+Enter"})
             </TooltipContent>
           </Tooltip>
-          {getEditorLanguage(connectionType) === "sql" && (
+          {getEditorLanguage(dbServiceEngineType) === "sql" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -616,7 +626,7 @@ export function SQLEditorView({
           </Select>
 
           {/* Schema Selector (Postgres only) */}
-          {supportsSchema(connectionType) && (
+          {supportsSchema(dbServiceEngineType) && (
             <Select
               disabled={!selectedDatabase || schemas.length === 0}
               onValueChange={handleSchemaChange}
@@ -685,7 +695,7 @@ export function SQLEditorView({
         >
           <MonacoEditor
             height="100%"
-            language={getEditorLanguage(connectionType)}
+            language={getEditorLanguage(dbServiceEngineType)}
             onChange={(value: string | undefined) => {
               const v = value || "";
               setQuery(v);

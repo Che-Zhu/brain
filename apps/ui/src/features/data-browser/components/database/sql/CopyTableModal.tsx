@@ -5,7 +5,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@data-browser/components/ui/radio-group";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { Copy } from "lucide-react";
 import {
   createContext,
@@ -56,7 +56,7 @@ function CopyTableProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { copyTable } = useConnectionStore();
+  const { copyTable } = useDbAccessReadOnlyActions();
   const [newTableName, setNewTableName] = useState(`${tableName}_copy`);
   const [copyOption, setCopyOption] = useState<"structure" | "structure_data">(
     "structure_data"

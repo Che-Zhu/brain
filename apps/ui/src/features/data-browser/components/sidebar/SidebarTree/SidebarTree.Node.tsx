@@ -21,9 +21,9 @@ import { useSidebarTree } from "./SidebarTreeProvider";
 import type { NodeType, TreeNodeData } from "./types";
 import { DB_ICONS, EXPANDABLE_TYPES, NODE_ICON_COLORS } from "./types";
 
-/** Per-connection context passed by Sidebar to each connection's tree. */
+/** Per-DB-Service context passed by Sidebar to each service tree. */
 export interface TreeNodeContextValue {
-  connectionDbType: string;
+  dbServiceEngineType: string;
   onContextMenu: (e: React.MouseEvent, node: TreeNodeData) => void;
   onItemClick: (node: TreeNodeData) => void;
   onToggle: (node: TreeNodeData) => void;
@@ -46,7 +46,7 @@ const NODE_ICONS: Record<
   NodeType,
   React.ComponentType<{ className?: string }>
 > = {
-  connection: Database,
+  db_service: Database,
   database: Database,
   schema: ListTree,
   table_folder: Folder,
@@ -78,7 +78,7 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
   const { expandedItems, isLoading: loadingItems, treeData } = useSidebarTree();
   const {
     selectedItemId,
-    connectionDbType,
+    dbServiceEngineType,
     onItemClick,
     onToggle,
     onContextMenu,
@@ -97,7 +97,7 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
     node.type === "redis_key" && node.metadata.redisKeyType
       ? (REDIS_TYPE_ICONS[node.metadata.redisKeyType] ?? NODE_ICONS[node.type])
       : NODE_ICONS[node.type];
-  const brandIcon = isRoot ? DB_ICONS[connectionDbType] : null;
+  const brandIcon = isRoot ? DB_ICONS[dbServiceEngineType] : null;
 
   return (
     <div>
@@ -108,8 +108,8 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
             ? "bg-input font-medium text-accent-foreground"
             : "text-muted-foreground hover:bg-input hover:text-foreground"
         )}
-        data-qa-connection-id={node.connectionId || node.id}
         data-qa-database={node.metadata.database}
+        data-qa-db-service-key={node.dbServiceKey || node.id}
         data-qa-module="database"
         data-qa-object="sidebar-node"
         data-qa-resource-id={node.id}
@@ -160,7 +160,7 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
 
         {brandIcon ? (
           <img
-            alt={connectionDbType}
+            alt={dbServiceEngineType}
             className="h-4 w-4 shrink-0"
             src={brandIcon}
           />

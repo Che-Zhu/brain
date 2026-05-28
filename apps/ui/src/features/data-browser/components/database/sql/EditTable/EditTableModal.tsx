@@ -92,8 +92,8 @@ function EditTableFooter({ onClose }: { onClose: () => void }) {
 // ---------------------------------------------------------------------------
 
 interface EditTableModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   open: boolean;
@@ -108,7 +108,7 @@ interface EditTableModalProps {
 export function EditTableModal({
   open,
   onOpenChange,
-  connectionId,
+  dbServiceKey,
   databaseName,
   tableName,
   schema,
@@ -125,8 +125,8 @@ export function EditTableModal({
     <Dialog onOpenChange={handleClose} open={open}>
       <DialogContent className="flex max-h-[90vh] min-h-[50vh] flex-col p-0 sm:max-w-5xl">
         <EditTableProvider
-          connectionId={connectionId}
           databaseName={databaseName}
+          dbServiceKey={dbServiceKey}
           schema={schema}
           tableName={tableName}
         >

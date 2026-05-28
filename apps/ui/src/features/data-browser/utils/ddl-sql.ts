@@ -5,9 +5,11 @@
 
 export type SqlDialect = "MYSQL" | "POSTGRES" | "SQLITE3" | "CLICKHOUSE";
 
-/** Resolve a connection type to a supported SQL dialect. */
-export function resolveSqlDialect(dbType: string | undefined): SqlDialect {
-  switch (dbType?.toUpperCase()) {
+/** Resolve a DB Service engine type to a supported SQL dialect. */
+export function resolveSqlDialect(
+  dbServiceEngineType: string | undefined
+): SqlDialect {
+  switch (dbServiceEngineType?.toUpperCase()) {
     case "MYSQL":
       return "MYSQL";
     case "CLICKHOUSE":
@@ -40,13 +42,13 @@ export function qualifiedTable(
   return q;
 }
 
-/** Build a quoted storage-unit reference directly from a connection type. */
+/** Build a quoted storage-unit reference directly from a DB Service engine type. */
 export function buildStorageUnitReference(
-  dbType: string | undefined,
+  dbServiceEngineType: string | undefined,
   table: string,
   schema?: string
 ): string {
-  return qualifiedTable(resolveSqlDialect(dbType), table, schema);
+  return qualifiedTable(resolveSqlDialect(dbServiceEngineType), table, schema);
 }
 
 // ---------------------------------------------------------------------------

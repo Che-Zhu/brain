@@ -11,7 +11,7 @@ import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { Textarea } from "@data-browser/components/ui/Textarea";
 import { useRawExecuteLazyQuery } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import { buildStorageUnitReference } from "@data-browser/utils/ddl-sql";
 import {
   downloadBlob,
@@ -87,13 +87,11 @@ function useExportDataCtx(): ExportDataCtxValue {
 
 /** Wraps ModalForm.Provider (complex mode, no onSubmit) and domain context for SQL table export. */
 function ExportDataProvider({
-  connectionId,
   databaseName,
   schema,
   tableName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   schema?: string | null;
   tableName: string;
@@ -110,7 +108,6 @@ function ExportDataProvider({
       }}
     >
       <ExportDataBridge
-        connectionId={connectionId}
         databaseName={databaseName}
         schema={schema}
         tableName={tableName}
@@ -123,13 +120,11 @@ function ExportDataProvider({
 
 /** Inner bridge that owns domain state and export logic, accessing ModalForm actions via useModalForm(). */
 function ExportDataBridge({
-  connectionId,
   databaseName,
   schema,
   tableName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   schema?: string | null;
   tableName: string;
@@ -141,7 +136,7 @@ function ExportDataBridge({
   const [isSuccess, setIsSuccess] = useState(false);
   const { actions } = useModalForm();
   const [executeQuery] = useRawExecuteLazyQuery({ fetchPolicy: "no-cache" });
-  const connections = useConnectionStore((s) => s.connections);
+  const dbService = useDbAccessService();
 
   const handleExport = useCallback(async () => {
     actions.setSubmitting(true);
@@ -149,11 +144,8 @@ function ExportDataBridge({
     setIsSuccess(false);
 
     try {
-      const connectionType = connections.find(
-        (connection) => connection.id === connectionId
-      )?.type;
       const qualifiedName = buildStorageUnitReference(
-        connectionType,
+        dbService.engineType,
         tableName,
         schema ?? undefined
       );
@@ -208,9 +200,8 @@ function ExportDataBridge({
     }
   }, [
     actions,
-    connectionId,
-    connections,
     databaseName,
+    dbService.engineType,
     executeQuery,
     filter,
     format,
@@ -313,8 +304,8 @@ function ExportDataFooterBridge() {
 // ---------------------------------------------------------------------------
 
 interface ExportDataModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   schema?: string | null;
@@ -325,7 +316,6 @@ interface ExportDataModalProps {
 export function ExportDataModal({
   open,
   onOpenChange,
-  connectionId,
   databaseName,
   schema,
   tableName,
@@ -334,7 +324,6 @@ export function ExportDataModal({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-lg">
         <ExportDataProvider
-          connectionId={connectionId}
           databaseName={databaseName}
           schema={schema}
           tableName={tableName}

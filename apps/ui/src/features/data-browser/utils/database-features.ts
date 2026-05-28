@@ -132,7 +132,7 @@ export function getEditorPlaceholder(dbType: string): string {
   return "SELECT * FROM table_name";
 }
 
-/** Redis commands that require persistent connection state or are blocking. */
+/** Redis commands that require persistent server session state or are blocking. */
 const REDIS_UNSUPPORTED_COMMANDS: Record<string, string> = {
   MULTI: "Redis transactions are not supported in this editor.",
   EXEC: "Redis transactions are not supported in this editor.",

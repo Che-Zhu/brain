@@ -6,12 +6,14 @@ import type {
   AccessObjectRef,
   AccessRowsSort,
 } from "@data-browser/api/access-types";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessRefresh,
+  useDbAccessRuntime,
+} from "@data-browser/state/db-access-session";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseDataQueryParams {
-  connectionId: string;
   currentPage: number;
   objectRef: AccessObjectRef;
   /** Called once when query returns columns and no visible columns are set yet. */
@@ -46,7 +48,6 @@ export function useDataQuery(params: UseDataQueryParams): {
   actions: DataQueryActions;
 } {
   const {
-    connectionId,
     currentPage,
     pageSize,
     sortColumn,
@@ -56,7 +57,8 @@ export function useDataQuery(params: UseDataQueryParams): {
     onInitVisibleColumns,
   } = params;
 
-  const { connections, tableRefreshKey } = useConnectionStore();
+  const runtime = useDbAccessRuntime();
+  const { tableRefreshKey } = useDbAccessRefresh();
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<TableData | null>(null);
@@ -68,13 +70,6 @@ export function useDataQuery(params: UseDataQueryParams): {
   const latestRequestIdRef = useRef(0);
   const handleSubmitRequest = useCallback(
     async (overridePageOffset?: number) => {
-      const conn = connections.find((c) => c.id === connectionId);
-      if (!conn?.runtime) {
-        setError("Connection not found");
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
       setError(null);
 
@@ -93,7 +88,7 @@ export function useDataQuery(params: UseDataQueryParams): {
 
       try {
         const result = await getRows({
-          runtime: conn.runtime,
+          runtime,
           ref: objectRef,
           pageSize,
           pageOffset: overridePageOffset ?? (currentPage - 1) * pageSize,
@@ -123,8 +118,7 @@ export function useDataQuery(params: UseDataQueryParams): {
       }
     },
     [
-      connections,
-      connectionId,
+      runtime,
       sortColumn,
       sortDirection,
       pageSize,

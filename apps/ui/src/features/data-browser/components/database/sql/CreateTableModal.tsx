@@ -16,7 +16,10 @@ import {
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
 import type { RecordInput } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessReadOnlyActions,
+  useDbAccessService,
+} from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { Plus, Table, Trash2 } from "lucide-react";
 import {
@@ -87,19 +90,19 @@ function useCreateTableCtx(): CreateTableCtxValue {
 
 /** Owns business logic for creating a SQL table with column definitions. */
 function CreateTableProvider({
-  connectionId,
   databaseName,
   schema,
   onSuccess,
   children,
 }: {
-  connectionId: string;
+  dbServiceKey: string;
   databaseName: string;
   schema?: string;
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { createTable, connections } = useConnectionStore();
+  const { createTable } = useDbAccessReadOnlyActions();
+  const dbService = useDbAccessService();
   const [tableName, setTableName] = useState("");
   const [columns, setColumns] = useState<ColumnDefinition[]>([
     { id: "1", name: "id", type: "INT", isPrimaryKey: true, isNullable: false },
@@ -136,8 +139,11 @@ function CreateTableProvider({
       return;
     }
 
-    const conn = connections.find((c) => c.id === connectionId);
-    const schemaParam = resolveSchemaParam(conn?.type, databaseName, schema);
+    const schemaParam = resolveSchemaParam(
+      dbService.engineType,
+      databaseName,
+      schema
+    );
     const fields: RecordInput[] = columns.map((col) => ({
       Key: col.name,
       Value: col.type,
@@ -161,9 +167,8 @@ function CreateTableProvider({
   }, [
     tableName,
     columns,
-    connections,
-    connectionId,
     databaseName,
+    dbService.engineType,
     schema,
     createTable,
     onSuccess,
@@ -346,8 +351,8 @@ function CreateTableSubmitButton() {
 // ---------------------------------------------------------------------------
 
 interface CreateTableModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   open: boolean;
@@ -358,7 +363,7 @@ interface CreateTableModalProps {
 export function CreateTableModal({
   open,
   onOpenChange,
-  connectionId,
+  dbServiceKey,
   databaseName,
   schema,
   onSuccess,
@@ -372,8 +377,8 @@ export function CreateTableModal({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl">
         <CreateTableProvider
-          connectionId={connectionId}
           databaseName={databaseName}
+          dbServiceKey={dbServiceKey}
           onSuccess={handleSuccess}
           schema={schema}
         >

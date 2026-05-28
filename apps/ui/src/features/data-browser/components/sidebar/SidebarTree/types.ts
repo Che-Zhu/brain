@@ -1,8 +1,8 @@
 import type { AccessObjectRef } from "@data-browser/api/access-types";
-import type { Connection } from "@data-browser/stores/useConnectionStore";
+import type { DbAccessService } from "@data-browser/state/db-access-session";
 
 export type NodeType =
-  | "connection"
+  | "db_service"
   | "database"
   | "schema"
   | "table_folder"
@@ -14,7 +14,7 @@ export type NodeType =
   | "redis_key";
 
 export interface TreeNodeData {
-  connectionId: string;
+  dbServiceKey: string;
   id: string;
   metadata: {
     database?: string;
@@ -32,7 +32,7 @@ export interface TreeNodeData {
 
 /** Types that can be expanded to show children */
 export const EXPANDABLE_TYPES: ReadonlySet<NodeType> = new Set([
-  "connection",
+  "db_service",
   "database",
   "schema",
   "table_folder",
@@ -42,7 +42,7 @@ export const EXPANDABLE_TYPES: ReadonlySet<NodeType> = new Set([
 
 /** Icon color class per node type */
 export const NODE_ICON_COLORS: Record<NodeType, string> = {
-  connection: "text-primary",
+  db_service: "text-primary",
   database: "text-chart-3",
   schema: "text-chart-4",
   table_folder: "text-chart-2",
@@ -54,7 +54,7 @@ export const NODE_ICON_COLORS: Record<NodeType, string> = {
   redis_key: "text-muted-foreground",
 };
 
-/** Database brand icons (connection-level, keyed by Connection.type) */
+/** Database brand icons keyed by DB Service engine type. */
 export const DB_ICONS: Record<string, string> = {
   MYSQL: "/images/mysql.svg",
   POSTGRES: "/images/postgresql.svg",
@@ -63,13 +63,13 @@ export const DB_ICONS: Record<string, string> = {
   // ClickHouse has no brand icon — falls through to default Database icon
 };
 
-/** Convert a Connection to a root-level TreeNodeData */
-export function connectionToNode(conn: Connection): TreeNodeData {
+/** Convert a DB Service to a root-level TreeNodeData. */
+export function dbServiceToNode(dbService: DbAccessService): TreeNodeData {
   return {
-    id: conn.id,
-    name: conn.name,
-    type: "connection",
-    connectionId: conn.id,
+    dbServiceKey: dbService.dbServiceKey,
+    id: dbService.dbServiceKey,
     metadata: {},
+    name: dbService.displayName,
+    type: "db_service",
   };
 }

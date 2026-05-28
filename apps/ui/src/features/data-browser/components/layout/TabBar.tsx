@@ -8,10 +8,10 @@ import {
 } from "@data-browser/components/ui/tooltip";
 import { cn } from "@data-browser/lib/utils";
 import {
-  type Tab,
-  type TabType,
-  useTabStore,
-} from "@data-browser/stores/useTabStore";
+  type DbAccessTab,
+  type DbAccessTabType,
+  useDbAccessTabs,
+} from "@data-browser/state/db-access-session";
 import {
   Database,
   FileCode,
@@ -22,7 +22,7 @@ import {
 import type React from "react";
 import { useState } from "react";
 
-function getTabIcon(type: TabType) {
+function getTabIcon(type: DbAccessTabType) {
   switch (type) {
     case "query":
       return <FileCode className="h-4 w-4" />;
@@ -41,7 +41,7 @@ interface TabItemProps {
   onActivate: () => void;
   onClose: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
-  tab: Tab;
+  tab: DbAccessTab;
 }
 
 function TabItem({
@@ -59,8 +59,8 @@ function TabItem({
         isActive ? "bg-input text-foreground" : "text-foreground hover:bg-muted"
       )}
       data-qa-action="activate"
-      data-qa-connection-id={tab.connectionId}
       data-qa-database={tab.databaseName}
+      data-qa-db-service-key={tab.dbServiceKey}
       data-qa-module="layout"
       data-qa-object="tab"
       data-qa-resource-id={tab.id}
@@ -116,7 +116,7 @@ export function TabBar() {
     closeTab,
     closeOtherTabs,
     closeAllTabs,
-  } = useTabStore();
+  } = useDbAccessTabs();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;

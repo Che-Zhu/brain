@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { Database } from "lucide-react";
 import {
   createContext,
@@ -47,7 +47,7 @@ function EditDatabaseProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { renameDatabase } = useConnectionStore();
+  const { renameDatabase } = useDbAccessReadOnlyActions();
   const [newName, setNewName] = useState(databaseName);
 
   const handleSubmit = useCallback(async () => {

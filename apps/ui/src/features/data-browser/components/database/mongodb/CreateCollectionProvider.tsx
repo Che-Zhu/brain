@@ -1,5 +1,8 @@
 import { ModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessReadOnlyActions,
+  useDbAccessService,
+} from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { Database } from "lucide-react";
 import {
@@ -42,25 +45,24 @@ export function useCreateCollectionCtx(): CreateCollectionCtxValue {
 
 /** Owns business logic for creating a MongoDB collection. */
 export function CreateCollectionProvider({
-  connectionId,
   databaseName,
   onSuccess,
   children,
 }: {
-  connectionId: string;
+  dbServiceKey: string;
   databaseName: string;
   onSuccess?: () => void;
   children: ReactNode;
 }): JSX.Element {
-  const { createTable, connections } = useConnectionStore();
+  const { createTable } = useDbAccessReadOnlyActions();
+  const dbService = useDbAccessService();
   const [collectionName, setCollectionName] = useState("");
 
   const handleSubmit = useCallback(async () => {
     if (!collectionName) {
       return;
     }
-    const conn = connections.find((c) => c.id === connectionId);
-    const schemaParam = resolveSchemaParam(conn?.type, databaseName);
+    const schemaParam = resolveSchemaParam(dbService.engineType, databaseName);
     const result = await createTable(
       databaseName,
       schemaParam,
@@ -75,9 +77,8 @@ export function CreateCollectionProvider({
     }
   }, [
     collectionName,
-    connections,
-    connectionId,
     databaseName,
+    dbService.engineType,
     createTable,
     onSuccess,
   ]);

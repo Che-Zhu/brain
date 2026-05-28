@@ -1,9 +1,14 @@
-type ConnectionType = "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CLICKHOUSE";
+type DbServiceEngineType =
+  | "MYSQL"
+  | "POSTGRES"
+  | "MONGODB"
+  | "REDIS"
+  | "CLICKHOUSE";
 type ExportFormat = "csv" | "json" | "sql" | "excel";
 
 interface BuildDatabaseExportPlanOptions {
   allSchemas: string[];
-  connectionType: ConnectionType | undefined;
+  dbServiceEngineType: DbServiceEngineType | undefined;
   fallbackSchema: string;
   includeSystemSchemas: boolean;
   systemSchemas: string[];
@@ -11,13 +16,13 @@ interface BuildDatabaseExportPlanOptions {
 
 /** Resolve which logical schema buckets should be exported for a database export. */
 export function buildDatabaseExportPlan({
-  connectionType,
+  dbServiceEngineType,
   fallbackSchema,
   allSchemas,
   systemSchemas,
   includeSystemSchemas,
 }: BuildDatabaseExportPlanOptions): string[] {
-  if (connectionType === "POSTGRES") {
+  if (dbServiceEngineType === "POSTGRES") {
     const filteredSchemas = includeSystemSchemas
       ? allSchemas
       : allSchemas.filter((schema) => !systemSchemas.includes(schema));
@@ -29,13 +34,13 @@ export function buildDatabaseExportPlan({
 
 /** Build the ZIP entry path for a storage unit export. */
 export function formatDatabaseExportEntryName(
-  connectionType: ConnectionType | undefined,
+  dbServiceEngineType: DbServiceEngineType | undefined,
   schema: string,
   tableName: string,
   format: ExportFormat
 ): string {
   const filename = `${tableName}.${format === "excel" ? "xlsx" : format}`;
-  if (connectionType === "POSTGRES") {
+  if (dbServiceEngineType === "POSTGRES") {
     return `${schema}/${filename}`;
   }
   return filename;
@@ -43,11 +48,11 @@ export function formatDatabaseExportEntryName(
 
 /** Human-readable label for progress and partial failure messages. */
 export function formatDatabaseExportTargetName(
-  connectionType: ConnectionType | undefined,
+  dbServiceEngineType: DbServiceEngineType | undefined,
   schema: string,
   tableName: string
 ): string {
-  if (connectionType === "POSTGRES") {
+  if (dbServiceEngineType === "POSTGRES") {
     return `${schema}.${tableName}`;
   }
   return tableName;

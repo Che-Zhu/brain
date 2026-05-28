@@ -53,14 +53,14 @@ export function MainLayout() {
         className="flex h-full min-h-0 w-full overflow-hidden"
         data-qa-module="layout"
         data-qa-object="app-shell"
-        data-qa-state="connections"
+        data-qa-state="db-access-session"
         data-testid="layout.shell"
       >
         <div
           className="relative shrink-0"
           data-qa-module="layout"
           data-qa-object="sidebar"
-          data-qa-state="connections"
+          data-qa-state="db-access-session"
           data-testid="layout.sidebar-region"
           style={{ width: sidebarWidth }}
         >
@@ -79,7 +79,7 @@ export function MainLayout() {
           className="relative flex flex-1 flex-col overflow-hidden"
           data-qa-module="layout"
           data-qa-object="main"
-          data-qa-state="connections"
+          data-qa-state="db-access-session"
           data-testid="layout.main-region"
         >
           <TabBar />

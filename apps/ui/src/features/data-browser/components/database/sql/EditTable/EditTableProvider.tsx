@@ -4,7 +4,7 @@ import {
   useExecuteConfirmedSqlMutation,
   useRawExecuteLazyQuery,
 } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import type { SqlDialect } from "@data-browser/utils/ddl-sql";
 import {
   addColumnSQL,
@@ -51,15 +51,14 @@ export function useEditTable(): EditTableContextValue {
 
 interface EditTableProviderProps {
   children: ReactNode;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   schema?: string;
   tableName: string;
 }
 
 /** Wraps ModalForm.Provider (complex mode, no onSubmit) and domain context for editing table schema. */
 export function EditTableProvider({
-  connectionId,
   databaseName,
   tableName,
   schema,
@@ -73,7 +72,6 @@ export function EditTableProvider({
   return (
     <ModalForm.Provider meta={meta}>
       <EditTableBridge
-        connectionId={connectionId}
         databaseName={databaseName}
         schema={schema}
         tableName={tableName}
@@ -97,31 +95,27 @@ export function resolveForeignKeyDropName(
 
 /** Inner bridge that owns all state, schema fetching, DDL execution, and batch CRUD handlers. */
 function EditTableBridge({
-  connectionId,
   databaseName,
   tableName,
   schema,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   tableName: string;
   schema?: string;
   children: ReactNode;
 }) {
-  const { connections } = useConnectionStore();
-  const conn = connections.find((c) => c.id === connectionId);
+  const dbService = useDbAccessService();
   const { actions: modalActions } = useModalForm();
 
   const dialect: SqlDialect = (() => {
-    const dbType = conn?.type;
     const map: Record<string, SqlDialect> = {
       MYSQL: "MYSQL",
       POSTGRES: "POSTGRES",
       SQLITE3: "SQLITE3",
       CLICKHOUSE: "CLICKHOUSE",
     };
-    return map[dbType ?? ""] ?? "POSTGRES";
+    return map[dbService.engineType] ?? "POSTGRES";
   })();
 
   const [columns, setColumns] = useState<ColumnDefinition[]>([]);
@@ -151,10 +145,6 @@ function EditTableBridge({
 
   const fetchTableSchema = async () => {
     setIsLoading(true);
-    if (!conn) {
-      setIsLoading(false);
-      return;
-    }
 
     try {
       // Fetch columns

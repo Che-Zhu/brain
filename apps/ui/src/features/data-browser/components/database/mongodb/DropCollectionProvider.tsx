@@ -1,5 +1,5 @@
 import { ModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessReadOnlyActions } from "@data-browser/state/db-access-session";
 import { AlertTriangle } from "lucide-react";
 import {
   createContext,
@@ -51,7 +51,7 @@ export function DropCollectionProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }): JSX.Element {
-  const { dropCollection } = useConnectionStore();
+  const { dropCollection } = useDbAccessReadOnlyActions();
   const [confirmName, setConfirmName] = useState("");
   const canDrop = confirmName === collectionName;
 

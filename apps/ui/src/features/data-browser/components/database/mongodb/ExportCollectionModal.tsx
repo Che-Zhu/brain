@@ -9,7 +9,7 @@ import {
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useDbAccessService } from "@data-browser/state/db-access-session";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { downloadBlob } from "@data-browser/utils/export-utils";
 import { Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
@@ -88,12 +88,10 @@ function useExportCollectionCtx(): ExportCollectionCtxValue {
 
 /** Wraps ModalForm.Provider (complex mode, no onSubmit) and domain context for MongoDB collection export. */
 function ExportCollectionProvider({
-  connectionId,
   databaseName,
   collectionName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   collectionName: string;
   children: ReactNode;
@@ -108,7 +106,6 @@ function ExportCollectionProvider({
     >
       <ExportCollectionBridge
         collectionName={collectionName}
-        connectionId={connectionId}
         databaseName={databaseName}
       >
         {children}
@@ -123,17 +120,15 @@ function ExportCollectionProvider({
  * maps JSON to NDJSON for backend, triggers download via downloadBlob utility.
  */
 function ExportCollectionBridge({
-  connectionId,
   databaseName,
   collectionName,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   collectionName: string;
   children: ReactNode;
 }) {
-  const { connections } = useConnectionStore();
+  const dbService = useDbAccessService();
   const [format, setFormat] = useState<CollectionExportFormat>("json");
   const [filter, setFilter] = useState("");
   const [limit, setLimit] = useState<number | "">("");
@@ -146,12 +141,10 @@ function ExportCollectionBridge({
     setIsSuccess(false);
 
     try {
-      const connection = connections.find((c) => c.id === connectionId);
-      if (!connection) {
-        throw new Error("Connection not found");
-      }
-
-      const graphqlSchema = resolveSchemaParam(connection.type, databaseName);
+      const graphqlSchema = resolveSchemaParam(
+        dbService.engineType,
+        databaseName
+      );
       const backendFormat = BACKEND_FORMATS[format];
 
       const response = await fetch("/api/export", {
@@ -197,9 +190,8 @@ function ExportCollectionBridge({
   }, [
     actions,
     collectionName,
-    connectionId,
-    connections,
     databaseName,
+    dbService.engineType,
     filter,
     format,
     limit,
@@ -293,8 +285,8 @@ function ExportCollectionFooterBridge() {
 
 interface ExportCollectionModalProps {
   collectionName: string;
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }
@@ -303,7 +295,6 @@ interface ExportCollectionModalProps {
 export function ExportCollectionModal({
   open,
   onOpenChange,
-  connectionId,
   databaseName,
   collectionName,
 }: ExportCollectionModalProps) {
@@ -312,7 +303,6 @@ export function ExportCollectionModal({
       <DialogContent className="sm:max-w-lg">
         <ExportCollectionProvider
           collectionName={collectionName}
-          connectionId={connectionId}
           databaseName={databaseName}
         >
           <ModalForm.Header />

@@ -21,8 +21,8 @@ import { TableViewToolbar } from "./TableView/TableView.Toolbar";
 import { TableViewProvider, useTableView } from "./TableView/TableViewProvider";
 
 interface TableDetailViewProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   objectRef: AccessObjectRef;
   schema?: string;
   tableName: string;
@@ -37,8 +37,8 @@ export function TableDetailView(props: TableDetailViewProps) {
 }
 
 function TableDetailViewContent({
-  connectionId,
   databaseName,
+  dbServiceKey,
   objectRef,
   tableName,
   schema,
@@ -51,8 +51,8 @@ function TableDetailViewContent({
   return (
     <div
       className="flex h-full flex-col"
-      data-qa-connection-id={connectionId}
       data-qa-database={databaseName}
+      data-qa-db-service-key={dbServiceKey}
       data-qa-loading={state.loading ? "true" : "false"}
       data-qa-module="sql"
       data-qa-object="table-detail"
@@ -65,8 +65,8 @@ function TableDetailViewContent({
       data-testid="sql.table.detail"
     >
       <TableViewToolbar
-        connectionId={connectionId}
         databaseName={databaseName}
+        dbServiceKey={dbServiceKey}
         schema={schema}
         tableName={tableName}
       />

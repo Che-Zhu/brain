@@ -9,7 +9,10 @@ import {
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { useRawExecuteLazyQuery } from "@data-browser/generated/graphql";
-import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import {
+  useDbAccessReadOnlyActions,
+  useDbAccessService,
+} from "@data-browser/state/db-access-session";
 import {
   buildDatabaseExportPlan,
   formatDatabaseExportEntryName,
@@ -83,12 +86,10 @@ function useExportDatabaseCtx(): ExportDatabaseCtxValue {
 
 /** Wraps ModalForm.Provider (complex mode, no onSubmit) and domain context for database ZIP export. */
 function ExportDatabaseProvider({
-  connectionId,
   databaseName,
   schema,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   schema: string;
   children: ReactNode;
@@ -101,11 +102,7 @@ function ExportDatabaseProvider({
         icon: Database,
       }}
     >
-      <ExportDatabaseBridge
-        connectionId={connectionId}
-        databaseName={databaseName}
-        schema={schema}
-      >
+      <ExportDatabaseBridge databaseName={databaseName} schema={schema}>
         {children}
       </ExportDatabaseBridge>
     </ModalForm.Provider>
@@ -118,12 +115,10 @@ function ExportDatabaseProvider({
  * bundles into ZIP via JSZip, triggers download. Partial failures surface as an info alert.
  */
 function ExportDatabaseBridge({
-  connectionId,
   databaseName,
   schema,
   children,
 }: {
-  connectionId: string;
   databaseName: string;
   schema: string;
   children: ReactNode;
@@ -133,13 +128,9 @@ function ExportDatabaseBridge({
   const [statusText, setStatusText] = useState("");
   const { actions } = useModalForm();
   const [executeQuery] = useRawExecuteLazyQuery({ fetchPolicy: "no-cache" });
-  const connections = useConnectionStore((s) => s.connections);
-  const fetchSchemas = useConnectionStore((s) => s.fetchSchemas);
-  const fetchTables = useConnectionStore((s) => s.fetchTables);
-  const systemSchemas = useConnectionStore((s) => s.systemSchemas);
-  const showSystemObjectsFor = useConnectionStore(
-    (s) => s.showSystemObjectsFor
-  );
+  const dbService = useDbAccessService();
+  const { fetchSchemas, fetchTables, systemSchemas, showSystemObjectsFor } =
+    useDbAccessReadOnlyActions();
 
   const handleExport = useCallback(async () => {
     actions.setSubmitting(true);
@@ -148,16 +139,14 @@ function ExportDatabaseBridge({
     setStatusText("Fetching table list...");
 
     try {
-      const connectionType = connections.find(
-        (connection) => connection.id === connectionId
-      )?.type;
-      const databaseNodeId = `${connectionId}-${databaseName}`;
+      const dbServiceEngineType = dbService.engineType;
+      const databaseNodeId = `${dbService.dbServiceKey}-${databaseName}`;
       const allSchemas =
-        connectionType === "POSTGRES"
-          ? await fetchSchemas(connectionId, databaseName)
+        dbServiceEngineType === "POSTGRES"
+          ? await fetchSchemas(databaseName)
           : [];
       const schemasToExport = buildDatabaseExportPlan({
-        connectionType,
+        dbServiceEngineType,
         fallbackSchema: schema,
         allSchemas,
         systemSchemas,
@@ -166,11 +155,7 @@ function ExportDatabaseBridge({
       const exportTargets: Array<{ schema: string; tableName: string }> = [];
 
       for (const schemaName of schemasToExport) {
-        const tables = await fetchTables(
-          connectionId,
-          databaseName,
-          schemaName
-        );
+        const tables = await fetchTables(databaseName, schemaName);
         for (const table of tables) {
           exportTargets.push({ schema: schemaName, tableName: table.name });
         }
@@ -189,7 +174,7 @@ function ExportDatabaseBridge({
           continue;
         }
         const targetLabel = formatDatabaseExportTargetName(
-          connectionType,
+          dbServiceEngineType,
           target.schema,
           target.tableName
         );
@@ -199,7 +184,7 @@ function ExportDatabaseBridge({
 
         try {
           const qualifiedName = buildStorageUnitReference(
-            connectionType,
+            dbServiceEngineType,
             target.tableName,
             target.schema
           );
@@ -233,7 +218,7 @@ function ExportDatabaseBridge({
 
           zip.file(
             formatDatabaseExportEntryName(
-              connectionType,
+              dbServiceEngineType,
               target.schema,
               target.tableName,
               format
@@ -270,9 +255,9 @@ function ExportDatabaseBridge({
     }
   }, [
     actions,
-    connectionId,
-    connections,
     databaseName,
+    dbService.dbServiceKey,
+    dbService.engineType,
     executeQuery,
     fetchSchemas,
     fetchTables,
@@ -329,8 +314,8 @@ function ExportDatabaseFooterBridge() {
 // ---------------------------------------------------------------------------
 
 interface ExportDatabaseModalProps {
-  connectionId: string;
   databaseName: string;
+  dbServiceKey: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   schema: string;
@@ -340,18 +325,13 @@ interface ExportDatabaseModalProps {
 export function ExportDatabaseModal({
   open,
   onOpenChange,
-  connectionId,
   databaseName,
   schema,
 }: ExportDatabaseModalProps) {
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-lg">
-        <ExportDatabaseProvider
-          connectionId={connectionId}
-          databaseName={databaseName}
-          schema={schema}
-        >
+        <ExportDatabaseProvider databaseName={databaseName} schema={schema}>
           <ModalForm.Header />
           <ExportDatabaseFields />
           <ModalForm.Alert />
