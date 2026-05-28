@@ -16,7 +16,7 @@ const NAME_RE = /orders-db/;
 const RESOURCE_PANE_SURFACE_RE = /resource-pane-surface/;
 const CANVAS_ACTION_BODY_BACKGROUND_RE =
   /canvas-action-surface-body-background/;
-const DATA_BROWSER_RE = /data-browser-shell/;
+const DATA_BROWSER_RE = /text-resource-pane-foreground/;
 const SUBTITLE_RE = /Database PostgreSQL 16.4/;
 
 const databaseData = {
