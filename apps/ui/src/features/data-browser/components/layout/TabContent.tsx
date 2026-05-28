@@ -52,7 +52,7 @@ export function TabContent() {
           />
         );
       case "table":
-        if (!(tab.databaseName && tab.tableName)) {
+        if (!(tab.databaseName && tab.tableName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
               {t("layout.invalid.tableConfig")}
@@ -64,12 +64,13 @@ export function TabContent() {
             connectionId={tab.connectionId}
             databaseName={tab.databaseName}
             key={tab.id}
+            objectRef={tab.objectRef}
             schema={tab.schemaName}
             tableName={tab.tableName}
           />
         );
       case "collection":
-        if (!(tab.databaseName && tab.collectionName)) {
+        if (!(tab.databaseName && tab.collectionName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
               {t("layout.invalid.collectionConfig")}
@@ -82,10 +83,11 @@ export function TabContent() {
             connectionId={tab.connectionId}
             databaseName={tab.databaseName}
             key={tab.id}
+            objectRef={tab.objectRef}
           />
         );
       case "redis_key_detail":
-        if (!(tab.databaseName && tab.tableName)) {
+        if (!(tab.databaseName && tab.tableName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
               {t("layout.invalid.tableConfig")}
@@ -98,6 +100,7 @@ export function TabContent() {
             databaseName={tab.databaseName}
             key={tab.id}
             keyName={tab.tableName}
+            objectRef={tab.objectRef}
           />
         );
       default:

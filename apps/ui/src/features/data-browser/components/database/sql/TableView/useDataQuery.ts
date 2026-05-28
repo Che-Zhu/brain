@@ -1,37 +1,25 @@
 import {
-  type SortCondition,
-  SortDirection,
-  useGetStorageUnitRowsLazyQuery,
-  type WhereCondition,
-  WhereConditionType,
-} from "@data-browser/generated/graphql";
+  accessRowsToDataFlowTableData,
+  getRows,
+} from "@data-browser/api/access-adapter";
+import type {
+  AccessObjectRef,
+  AccessRowsSort,
+} from "@data-browser/api/access-types";
 import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { resolveSchemaParam } from "@data-browser/utils/database-features";
-import {
-  type TableData,
-  transformRowsResult,
-} from "@data-browser/utils/graphql-transforms";
-import {
-  mergeSearchWithWhere,
-  parseSearchToWhereCondition,
-} from "@data-browser/utils/search-parser";
+import type { TableData } from "@data-browser/utils/graphql-transforms";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FilterCondition } from "./types";
 
 interface UseDataQueryParams {
   connectionId: string;
   currentPage: number;
-  databaseName: string;
-  filterConditions: FilterCondition[];
+  objectRef: AccessObjectRef;
   /** Called once when query returns columns and no visible columns are set yet. */
   onInitVisibleColumns: (columns: string[]) => void;
   pageSize: number;
-  schema?: string;
-  searchTerm: string;
   sortColumn: string | null;
   sortDirection: "asc" | "desc" | null;
-  tableName: string;
   visibleColumnsCount: number;
 }
 
@@ -61,22 +49,16 @@ export function useDataQuery(params: UseDataQueryParams): {
   const { t } = useI18n();
   const {
     connectionId,
-    databaseName,
-    schema,
-    tableName,
     currentPage,
     pageSize,
-    searchTerm,
     sortColumn,
     sortDirection,
-    filterConditions,
+    objectRef,
     visibleColumnsCount,
     onInitVisibleColumns,
   } = params;
 
   const { connections, tableRefreshKey } = useConnectionStore();
-
-  const [getRows] = useGetStorageUnitRowsLazyQuery({ fetchPolicy: "no-cache" });
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<TableData | null>(null);
@@ -86,30 +68,12 @@ export function useDataQuery(params: UseDataQueryParams): {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const latestRequestIdRef = useRef(0);
-  const filterConditionsRef = useRef(filterConditions);
-  const columnsRef = useRef<{ names: string[]; types: string[] }>({
-    names: [],
-    types: [],
-  });
-
-  // Keep refs in sync
-  useEffect(() => {
-    filterConditionsRef.current = filterConditions;
-  }, [filterConditions]);
-
-  useEffect(() => {
-    if (data?.columns && data.columns.length > 0) {
-      columnsRef.current = {
-        names: data.columns,
-        types: data.columns.map((c) => data.columnTypes[c] ?? "string"),
-      };
-    }
-  }, [data?.columns, data?.columnTypes]);
-
   const handleSubmitRequest = useCallback(
     async (overridePageOffset?: number) => {
       const conn = connections.find((c) => c.id === connectionId);
-      if (!conn) {
+      if (!conn?.runtime) {
+        setError(t("common.error.connectionNotFound"));
+        setLoading(false);
         return;
       }
 
@@ -119,95 +83,35 @@ export function useDataQuery(params: UseDataQueryParams): {
       latestRequestIdRef.current += 1;
       const thisRequestId = latestRequestIdRef.current;
 
-      const graphqlSchema = resolveSchemaParam(conn.type, databaseName, schema);
-
-      // Build sort condition
-      const sort: SortCondition[] | undefined =
+      const sort: AccessRowsSort[] | undefined =
         sortColumn && sortDirection
           ? [
               {
-                Column: sortColumn,
-                Direction:
-                  sortDirection === "asc"
-                    ? SortDirection.Asc
-                    : SortDirection.Desc,
+                column: sortColumn,
+                direction: sortDirection === "asc" ? "ASC" : "DESC",
               },
             ]
           : undefined;
 
-      // Build filter where condition
-      const currentFilters = filterConditionsRef.current;
-      let filterWhere: WhereCondition | undefined;
-      if (currentFilters.length > 0) {
-        const noValueOperators = ["IS NULL", "IS NOT NULL"];
-        const atomicConditions: WhereCondition[] = currentFilters
-          .filter(
-            (fc) =>
-              fc.column &&
-              fc.operator &&
-              (noValueOperators.includes(fc.operator) || fc.value !== "")
-          )
-          .map((fc) => ({
-            Type: WhereConditionType.Atomic,
-            Atomic: {
-              Key: fc.column,
-              Operator: fc.operator,
-              Value: fc.value ?? "",
-              ColumnType: data?.columnTypes[fc.column] ?? "string",
-            },
-          }));
-
-        if (atomicConditions.length === 1) {
-          filterWhere = atomicConditions[0];
-        } else if (atomicConditions.length > 1) {
-          filterWhere = {
-            Type: WhereConditionType.And,
-            And: { Children: atomicConditions },
-          };
-        }
-      }
-
-      // Build search where condition
-      const searchWhere = searchTerm.trim()
-        ? parseSearchToWhereCondition(
-            searchTerm,
-            columnsRef.current.names,
-            columnsRef.current.types
-          )
-        : undefined;
-
-      const where = mergeSearchWithWhere(searchWhere, filterWhere);
-
       try {
-        const { data: result, error: queryError } = await getRows({
-          variables: {
-            schema: graphqlSchema,
-            storageUnit: tableName,
-            where,
-            sort,
-            pageSize,
-            pageOffset: overridePageOffset ?? (currentPage - 1) * pageSize,
-          },
-          context: { database: databaseName },
+        const result = await getRows({
+          runtime: conn.runtime,
+          ref: objectRef,
+          pageSize,
+          pageOffset: overridePageOffset ?? (currentPage - 1) * pageSize,
+          sort,
         });
 
         if (thisRequestId !== latestRequestIdRef.current) {
           return;
         }
 
-        if (queryError) {
-          setError(queryError.message);
-          return;
-        }
-
-        if (result?.Row) {
-          const tableData = transformRowsResult(result.Row);
-          setData(tableData);
-          setPrimaryKey(tableData.primaryKey);
-          setForeignKeyColumns(tableData.foreignKeyColumns);
-          if (visibleColumnsCount === 0 && tableData.columns.length > 0) {
-            onInitVisibleColumns(tableData.columns);
-          }
+        const tableData = accessRowsToDataFlowTableData(result);
+        setData(tableData);
+        setPrimaryKey(tableData.primaryKey);
+        setForeignKeyColumns(tableData.foreignKeyColumns);
+        if (visibleColumnsCount === 0 && tableData.columns.length > 0) {
+          onInitVisibleColumns(tableData.columns);
         }
       } catch (err: any) {
         if (thisRequestId !== latestRequestIdRef.current) {
@@ -223,15 +127,11 @@ export function useDataQuery(params: UseDataQueryParams): {
     [
       connections,
       connectionId,
-      databaseName,
-      schema,
-      tableName,
       sortColumn,
       sortDirection,
-      searchTerm,
       pageSize,
       currentPage,
-      getRows,
+      objectRef,
       visibleColumnsCount,
       onInitVisibleColumns,
       t,

@@ -15,7 +15,7 @@ export interface TableData {
   /** Primary key column name, if any. */
   primaryKey: string | null;
   /** Row objects: { columnName: cellValue }. */
-  rows: Record<string, string>[];
+  rows: Array<Record<string, string | null>>;
   /** Total row count (server-side, for pagination). */
   total: number;
 }

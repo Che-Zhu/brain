@@ -1,3 +1,4 @@
+import type { AccessObjectRef } from "@data-browser/api/access-types";
 import type { Alert } from "@data-browser/components/database/shared/types";
 import {
   createContext,
@@ -10,11 +11,12 @@ import {
 } from "react";
 import type {
   FilterCondition,
+  RenderedTableRow,
   TableViewActions,
   TableViewContextValue,
   TableViewState,
 } from "./types";
-import { useChangesetManager } from "./useChangesetManager";
+import type { ChangesetManagerState } from "./useChangesetManager";
 import { useColumnResize } from "./useColumnResize";
 import { useDataQuery } from "./useDataQuery";
 
@@ -47,15 +49,57 @@ interface TableViewProviderProps {
   children: ReactNode;
   connectionId: string;
   databaseName: string;
+  objectRef: AccessObjectRef;
   schema?: string;
   tableName: string;
 }
+
+function buildExistingRowKey(pageOffset: number, sourceRowIndex: number) {
+  return `existing-${pageOffset + sourceRowIndex}`;
+}
+
+const NOOP = (..._args: unknown[]) => undefined;
+const ASYNC_NOOP = async (..._args: unknown[]) => undefined;
+const EMPTY_SET = new Set<string>();
+
+function normalizeCellValue(value: unknown) {
+  return value == null ? null : String(value);
+}
+
+const EMPTY_CHANGESET_STATE: ChangesetManagerState = {
+  activeCell: null,
+  activeDraftValue: "",
+  changes: new Map(),
+  newRowCounter: 0,
+  newRowOrder: [],
+  selectedRowKeys: EMPTY_SET,
+  showDiscardModal: false,
+  showPreviewModal: false,
+  showSubmitModal: false,
+  undoStack: [],
+};
+const READ_ONLY_CHANGESET_ACTIONS = {
+  activateCell: NOOP,
+  deactivateCell: NOOP,
+  updateActiveCellValue: NOOP,
+  moveActiveCell: NOOP,
+  toggleRowSelection: NOOP,
+  addPendingRow: NOOP,
+  markSelectedRowsForDelete: NOOP,
+  undoLastChange: NOOP,
+  discardChanges: NOOP,
+  setShowPreviewModal: NOOP,
+  setShowSubmitModal: NOOP,
+  setShowDiscardModal: NOOP,
+  submitChanges: ASYNC_NOOP,
+};
 
 /** Provider that owns all TableDetailView state, GraphQL operations, and handlers. */
 export function TableViewProvider({
   connectionId,
   databaseName,
   tableName,
+  objectRef,
   schema,
   children,
 }: TableViewProviderProps) {
@@ -95,15 +139,11 @@ export function TableViewProvider({
   // ---- Data query (GraphQL fetch, loading/error, race condition prevention) ----
   const { state: queryState, actions: queryActions } = useDataQuery({
     connectionId,
-    databaseName,
-    schema,
-    tableName,
     currentPage,
     pageSize,
-    searchTerm,
     sortColumn,
     sortDirection,
-    filterConditions,
+    objectRef,
     visibleColumnsCount: visibleColumns.length,
     onInitVisibleColumns,
   });
@@ -124,20 +164,37 @@ export function TableViewProvider({
 
   const pageOffset = (currentPage - 1) * pageSize;
 
-  // ---- Changeset editing ----
-  const { state: changesetState, actions: changesetActions } =
-    useChangesetManager({
-      connectionId,
-      databaseName,
-      schema,
-      tableName,
-      data: queryState.data,
-      pageOffset,
-      visibleColumns,
-      primaryKey: queryState.primaryKey,
-      refresh: queryActions.refresh,
-      showAlert,
-    });
+  const renderedRows: RenderedTableRow[] = (queryState.data?.rows ?? []).map(
+    (row, sourceRowIndex) => {
+      const originalRow = Object.fromEntries(
+        Object.entries(row).map(([column, value]) => [
+          column,
+          normalizeCellValue(value),
+        ])
+      );
+
+      return {
+        rowKey: buildExistingRowKey(pageOffset, sourceRowIndex),
+        sourceRowIndex,
+        rowNumber: pageOffset + sourceRowIndex + 1,
+        originalRow,
+        values: originalRow,
+        changeType: null,
+        isDeleted: false,
+        isInserted: false,
+      };
+    }
+  );
+
+  // Hidden write support remains compiled separately; the visible migration path is read-only.
+  const changesetState = {
+    ...EMPTY_CHANGESET_STATE,
+    renderedRows,
+    pendingChangeCount: 0,
+    hasPendingChanges: false,
+  };
+
+  const changesetActions = READ_ONLY_CHANGESET_ACTIONS;
 
   const pendingReloadActionRef = useRef<null | (() => void)>(null);
 

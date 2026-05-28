@@ -1,3 +1,4 @@
+import type { AccessObjectRef } from "@data-browser/api/access-types";
 import { DataView } from "@data-browser/components/database/shared/DataView";
 import { FindBar } from "@data-browser/components/database/shared/FindBar";
 import { SingleObjectExportModal } from "@data-browser/components/database/shared/SingleObjectExportModal";
@@ -23,6 +24,7 @@ import { TableViewProvider, useTableView } from "./TableView/TableViewProvider";
 interface TableDetailViewProps {
   connectionId: string;
   databaseName: string;
+  objectRef: AccessObjectRef;
   schema?: string;
   tableName: string;
 }
@@ -38,6 +40,7 @@ export function TableDetailView(props: TableDetailViewProps) {
 function TableDetailViewContent({
   connectionId,
   databaseName,
+  objectRef,
   tableName,
   schema,
 }: TableDetailViewProps) {
@@ -99,10 +102,7 @@ function TableDetailViewContent({
 
       {state.showExportModal && (
         <SingleObjectExportModal
-          objectRef={{
-            kind: "table",
-            path: [databaseName, ...(schema ? [schema] : []), tableName],
-          }}
+          objectRef={objectRef}
           onOpenChange={(open) => {
             if (!open) {
               actions.setShowExportModal(false);

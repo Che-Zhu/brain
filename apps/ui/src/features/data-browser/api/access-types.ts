@@ -20,6 +20,51 @@ export interface AccessObjectsResult {
   truncated: boolean;
 }
 
+export interface AccessObjectResult {
+  object: AccessObject;
+}
+
+export interface AccessColumn {
+  isForeignKey: boolean;
+  isPrimary: boolean;
+  length?: number;
+  name: string;
+  precision?: number;
+  referencedColumn?: string;
+  referencedTable?: string;
+  scale?: number;
+  type: string;
+}
+
+export interface AccessColumnsResult {
+  columns: AccessColumn[];
+  ref: AccessObjectRef;
+}
+
+export interface AccessRowsSort {
+  column: string;
+  direction: "ASC" | "DESC";
+}
+
+export interface AccessRowsResult {
+  columns: AccessColumn[];
+  pageOffset: number;
+  pageSize: number;
+  ref: AccessObjectRef;
+  rows: string[][];
+  totalCount: number;
+}
+
+export interface DataFlowTableData {
+  columns: string[];
+  columnTypes: Record<string, string>;
+  disableUpdate: true;
+  foreignKeyColumns: string[];
+  primaryKey: string | null;
+  rows: Array<Record<string, string | null>>;
+  total: number;
+}
+
 export interface DataBrowserDatabaseMetadata {
   displayEngine: string;
   engineKey?: string;

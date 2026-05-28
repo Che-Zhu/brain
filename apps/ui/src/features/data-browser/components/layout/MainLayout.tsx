@@ -1,4 +1,5 @@
 import { Sidebar } from "@data-browser/components/sidebar/Sidebar";
+import { TooltipProvider } from "@data-browser/components/ui/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
@@ -47,42 +48,44 @@ export function MainLayout() {
   }, []);
 
   return (
-    <div
-      className="flex h-full min-h-0 w-full overflow-hidden bg-background"
-      data-qa-module="layout"
-      data-qa-object="app-shell"
-      data-qa-state="connections"
-      data-testid="layout.shell"
-    >
+    <TooltipProvider>
       <div
-        className="relative shrink-0"
+        className="flex h-full min-h-0 w-full overflow-hidden bg-background"
         data-qa-module="layout"
-        data-qa-object="sidebar"
+        data-qa-object="app-shell"
         data-qa-state="connections"
-        data-testid="layout.sidebar-region"
-        style={{ width: sidebarWidth }}
+        data-testid="layout.shell"
       >
-        <Sidebar />
         <div
-          className="absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
-          data-qa-action="resize"
+          className="relative shrink-0"
           data-qa-module="layout"
           data-qa-object="sidebar"
-          data-testid="layout.sidebar-resize-handle"
-          onMouseDown={handleMouseDown}
-        />
-      </div>
+          data-qa-state="connections"
+          data-testid="layout.sidebar-region"
+          style={{ width: sidebarWidth }}
+        >
+          <Sidebar />
+          <div
+            className="absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
+            data-qa-action="resize"
+            data-qa-module="layout"
+            data-qa-object="sidebar"
+            data-testid="layout.sidebar-resize-handle"
+            onMouseDown={handleMouseDown}
+          />
+        </div>
 
-      <main
-        className="relative flex flex-1 flex-col overflow-hidden bg-sidebar"
-        data-qa-module="layout"
-        data-qa-object="main"
-        data-qa-state="connections"
-        data-testid="layout.main-region"
-      >
-        <TabBar />
-        <TabContent />
-      </main>
-    </div>
+        <main
+          className="relative flex flex-1 flex-col overflow-hidden bg-sidebar"
+          data-qa-module="layout"
+          data-qa-object="main"
+          data-qa-state="connections"
+          data-testid="layout.main-region"
+        >
+          <TabBar />
+          <TabContent />
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }

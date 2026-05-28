@@ -1,3 +1,4 @@
+import type { AccessObjectRef } from "@data-browser/api/access-types";
 import { DataView } from "@data-browser/components/database/shared/DataView";
 import { FindBar } from "@data-browser/components/database/shared/FindBar";
 import { SingleObjectExportModal } from "@data-browser/components/database/shared/SingleObjectExportModal";
@@ -30,6 +31,7 @@ interface CollectionDetailViewProps {
   collectionName: string;
   connectionId: string;
   databaseName: string;
+  objectRef: AccessObjectRef;
 }
 
 /** MongoDB collection detail view composed from Provider + subcomponents. */
@@ -46,6 +48,7 @@ function CollectionDetailViewContent({
   databaseName,
   collectionName,
   connectionId,
+  objectRef,
 }: CollectionDetailViewProps) {
   const { t } = useI18n();
   const { state, actions } = useCollectionView();
@@ -109,12 +112,7 @@ function CollectionDetailViewContent({
       {state.error ? (
         <DataView.Error message={state.error} />
       ) : (
-        <FindBar.Provider
-          columns={docColumns}
-          onSearchTermChange={actions.setSearchTerm}
-          rows={state.documents}
-          searchTerm={state.searchTerm}
-        >
+        <FindBar.Provider columns={docColumns} rows={state.documents}>
           <FindBar.Bar />
           <div
             className="flex-1 space-y-4 overflow-auto p-4"
@@ -162,7 +160,7 @@ function CollectionDetailViewContent({
       />
 
       <SingleObjectExportModal
-        objectRef={{ kind: "collection", path: [databaseName, collectionName] }}
+        objectRef={objectRef}
         onOpenChange={(open) => {
           if (!open) {
             actions.setShowExportModal(false);

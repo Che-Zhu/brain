@@ -1,3 +1,11 @@
+import {
+  accessRowsToDataFlowTableData,
+  getRows,
+} from "@data-browser/api/access-adapter";
+import type {
+  AccessObjectRef,
+  AccessRowsSort,
+} from "@data-browser/api/access-types";
 import { DataView } from "@data-browser/components/database/shared/DataView";
 import {
   FindBar,
@@ -18,19 +26,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import {
-  type SortCondition,
-  SortDirection,
-  useGetStorageUnitRowsLazyQuery,
-} from "@data-browser/generated/graphql";
 import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { resolveSchemaParam } from "@data-browser/utils/database-features";
-import {
-  type TableData,
-  transformRowsResult,
-} from "@data-browser/utils/graphql-transforms";
+import type { TableData } from "@data-browser/utils/graphql-transforms";
 import {
   ArrowDownAZ,
   ArrowUpAZ,
@@ -88,6 +87,7 @@ interface RedisKeyDetailViewProps {
   connectionId: string;
   databaseName: string;
   keyName: string;
+  objectRef: AccessObjectRef;
 }
 
 /** Displays and allows inline editing of a single Redis key's contents. */
@@ -95,11 +95,10 @@ export function RedisKeyDetailView({
   connectionId,
   databaseName,
   keyName,
+  objectRef,
 }: RedisKeyDetailViewProps) {
   const { connections, tableRefreshKey } = useConnectionStore();
   const { t } = useI18n();
-  // ---- GraphQL hooks ----
-  const [getRows] = useGetStorageUnitRowsLazyQuery({ fetchPolicy: "no-cache" });
 
   // ---- Data state ----
   const [data, setData] = useState<TableData | null>(null);
@@ -149,7 +148,9 @@ export function RedisKeyDetailView({
 
   const fetchData = useCallback(async () => {
     const conn = connections.find((c) => c.id === connectionId);
-    if (!conn) {
+    if (!conn?.runtime) {
+      setError(t("common.error.connectionNotFound"));
+      setLoading(false);
       return;
     }
 
@@ -159,54 +160,39 @@ export function RedisKeyDetailView({
     latestRequestIdRef.current += 1;
     const thisRequestId = latestRequestIdRef.current;
 
-    const schema = resolveSchemaParam(conn.type, databaseName);
-
-    const sort: SortCondition[] | undefined =
+    const sort: AccessRowsSort[] | undefined =
       sortColumn && sortDirection
         ? [
             {
-              Column: sortColumn,
-              Direction:
-                sortDirection === "asc"
-                  ? SortDirection.Asc
-                  : SortDirection.Desc,
+              column: sortColumn,
+              direction: sortDirection === "asc" ? "ASC" : "DESC",
             },
           ]
         : undefined;
 
     try {
-      const { data: result, error: gqlError } = await getRows({
-        variables: {
-          schema,
-          storageUnit: keyName,
-          sort,
-          pageSize,
-          pageOffset: (currentPage - 1) * pageSize,
-        },
-        context: { database: databaseName },
+      const result = await getRows({
+        runtime: conn.runtime,
+        ref: objectRef,
+        sort,
+        pageSize,
+        pageOffset: (currentPage - 1) * pageSize,
       });
 
       if (thisRequestId !== latestRequestIdRef.current) {
         return;
       }
 
-      if (gqlError) {
-        setError(gqlError.message);
-        return;
-      }
+      const tableData = accessRowsToDataFlowTableData(result);
+      setData(tableData);
 
-      if (result?.Row) {
-        const tableData = transformRowsResult(result.Row);
-        setData(tableData);
-
-        // Initialize column widths on first load
-        if (Object.keys(columnWidths).length === 0) {
-          const widths: Record<string, number> = {};
-          tableData.columns.forEach((col) => {
-            widths[col] = Math.max(120, col.length * 10 + 60);
-          });
-          setColumnWidths(widths);
-        }
+      // Initialize column widths on first load
+      if (Object.keys(columnWidths).length === 0) {
+        const widths: Record<string, number> = {};
+        tableData.columns.forEach((col) => {
+          widths[col] = Math.max(120, col.length * 10 + 60);
+        });
+        setColumnWidths(widths);
       }
     } catch (err) {
       if (thisRequestId !== latestRequestIdRef.current) {
@@ -222,13 +208,11 @@ export function RedisKeyDetailView({
   }, [
     connections,
     connectionId,
-    databaseName,
-    keyName,
     sortColumn,
     sortDirection,
     pageSize,
     currentPage,
-    getRows,
+    objectRef,
     t,
   ]);
 
@@ -776,7 +760,7 @@ export function RedisKeyDetailView({
         )}
 
         <SingleObjectExportModal
-          objectRef={{ kind: "key", path: [databaseName, keyName] }}
+          objectRef={objectRef}
           onOpenChange={setShowExport}
           open={showExport}
           title={keyName}

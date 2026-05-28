@@ -1,13 +1,9 @@
+import { getRows } from "@data-browser/api/access-adapter";
+import type { AccessObjectRef } from "@data-browser/api/access-types";
 import type { FlatMongoFilter } from "@data-browser/components/database/mongodb/filter-collection.types";
 import type { Alert } from "@data-browser/components/database/shared/types";
-import {
-  useGetStorageUnitRowsLazyQuery,
-  type WhereCondition,
-  WhereConditionType,
-} from "@data-browser/generated/graphql";
 import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
-import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import {
   createContext,
   type ReactNode,
@@ -18,7 +14,6 @@ import {
   useState,
 } from "react";
 import type { CollectionViewContextValue } from "./types";
-import { useDocumentChangesetManager } from "./useDocumentChangesetManager";
 
 const CollectionViewCtx = createContext<CollectionViewContextValue | null>(
   null
@@ -40,20 +35,40 @@ interface CollectionViewProviderProps {
   collectionName: string;
   connectionId: string;
   databaseName: string;
+  objectRef: AccessObjectRef;
 }
+
+const NOOP = (..._args: unknown[]) => undefined;
+const ASYNC_NOOP = async (..._args: unknown[]) => undefined;
+const EMPTY_CHANGESET = new Map();
+const EMPTY_STRING_SET = new Set<string>();
+const READ_ONLY_DOCUMENT_ACTIONS = {
+  toggleRowSelection: NOOP,
+  handleAddClick: NOOP,
+  setShowAddModal: NOOP,
+  setAddContent: NOOP,
+  handleAddSave: ASYNC_NOOP,
+  handleEditClick: NOOP,
+  setEditContent: NOOP,
+  cancelEdit: NOOP,
+  handleEditSave: ASYNC_NOOP,
+  markSelectedForDelete: NOOP,
+  undoLastChange: NOOP,
+  discardChanges: NOOP,
+  setShowPreviewModal: NOOP,
+  setShowSubmitModal: NOOP,
+  setShowDiscardModal: NOOP,
+  submitChanges: ASYNC_NOOP,
+};
 
 /** Provider that owns all CollectionDetailView state, GraphQL operations, and handlers. */
 export function CollectionViewProvider({
   connectionId,
-  databaseName,
-  collectionName,
+  objectRef,
   children,
 }: CollectionViewProviderProps) {
   const { t } = useI18n();
   const { connections, collectionRefreshKey } = useConnectionStore();
-
-  // ---- GraphQL hooks ----
-  const [getRows] = useGetStorageUnitRowsLazyQuery({ fetchPolicy: "no-cache" });
 
   // ---- Core state ----
   const [loading, setLoading] = useState(true);
@@ -91,19 +106,24 @@ export function CollectionViewProvider({
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const pageOffset = (currentPage - 1) * pageSize;
+  // Hidden document writes remain compiled separately; the visible path is read-only.
+  const changesetState = {
+    changes: EMPTY_CHANGESET,
+    undoStack: [],
+    selectedRowKeys: EMPTY_STRING_SET,
+    newRowOrder: [],
+    showAddModal: false,
+    addContent: "",
+    editingRowKey: null,
+    editContent: "",
+    showPreviewModal: false,
+    showSubmitModal: false,
+    showDiscardModal: false,
+    pendingChangeCount: 0,
+    hasPendingChanges: false,
+  };
 
-  // ---- Document changeset (add / edit / delete) ----
-  const { state: changesetState, actions: changesetActions } =
-    useDocumentChangesetManager({
-      connectionId,
-      databaseName,
-      collectionName,
-      documents,
-      pageOffset,
-      refresh,
-      showAlert,
-    });
+  const changesetActions = READ_ONLY_DOCUMENT_ACTIONS;
 
   // ---- Discard guard ----
   const pendingReloadActionRef = useRef<null | (() => void)>(null);
@@ -173,112 +193,30 @@ export function CollectionViewProvider({
       setError(null);
 
       const conn = connections.find((c) => c.id === connectionId);
-      if (!conn) {
+      if (!conn?.runtime) {
         setError(t("common.error.connectionNotFound"));
         setLoading(false);
         return;
       }
 
-      const graphqlSchema = resolveSchemaParam(conn.type, databaseName);
-
-      // Build WhereCondition from activeFilter
-      // FilterCollectionModal outputs MongoDB-native format:
-      //   $eq:    { field: value }
-      //   $regex: { field: { $regex: "...", $options: "i" } }
-      //   others: { field: { $gt: value } }
-      const filterConditions: WhereCondition[] = [];
-      for (const [fieldName, condition] of Object.entries(activeFilter)) {
-        if (condition === undefined || condition === null) {
-          continue;
-        }
-        if (typeof condition !== "object" || Array.isArray(condition)) {
-          // Primitive value -> $eq
-          filterConditions.push({
-            Type: WhereConditionType.Atomic,
-            Atomic: {
-              Key: fieldName,
-              Operator: "eq",
-              Value: String(condition),
-              ColumnType: "string",
-            },
-          });
-        } else {
-          // Object with MongoDB operators: { $regex: "...", $options: "..." } or { $gt: value }
-          for (const [op, val] of Object.entries(
-            condition as Record<string, unknown>
-          )) {
-            if (op === "$options") {
-              continue; // Skip $options (handled with $regex)
-            }
-            const operator = op.replace("$", "");
-            const value = Array.isArray(val)
-              ? val.join(", ")
-              : String(val ?? "");
-            filterConditions.push({
-              Type: WhereConditionType.Atomic,
-              Atomic: {
-                Key: fieldName,
-                Operator: operator,
-                Value: value,
-                ColumnType: "string",
-              },
-            });
-          }
-        }
-      }
-
-      // Add search term as regex on 'document' column if present
-      if (searchTerm.trim()) {
-        filterConditions.push({
-          Type: WhereConditionType.Atomic,
-          Atomic: {
-            Key: "document",
-            Operator: "regex",
-            Value: searchTerm.trim(),
-            ColumnType: "string",
-          },
-        });
-      }
-
-      let where: WhereCondition | undefined;
-      if (filterConditions.length === 1) {
-        where = filterConditions[0];
-      } else if (filterConditions.length > 1) {
-        where = {
-          Type: WhereConditionType.And,
-          And: { Children: filterConditions },
-        };
-      }
-
       try {
-        const { data: result, error: queryError } = await getRows({
-          variables: {
-            schema: graphqlSchema,
-            storageUnit: collectionName,
-            where,
-            pageSize,
-            pageOffset: (currentPage - 1) * pageSize,
-          },
-          context: { database: databaseName },
+        const result = await getRows({
+          runtime: conn.runtime,
+          ref: objectRef,
+          pageSize,
+          pageOffset: (currentPage - 1) * pageSize,
         });
 
-        if (queryError) {
-          setError(queryError.message);
-          return;
-        }
-
-        if (result?.Row) {
-          const parsedDocs = result.Row.Rows.map((row) => {
-            const rawDocument = row[0] ?? "{}";
-            try {
-              return JSON.parse(rawDocument);
-            } catch {
-              return { _raw: rawDocument };
-            }
-          });
-          setDocuments(parsedDocs);
-          setTotal(result.Row.TotalCount);
-        }
+        const parsedDocs = result.rows.map((row) => {
+          const rawDocument = row[0] ?? "{}";
+          try {
+            return JSON.parse(rawDocument);
+          } catch {
+            return { _raw: rawDocument };
+          }
+        });
+        setDocuments(parsedDocs);
+        setTotal(result.totalCount);
       } catch (err: any) {
         setError(err.message || t("mongodb.error.fetchCollectionData"));
       } finally {
@@ -289,16 +227,12 @@ export function CollectionViewProvider({
     fetchData();
   }, [
     connectionId,
-    databaseName,
-    collectionName,
     connections,
     collectionRefreshKey,
     currentPage,
     pageSize,
-    searchTerm,
-    activeFilter,
+    objectRef,
     refreshKey,
-    getRows,
     t,
   ]);
 
@@ -326,7 +260,6 @@ export function CollectionViewProvider({
     (filter: FlatMongoFilter) => {
       runWithDiscardGuard(() => {
         setActiveFilter(filter);
-        setCurrentPage(1);
       });
     },
     [runWithDiscardGuard]
