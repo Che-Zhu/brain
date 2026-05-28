@@ -142,6 +142,29 @@ function connectionFromRuntime(runtime: DataBrowserHostContext): Connection {
   };
 }
 
+function runtimeConnectionMatches(
+  connection: Connection | undefined,
+  runtime: DataBrowserHostContext
+) {
+  const current = connection?.runtime;
+  if (current === undefined) {
+    return false;
+  }
+
+  return (
+    current.projectUid === runtime.projectUid &&
+    current.namespace === runtime.namespace &&
+    current.kubeconfig === runtime.kubeconfig &&
+    current.databaseWorkloadName === runtime.databaseWorkloadName &&
+    current.databaseWorkloadNamespace === runtime.databaseWorkloadNamespace &&
+    current.engine === runtime.engine &&
+    current.database.name === runtime.database.name &&
+    current.database.displayEngine === runtime.database.displayEngine &&
+    current.database.engineKey === runtime.database.engineKey &&
+    current.database.formattedVersion === runtime.database.formattedVersion
+  );
+}
+
 export function getRuntimeConnection(): Connection | undefined {
   return useConnectionStore
     .getState()
@@ -159,12 +182,26 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
 
   initializeRuntimeConnection: (runtime) =>
     set((state) => {
-      const connection = connectionFromRuntime(runtime);
+      const existingConnection = state.connections.find(
+        (connection) => connection.id === VIRTUAL_CONNECTION_ID
+      );
+      const connection = runtimeConnectionMatches(existingConnection, runtime)
+        ? existingConnection
+        : connectionFromRuntime(runtime);
       const selectedItem =
         state.selectedItem?.connectionId === VIRTUAL_CONNECTION_ID ||
         state.selectedItem?.id === VIRTUAL_CONNECTION_ID
           ? state.selectedItem
           : null;
+
+      if (
+        connection === existingConnection &&
+        state.connections.length === 1 &&
+        state.connections[0] === existingConnection &&
+        state.selectedItem === selectedItem
+      ) {
+        return state;
+      }
 
       return {
         connections: [connection],

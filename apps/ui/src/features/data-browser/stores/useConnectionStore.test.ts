@@ -39,6 +39,17 @@ test("engine-supported runtime initializes a single virtual connection", async (
   ]);
 });
 
+test("runtime connection initialization is idempotent for the same runtime", () => {
+  useConnectionStore.getState().initializeRuntimeConnection(runtime);
+  const firstConnection = useConnectionStore.getState().connections[0];
+
+  useConnectionStore.getState().initializeRuntimeConnection({ ...runtime });
+  const state = useConnectionStore.getState();
+
+  assert.equal(state.connections.length, 1);
+  assert.equal(state.connections[0], firstConnection);
+});
+
 test("runtime connection exposes read-only mutation stubs", async () => {
   const result = await useConnectionStore.getState().createDatabase("next");
 

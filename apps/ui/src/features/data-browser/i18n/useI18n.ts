@@ -1,6 +1,9 @@
 import { type DataBrowserMessageKey, dataBrowserMessages } from "./messages";
 
 type MessageParams = Record<string, string | number>;
+type DataBrowserI18n = {
+  t: (key: DataBrowserMessageKey | string, params?: MessageParams) => string;
+};
 
 function interpolate(message: string, params: MessageParams | undefined) {
   if (params === undefined) {
@@ -13,12 +16,14 @@ function interpolate(message: string, params: MessageParams | undefined) {
   );
 }
 
-export function useI18n() {
-  return {
-    t(key: DataBrowserMessageKey | string, params?: MessageParams) {
-      const message = dataBrowserMessages[key as DataBrowserMessageKey] ?? key;
+const dataBrowserI18n: DataBrowserI18n = {
+  t(key, params) {
+    const message = dataBrowserMessages[key as DataBrowserMessageKey] ?? key;
 
-      return interpolate(message, params);
-    },
-  };
+    return interpolate(message, params);
+  },
+};
+
+export function useI18n() {
+  return dataBrowserI18n;
 }
