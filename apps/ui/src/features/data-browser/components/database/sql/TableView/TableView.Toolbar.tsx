@@ -4,7 +4,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { Download, RefreshCw } from "lucide-react";
 import { useTableView } from "./TableViewProvider";
@@ -22,7 +21,6 @@ export function TableViewToolbar({
   tableName,
   schema,
 }: TableViewToolbarProps) {
-  const { t } = useI18n();
   const { state, actions } = useTableView();
   return (
     <div
@@ -59,7 +57,7 @@ export function TableViewToolbar({
               />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t("common.actions.refresh")}</TooltipContent>
+          <TooltipContent>{"Refresh"}</TooltipContent>
         </Tooltip>
       </div>
       <div className="flex items-center gap-2">
@@ -72,7 +70,7 @@ export function TableViewToolbar({
           onClick={() => actions.setShowExportModal(true)}
         >
           <Download className="h-4 w-4" />
-          {t("common.actions.export")}
+          {"Export"}
         </Button>
       </div>
     </div>

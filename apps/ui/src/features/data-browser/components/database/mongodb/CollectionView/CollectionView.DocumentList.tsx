@@ -1,5 +1,4 @@
 import { FindBarContext } from "@data-browser/components/database/shared/FindBar.Provider";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { FileJson } from "lucide-react";
 import { use, useMemo } from "react";
@@ -11,7 +10,6 @@ const TRAILING_OBJECT_BRACE_PATTERN = /\n\}$/;
 
 /** List of MongoDB document cards with selection checkboxes and change indicators. */
 export function CollectionViewDocumentList() {
-  const { t } = useI18n();
   const { state } = useCollectionView();
   const findBar = use(FindBarContext);
 
@@ -59,9 +57,7 @@ export function CollectionViewDocumentList() {
         data-testid="mongodb.collection.document-list-empty"
       >
         <FileJson className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-        <p className="text-muted-foreground text-sm">
-          {t("mongodb.collection.noDocuments")}
-        </p>
+        <p className="text-muted-foreground text-sm">{"No documents found"}</p>
       </div>
     );
   }

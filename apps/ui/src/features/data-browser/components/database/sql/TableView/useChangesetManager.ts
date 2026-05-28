@@ -4,7 +4,6 @@ import {
   useDeleteRowMutation,
   useUpdateStorageUnitMutation,
 } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
@@ -468,7 +467,6 @@ export function useChangesetManager({
   refresh,
   showAlert,
 }: UseChangesetManagerParams) {
-  const { t } = useI18n();
   const { connections } = useConnectionStore();
   const [addRowMutation] = useAddRowMutation();
   const [deleteRowMutation] = useDeleteRowMutation();
@@ -762,9 +760,7 @@ export function useChangesetManager({
           });
 
           if (errors?.length || !result?.DeleteRow.Status) {
-            throw new Error(
-              errors?.[0]?.message ?? t("sql.inline.failedToDeleteRowGeneric")
-            );
+            throw new Error(errors?.[0]?.message ?? "Failed to delete row.");
           }
         } else if (change.type === "update") {
           const { data: result, errors } = await updateStorageUnitMutation({
@@ -778,9 +774,7 @@ export function useChangesetManager({
           });
 
           if (errors?.length || !result?.UpdateStorageUnit.Status) {
-            throw new Error(
-              errors?.[0]?.message ?? t("sql.inline.failedToUpdateRowGeneric")
-            );
+            throw new Error(errors?.[0]?.message ?? "Failed to update row.");
           }
         } else {
           const insertValues = toRecordInputs(change.values).filter(
@@ -796,9 +790,7 @@ export function useChangesetManager({
           });
 
           if (errors?.length || !result?.AddRow.Status) {
-            throw new Error(
-              errors?.[0]?.message ?? t("sql.inline.failedToAddRowGeneric")
-            );
+            throw new Error(errors?.[0]?.message ?? "Failed to add row.");
           }
         }
 
@@ -813,21 +805,15 @@ export function useChangesetManager({
     if (failedMessages.length === 0) {
       dispatch({ type: "discard-all" });
       refresh();
-      showAlert(
-        t("common.alert.success"),
-        t("sql.changes.submitSuccess"),
-        "success"
-      );
+      showAlert("Success", "Changes submitted successfully.", "success");
       return;
     }
 
     dispatch({ type: "prune-successes", rowKeys: successfulRowKeys });
     refresh();
-    const summary = t("sql.changes.submitPartialFailure", {
-      count: failedMessages.length,
-    });
+    const summary = `${failedMessages.length} change(s) failed.`;
     const details = failedMessages.join("\n");
-    showAlert(t("common.alert.error"), `${summary}\n\n${details}`, "error");
+    showAlert("Error", `${summary}\n\n${details}`, "error");
   }, [
     addRowMutation,
     connectionId,
@@ -838,7 +824,6 @@ export function useChangesetManager({
     schema,
     showAlert,
     state.changes,
-    t,
     tableName,
     updateStorageUnitMutation,
   ]);

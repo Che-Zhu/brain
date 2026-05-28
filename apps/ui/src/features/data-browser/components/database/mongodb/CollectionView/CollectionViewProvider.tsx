@@ -2,7 +2,6 @@ import { getRows } from "@data-browser/api/access-adapter";
 import type { AccessObjectRef } from "@data-browser/api/access-types";
 import type { FlatMongoFilter } from "@data-browser/components/database/mongodb/filter-collection.types";
 import type { Alert } from "@data-browser/components/database/shared/types";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import {
   createContext,
@@ -67,7 +66,6 @@ export function CollectionViewProvider({
   objectRef,
   children,
 }: CollectionViewProviderProps) {
-  const { t } = useI18n();
   const { connections, collectionRefreshKey } = useConnectionStore();
 
   // ---- Core state ----
@@ -194,7 +192,7 @@ export function CollectionViewProvider({
 
       const conn = connections.find((c) => c.id === connectionId);
       if (!conn?.runtime) {
-        setError(t("common.error.connectionNotFound"));
+        setError("Connection not found");
         setLoading(false);
         return;
       }
@@ -218,7 +216,7 @@ export function CollectionViewProvider({
         setDocuments(parsedDocs);
         setTotal(result.totalCount);
       } catch (err: any) {
-        setError(err.message || t("mongodb.error.fetchCollectionData"));
+        setError(err.message || "Failed to fetch collection data");
       } finally {
         setLoading(false);
       }
@@ -233,7 +231,6 @@ export function CollectionViewProvider({
     pageSize,
     objectRef,
     refreshKey,
-    t,
   ]);
 
   // ---- Page change ----

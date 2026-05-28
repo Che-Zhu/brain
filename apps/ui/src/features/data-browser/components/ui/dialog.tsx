@@ -1,5 +1,4 @@
 import { Button } from "@data-browser/components/ui/Button";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -53,8 +52,6 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
-  const { t } = useI18n();
-
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -73,7 +70,7 @@ function DialogContent({
             data-slot="dialog-close"
           >
             <XIcon />
-            <span className="sr-only">{t("common.actions.close")}</span>
+            <span className="sr-only">{"Close"}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -99,8 +96,6 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean;
 }) {
-  const { t } = useI18n();
-
   return (
     <div
       className={cn(
@@ -113,7 +108,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">{t("common.actions.close")}</Button>
+          <Button variant="outline">{"Close"}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

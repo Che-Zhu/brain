@@ -4,7 +4,6 @@ import type {
   AccessObjectRef,
 } from "@data-browser/api/access-types";
 import { DATA_BROWSER_CAPABILITIES } from "@data-browser/capabilities";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import {
   createContext,
@@ -129,8 +128,7 @@ export function dataBrowserObjectToTreeNode(params: {
 }
 
 export function dataBrowserPostgresSchemaFolders(
-  node: TreeNodeData,
-  t: (key: "sidebar.tree.tables" | "sidebar.tree.views") => string
+  node: TreeNodeData
 ): TreeNodeData[] {
   const ref = node.metadata.objectRef;
   if (!ref) {
@@ -147,7 +145,7 @@ export function dataBrowserPostgresSchemaFolders(
         parentRef: ref,
         schema: node.name,
       },
-      name: t("sidebar.tree.tables"),
+      name: "Tables",
       parentId: node.id,
       type: "table_folder",
     },
@@ -160,17 +158,14 @@ export function dataBrowserPostgresSchemaFolders(
         parentRef: ref,
         schema: node.name,
       },
-      name: t("sidebar.tree.views"),
+      name: "Views",
       parentId: node.id,
       type: "view_folder",
     },
   ];
 }
 
-export function dataBrowserRedisKeysFolder(
-  node: TreeNodeData,
-  t: (key: "sidebar.redis.keysFolder") => string
-): TreeNodeData[] {
+export function dataBrowserRedisKeysFolder(node: TreeNodeData): TreeNodeData[] {
   const ref = node.metadata.objectRef;
   if (!ref) {
     return [];
@@ -185,7 +180,7 @@ export function dataBrowserRedisKeysFolder(
         kindFilter: ["key"],
         parentRef: ref,
       },
-      name: t("sidebar.redis.keysFolder"),
+      name: "Keys",
       parentId: node.id,
       type: "redis_keys_folder",
     },
@@ -202,7 +197,6 @@ export function SidebarTreeProvider({
   children: React.ReactNode;
 }) {
   const connections = useConnectionStore((state) => state.connections);
-  const { t } = useI18n();
 
   const activeConnection = connections[0];
   const storageKey = useMemo(
@@ -250,11 +244,11 @@ export function SidebarTreeProvider({
       }
 
       if (node.type === "schema") {
-        return dataBrowserPostgresSchemaFolders(node, t);
+        return dataBrowserPostgresSchemaFolders(node);
       }
 
       if (node.type === "database" && connection.type === "REDIS") {
-        return dataBrowserRedisKeysFolder(node, t);
+        return dataBrowserRedisKeysFolder(node);
       }
 
       if (
@@ -303,7 +297,7 @@ export function SidebarTreeProvider({
 
       return [];
     },
-    [connections, t]
+    [connections]
   );
 
   const fetchNodeChildren = useCallback(

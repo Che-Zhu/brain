@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@data-browser/components/ui/select";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Plus, Trash2 } from "lucide-react";
 import {
   FilterCollectionProvider,
@@ -28,20 +27,16 @@ interface FilterCollectionModalProps {
   open: boolean;
 }
 
-function getOperatorOptions(
-  t: ReturnType<typeof useI18n>["t"]
-): Array<{ value: MongoFilterOperator; label: string }> {
-  return [
-    { value: "$eq", label: t("mongodb.filter.operator.eq") },
-    { value: "$ne", label: t("mongodb.filter.operator.ne") },
-    { value: "$regex", label: t("mongodb.filter.operator.regex") },
-    { value: "$gt", label: t("mongodb.filter.operator.gt") },
-    { value: "$lt", label: t("mongodb.filter.operator.lt") },
-    { value: "$gte", label: t("mongodb.filter.operator.gte") },
-    { value: "$lte", label: t("mongodb.filter.operator.lte") },
-    { value: "$in", label: t("mongodb.filter.operator.in") },
-  ];
-}
+const OPERATOR_OPTIONS: Array<{ value: MongoFilterOperator; label: string }> = [
+  { value: "$eq", label: "equals" },
+  { value: "$ne", label: "not equal" },
+  { value: "$regex", label: "matches regex" },
+  { value: "$gt", label: "greater than" },
+  { value: "$lt", label: "less than" },
+  { value: "$gte", label: "greater than or equal" },
+  { value: "$lte", label: "less than or equal" },
+  { value: "$in", label: "in list" },
+];
 
 /** Modal for building flat MongoDB collection filters. */
 export function FilterCollectionModal({
@@ -77,11 +72,9 @@ export function FilterCollectionModal({
 }
 
 function FilterConditionList() {
-  const { t } = useI18n();
   const { conditions, fields, addCondition, removeCondition, updateCondition } =
     useFilterCollectionCtx();
   const { state } = useModalForm();
-  const operatorOptions = getOperatorOptions(t);
   const usedFields = new Set(
     conditions.map((condition) => condition.field.trim()).filter(Boolean)
   );
@@ -90,9 +83,7 @@ function FilterConditionList() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-foreground text-sm">
-          {t("mongodb.filter.conditions")}
-        </h3>
+        <h3 className="font-medium text-foreground text-sm">{"Conditions"}</h3>
         <Button
           className="h-9 gap-2"
           disabled={state.isSubmitting || !canAddCondition}
@@ -101,7 +92,7 @@ function FilterConditionList() {
           type="button"
         >
           <Plus className="h-4 w-4" />
-          {t("mongodb.filter.addCondition")}
+          {"Add condition"}
         </Button>
       </div>
 
@@ -122,9 +113,7 @@ function FilterConditionList() {
                   value={condition.field}
                 >
                   <SelectTrigger className="h-9 min-w-50">
-                    <SelectValue
-                      placeholder={t("mongodb.filter.selectField")}
-                    />
+                    <SelectValue placeholder={"Select field"} />
                   </SelectTrigger>
                   <SelectContent>
                     {fieldOptions.map((field) => (
@@ -148,7 +137,7 @@ function FilterConditionList() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {operatorOptions.map((operator) => (
+                    {OPERATOR_OPTIONS.map((operator) => (
                       <SelectItem key={operator.value} value={operator.value}>
                         {operator.label}
                       </SelectItem>
@@ -164,8 +153,8 @@ function FilterConditionList() {
                   }
                   placeholder={
                     condition.operator === "$in"
-                      ? t("mongodb.filter.valueInPlaceholder")
-                      : t("mongodb.filter.valuePlaceholder")
+                      ? "value1, value2, value3"
+                      : "Value"
                   }
                   value={condition.value}
                 />
@@ -198,7 +187,6 @@ function FilterModalAlert() {
 }
 
 function FilterCollectionFooter() {
-  const { t } = useI18n();
   const { state, actions } = useModalForm();
 
   return (
@@ -210,7 +198,7 @@ function FilterCollectionFooter() {
         onClick={actions.submit}
         type="button"
       >
-        {t("mongodb.filter.apply")}
+        {"Apply filter"}
       </Button>
     </ModalForm.Footer>
   );

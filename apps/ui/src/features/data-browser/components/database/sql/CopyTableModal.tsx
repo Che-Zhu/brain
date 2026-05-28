@@ -5,7 +5,6 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@data-browser/components/ui/radio-group";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { Copy } from "lucide-react";
 import {
@@ -57,7 +56,6 @@ function CopyTableProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { copyTable } = useConnectionStore();
   const [newTableName, setNewTableName] = useState(`${tableName}_copy`);
   const [copyOption, setCopyOption] = useState<"structure" | "structure_data">(
@@ -79,7 +77,7 @@ function CopyTableProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
   }, [
     newTableName,
@@ -89,7 +87,6 @@ function CopyTableProvider({
     tableName,
     copyTable,
     onSuccess,
-    t,
   ]);
 
   return (
@@ -103,7 +100,7 @@ function CopyTableProvider({
       }}
     >
       <ModalForm.Provider
-        meta={{ title: t("sql.copyTable.title"), icon: Copy }}
+        meta={{ title: "Copy table", icon: Copy }}
         onSubmit={handleSubmit}
       >
         {children}
@@ -118,7 +115,6 @@ function CopyTableProvider({
 
 /** Source table (disabled), new table name input, and copy option radios. */
 function CopyTableFields() {
-  const { t } = useI18n();
   const {
     newTableName,
     setNewTableName,
@@ -132,24 +128,24 @@ function CopyTableFields() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.copyTable.sourceTable")}
+          {"Source table"}
         </label>
         <Input disabled value={tableName} />
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.copyTable.newTableName")}
+          {"New table name"}
         </label>
         <Input
           disabled={state.isSubmitting}
           onChange={(e) => setNewTableName(e.target.value)}
-          placeholder={t("sql.copyTable.newTableNamePlaceholder")}
+          placeholder={"Enter new table name"}
           value={newTableName}
         />
       </div>
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.copyTable.options")}
+          {"Copy options"}
         </label>
         <RadioGroup
           disabled={state.isSubmitting}
@@ -158,13 +154,11 @@ function CopyTableFields() {
         >
           <label className="flex cursor-pointer items-center gap-2">
             <RadioGroupItem value="structure" />
-            <span className="text-sm">{t("sql.copyTable.structureOnly")}</span>
+            <span className="text-sm">{"Structure only"}</span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
             <RadioGroupItem value="structure_data" />
-            <span className="text-sm">
-              {t("sql.copyTable.structureAndData")}
-            </span>
+            <span className="text-sm">{"Structure and data"}</span>
           </label>
         </RadioGroup>
       </div>
@@ -174,12 +168,11 @@ function CopyTableFields() {
 
 /** Submit button disabled when new table name is empty. */
 function CopyTableSubmitButton() {
-  const { t } = useI18n();
   const { newTableName } = useCopyTableCtx();
   return (
     <ModalForm.SubmitButton
       disabled={!newTableName.trim()}
-      label={t("sql.copyTable.submit")}
+      label={"Copy table"}
     />
   );
 }

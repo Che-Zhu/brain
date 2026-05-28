@@ -1,5 +1,4 @@
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { List } from "lucide-react";
 import {
@@ -157,7 +156,6 @@ export function RedisKeyProvider({
   initialData,
   children,
 }: RedisKeyProviderProps): JSX.Element {
-  const { t } = useI18n();
   const { createTable } = useConnectionStore();
   const [draft, setDraft] = useState<RedisKeyDraft>(() =>
     normalizeDraft(initialData)
@@ -217,10 +215,10 @@ export function RedisKeyProvider({
       return;
     }
     if (draft.mode === "create" && !hasRedisDraftPayload(draft)) {
-      throw new Error(t("redis.alert.emptyValueRequired"));
+      throw new Error("Value is required.");
     }
     if (draft.mode === "edit" && draft.type !== "string") {
-      throw new Error(t("redis.alert.unsupportedEditMode"));
+      throw new Error("This Redis key type cannot be edited here.");
     }
     const fields = buildRedisFields(draft);
     const result = await createTable(
@@ -232,9 +230,9 @@ export function RedisKeyProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
-  }, [draft, databaseName, createTable, onSuccess, t]);
+  }, [draft, databaseName, createTable, onSuccess]);
 
   const isEditMode = draft.mode === "edit";
   const isStringEdit = isEditMode && draft.type === "string";
@@ -260,12 +258,8 @@ export function RedisKeyProvider({
     >
       <ModalForm.Provider
         meta={{
-          title: isEditMode
-            ? t("redis.keyModal.titleEdit")
-            : t("redis.keyModal.titleCreate"),
-          description: isEditMode
-            ? t("redis.keyModal.editDescription")
-            : undefined,
+          title: isEditMode ? "Edit Redis key" : "Create Redis key",
+          description: isEditMode ? "Update this Redis key value." : undefined,
           icon: List,
         }}
         onSubmit={handleSubmit}

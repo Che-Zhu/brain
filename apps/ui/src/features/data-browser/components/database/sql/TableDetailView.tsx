@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@data-browser/components/ui/dialog";
 import { ScrollArea } from "@data-browser/components/ui/scroll-area";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import {
   buildPreviewSql,
   summarizeChanges,
@@ -44,7 +43,6 @@ function TableDetailViewContent({
   tableName,
   schema,
 }: TableDetailViewProps) {
-  const { t } = useI18n();
   const { state, actions } = useTableView();
 
   const previewStatements = buildPreviewSql(tableName, state.changes);
@@ -128,11 +126,9 @@ function TableDetailViewContent({
           data-testid="sql.table.changes-preview-dialog"
         >
           <DialogHeader>
-            <DialogTitle>{t("sql.changes.previewTitle")}</DialogTitle>
+            <DialogTitle>{"Preview changes"}</DialogTitle>
             <DialogDescription>
-              {t("sql.changes.previewDescription", {
-                count: state.pendingChangeCount,
-              })}
+              {`${state.pendingChangeCount} pending change(s).`}
             </DialogDescription>
           </DialogHeader>
 
@@ -151,30 +147,21 @@ function TableDetailViewContent({
       </Dialog>
 
       <ConfirmationModal
-        confirmText={t("common.actions.confirm")}
+        confirmText={"Confirm"}
         isOpen={state.showSubmitModal}
-        message={t("sql.changes.submitConfirmMessage", {
-          count: state.pendingChangeCount,
-          updates: summary.updates,
-          inserts: summary.inserts,
-          deletes: summary.deletes,
-        })}
+        message={`Submit ${state.pendingChangeCount} change(s)? Updates: ${summary.updates}, inserts: ${summary.inserts}, deletes: ${summary.deletes}.`}
         onClose={() => actions.setShowSubmitModal(false)}
         onConfirm={actions.submitChanges}
-        title={t("sql.changes.submitConfirmTitle", {
-          count: state.pendingChangeCount,
-        })}
+        title={`Submit ${state.pendingChangeCount} change(s)?`}
       />
 
       <ConfirmationModal
-        confirmText={t("common.actions.discard")}
+        confirmText={"Discard"}
         isOpen={state.showDiscardModal}
-        message={t("sql.changes.discardMessage", {
-          count: state.pendingChangeCount,
-        })}
+        message={`Discard ${state.pendingChangeCount} pending change(s)?`}
         onClose={() => actions.setShowDiscardModal(false)}
         onConfirm={actions.confirmDiscardAndContinue}
-        title={t("sql.changes.discardTitle")}
+        title={"Discard changes?"}
       />
 
       {state.alert && (

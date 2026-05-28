@@ -5,22 +5,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Plus, Trash2 } from "lucide-react";
 import { useRedisKeyCtx } from "./RedisKeyProvider";
 
 /** Create-only editor for Redis sorted-set member/score pairs. */
 export function RedisKeyZSetEditor() {
-  const { t } = useI18n();
   const { draft, setZsetItems } = useRedisKeyCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <label className="font-medium text-foreground text-sm">
-          {t("redis.key.value")}
-        </label>
+        <label className="font-medium text-foreground text-sm">{"Value"}</label>
         <Button
           className="h-7 gap-1 px-2 text-primary text-xs hover:text-primary"
           disabled={state.isSubmitting}
@@ -32,7 +28,7 @@ export function RedisKeyZSetEditor() {
           variant="ghost"
         >
           <Plus className="h-3 w-3" />
-          {t("redis.key.addMember")}
+          {"Add member"}
         </Button>
       </div>
       <div className="rounded-md border">
@@ -40,11 +36,9 @@ export function RedisKeyZSetEditor() {
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
               <th className="w-[140px] px-4 py-2 text-left font-medium">
-                {t("redis.key.zsetScorePlaceholder")}
+                {"Score"}
               </th>
-              <th className="px-4 py-2 text-left font-medium">
-                {t("redis.key.zsetMemberPlaceholder")}
-              </th>
+              <th className="px-4 py-2 text-left font-medium">{"Member"}</th>
               <th className="w-10 px-4 py-2" />
             </tr>
           </thead>
@@ -64,7 +58,7 @@ export function RedisKeyZSetEditor() {
                       next[index] = { ...current, score: e.target.value };
                       setZsetItems(next);
                     }}
-                    placeholder={t("redis.key.zsetScorePlaceholder")}
+                    placeholder={"Score"}
                     type="number"
                     value={item.score}
                   />
@@ -82,7 +76,7 @@ export function RedisKeyZSetEditor() {
                       next[index] = { ...current, member: e.target.value };
                       setZsetItems(next);
                     }}
-                    placeholder={t("redis.key.zsetMemberPlaceholder")}
+                    placeholder={"Member"}
                     type="text"
                     value={item.member}
                   />
@@ -105,7 +99,7 @@ export function RedisKeyZSetEditor() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{t("redis.key.removeItem")}</TooltipContent>
+                    <TooltipContent>{"Remove item"}</TooltipContent>
                   </Tooltip>
                 </td>
               </tr>

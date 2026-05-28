@@ -2,14 +2,12 @@ import { CollectionDetailView } from "@data-browser/components/database/mongodb/
 import { RedisKeyDetailView } from "@data-browser/components/database/redis/RedisKeyDetailView";
 import { TableDetailView } from "@data-browser/components/database/sql/TableDetailView";
 import { SQLEditorView } from "@data-browser/components/editor/SQLEditorView";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { type Tab, useTabStore } from "@data-browser/stores/useTabStore";
 import { Database } from "lucide-react";
 import { useMemo } from "react";
 
 export function TabContent() {
   const { tabs, activeTabId, updateTab } = useTabStore();
-  const { t } = useI18n();
 
   const activeTab = useMemo(() => {
     return tabs.find((t) => t.id === activeTabId);
@@ -19,15 +17,17 @@ export function TabContent() {
   if (!activeTab) {
     return (
       <div
-        className="flex flex-1 flex-col items-center justify-center bg-muted/10 text-muted-foreground"
+        className="flex flex-1 flex-col items-center justify-center text-muted-foreground"
         data-qa-module="layout"
         data-qa-object="tab-content"
         data-qa-state="empty"
         data-testid="layout.tab-content.empty"
       >
         <Database className="mb-4 h-16 w-16 opacity-20" />
-        <p className="font-medium text-lg">{t("layout.empty.noTabsTitle")}</p>
-        <p className="text-sm">{t("layout.empty.noTabsDescription")}</p>
+        <p className="font-medium text-lg">{"No object selected"}</p>
+        <p className="text-sm">
+          {"Select an object from the sidebar to inspect its data."}
+        </p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export function TabContent() {
         if (!(tab.databaseName && tab.tableName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
-              {t("layout.invalid.tableConfig")}
+              {"Invalid table tab configuration"}
             </div>
           );
         }
@@ -73,7 +73,7 @@ export function TabContent() {
         if (!(tab.databaseName && tab.collectionName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
-              {t("layout.invalid.collectionConfig")}
+              {"Invalid collection tab configuration"}
             </div>
           );
         }
@@ -90,7 +90,7 @@ export function TabContent() {
         if (!(tab.databaseName && tab.tableName && tab.objectRef)) {
           return (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
-              {t("layout.invalid.tableConfig")}
+              {"Invalid table tab configuration"}
             </div>
           );
         }
@@ -106,7 +106,7 @@ export function TabContent() {
       default:
         return (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            {t("layout.invalid.unknownTabType")}
+            {"Unknown tab type"}
           </div>
         );
     }

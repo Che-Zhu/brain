@@ -3,14 +3,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { useFindBar } from "./FindBar.Provider";
 
 /** Always-visible find-in-page search bar matching the Figma toolbar design. */
 export function FindBarBar({ className }: { className?: string }) {
-  const { t } = useI18n();
   const { state, actions, meta } = useFindBar();
 
   const isMac = navigator.platform.toUpperCase().includes("MAC");
@@ -44,7 +42,7 @@ export function FindBarBar({ className }: { className?: string }) {
               meta.inputRef.current?.blur();
             }
           }}
-          placeholder={t("common.findBar.placeholder")}
+          placeholder={"Find in results..."}
           ref={meta.inputRef}
           type="text"
           value={state.searchTerm}
@@ -65,7 +63,7 @@ export function FindBarBar({ className }: { className?: string }) {
           <span className="whitespace-nowrap px-2 text-muted-foreground text-xs tabular-nums">
             {state.total > 0
               ? `${state.currentMatchIndex + 1}/${state.total}`
-              : t("common.findBar.noResults")}
+              : "No results"}
           </span>
         )}
 
@@ -83,7 +81,7 @@ export function FindBarBar({ className }: { className?: string }) {
               </button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{t("common.findBar.previousMatch")}</TooltipContent>
+          <TooltipContent>{"Previous match"}</TooltipContent>
         </Tooltip>
 
         {/* Next match */}
@@ -100,7 +98,7 @@ export function FindBarBar({ className }: { className?: string }) {
               </button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{t("common.findBar.nextMatch")}</TooltipContent>
+          <TooltipContent>{"Next match"}</TooltipContent>
         </Tooltip>
 
         {/* Clear / close */}
@@ -117,7 +115,7 @@ export function FindBarBar({ className }: { className?: string }) {
               </button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{t("common.findBar.clear")}</TooltipContent>
+          <TooltipContent>{"Clear search"}</TooltipContent>
         </Tooltip>
       </div>
     </div>

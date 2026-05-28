@@ -7,7 +7,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@data-browser/components/ui/select";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { Plus, X } from "lucide-react";
 import { useEditTable } from "./EditTableProvider";
@@ -26,7 +25,6 @@ const FK_ACTIONS = [
  * Consumes `useEditTable()` for all state and actions.
  */
 export function EditTableForeignKeysTab() {
-  const { t } = useI18n();
   const { state, actions } = useEditTable();
   const { foreignKeys, columnNames, isExecuting } = state;
   const { addForeignKey, updateForeignKey, toggleForeignKeyDeletion } = actions;
@@ -41,30 +39,26 @@ export function EditTableForeignKeysTab() {
           variant="link"
         >
           <Plus className="h-3 w-3" />
-          {t("sql.editTable.foreignKeys.add")}
+          {"Add foreign key"}
         </Button>
       </div>
       <div className="rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
+              <th className="px-3 py-2 text-left font-medium">{"Name"}</th>
+              <th className="px-3 py-2 text-left font-medium">{"Column"}</th>
               <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.name")}
+                {"Reference table"}
               </th>
               <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.column")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.refTable")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.refColumn")}
+                {"Reference column"}
               </th>
               <th className="w-24 px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.onDelete")}
+                {"On delete"}
               </th>
               <th className="w-24 px-3 py-2 text-left font-medium">
-                {t("sql.editTable.foreignKeys.onUpdate")}
+                {"On update"}
               </th>
               <th className="w-8" />
             </tr>
@@ -76,7 +70,7 @@ export function EditTableForeignKeysTab() {
                   className="p-8 text-center text-muted-foreground"
                   colSpan={7}
                 >
-                  {t("sql.editTable.foreignKeys.empty")}
+                  {"No foreign keys"}
                 </td>
               </tr>
             ) : (
@@ -100,9 +94,7 @@ export function EditTableForeignKeysTab() {
                       onChange={(e) =>
                         updateForeignKey(fk.id, "name", e.target.value)
                       }
-                      placeholder={t(
-                        "sql.editTable.foreignKeys.namePlaceholder"
-                      )}
+                      placeholder={"Foreign key name"}
                       value={fk.name}
                     />
                   </td>
@@ -122,11 +114,7 @@ export function EditTableForeignKeysTab() {
                         )}
                         size="sm"
                       >
-                        <SelectValue
-                          placeholder={t(
-                            "sql.editTable.foreignKeys.columnPlaceholder"
-                          )}
-                        />
+                        <SelectValue placeholder={"Column"} />
                       </SelectTrigger>
                       <SelectContent>
                         {columnNames.map((c) => (
@@ -152,9 +140,7 @@ export function EditTableForeignKeysTab() {
                           e.target.value
                         )
                       }
-                      placeholder={t(
-                        "sql.editTable.foreignKeys.refTablePlaceholder"
-                      )}
+                      placeholder={"Reference table"}
                       value={fk.referencedTable}
                     />
                   </td>
@@ -173,9 +159,7 @@ export function EditTableForeignKeysTab() {
                           e.target.value
                         )
                       }
-                      placeholder={t(
-                        "sql.editTable.foreignKeys.refColumnPlaceholder"
-                      )}
+                      placeholder={"Reference column"}
                       value={fk.referencedColumn}
                     />
                   </td>

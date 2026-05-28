@@ -1,5 +1,4 @@
 import { Button } from "@data-browser/components/ui/Button";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Database } from "lucide-react";
 
 interface DataViewErrorProps {
@@ -9,8 +8,6 @@ interface DataViewErrorProps {
 
 /** Error card with optional retry button for data views. */
 export function DataViewError({ message, onRetry }: DataViewErrorProps) {
-  const { t } = useI18n();
-
   return (
     <div
       className="flex h-full items-center justify-center bg-muted/5"
@@ -33,7 +30,7 @@ export function DataViewError({ message, onRetry }: DataViewErrorProps) {
             onClick={onRetry}
             variant="outline"
           >
-            {t("common.actions.retry")}
+            {"Retry"}
           </Button>
         )}
       </div>

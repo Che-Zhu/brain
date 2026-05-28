@@ -9,7 +9,6 @@ import {
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { useRawExecuteLazyQuery } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import {
   buildDatabaseExportPlan,
@@ -94,11 +93,10 @@ function ExportDatabaseProvider({
   schema: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   return (
     <ModalForm.Provider
       meta={{
-        title: t("database.export.title"),
+        title: "Export database",
         description: databaseName,
         icon: Database,
       }}
@@ -130,7 +128,6 @@ function ExportDatabaseBridge({
   schema: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const [format, setFormat] = useState<ExportFormat>("sql");
   const [isSuccess, setIsSuccess] = useState(false);
   const [statusText, setStatusText] = useState("");
@@ -148,7 +145,7 @@ function ExportDatabaseBridge({
     actions.setSubmitting(true);
     actions.closeAlert();
     setIsSuccess(false);
-    setStatusText(t("database.export.fetchingTableList"));
+    setStatusText("Fetching table list...");
 
     try {
       const connectionType = connections.find(
@@ -180,7 +177,7 @@ function ExportDatabaseBridge({
       }
 
       if (exportTargets.length === 0) {
-        throw new Error(t("database.export.noTablesFound"));
+        throw new Error("No tables found to export.");
       }
 
       const zip = new JSZip();
@@ -197,11 +194,7 @@ function ExportDatabaseBridge({
           target.tableName
         );
         setStatusText(
-          t("database.export.exportingTable", {
-            current: i + 1,
-            total: exportTargets.length,
-            tableName: targetLabel,
-          })
+          `Exporting table ${targetLabel} (${i + 1}/${exportTargets.length})...`
         );
 
         try {
@@ -252,7 +245,7 @@ function ExportDatabaseBridge({
         }
       }
 
-      setStatusText(t("database.export.generatingZip"));
+      setStatusText("Generating ZIP archive...");
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       downloadBlob(zipBlob, `export_${databaseName}.zip`);
@@ -262,19 +255,15 @@ function ExportDatabaseBridge({
       if (failedTables.length > 0) {
         actions.setAlert({
           type: "info",
-          title: t("database.export.partialExportTitle"),
-          message: t("database.export.partialExportMessage", {
-            successful: exportTargets.length - failedTables.length,
-            total: exportTargets.length,
-            failedTables: failedTables.join(", "),
-          }),
+          title: "Export completed with skipped tables",
+          message: `Exported ${exportTargets.length - failedTables.length} of ${exportTargets.length} tables. Failed: ${failedTables.join(", ")}`,
         });
       }
     } catch (err: any) {
       actions.setAlert({
         type: "error",
-        title: t("database.export.failed"),
-        message: err.message || t("common.unknownError"),
+        title: "Export failed",
+        message: err.message || "Unknown error",
       });
     } finally {
       actions.setSubmitting(false);
@@ -291,7 +280,6 @@ function ExportDatabaseBridge({
     schema,
     showSystemObjectsFor,
     systemSchemas,
-    t,
   ]);
 
   return (

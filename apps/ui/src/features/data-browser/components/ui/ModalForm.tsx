@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@data-browser/components/ui/dialog";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { AlertCircle, CheckCircle, Info, Loader2, X } from "lucide-react";
@@ -62,7 +61,6 @@ function ModalFormProvider({
   meta,
   onSubmit,
 }: ModalFormProviderProps) {
-  const { t } = useI18n();
   const [isSubmitting, setSubmitting] = useState(false);
   const [alert, setAlert] = useState<ModalAlert | null>(null);
 
@@ -81,7 +79,7 @@ function ModalFormProvider({
         } catch (e) {
           setAlert({
             type: "error",
-            title: t("common.alert.error"),
+            title: "Error",
             message: e instanceof Error ? e.message : String(e),
           });
         } finally {
@@ -135,7 +133,6 @@ const ALERT_STYLES: Record<ModalAlert["type"], string> = {
 
 /** Renders an inline dismissible alert banner. Returns `null` when no alert is active. */
 function ModalFormAlert({ className }: { className?: string }) {
-  const { t } = useI18n();
   const { state, actions } = useModalForm();
   if (!state.alert) {
     return null;
@@ -165,7 +162,7 @@ function ModalFormAlert({ className }: { className?: string }) {
         variant="ghost"
       >
         <X className="h-3.5 w-3.5" />
-        <span className="sr-only">{t("common.alert.dismiss")}</span>
+        <span className="sr-only">{"Dismiss alert"}</span>
       </Button>
     </div>
   );
@@ -204,7 +201,6 @@ function ModalFormSubmitButton({
   disabled?: boolean;
   onClick?: () => void;
 }) {
-  const { t } = useI18n();
   const { state, actions, meta } = useModalForm();
   const handleClick = onClick ?? actions.submit;
 
@@ -216,22 +212,17 @@ function ModalFormSubmitButton({
       variant="default"
     >
       {state.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-      {label ??
-        (meta.isDestructive
-          ? t("common.actions.delete")
-          : t("common.actions.submit"))}
+      {label ?? (meta.isDestructive ? "Delete" : "Submit")}
     </Button>
   );
 }
 
 /** Cancel button that closes the parent Dialog via Radix `DialogClose`. */
 function ModalFormCancelButton() {
-  const { t } = useI18n();
-
   return (
     <DialogClose asChild>
       <Button type="button" variant="outline">
-        {t("common.actions.cancel")}
+        {"Cancel"}
       </Button>
     </DialogClose>
   );

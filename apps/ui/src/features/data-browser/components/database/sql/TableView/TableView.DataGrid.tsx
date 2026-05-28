@@ -1,5 +1,4 @@
 import { FindBarContext } from "@data-browser/components/database/shared/FindBar.Provider";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { EyeOff, Loader2 } from "lucide-react";
 import {
@@ -15,7 +14,6 @@ import { useTableView } from "./TableViewProvider";
 
 /** Renders the SQL table data grid with row-number selection, cell editing, and pending-change states. */
 export function TableViewDataGrid() {
-  const { t } = useI18n();
   const { state, actions } = useTableView();
   const findBar = use(FindBarContext);
 
@@ -176,9 +174,7 @@ export function TableViewDataGrid() {
             {hiddenColumnCount > 0 && (
               <th
                 className="sticky top-0 z-40 border-border/50 border-b bg-background px-4 py-2 text-center font-medium text-muted-foreground text-xs"
-                title={t("sql.table.hiddenColumnsTitle", {
-                  count: hiddenColumnCount,
-                })}
+                title={`${hiddenColumnCount} hidden column(s)`}
               >
                 <div className="flex items-center justify-center gap-1">
                   <EyeOff className="h-3.5 w-3.5" />

@@ -1,4 +1,3 @@
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -27,13 +26,9 @@ export function FormatSelector<T extends string>({
   onChange,
   disabled,
 }: FormatSelectorProps<T>) {
-  const { t } = useI18n();
-
   return (
     <div className="flex flex-col gap-2">
-      <label className="font-medium text-foreground text-sm">
-        {t("common.export.format")}
-      </label>
+      <label className="font-medium text-foreground text-sm">{"Format"}</label>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
           <button

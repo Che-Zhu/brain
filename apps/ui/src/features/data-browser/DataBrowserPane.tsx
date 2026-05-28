@@ -5,7 +5,6 @@ import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { useEffect } from "react";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { isDataBrowserEngineVisible } from "./capabilities";
-import { useI18n } from "./i18n/useI18n";
 import { DataBrowserRuntimeProvider, useDataBrowserRuntime } from "./runtime";
 import "./styles/data-browser.css";
 
@@ -18,7 +17,6 @@ export interface DataBrowserPaneProps {
 
 function DataBrowserPaneBody() {
   const runtime = useDataBrowserRuntime();
-  const { t } = useI18n();
   const engineVisible = isDataBrowserEngineVisible(runtime.engine);
   const initializeRuntimeConnection = useConnectionStore(
     (state) => state.initializeRuntimeConnection
@@ -35,9 +33,13 @@ function DataBrowserPaneBody() {
       <div data-browser-empty-state>
         <div data-browser-empty-state-card>
           <h3 data-browser-empty-state-title>
-            {t("browser.unsupported.title")}
+            {"Unsupported database engine"}
           </h3>
-          <p data-browser-empty-state-body>{t("browser.unsupported.body")}</p>
+          <p data-browser-empty-state-body>
+            {
+              "This database engine is not available in the first browser version."
+            }
+          </p>
         </div>
       </div>
     );
@@ -60,7 +62,7 @@ export function DataBrowserPane({
       selectedDatabaseData={selectedDatabaseData}
     >
       <div
-        className="data-browser-theme flex h-full min-h-0 w-full overflow-hidden bg-background"
+        className="data-browser-theme flex h-full min-h-0 w-full overflow-hidden"
         data-browser-shell
       >
         <DataBrowserPaneBody />

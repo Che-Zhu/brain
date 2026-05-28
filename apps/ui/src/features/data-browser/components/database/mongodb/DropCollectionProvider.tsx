@@ -1,5 +1,4 @@
 import { ModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -52,7 +51,6 @@ export function DropCollectionProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }): JSX.Element {
-  const { t } = useI18n();
   const { dropCollection } = useConnectionStore();
   const [confirmName, setConfirmName] = useState("");
   const canDrop = confirmName === collectionName;
@@ -65,9 +63,9 @@ export function DropCollectionProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
-  }, [canDrop, dropCollection, databaseName, collectionName, onSuccess, t]);
+  }, [canDrop, dropCollection, databaseName, collectionName, onSuccess]);
 
   return (
     <DropCollectionCtx
@@ -75,7 +73,7 @@ export function DropCollectionProvider({
     >
       <ModalForm.Provider
         meta={{
-          title: t("mongodb.collection.drop"),
+          title: "Drop collection",
           icon: AlertTriangle,
           isDestructive: true,
         }}

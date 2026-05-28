@@ -4,7 +4,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { Download, RefreshCw } from "lucide-react";
 import { useCollectionView } from "./CollectionViewProvider";
@@ -20,7 +19,6 @@ export function CollectionViewToolbar({
   databaseName,
   collectionName,
 }: CollectionViewToolbarProps) {
-  const { t } = useI18n();
   const { state, actions } = useCollectionView();
   return (
     <div
@@ -56,7 +54,7 @@ export function CollectionViewToolbar({
               />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t("common.actions.refresh")}</TooltipContent>
+          <TooltipContent>{"Refresh"}</TooltipContent>
         </Tooltip>
       </div>
       <div className="flex items-center gap-2">
@@ -69,7 +67,7 @@ export function CollectionViewToolbar({
           onClick={() => actions.setShowExportModal(true)}
         >
           <Download className="h-4 w-4" />
-          {t("common.actions.export")}
+          {"Export"}
         </Button>
       </div>
     </div>

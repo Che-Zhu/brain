@@ -7,7 +7,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@data-browser/components/ui/tabs";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Key, Link as LinkIcon, Loader2, Table } from "lucide-react";
 import { EditTableColumnsTab } from "./EditTable.ColumnsTab";
 import { EditTableForeignKeysTab } from "./EditTable.ForeignKeysTab";
@@ -20,7 +19,6 @@ import { EditTableProvider, useEditTable } from "./EditTableProvider";
 
 /** Renders the tabbed content area, consuming EditTable context. */
 function EditTableContent() {
-  const { t } = useI18n();
   const { state, actions } = useEditTable();
 
   return (
@@ -32,15 +30,15 @@ function EditTableContent() {
       <TabsList className="w-full shrink-0 justify-start px-6" variant="line">
         <TabsTrigger value="fields">
           <Table />
-          {t("sql.editTable.tabs.fields")} ({state.columns.length})
+          {"Fields"} ({state.columns.length})
         </TabsTrigger>
         <TabsTrigger value="indexes">
           <Key />
-          {t("sql.editTable.tabs.indexes")} ({state.indexes.length})
+          {"Indexes"} ({state.indexes.length})
         </TabsTrigger>
         <TabsTrigger value="foreignKeys">
           <LinkIcon />
-          {t("sql.editTable.tabs.foreignKeys")} ({state.foreignKeys.length})
+          {"Foreign keys"} ({state.foreignKeys.length})
         </TabsTrigger>
       </TabsList>
 
@@ -69,21 +67,20 @@ function EditTableContent() {
 
 /** Footer with Apply Changes and Close buttons. */
 function EditTableFooter({ onClose }: { onClose: () => void }) {
-  const { t } = useI18n();
   const { state, actions } = useEditTable();
   const { pendingChangeCount, isExecuting } = state;
 
   return (
     <ModalForm.Footer className="shrink-0 border-t bg-muted/5 px-6 py-4">
       <Button disabled={isExecuting} onClick={onClose} variant="outline">
-        {t("sql.editTable.close")}
+        {"Close"}
       </Button>
       <Button
         disabled={isExecuting || pendingChangeCount === 0}
         onClick={actions.applyAllChanges}
       >
         {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {t("sql.editTable.applyChanges")}
+        {"Apply changes"}
         {pendingChangeCount > 0 && ` (${pendingChangeCount})`}
       </Button>
     </ModalForm.Footer>

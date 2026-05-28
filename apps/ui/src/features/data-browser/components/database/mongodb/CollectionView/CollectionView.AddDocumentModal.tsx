@@ -1,4 +1,3 @@
-import { useI18n } from "@data-browser/i18n/useI18n";
 import {
   DocumentEditorDialog,
   type DocumentEditorDialogProps,
@@ -11,14 +10,12 @@ export function AddDocumentModal(
     "title" | "submitLabel" | "description" | "placeholder"
   >
 ) {
-  const { t } = useI18n();
-
   return (
     <DocumentEditorDialog
-      description={t("mongodb.document.addDescription")}
+      description={"Create a new document using JSON."}
       placeholder="{ ... }"
-      submitLabel={t("mongodb.document.add")}
-      title={t("mongodb.document.addTitle")}
+      submitLabel={"Add document"}
+      title={"Add document"}
       {...props}
     />
   );

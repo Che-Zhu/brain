@@ -26,7 +26,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
@@ -98,7 +97,6 @@ export function RedisKeyDetailView({
   objectRef,
 }: RedisKeyDetailViewProps) {
   const { connections, tableRefreshKey } = useConnectionStore();
-  const { t } = useI18n();
 
   // ---- Data state ----
   const [data, setData] = useState<TableData | null>(null);
@@ -149,7 +147,7 @@ export function RedisKeyDetailView({
   const fetchData = useCallback(async () => {
     const conn = connections.find((c) => c.id === connectionId);
     if (!conn?.runtime) {
-      setError(t("common.error.connectionNotFound"));
+      setError("Connection not found");
       setLoading(false);
       return;
     }
@@ -199,7 +197,7 @@ export function RedisKeyDetailView({
         return;
       }
       const message = err instanceof Error ? err.message.trim() : "";
-      setError(message || t("redis.detail.fetchFailed"));
+      setError(message || "Failed to fetch Redis key");
     } finally {
       if (thisRequestId === latestRequestIdRef.current) {
         setLoading(false);
@@ -213,7 +211,6 @@ export function RedisKeyDetailView({
     pageSize,
     currentPage,
     objectRef,
-    t,
   ]);
 
   useEffect(() => {
@@ -400,7 +397,7 @@ export function RedisKeyDetailView({
                   />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{t("common.actions.refresh")}</TooltipContent>
+              <TooltipContent>{"Refresh"}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -414,7 +411,7 @@ export function RedisKeyDetailView({
               onClick={() => setShowExport(true)}
             >
               <Download className="h-4 w-4" />
-              {t("common.actions.export")}
+              {"Export"}
             </Button>
           </div>
         </div>
@@ -529,7 +526,7 @@ export function RedisKeyDetailView({
                             className="w-40"
                           >
                             <DropdownMenuLabel className="text-[10px] text-muted-foreground">
-                              {t("redis.detail.sortActions")}
+                              {"Sort actions"}
                             </DropdownMenuLabel>
                             <DropdownMenuItem
                               className={cn(
@@ -540,7 +537,7 @@ export function RedisKeyDetailView({
                               onSelect={() => handleSort(col, "asc")}
                             >
                               <ArrowUpAZ className="h-3.5 w-3.5" />
-                              {t("redis.detail.sortAsc")}
+                              {"Sort ascending"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className={cn(
@@ -551,14 +548,14 @@ export function RedisKeyDetailView({
                               onSelect={() => handleSort(col, "desc")}
                             >
                               <ArrowDownAZ className="h-3.5 w-3.5" />
-                              {t("redis.detail.sortDesc")}
+                              {"Sort descending"}
                             </DropdownMenuItem>
                             {sortColumn === col && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onSelect={clearSort}>
                                   <X className="h-3.5 w-3.5" />
-                                  {t("redis.detail.clearSort")}
+                                  {"Clear sort"}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -741,7 +738,7 @@ export function RedisKeyDetailView({
               data-qa-state="empty"
               data-testid="redis.key.empty"
             >
-              {t("redis.detail.empty")}
+              {"No values found"}
             </div>
           )}
         </div>

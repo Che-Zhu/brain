@@ -16,7 +16,6 @@ import {
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
 import type { RecordInput } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { Plus, Table, Trash2 } from "lucide-react";
@@ -100,7 +99,6 @@ function CreateTableProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { createTable, connections } = useConnectionStore();
   const [tableName, setTableName] = useState("");
   const [columns, setColumns] = useState<ColumnDefinition[]>([
@@ -158,7 +156,7 @@ function CreateTableProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
   }, [
     tableName,
@@ -169,7 +167,6 @@ function CreateTableProvider({
     schema,
     createTable,
     onSuccess,
-    t,
   ]);
 
   return (
@@ -184,7 +181,7 @@ function CreateTableProvider({
       }}
     >
       <ModalForm.Provider
-        meta={{ title: t("sql.createTable.title"), icon: Table }}
+        meta={{ title: "Create table", icon: Table }}
         onSubmit={handleSubmit}
       >
         {children}
@@ -199,20 +196,19 @@ function CreateTableProvider({
 
 /** Input for the new table name. */
 function CreateTableNameField() {
-  const { t } = useI18n();
   const { tableName, setTableName } = useCreateTableCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-1.5">
       <label className="font-medium text-foreground text-sm">
-        {t("sql.createTable.tableName")}
+        {"Table name"}
       </label>
       <Input
         className="max-w-md"
         disabled={state.isSubmitting}
         onChange={(e) => setTableName(e.target.value)}
-        placeholder={t("sql.createTable.tableNamePlaceholder")}
+        placeholder={"Enter table name"}
         value={tableName}
       />
     </div>
@@ -221,7 +217,6 @@ function CreateTableNameField() {
 
 /** Editable table of column definitions with add/remove/update. */
 function CreateTableColumnEditor() {
-  const { t } = useI18n();
   const { columns, addColumn, removeColumn, updateColumn } =
     useCreateTableCtx();
   const { state } = useModalForm();
@@ -230,7 +225,7 @@ function CreateTableColumnEditor() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.createTable.columns")}
+          {"Columns"}
         </label>
         <Button
           className="h-7 gap-1 px-2 text-primary text-xs hover:text-primary"
@@ -241,7 +236,7 @@ function CreateTableColumnEditor() {
           variant="ghost"
         >
           <Plus className="h-3 w-3" />
-          {t("sql.createTable.addColumn")}
+          {"Add column"}
         </Button>
       </div>
 
@@ -249,17 +244,11 @@ function CreateTableColumnEditor() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">
-                {t("sql.createTable.name")}
-              </th>
-              <th className="px-4 py-2 text-left font-medium">
-                {t("sql.createTable.type")}
-              </th>
+              <th className="px-4 py-2 text-left font-medium">{"Name"}</th>
+              <th className="px-4 py-2 text-left font-medium">{"Type"}</th>
+              <th className="w-20 px-4 py-2 text-center font-medium">{"PK"}</th>
               <th className="w-20 px-4 py-2 text-center font-medium">
-                {t("sql.createTable.pk")}
-              </th>
-              <th className="w-20 px-4 py-2 text-center font-medium">
-                {t("sql.createTable.null")}
+                {"Null"}
               </th>
               <th className="w-10 px-4 py-2" />
             </tr>
@@ -274,7 +263,7 @@ function CreateTableColumnEditor() {
                     onChange={(e) =>
                       updateColumn(col.id, "name", e.target.value)
                     }
-                    placeholder={t("sql.createTable.columnNamePlaceholder")}
+                    placeholder={"Column name"}
                     type="text"
                     value={col.name}
                   />
@@ -329,9 +318,7 @@ function CreateTableColumnEditor() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {t("sql.createTable.removeColumn")}
-                    </TooltipContent>
+                    <TooltipContent>{"Remove column"}</TooltipContent>
                   </Tooltip>
                 </td>
               </tr>
@@ -345,12 +332,11 @@ function CreateTableColumnEditor() {
 
 /** Submit button disabled when table name or columns are empty. */
 function CreateTableSubmitButton() {
-  const { t } = useI18n();
   const { tableName, columns } = useCreateTableCtx();
   return (
     <ModalForm.SubmitButton
       disabled={!tableName || columns.length === 0}
-      label={t("sql.createTable.submit")}
+      label={"Create table"}
     />
   );
 }

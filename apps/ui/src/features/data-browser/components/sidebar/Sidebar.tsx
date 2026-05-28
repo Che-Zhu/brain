@@ -1,7 +1,6 @@
 import type { AccessObjectRef } from "@data-browser/api/access-types";
 import { DATA_BROWSER_CAPABILITIES } from "@data-browser/capabilities";
 import type { Alert } from "@data-browser/components/ui/types";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { useTabStore } from "@data-browser/stores/useTabStore";
 import { type MouseEvent, useCallback, useReducer, useState } from "react";
@@ -79,7 +78,6 @@ function SidebarInner() {
     triggerTableRefresh,
   } = useConnectionStore();
   const { openTab } = useTabStore();
-  const { t } = useI18n();
 
   const {
     expandedItems,
@@ -121,10 +119,10 @@ function SidebarInner() {
         } catch (error) {
           if (node.type === "connection") {
             showAlert(
-              t("sidebar.alert.connectionFailedTitle"),
+              "Connection failed",
               error instanceof Error
                 ? error.message
-                : t("sidebar.alert.connectionFailedMessage"),
+                : "Failed to load connection.",
               "error"
             );
           }
@@ -136,10 +134,7 @@ function SidebarInner() {
         node.metadata.objectRef
       ) {
         const tableTitle = node.metadata.database
-          ? t("sidebar.tab.tableWithDatabase", {
-              database: node.metadata.database,
-              table: node.name,
-            })
+          ? `${node.metadata.database} / ${node.name}`
           : node.name;
         openTab({
           connectionId: node.connectionId,
@@ -152,10 +147,7 @@ function SidebarInner() {
         });
       } else if (node.type === "collection" && node.metadata.objectRef) {
         const collectionTitle = node.metadata.database
-          ? t("sidebar.tab.tableWithDatabase", {
-              database: node.metadata.database,
-              table: node.name,
-            })
+          ? `${node.metadata.database} / ${node.name}`
           : node.name;
         openTab({
           collectionName: node.name,
@@ -173,15 +165,12 @@ function SidebarInner() {
           databaseName: redisDatabase,
           objectRef: node.metadata.objectRef,
           tableName: node.name,
-          title: t("sidebar.tab.redisKeyDetail", {
-            database: redisDatabase,
-            key: node.name,
-          }),
+          title: `${redisDatabase} / ${node.name}`,
           type: "redis_key_detail",
         });
       }
     },
-    [openTab, selectItem, showAlert, t, toggleItem, triggerCollectionRefresh]
+    [openTab, selectItem, showAlert, toggleItem, triggerCollectionRefresh]
   );
 
   const handleContextMenu = useCallback(
@@ -288,7 +277,6 @@ function SidebarInner() {
     const { node } = contextMenu;
     const callbacks = {
       onAction: handleContextMenuAction,
-      t,
     };
     const connectionType =
       connections.find((connection) => connection.id === node.connectionId)
@@ -322,7 +310,7 @@ function SidebarInner() {
 
   return (
     <div
-      className="flex h-full w-full flex-col border-sidebar-border border-r bg-sidebar"
+      className="flex h-full w-full flex-col border-sidebar-border border-r"
       data-qa-module="database"
       data-qa-object="sidebar"
       data-qa-state={
@@ -337,7 +325,7 @@ function SidebarInner() {
         data-testid="database.sidebar.header"
       >
         <span className="font-medium text-sidebar-foreground text-xl">
-          {t("sidebar.title")}
+          {"Database"}
         </span>
       </div>
 

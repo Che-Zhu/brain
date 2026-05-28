@@ -1,6 +1,5 @@
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import type { ModalAlert } from "@data-browser/components/ui/types";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Filter } from "lucide-react";
 import {
   createContext,
@@ -382,7 +381,6 @@ export function FilterCollectionProvider({
   onOpenChange,
   children,
 }: FilterCollectionProviderProps): JSX.Element {
-  const { t } = useI18n();
   const [conditions, setConditions] = useState<FilterConditionDraft[]>(() => [
     createEmptyCondition(fields),
   ]);
@@ -409,14 +407,14 @@ export function FilterCollectionProvider({
       if (parsed.hasUnsupported) {
         pushAlert({
           type: "info",
-          title: t("mongodb.alert.filtersNotLoadedTitle"),
-          message: t("mongodb.alert.filtersNotLoadedMessage"),
+          title: "Filters are not ready",
+          message: "Load collection data before adding filters.",
         });
       }
     }
 
     wasOpenRef.current = open;
-  }, [open, initialFilter, fields, pushAlert, t]);
+  }, [open, initialFilter, fields, pushAlert]);
 
   const addCondition = useCallback(() => {
     const nextField =
@@ -424,14 +422,14 @@ export function FilterCollectionProvider({
     if (!nextField) {
       pushAlert({
         type: "info",
-        title: t("mongodb.alert.noAdditionalFieldsTitle"),
-        message: t("mongodb.alert.noAdditionalFieldsMessage"),
+        title: "No additional fields",
+        message: "All available fields already have filters.",
       });
       return;
     }
 
     setConditions((prev) => [...prev, createConditionForField(nextField)]);
-  }, [fields, conditions, pushAlert, t]);
+  }, [fields, conditions, pushAlert]);
 
   const removeCondition = useCallback((id: string) => {
     setConditions((prev) => prev.filter((condition) => condition.id !== id));
@@ -475,7 +473,7 @@ export function FilterCollectionProvider({
       }}
     >
       <ModalForm.Provider
-        meta={{ title: t("mongodb.filter.title"), icon: Filter }}
+        meta={{ title: "Filter collection", icon: Filter }}
         onSubmit={handleSubmit}
       >
         <AlertBridge

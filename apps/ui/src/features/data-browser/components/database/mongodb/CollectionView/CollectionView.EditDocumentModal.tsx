@@ -1,4 +1,3 @@
-import { useI18n } from "@data-browser/i18n/useI18n";
 import {
   DocumentEditorDialog,
   type DocumentEditorDialogProps,
@@ -8,12 +7,10 @@ import {
 export function EditDocumentModal(
   props: Omit<DocumentEditorDialogProps, "title" | "submitLabel">
 ) {
-  const { t } = useI18n();
-
   return (
     <DocumentEditorDialog
-      submitLabel={t("mongodb.document.saveChanges")}
-      title={t("mongodb.document.editTitle")}
+      submitLabel={"Save changes"}
+      title={"Edit document"}
       {...props}
     />
   );

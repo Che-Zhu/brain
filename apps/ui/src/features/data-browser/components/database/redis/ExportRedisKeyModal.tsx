@@ -10,7 +10,6 @@ import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { useGetStorageUnitRowsLazyQuery } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import {
@@ -86,12 +85,8 @@ function ExportRedisKeyProvider({
   keyName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
-
   return (
-    <ModalForm.Provider
-      meta={{ title: t("redis.export.title"), icon: Download }}
-    >
+    <ModalForm.Provider meta={{ title: "Export Redis key", icon: Download }}>
       <ExportRedisKeyBridge
         connectionId={connectionId}
         databaseName={databaseName}
@@ -114,7 +109,6 @@ function ExportRedisKeyBridge({
   keyName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [rowLimit, setRowLimit] = useState<number | "">("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -150,8 +144,8 @@ function ExportRedisKeyBridge({
       if (!(columns?.length && rows?.length)) {
         actions.setAlert({
           type: "error",
-          title: t("redis.export.failed"),
-          message: t("redis.export.noData"),
+          title: "Export failed",
+          message: "No data returned for this key.",
         });
         return;
       }
@@ -174,7 +168,7 @@ function ExportRedisKeyBridge({
     } catch (err: any) {
       actions.setAlert({
         type: "error",
-        title: t("redis.export.failed"),
+        title: "Export failed",
         message: err.message || String(err),
       });
     } finally {
@@ -189,7 +183,6 @@ function ExportRedisKeyBridge({
     getRows,
     keyName,
     rowLimit,
-    t,
   ]);
 
   return (
@@ -213,7 +206,6 @@ function ExportRedisKeyBridge({
 // ---------------------------------------------------------------------------
 
 function ExportRedisKeyFields() {
-  const { t } = useI18n();
   const { format, setFormat, rowLimit, setRowLimit, isSuccess } =
     useExportRedisKeyCtx();
   const { state } = useModalForm();
@@ -230,7 +222,7 @@ function ExportRedisKeyFields() {
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("redis.export.rowLimit")}
+          {"Row limit"}
         </label>
         <Input
           disabled={disabled}
@@ -240,12 +232,12 @@ function ExportRedisKeyFields() {
               e.target.value === "" ? "" : Number.parseInt(e.target.value, 10)
             )
           }
-          placeholder={t("redis.export.rowLimitPlaceholder")}
+          placeholder={"Optional row limit"}
           type="number"
           value={rowLimit}
         />
         <p className="text-muted-foreground text-xs">
-          {t("redis.export.rowLimitHint")}
+          {"Leave empty to export all rows returned by the backend."}
         </p>
       </div>
 

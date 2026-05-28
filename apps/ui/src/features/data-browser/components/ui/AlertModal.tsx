@@ -1,4 +1,3 @@
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
 import { Button } from "./Button";
@@ -27,8 +26,7 @@ export function AlertModal({
   type = "info",
   buttonText,
 }: AlertModalProps) {
-  const { t } = useI18n();
-  const resolvedButtonText = buttonText ?? t("common.actions.ok");
+  const resolvedButtonText = buttonText ?? "OK";
 
   const getIcon = () => {
     switch (type) {

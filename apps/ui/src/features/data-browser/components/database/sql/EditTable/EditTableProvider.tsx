@@ -4,7 +4,6 @@ import {
   useExecuteConfirmedSqlMutation,
   useRawExecuteLazyQuery,
 } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import type { SqlDialect } from "@data-browser/utils/ddl-sql";
 import {
@@ -66,9 +65,8 @@ export function EditTableProvider({
   schema,
   children,
 }: EditTableProviderProps) {
-  const { t } = useI18n();
   const meta: ModalMeta = {
-    title: t("sql.editTable.title", { tableName }),
+    title: `Edit table ${tableName}`,
     icon: Table,
   };
 
@@ -111,7 +109,6 @@ function EditTableBridge({
   schema?: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { connections } = useConnectionStore();
   const conn = connections.find((c) => c.id === connectionId);
   const { actions: modalActions } = useModalForm();
@@ -256,7 +253,7 @@ function EditTableBridge({
     } catch (error) {
       modalActions.setAlert({
         type: "error",
-        title: t("sql.editTable.loadSchemaFailed"),
+        title: "Failed to load table schema",
         message: String(error),
       });
       setColumns([]);
@@ -287,7 +284,7 @@ function EditTableBridge({
         if (errors?.length) {
           return {
             success: false,
-            message: errors[0]?.message ?? t("common.error.unknown"),
+            message: errors[0]?.message ?? "Unknown error",
           };
         }
         const msg = data?.ExecuteConfirmedSQL;
@@ -524,8 +521,8 @@ function EditTableBridge({
       if (!col.name.trim()) {
         modalActions.setAlert({
           type: "error",
-          title: t("sql.editTable.validationFailed"),
-          message: t("sql.editTable.columnNameRequired"),
+          title: "Validation failed",
+          message: "Column name is required.",
         });
         return;
       }
@@ -537,16 +534,16 @@ function EditTableBridge({
       if (!idx.name.trim()) {
         modalActions.setAlert({
           type: "error",
-          title: t("sql.editTable.validationFailed"),
-          message: t("sql.editTable.indexNameRequired"),
+          title: "Validation failed",
+          message: "Index name is required.",
         });
         return;
       }
       if (idx.columns.length === 0) {
         modalActions.setAlert({
           type: "error",
-          title: t("sql.editTable.validationFailed"),
-          message: t("sql.editTable.indexColumnsRequired"),
+          title: "Validation failed",
+          message: "Index columns are required.",
         });
         return;
       }
@@ -567,8 +564,8 @@ function EditTableBridge({
       ) {
         modalActions.setAlert({
           type: "error",
-          title: t("sql.editTable.validationFailed"),
-          message: t("sql.editTable.foreignKeyFieldsRequired"),
+          title: "Validation failed",
+          message: "Foreign key fields are required.",
         });
         return;
       }
@@ -585,7 +582,7 @@ function EditTableBridge({
       const sql = dropForeignKeySQL(dialect, tableName, dropName, schema);
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.dropForeignKey", { name: dropName }),
+        label: `Drop foreign key ${dropName}`,
         success: result.success,
         message: result.message,
         sql,
@@ -600,7 +597,7 @@ function EditTableBridge({
       const sql = dropIndexSQL(dialect, tableName, idx.name, schema);
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.dropIndex", { name: idx.name }),
+        label: `Drop index ${idx.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -615,7 +612,7 @@ function EditTableBridge({
       const sql = dropColumnSQL(dialect, tableName, col.name, schema);
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.dropColumn", { name: col.name }),
+        label: `Drop column ${col.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -634,7 +631,7 @@ function EditTableBridge({
       );
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.addColumn", { name: col.name }),
+        label: `Add column ${col.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -656,7 +653,7 @@ function EditTableBridge({
       );
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.modifyColumn", { name: col.name }),
+        label: `Modify column ${col.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -675,7 +672,7 @@ function EditTableBridge({
       const dropResult = await executeSingleStatement(dropSql);
       if (!dropResult.success) {
         results.push({
-          label: t("sql.editTable.result.modifyIndex", { name: idx.name }),
+          label: `Modify index ${idx.name}`,
           success: false,
           message: dropResult.message,
           sql: dropSql,
@@ -693,7 +690,7 @@ function EditTableBridge({
       );
       const createResult = await executeSingleStatement(createSql);
       results.push({
-        label: t("sql.editTable.result.modifyIndex", { name: idx.name }),
+        label: `Modify index ${idx.name}`,
         success: createResult.success,
         message: createResult.message,
         sql: createSql,
@@ -712,7 +709,7 @@ function EditTableBridge({
       );
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.addIndex", { name: idx.name }),
+        label: `Add index ${idx.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -729,7 +726,7 @@ function EditTableBridge({
       const dropResult = await executeSingleStatement(dropSql);
       if (!dropResult.success) {
         results.push({
-          label: t("sql.editTable.result.modifyForeignKey", { name: fk.name }),
+          label: `Modify foreign key ${fk.name}`,
           success: false,
           message: dropResult.message,
           sql: dropSql,
@@ -750,7 +747,7 @@ function EditTableBridge({
       );
       const addResult = await executeSingleStatement(addSql);
       results.push({
-        label: t("sql.editTable.result.modifyForeignKey", { name: fk.name }),
+        label: `Modify foreign key ${fk.name}`,
         success: addResult.success,
         message: addResult.message,
         sql: addSql,
@@ -772,7 +769,7 @@ function EditTableBridge({
       );
       const result = await executeSingleStatement(sql);
       results.push({
-        label: t("sql.editTable.result.addForeignKey", { name: fk.name }),
+        label: `Add foreign key ${fk.name}`,
         success: result.success,
         message: result.message,
         sql,
@@ -797,7 +794,7 @@ function EditTableBridge({
     if (failCount === 0) {
       modalActions.setAlert({
         type: "success",
-        title: t("sql.editTable.applySuccess", { count: String(successCount) }),
+        title: `Applied ${String(successCount)} change(s).`,
         message: details,
       });
       // Re-fetch schema to get clean state
@@ -805,33 +802,25 @@ function EditTableBridge({
     } else {
       modalActions.setAlert({
         type: "error",
-        title: t("sql.editTable.applyPartial", {
-          success: String(successCount),
-          failed: String(failCount),
-        }),
+        title: `Applied ${String(successCount)} change(s); ${String(failCount)} failed.`,
         message: details,
       });
       // Re-fetch to sync with actual DB state, preserving failed new items
       const failedNewColumns = newColumns.filter((column) => {
         const result = results.find(
-          (r) =>
-            r.label ===
-            t("sql.editTable.result.addColumn", { name: column.name })
+          (r) => r.label === `Add column ${column.name}`
         );
         return result ? !result.success : false;
       });
       const failedNewIndexes = newIndexes.filter((index) => {
         const result = results.find(
-          (r) =>
-            r.label === t("sql.editTable.result.addIndex", { name: index.name })
+          (r) => r.label === `Add index ${index.name}`
         );
         return result ? !result.success : false;
       });
       const failedNewForeignKeys = newForeignKeys.filter((foreignKey) => {
         const result = results.find(
-          (r) =>
-            r.label ===
-            t("sql.editTable.result.addForeignKey", { name: foreignKey.name })
+          (r) => r.label === `Add foreign key ${foreignKey.name}`
         );
         return result ? !result.success : false;
       });

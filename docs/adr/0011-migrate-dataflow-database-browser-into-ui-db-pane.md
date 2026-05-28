@@ -49,8 +49,8 @@ The migration preserves DataFlow's database browser interaction details by movin
 - Hide complex export options such as SQL export, Excel export, JSON export when not backend-supported, WHERE filters, Mongo filters, frontend query-backed export, row-limit controls, selected-row export, and whole-database ZIP export.
 - Keep Zustand as feature-local state for the migrated DataFlow code in the first version. Do not migrate the browser state to Jotai yet.
 - Use existing `apps/ui` Jotai state only for host context such as kubeconfig, namespace, project UID, and selected database service.
-- Delete DataFlow i18n from the migrated feature. Do not move the Chinese locale.
-- Keep a feature-local English-only `t()` shim if needed to preserve migrated component code and avoid rewriting every call site. Do not mount a DataFlow `I18nProvider`, do not keep language switching, and do not keep the Chinese locale.
+- Delete DataFlow i18n from the migrated feature. Do not move the Chinese locale, do not keep a feature-local translator shim, and do not mount a DataFlow `I18nProvider` or language switcher.
+- Use direct English strings in migrated DataFlow components until the product makes a project-wide i18n decision. Future localization should be introduced through the app-level i18n architecture rather than a data-browser-local compatibility layer.
 - Use an `apps/api` REST adapter for the visible read-only data path.
 - Authenticate visible REST adapter requests with the host kubeconfig using the existing app API bearer format: `Authorization: Bearer ${encodeURIComponent(kubeconfig.trim())}`. Do not migrate DataFlow's old session token, session storage, Sealos bootstrap, or auth store behavior.
 - Have the visible REST adapter convert `AccessRowsResult` into DataFlow-compatible table data shapes where that reduces component changes. Requests still use canonical `AccessObjectRef`.

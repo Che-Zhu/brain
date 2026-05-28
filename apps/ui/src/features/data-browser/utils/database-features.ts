@@ -134,21 +134,21 @@ export function getEditorPlaceholder(dbType: string): string {
 
 /** Redis commands that require persistent connection state or are blocking. */
 const REDIS_UNSUPPORTED_COMMANDS: Record<string, string> = {
-  MULTI: "redis.unsupported.transaction",
-  EXEC: "redis.unsupported.transaction",
-  DISCARD: "redis.unsupported.transaction",
-  WATCH: "redis.unsupported.watch",
-  UNWATCH: "redis.unsupported.watch",
-  SUBSCRIBE: "redis.unsupported.pubsub",
-  PSUBSCRIBE: "redis.unsupported.pubsub",
-  UNSUBSCRIBE: "redis.unsupported.pubsub",
-  PUNSUBSCRIBE: "redis.unsupported.pubsub",
-  MONITOR: "redis.unsupported.blocking",
+  MULTI: "Redis transactions are not supported in this editor.",
+  EXEC: "Redis transactions are not supported in this editor.",
+  DISCARD: "Redis transactions are not supported in this editor.",
+  WATCH: "Redis WATCH commands are not supported in this editor.",
+  UNWATCH: "Redis WATCH commands are not supported in this editor.",
+  SUBSCRIBE: "Redis Pub/Sub commands are not supported in this editor.",
+  PSUBSCRIBE: "Redis Pub/Sub commands are not supported in this editor.",
+  UNSUBSCRIBE: "Redis Pub/Sub commands are not supported in this editor.",
+  PUNSUBSCRIBE: "Redis Pub/Sub commands are not supported in this editor.",
+  MONITOR: "Redis blocking commands are not supported in this editor.",
 };
 
 /**
- * Returns the i18n error message key for an unsupported Redis command,
- * or null if the command is supported.
+ * Returns an error message for an unsupported Redis command, or null if the
+ * command is supported.
  */
 export function getUnsupportedRedisCommand(query: string): string | null {
   const firstToken = query.trim().split(/\s+/)[0]?.toUpperCase() ?? "";

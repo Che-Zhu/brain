@@ -2,7 +2,6 @@ import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { useDeleteRowMutation } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { AlertTriangle } from "lucide-react";
 import {
   createContext,
@@ -50,7 +49,6 @@ function DeleteRedisKeyProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const [deleteRow] = useDeleteRowMutation();
   const [confirmName, setConfirmName] = useState("");
   const canDelete = confirmName === keyName;
@@ -68,7 +66,7 @@ function DeleteRedisKeyProvider({
       context: { database: databaseName },
     });
     if (errors?.length) {
-      throw new Error(errors[0]?.message ?? t("common.error.unknown"));
+      throw new Error(errors[0]?.message ?? "Unknown error");
     }
     onSuccess?.();
   }, [canDelete, databaseName, keyName, deleteRow, onSuccess]);
@@ -79,7 +77,7 @@ function DeleteRedisKeyProvider({
     >
       <ModalForm.Provider
         meta={{
-          title: t("redis.deleteKey.title"),
+          title: "Delete Redis key",
           icon: AlertTriangle,
           isDestructive: true,
         }}
@@ -96,30 +94,28 @@ function DeleteRedisKeyProvider({
 // ---------------------------------------------------------------------------
 
 function DeleteRedisKeyWarning() {
-  const { t } = useI18n();
   const { keyName } = useDeleteRedisKeyCtx();
 
   return (
     <div className="rounded-lg border border-destructive/10 bg-destructive/5 p-4 text-sm">
       <p className="font-medium text-destructive">
-        {t("redis.deleteKey.warningTitle")}
+        {"This action cannot be undone"}
       </p>
       <p className="mt-1 text-muted-foreground">
-        {t("redis.deleteKey.warningMessage", { keyName })}
+        {`Redis key "${keyName}" will be permanently deleted.`}
       </p>
     </div>
   );
 }
 
 function DeleteRedisKeyConfirmation() {
-  const { t } = useI18n();
   const { confirmName, setConfirmName, keyName } = useDeleteRedisKeyCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-1.5">
       <label className="font-medium text-foreground text-sm">
-        {t("redis.deleteKey.confirmName")}
+        {"Type the key name to confirm."}
       </label>
       <Input
         disabled={state.isSubmitting}
@@ -132,14 +128,8 @@ function DeleteRedisKeyConfirmation() {
 }
 
 function DeleteRedisKeySubmitButton() {
-  const { t } = useI18n();
   const { canDelete } = useDeleteRedisKeyCtx();
-  return (
-    <ModalForm.SubmitButton
-      disabled={!canDelete}
-      label={t("redis.deleteKey.submit")}
-    />
-  );
+  return <ModalForm.SubmitButton disabled={!canDelete} label={"Delete key"} />;
 }
 
 // ---------------------------------------------------------------------------

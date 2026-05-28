@@ -5,22 +5,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Plus, Trash2 } from "lucide-react";
 import { useRedisKeyCtx } from "./RedisKeyProvider";
 
 /** Create-only editor for Redis list values. */
 export function RedisKeyListEditor() {
-  const { t } = useI18n();
   const { draft, setListItems } = useRedisKeyCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <label className="font-medium text-foreground text-sm">
-          {t("redis.key.value")}
-        </label>
+        <label className="font-medium text-foreground text-sm">{"Value"}</label>
         <Button
           className="h-7 gap-1 px-2 text-primary text-xs hover:text-primary"
           disabled={state.isSubmitting}
@@ -30,16 +26,14 @@ export function RedisKeyListEditor() {
           variant="ghost"
         >
           <Plus className="h-3 w-3" />
-          {t("redis.key.addItem")}
+          {"Add item"}
         </Button>
       </div>
       <div className="rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">
-                {t("redis.key.listItemPlaceholder")}
-              </th>
+              <th className="px-4 py-2 text-left font-medium">{"List item"}</th>
               <th className="w-10 px-4 py-2" />
             </tr>
           </thead>
@@ -55,7 +49,7 @@ export function RedisKeyListEditor() {
                       next[index] = { value: e.target.value };
                       setListItems(next);
                     }}
-                    placeholder={t("redis.key.listItemPlaceholder")}
+                    placeholder={"List item"}
                     type="text"
                     value={item.value}
                   />
@@ -78,7 +72,7 @@ export function RedisKeyListEditor() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{t("redis.key.removeItem")}</TooltipContent>
+                    <TooltipContent>{"Remove item"}</TooltipContent>
                   </Tooltip>
                 </td>
               </tr>

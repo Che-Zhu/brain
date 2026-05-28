@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@data-browser/components/ui/select";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useCallback } from "react";
 import { RedisKeyHashEditor } from "./RedisKey.HashEditor";
 import { RedisKeyListEditor } from "./RedisKey.ListEditor";
@@ -64,7 +63,6 @@ export function RedisKeyModal({
 
 /** Shared key identity fields with create-only type/name editing. */
 function RedisKeyIdentityFields() {
-  const { t } = useI18n();
   const { draft, setKey, setType, canEditKeyName, canEditType, isEditMode } =
     useRedisKeyCtx();
   const { state } = useModalForm();
@@ -73,7 +71,7 @@ function RedisKeyIdentityFields() {
     <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-foreground text-sm">
-          {t("redis.key.name")}
+          {"Key name"}
         </label>
         <Input
           className={
@@ -81,19 +79,19 @@ function RedisKeyIdentityFields() {
           }
           disabled={state.isSubmitting || !canEditKeyName}
           onChange={(event) => setKey(event.target.value)}
-          placeholder={t("redis.key.namePlaceholder")}
+          placeholder={"Enter key name"}
           value={draft.key}
         />
         {isEditMode && !canEditKeyName && (
           <p className="text-muted-foreground text-xs">
-            {t("redis.key.nameReadonly")}
+            {"Key name cannot be changed."}
           </p>
         )}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-foreground text-sm">
-          {t("redis.key.type")}
+          {"Key type"}
         </label>
         <Select
           disabled={state.isSubmitting || !canEditType}
@@ -117,7 +115,7 @@ function RedisKeyIdentityFields() {
         </Select>
         {isEditMode && !canEditType && (
           <p className="text-muted-foreground text-xs">
-            {t("redis.key.typeReadonly")}
+            {"Key type cannot be changed."}
           </p>
         )}
       </div>
@@ -126,13 +124,12 @@ function RedisKeyIdentityFields() {
 }
 
 function RedisKeyEditorSwitch() {
-  const { t } = useI18n();
   const { draft, isEditMode, isStringEdit } = useRedisKeyCtx();
 
   if (isEditMode && !isStringEdit) {
     return (
       <div className="rounded-lg border border-dashed p-4 text-muted-foreground text-sm">
-        {t("redis.key.editOnlyString")}
+        {"Only string values can be edited in this form."}
       </div>
     );
   }
@@ -154,13 +151,9 @@ function RedisKeyEditorSwitch() {
 }
 
 function RedisKeyFooter() {
-  const { t } = useI18n();
   const { draft, isEditMode, isStringEdit } = useRedisKeyCtx();
   const { state } = useModalForm();
-  const submitLabel =
-    draft.mode === "edit"
-      ? t("redis.key.saveAction")
-      : t("redis.key.createAction");
+  const submitLabel = draft.mode === "edit" ? "Save key" : "Create key";
   const isCreateDisabled =
     draft.mode === "create" && !hasRedisDraftPayload(draft);
   const isSubmitDisabled =

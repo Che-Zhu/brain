@@ -4,7 +4,6 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@data-browser/components/ui/radio-group";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { Eraser } from "lucide-react";
@@ -57,7 +56,6 @@ function ClearTableDataProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { clearTableData } = useConnectionStore();
   const [mode, setMode] = useState<"truncate" | "delete">("truncate");
 
@@ -66,15 +64,15 @@ function ClearTableDataProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
-  }, [databaseName, schema, tableName, mode, clearTableData, onSuccess, t]);
+  }, [databaseName, schema, tableName, mode, clearTableData, onSuccess]);
 
   return (
     <ClearTableDataCtx value={{ mode, setMode, tableName }}>
       <ModalForm.Provider
         meta={{
-          title: t("sql.clearTable.title"),
+          title: "Clear table data",
           icon: Eraser,
           isDestructive: true,
         }}
@@ -92,13 +90,12 @@ function ClearTableDataProvider({
 
 /** Warning banner about data loss. */
 function ClearTableDataWarning() {
-  const { t } = useI18n();
   const { tableName } = useClearTableDataCtx();
 
   return (
     <div className="rounded-lg border border-destructive/10 bg-destructive/5 p-4 text-sm">
       <p className="text-destructive">
-        {t("sql.clearTable.warning", { tableName })}
+        {`All data in "${tableName}" will be removed.`}
       </p>
     </div>
   );
@@ -106,14 +103,13 @@ function ClearTableDataWarning() {
 
 /** Radio selector for TRUNCATE vs DELETE mode. */
 function ClearTableDataModeSelector() {
-  const { t } = useI18n();
   const { mode, setMode } = useClearTableDataCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-2">
       <label className="font-medium text-foreground text-sm">
-        {t("sql.clearTable.mode")}
+        {"Clear mode"}
       </label>
       <RadioGroup
         disabled={state.isSubmitting}
@@ -130,11 +126,9 @@ function ClearTableDataModeSelector() {
         >
           <RadioGroupItem className="mt-0.5" value="truncate" />
           <div>
-            <div className="font-medium text-sm">
-              {t("sql.clearTable.fastTruncate")}
-            </div>
+            <div className="font-medium text-sm">{"Fast truncate"}</div>
             <div className="text-muted-foreground text-xs">
-              {t("sql.clearTable.fastTruncateDescription")}
+              {"Use TRUNCATE for a faster operation when supported."}
             </div>
           </div>
         </label>
@@ -148,11 +142,9 @@ function ClearTableDataModeSelector() {
         >
           <RadioGroupItem className="mt-0.5" value="delete" />
           <div>
-            <div className="font-medium text-sm">
-              {t("sql.clearTable.safeDelete")}
-            </div>
+            <div className="font-medium text-sm">{"Safe delete"}</div>
             <div className="text-muted-foreground text-xs">
-              {t("sql.clearTable.safeDeleteDescription")}
+              {"Use DELETE so constraints and triggers are respected."}
             </div>
           </div>
         </label>
@@ -183,7 +175,6 @@ export function ClearTableDataModal({
   tableName,
   onSuccess,
 }: ClearTableDataModalProps) {
-  const { t } = useI18n();
   const handleSuccess = useCallback(() => {
     onSuccess?.();
     onOpenChange(false);
@@ -204,7 +195,7 @@ export function ClearTableDataModal({
           <ModalForm.Alert />
           <ModalForm.Footer>
             <ModalForm.CancelButton />
-            <ModalForm.SubmitButton label={t("sql.clearTable.submit")} />
+            <ModalForm.SubmitButton label={"Clear table"} />
           </ModalForm.Footer>
         </ClearTableDataProvider>
       </DialogContent>

@@ -11,7 +11,6 @@ import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
 import { Textarea } from "@data-browser/components/ui/Textarea";
 import { useRawExecuteLazyQuery } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { buildStorageUnitReference } from "@data-browser/utils/ddl-sql";
 import {
@@ -100,12 +99,10 @@ function ExportDataProvider({
   tableName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
-
   return (
     <ModalForm.Provider
       meta={{
-        title: t("sql.export.title"),
+        title: "Export data",
         description: schema
           ? `${databaseName}.${schema}.${tableName}`
           : `${databaseName}.${tableName}`,
@@ -138,7 +135,6 @@ function ExportDataBridge({
   tableName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [rowCount, setRowCount] = useState<number | "">(1000);
   const [filter, setFilter] = useState("");
@@ -178,7 +174,7 @@ function ExportDataBridge({
         throw new Error(error.message);
       }
       if (!data?.RawExecute) {
-        throw new Error(t("sql.export.noDataReturned"));
+        throw new Error("No data returned to export.");
       }
 
       const { Columns, Rows } = data.RawExecute;
@@ -204,8 +200,8 @@ function ExportDataBridge({
     } catch (err: any) {
       actions.setAlert({
         type: "error",
-        title: t("sql.export.failed"),
-        message: err.message || t("common.unknownError"),
+        title: "Export failed",
+        message: err.message || "Unknown error",
       });
     } finally {
       actions.setSubmitting(false);
@@ -220,7 +216,6 @@ function ExportDataBridge({
     format,
     rowCount,
     schema,
-    t,
     tableName,
   ]);
 
@@ -248,7 +243,6 @@ function ExportDataBridge({
 
 /** Format selector, row limit, filter, and progress display. */
 function ExportDataFields() {
-  const { t } = useI18n();
   const {
     format,
     setFormat,
@@ -272,7 +266,7 @@ function ExportDataFields() {
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.export.rowLimit")}
+          {"Row limit"}
         </label>
         <Input
           disabled={disabled}
@@ -281,24 +275,24 @@ function ExportDataFields() {
               e.target.value === "" ? "" : Number.parseInt(e.target.value, 10)
             )
           }
-          placeholder={t("sql.export.rowLimitPlaceholder")}
+          placeholder={"Optional row limit"}
           type="number"
           value={rowCount}
         />
         <p className="text-muted-foreground text-xs">
-          {t("sql.export.rowLimitHint")}
+          {"Leave empty to export all rows returned by the backend."}
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("sql.export.filterOptional")}
+          {"Filter (optional)"}
         </label>
         <Textarea
           className="h-24 resize-none font-mono"
           disabled={disabled}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder={t("sql.export.filterPlaceholder")}
+          placeholder={"WHERE clause or filter expression"}
           value={filter}
         />
       </div>

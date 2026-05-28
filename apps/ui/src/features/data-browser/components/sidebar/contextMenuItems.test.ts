@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { MessageKey } from "@data-browser/i18n/messages";
 import {
   getCollectionMenuItems,
   getConnectionMenuItems,
@@ -44,7 +43,6 @@ function actionsFor(items: ReturnType<typeof getSchemaMenuItems>): string[] {
 function callbacks(actions: string[]) {
   return {
     onAction: (action: string) => actions.push(action),
-    t: (key: MessageKey) => key,
   };
 }
 

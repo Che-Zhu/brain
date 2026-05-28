@@ -1,7 +1,6 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useCallback } from "react";
 import {
   CreateCollectionProvider,
@@ -52,14 +51,13 @@ export function CreateCollectionModal({
 
 /** Input field for the new collection name. */
 function CreateCollectionFields() {
-  const { t } = useI18n();
   const { collectionName, setCollectionName } = useCreateCollectionCtx();
   const { state, actions } = useModalForm();
 
   return (
     <div className="flex flex-col gap-1.5">
       <label className="font-medium text-foreground text-sm">
-        {t("mongodb.collection.name")}
+        {"Collection name"}
       </label>
       <Input
         autoFocus
@@ -70,7 +68,7 @@ function CreateCollectionFields() {
             actions.submit?.();
           }
         }}
-        placeholder={t("mongodb.collection.namePlaceholder")}
+        placeholder={"Enter collection name"}
         value={collectionName}
       />
     </div>
@@ -79,12 +77,11 @@ function CreateCollectionFields() {
 
 /** Submit button disabled when collection name is empty. */
 function CreateCollectionSubmitButton() {
-  const { t } = useI18n();
   const { collectionName } = useCreateCollectionCtx();
   return (
     <ModalForm.SubmitButton
       disabled={!collectionName}
-      label={t("mongodb.collection.createAction")}
+      label={"Create collection"}
     />
   );
 }

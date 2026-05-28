@@ -12,7 +12,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,7 +31,6 @@ export function DataViewPagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
-  const { t } = useI18n();
   const startRow = (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, total);
   const label = itemLabel ? ` ${itemLabel}` : "";
@@ -42,13 +40,13 @@ export function DataViewPagination({
     <div className="flex items-center justify-between border-border/50 border-t bg-muted/20 px-4 py-3">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground text-sm">
-          {t("common.pagination.range", { startRow, endRow, total, label })}
+          {`${startRow}-${endRow} of ${total}${label}`}
         </span>
       </div>
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
           <span className="whitespace-nowrap text-muted-foreground text-sm">
-            {t("common.pagination.rowsPerPage")}
+            {"Rows per page"}
           </span>
           <Select
             onValueChange={(v) => onPageSizeChange(Number(v))}
@@ -83,7 +81,7 @@ export function DataViewPagination({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>{t("common.pagination.firstPage")}</TooltipContent>
+            <TooltipContent>{"First page"}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -99,14 +97,10 @@ export function DataViewPagination({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>
-              {t("common.pagination.previousPage")}
-            </TooltipContent>
+            <TooltipContent>{"Previous page"}</TooltipContent>
           </Tooltip>
           <div className="mx-2 flex items-center gap-1">
-            <span className="text-muted-foreground text-sm">
-              {t("common.pagination.page")}
-            </span>
+            <span className="text-muted-foreground text-sm">{"Page"}</span>
             <Input
               className="h-7 w-12 px-1 text-center"
               max={safeTotalPages}
@@ -121,7 +115,7 @@ export function DataViewPagination({
               value={currentPage}
             />
             <span className="text-muted-foreground text-sm">
-              {t("common.pagination.of")} {safeTotalPages}
+              {"of"} {safeTotalPages}
             </span>
           </div>
           <Tooltip>
@@ -140,7 +134,7 @@ export function DataViewPagination({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>{t("common.pagination.nextPage")}</TooltipContent>
+            <TooltipContent>{"Next page"}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -156,7 +150,7 @@ export function DataViewPagination({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>{t("common.pagination.lastPage")}</TooltipContent>
+            <TooltipContent>{"Last page"}</TooltipContent>
           </Tooltip>
         </div>
       </div>

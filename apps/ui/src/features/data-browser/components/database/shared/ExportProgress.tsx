@@ -1,7 +1,6 @@
 import { Button } from "@data-browser/components/ui/Button";
 import { DialogClose, DialogFooter } from "@data-browser/components/ui/dialog";
 import { useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { CheckCircle, Download, Loader2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -23,8 +22,6 @@ export function ExportProgress({
   isSuccess,
   statusText,
 }: ExportProgressProps) {
-  const { t } = useI18n();
-
   if (!(isExporting || isSuccess)) {
     return null;
   }
@@ -35,16 +32,14 @@ export function ExportProgress({
         <>
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <span className="text-muted-foreground">
-            {statusText ?? t("common.status.exporting")}
+            {statusText ?? "Exporting..."}
           </span>
         </>
       )}
       {!isExporting && isSuccess && (
         <>
           <CheckCircle className="h-4 w-4 text-success" />
-          <span className="font-medium text-success">
-            {t("common.status.exportComplete")}
-          </span>
+          <span className="font-medium text-success">{"Export complete"}</span>
         </>
       )}
     </div>
@@ -67,7 +62,6 @@ interface ExportFooterProps {
  * Shows "Start Export" when idle, spinner when exporting, "Close" after success.
  */
 export function ExportFooter({ isSuccess, onClick }: ExportFooterProps) {
-  const { t } = useI18n();
   const { state, actions } = useModalForm();
   const handleClick = onClick ?? actions.submit;
 
@@ -75,7 +69,7 @@ export function ExportFooter({ isSuccess, onClick }: ExportFooterProps) {
     return (
       <DialogFooter>
         <DialogClose asChild>
-          <Button variant="outline">{t("common.actions.close")}</Button>
+          <Button variant="outline">{"Close"}</Button>
         </DialogClose>
       </DialogFooter>
     );
@@ -85,7 +79,7 @@ export function ExportFooter({ isSuccess, onClick }: ExportFooterProps) {
     <DialogFooter>
       <DialogClose asChild>
         <Button disabled={state.isSubmitting} type="button" variant="outline">
-          {t("common.actions.cancel")}
+          {"Cancel"}
         </Button>
       </DialogClose>
       <Button
@@ -98,9 +92,7 @@ export function ExportFooter({ isSuccess, onClick }: ExportFooterProps) {
         ) : (
           <Download className="h-4 w-4" />
         )}
-        {state.isSubmitting
-          ? t("common.status.exporting")
-          : t("common.actions.startExport")}
+        {state.isSubmitting ? "Exporting..." : "Start export"}
       </Button>
     </DialogFooter>
   );

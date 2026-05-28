@@ -1,7 +1,6 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { Database } from "lucide-react";
@@ -51,7 +50,6 @@ function CreateDatabaseProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { connections, createDatabase, createTable } = useConnectionStore();
   const [dbName, setDbName] = useState("");
   const [initialCollectionName, setInitialCollectionName] = useState("");
@@ -76,7 +74,7 @@ function CreateDatabaseProvider({
       if (result.success) {
         onSuccess?.();
       } else {
-        throw new Error(result.message ?? t("common.unknownError"));
+        throw new Error(result.message ?? "Unknown error");
       }
       return;
     }
@@ -85,7 +83,7 @@ function CreateDatabaseProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
   }, [
     connection?.type,
@@ -95,7 +93,6 @@ function CreateDatabaseProvider({
     initialCollectionName,
     isMongoConnection,
     onSuccess,
-    t,
   ]);
 
   return (
@@ -109,7 +106,7 @@ function CreateDatabaseProvider({
       }}
     >
       <ModalForm.Provider
-        meta={{ title: t("database.create.title"), icon: Database }}
+        meta={{ title: "Create database", icon: Database }}
         onSubmit={handleSubmit}
       >
         {children}
@@ -124,7 +121,6 @@ function CreateDatabaseProvider({
 
 /** Input field for the new database name. */
 function CreateDatabaseFields() {
-  const { t } = useI18n();
   const {
     dbName,
     setDbName,
@@ -138,12 +134,12 @@ function CreateDatabaseFields() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-foreground text-sm">
-          {t("database.name")}
+          {"Database name"}
         </label>
         <Input
           disabled={state.isSubmitting}
           onChange={(e) => setDbName(e.target.value)}
-          placeholder={t("database.namePlaceholder")}
+          placeholder={"Enter database name"}
           value={dbName}
         />
       </div>
@@ -151,12 +147,12 @@ function CreateDatabaseFields() {
       {isMongoConnection && (
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-foreground text-sm">
-            {t("mongodb.collection.name")}
+            {"Collection name"}
           </label>
           <Input
             disabled={state.isSubmitting}
             onChange={(e) => setInitialCollectionName(e.target.value)}
-            placeholder={t("mongodb.collection.namePlaceholder")}
+            placeholder={"Enter collection name"}
             value={initialCollectionName}
           />
         </div>
@@ -167,15 +163,11 @@ function CreateDatabaseFields() {
 
 /** Submit button disabled when database name is empty. */
 function CreateSubmitButton() {
-  const { t } = useI18n();
   const { dbName, initialCollectionName, isMongoConnection } =
     useCreateDatabaseCtx();
   const isDisabled = !dbName || (isMongoConnection && !initialCollectionName);
   return (
-    <ModalForm.SubmitButton
-      disabled={isDisabled}
-      label={t("database.create.submit")}
-    />
+    <ModalForm.SubmitButton disabled={isDisabled} label={"Create database"} />
   );
 }
 

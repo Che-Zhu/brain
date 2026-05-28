@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@data-browser/components/ui/dialog";
 import { ScrollArea } from "@data-browser/components/ui/scroll-area";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useMemo } from "react";
 import { AddDocumentModal } from "./CollectionView/CollectionView.AddDocumentModal";
 import { CollectionViewDocumentList } from "./CollectionView/CollectionView.DocumentList";
@@ -50,7 +49,6 @@ function CollectionDetailViewContent({
   connectionId,
   objectRef,
 }: CollectionDetailViewProps) {
-  const { t } = useI18n();
   const { state, actions } = useCollectionView();
 
   const previewCommands = buildPreviewCommands(collectionName, state.changes);
@@ -129,7 +127,7 @@ function CollectionDetailViewContent({
       {state.total > 0 && (
         <DataView.Pagination
           currentPage={state.currentPage}
-          itemLabel={t("mongodb.collection.documents")}
+          itemLabel={"documents"}
           loading={state.loading}
           onPageChange={actions.handlePageChange}
           onPageSizeChange={actions.handlePageSizeChange}
@@ -185,11 +183,9 @@ function CollectionDetailViewContent({
           data-testid="mongodb.collection.changes-preview-dialog"
         >
           <DialogHeader>
-            <DialogTitle>{t("mongodb.changes.previewTitle")}</DialogTitle>
+            <DialogTitle>{"Preview document changes"}</DialogTitle>
             <DialogDescription>
-              {t("mongodb.changes.previewDescription", {
-                count: state.pendingChangeCount,
-              })}
+              {`${state.pendingChangeCount} pending document change(s).`}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] rounded-md border bg-muted/20">
@@ -207,29 +203,21 @@ function CollectionDetailViewContent({
       </Dialog>
 
       <ConfirmationModal
-        confirmText={t("common.actions.confirm")}
+        confirmText={"Confirm"}
         isOpen={state.showSubmitModal}
-        message={t("mongodb.changes.submitConfirmMessage", {
-          updates: summary.updates,
-          inserts: summary.inserts,
-          deletes: summary.deletes,
-        })}
+        message={`Submit document changes? Updates: ${summary.updates}, inserts: ${summary.inserts}, deletes: ${summary.deletes}.`}
         onClose={() => actions.setShowSubmitModal(false)}
         onConfirm={actions.submitChanges}
-        title={t("mongodb.changes.submitConfirmTitle", {
-          count: state.pendingChangeCount,
-        })}
+        title={`Submit ${state.pendingChangeCount} document change(s)?`}
       />
 
       <ConfirmationModal
-        confirmText={t("common.actions.discard")}
+        confirmText={"Discard"}
         isOpen={state.showDiscardModal}
-        message={t("mongodb.changes.discardMessage", {
-          count: state.pendingChangeCount,
-        })}
+        message={`Discard ${state.pendingChangeCount} pending document change(s)?`}
         onClose={() => actions.setShowDiscardModal(false)}
         onConfirm={actions.confirmDiscardAndContinue}
-        title={t("mongodb.changes.discardTitle")}
+        title={"Discard changes?"}
       />
 
       {state.alert && (

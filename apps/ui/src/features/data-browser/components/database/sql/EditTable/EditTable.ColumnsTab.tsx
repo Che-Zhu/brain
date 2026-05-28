@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@data-browser/components/ui/select";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { Plus, X } from "lucide-react";
 import { useEditTable } from "./EditTableProvider";
@@ -45,7 +44,6 @@ const COLUMN_TYPES = [
  * Consumes `useEditTable()` for all state and actions.
  */
 export function EditTableColumnsTab() {
-  const { t } = useI18n();
   const { state, actions } = useEditTable();
   const { columns, isExecuting } = state;
   const { addColumn, updateColumn, toggleColumnDeletion } = actions;
@@ -60,21 +58,17 @@ export function EditTableColumnsTab() {
           variant="link"
         >
           <Plus className="h-3 w-3" />
-          {t("sql.editTable.columns.addField")}
+          {"Add field"}
         </Button>
       </div>
       <div className="rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.columns.name")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.columns.type")}
-              </th>
+              <th className="px-3 py-2 text-left font-medium">{"Name"}</th>
+              <th className="px-3 py-2 text-left font-medium">{"Type"}</th>
               <th className="w-14 px-3 py-2 text-center font-medium">
-                {t("sql.editTable.columns.null")}
+                {"Null"}
               </th>
               <th className="w-8" />
             </tr>
@@ -100,9 +94,7 @@ export function EditTableColumnsTab() {
                     onChange={(e) =>
                       updateColumn(col.id, "name", e.target.value)
                     }
-                    placeholder={t(
-                      "sql.editTable.columns.columnNamePlaceholder"
-                    )}
+                    placeholder={"Column name"}
                     readOnly={!col.isNew}
                     value={col.name}
                   />

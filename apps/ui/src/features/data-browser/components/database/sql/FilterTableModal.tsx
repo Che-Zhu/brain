@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@data-browser/components/ui/select";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { Filter, Plus, Trash2 } from "lucide-react";
 import { createContext, type ReactNode, use, useState } from "react";
 import type { FilterCondition } from "./TableView/types";
@@ -148,7 +147,6 @@ function FilterTableProvider({
 // ---------------------------------------------------------------------------
 
 function ColumnSelector() {
-  const { t } = useI18n();
   const { columns, selectedColumns, toggleColumn, toggleAllColumns } =
     useFilterTable();
 
@@ -156,7 +154,7 @@ function ColumnSelector() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-foreground text-sm">
-          {t("sql.filter.visibleColumns")}
+          {"Visible columns"}
         </h3>
         <Button
           className="h-6 p-0 text-highlight text-sm"
@@ -165,8 +163,8 @@ function ColumnSelector() {
           variant="link"
         >
           {selectedColumns.size === columns.length
-            ? t("sql.filter.deselectAll")
-            : t("sql.filter.selectAll")}
+            ? "Deselect all"
+            : "Select all"}
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -192,7 +190,6 @@ function ColumnSelector() {
 }
 
 function ConditionList() {
-  const { t } = useI18n();
   const {
     columns,
     conditions,
@@ -204,12 +201,10 @@ function ConditionList() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-foreground text-sm">
-          {t("sql.filter.conditions")}
-        </h3>
+        <h3 className="font-medium text-foreground text-sm">{"Conditions"}</h3>
         <Button className="h-9 gap-2" onClick={addCondition} size="sm">
           <Plus className="h-4 w-4" />
-          {t("sql.filter.addCondition")}
+          {"Add condition"}
         </Button>
       </div>
 
@@ -267,7 +262,7 @@ function ConditionList() {
                 onChange={(e) =>
                   updateCondition(condition.id, "value", e.target.value)
                 }
-                placeholder={t("sql.filter.valuePlaceholder")}
+                placeholder={"Value"}
                 value={condition.value}
               />
 
@@ -294,7 +289,6 @@ function ApplyButton({
   onApply: (cols: string[], conditions: FilterCondition[]) => void;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
   const { selectedColumns, conditions } = useFilterTable();
 
   const handleApply = () => {
@@ -307,7 +301,7 @@ function ApplyButton({
       className="bg-primary text-primary-foreground hover:bg-primary/90"
       onClick={handleApply}
     >
-      {t("sql.filter.apply")}
+      {"Apply filter"}
     </Button>
   );
 }
@@ -333,17 +327,13 @@ export function FilterTableModal({
   initialSelectedColumns,
   initialConditions,
 }: FilterTableModalProps) {
-  const { t } = useI18n();
-
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
         className="flex max-h-[85vh] max-w-2xl flex-col"
         showCloseButton={false}
       >
-        <ModalForm.Provider
-          meta={{ title: t("sql.filter.title"), icon: Filter }}
-        >
+        <ModalForm.Provider meta={{ title: "Filter table", icon: Filter }}>
           <FilterTableProvider
             columns={columns}
             initialConditions={initialConditions}

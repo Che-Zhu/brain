@@ -6,7 +6,6 @@ import type {
   AccessObjectRef,
   AccessRowsSort,
 } from "@data-browser/api/access-types";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import type { TableData } from "@data-browser/utils/graphql-transforms";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,7 +45,6 @@ export function useDataQuery(params: UseDataQueryParams): {
   state: DataQueryState;
   actions: DataQueryActions;
 } {
-  const { t } = useI18n();
   const {
     connectionId,
     currentPage,
@@ -72,7 +70,7 @@ export function useDataQuery(params: UseDataQueryParams): {
     async (overridePageOffset?: number) => {
       const conn = connections.find((c) => c.id === connectionId);
       if (!conn?.runtime) {
-        setError(t("common.error.connectionNotFound"));
+        setError("Connection not found");
         setLoading(false);
         return;
       }
@@ -117,7 +115,7 @@ export function useDataQuery(params: UseDataQueryParams): {
         if (thisRequestId !== latestRequestIdRef.current) {
           return;
         }
-        setError(err.message || t("sql.table.errorFetchData"));
+        setError(err.message || "Failed to fetch table data");
       } finally {
         if (thisRequestId === latestRequestIdRef.current) {
           setLoading(false);
@@ -134,7 +132,6 @@ export function useDataQuery(params: UseDataQueryParams): {
       objectRef,
       visibleColumnsCount,
       onInitVisibleColumns,
-      t,
     ]
   );
 

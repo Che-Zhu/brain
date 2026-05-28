@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@data-browser/components/ui/dialog";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useDataBrowserRuntime } from "@data-browser/runtime";
 import { downloadBlob } from "@data-browser/utils/export-utils";
 import { Download, FileText, Loader2 } from "lucide-react";
@@ -37,7 +36,6 @@ export function SingleObjectExportModal({
   title,
 }: SingleObjectExportModalProps) {
   const runtime = useDataBrowserRuntime();
-  const { t } = useI18n();
   const [format, setFormat] = useState<AccessExportFormat>("csv");
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +49,7 @@ export function SingleObjectExportModal({
       downloadBlob(result.blob, result.filename);
       onOpenChange(false);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t("common.error.unknown")
-      );
+      setError(caught instanceof Error ? caught.message : "Unknown error");
     } finally {
       setIsExporting(false);
     }
@@ -63,7 +59,7 @@ export function SingleObjectExportModal({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{title ?? t("common.actions.export")}</DialogTitle>
+          <DialogTitle>{title ?? "Export"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -98,7 +94,7 @@ export function SingleObjectExportModal({
             ) : (
               <Download className="h-4 w-4" />
             )}
-            {t("common.actions.export")}
+            {"Export"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,7 +1,6 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useCallback } from "react";
 import {
   DropCollectionProvider,
@@ -53,16 +52,15 @@ export function DropCollectionModal({
 
 /** Warning banner explaining the destructive action. */
 function DropCollectionWarning() {
-  const { t } = useI18n();
   const { collectionName } = useDropCollectionCtx();
 
   return (
     <div className="rounded-lg border border-destructive/10 bg-destructive/5 p-4 text-sm">
       <p className="font-medium text-destructive">
-        {t("mongodb.collection.warningTitle")}
+        {"This action cannot be undone"}
       </p>
       <p className="mt-1 text-muted-foreground">
-        {t("mongodb.collection.warningMessage", { collectionName })}
+        {`Collection "${collectionName}" will be permanently dropped.`}
       </p>
     </div>
   );
@@ -70,7 +68,6 @@ function DropCollectionWarning() {
 
 /** Confirmation input — user must type the collection name to enable drop. */
 function DropCollectionConfirmation() {
-  const { t } = useI18n();
   const { confirmName, setConfirmName, collectionName } =
     useDropCollectionCtx();
   const { state } = useModalForm();
@@ -78,7 +75,7 @@ function DropCollectionConfirmation() {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="font-medium text-foreground text-sm">
-        {t("mongodb.collection.confirmName")}
+        {"Type the collection name to confirm."}
       </label>
       <Input
         disabled={state.isSubmitting}
@@ -92,12 +89,8 @@ function DropCollectionConfirmation() {
 
 /** Submit button disabled until confirmation name matches. */
 function DropCollectionSubmitButton() {
-  const { t } = useI18n();
   const { canDrop } = useDropCollectionCtx();
   return (
-    <ModalForm.SubmitButton
-      disabled={!canDrop}
-      label={t("mongodb.collection.drop")}
-    />
+    <ModalForm.SubmitButton disabled={!canDrop} label={"Drop collection"} />
   );
 }

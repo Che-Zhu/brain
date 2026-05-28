@@ -1,6 +1,5 @@
 import { DATA_BROWSER_CAPABILITIES } from "@data-browser/capabilities";
 import type { ContextMenuItem } from "@data-browser/components/ui/ContextMenu";
-import type { MessageKey } from "@data-browser/i18n/messages";
 import { Download, RefreshCw } from "lucide-react";
 import React from "react";
 
@@ -8,7 +7,6 @@ type ConnectionType = "MYSQL" | "POSTGRES" | "MONGODB" | "REDIS" | "CLICKHOUSE";
 
 interface MenuCallbacks {
   onAction: (action: string) => void;
-  t: (key: MessageKey) => string;
 }
 
 interface SystemObjectsState {
@@ -16,13 +14,10 @@ interface SystemObjectsState {
   systemSchemas: string[];
 }
 
-function refreshItem(
-  onAction: (action: string) => void,
-  t: (key: MessageKey) => string
-): ContextMenuItem {
+function refreshItem(onAction: (action: string) => void): ContextMenuItem {
   return {
     icon: React.createElement(RefreshCw, { className: "h-4 w-4" }),
-    label: t("sidebar.menu.refresh"),
+    label: "Refresh",
     onClick: () => onAction("refresh"),
   };
 }
@@ -30,8 +25,7 @@ function refreshItem(
 function exportItem(
   action: string,
   onAction: (action: string) => void,
-  t: (key: MessageKey) => string,
-  labelKey: MessageKey
+  label: string
 ): ContextMenuItem[] {
   if (!DATA_BROWSER_CAPABILITIES.actions.singleObjectExport) {
     return [];
@@ -40,7 +34,7 @@ function exportItem(
   return [
     {
       icon: React.createElement(Download, { className: "h-4 w-4" }),
-      label: t(labelKey),
+      label,
       onClick: () => onAction(action),
     },
     { separator: true },
@@ -52,8 +46,8 @@ export function getConnectionMenuItems(
   callbacks: MenuCallbacks,
   _systemObjectsState?: SystemObjectsState
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getDatabaseMenuItems(
@@ -61,78 +55,73 @@ export function getDatabaseMenuItems(
   callbacks: MenuCallbacks,
   _systemObjectsState?: SystemObjectsState
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getSchemaMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getTableFolderMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getViewFolderMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getTableMenuItems(
   _connectionType: ConnectionType,
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
+  const { onAction } = callbacks;
   return [
-    ...exportItem("export_data", onAction, t, "sidebar.menu.exportData"),
-    refreshItem(onAction, t),
+    ...exportItem("export_data", onAction, "Export data"),
+    refreshItem(onAction),
   ];
 }
 
 export function getViewMenuItems(callbacks: MenuCallbacks): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
+  const { onAction } = callbacks;
   return [
-    ...exportItem("export_data", onAction, t, "sidebar.menu.exportData"),
-    refreshItem(onAction, t),
+    ...exportItem("export_data", onAction, "Export data"),
+    refreshItem(onAction),
   ];
 }
 
 export function getCollectionMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
+  const { onAction } = callbacks;
   return [
-    ...exportItem(
-      "export_collection",
-      onAction,
-      t,
-      "sidebar.menu.exportCollection"
-    ),
-    refreshItem(onAction, t),
+    ...exportItem("export_collection", onAction, "Export collection"),
+    refreshItem(onAction),
   ];
 }
 
 export function getRedisKeysFolderMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
-  return [refreshItem(onAction, t)];
+  const { onAction } = callbacks;
+  return [refreshItem(onAction)];
 }
 
 export function getRedisKeyMenuItems(
   callbacks: MenuCallbacks
 ): ContextMenuItem[] {
-  const { onAction, t } = callbacks;
+  const { onAction } = callbacks;
   return [
-    ...exportItem("export_redis_key", onAction, t, "sidebar.menu.exportKey"),
-    refreshItem(onAction, t),
+    ...exportItem("export_redis_key", onAction, "Export key"),
+    refreshItem(onAction),
   ];
 }

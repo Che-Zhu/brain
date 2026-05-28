@@ -1,5 +1,4 @@
 import { Input } from "@data-browser/components/ui/Input";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { AlertTriangle } from "lucide-react";
 import React from "react";
 import {
@@ -36,11 +35,10 @@ export function ConfirmationModal({
   verificationText,
   verificationLabel,
 }: ConfirmationModalProps) {
-  const { t } = useI18n();
   const [inputValue, setInputValue] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
-  const resolvedCancelText = cancelText ?? t("common.actions.cancel");
-  const resolvedConfirmText = confirmText ?? t("common.actions.confirm");
+  const resolvedCancelText = cancelText ?? "Cancel";
+  const resolvedConfirmText = confirmText ?? "Confirm";
 
   React.useEffect(() => {
     if (isOpen) {
@@ -93,10 +91,7 @@ export function ConfirmationModal({
           {verificationText && (
             <div className="flex flex-col gap-2">
               <label className="font-medium text-foreground text-sm">
-                {verificationLabel ??
-                  t("common.confirmation.typeToConfirm", {
-                    value: verificationText,
-                  })}
+                {verificationLabel ?? `Type ${verificationText} to confirm.`}
               </label>
               <Input
                 className="font-mono"
@@ -123,7 +118,7 @@ export function ConfirmationModal({
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                {t("common.status.processing")}
+                {"Processing..."}
               </div>
             ) : (
               resolvedConfirmText

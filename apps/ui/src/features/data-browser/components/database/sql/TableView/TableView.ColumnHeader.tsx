@@ -8,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@data-browser/components/ui/dropdown-menu";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { ArrowDownAZ, ArrowUpAZ, MoreHorizontal, X } from "lucide-react";
 import { simplifyColumnType, useTableView } from "./TableViewProvider";
@@ -20,7 +19,6 @@ interface ColumnHeaderProps {
 
 /** Renders a single column header `<th>` with type badge, sort indicator, menu dropdown, and resize handle. */
 export function TableViewColumnHeader({ column, index }: ColumnHeaderProps) {
-  const { t } = useI18n();
   const { state, actions } = useTableView();
   const width = state.columnWidths[column] || 120;
 
@@ -94,7 +92,7 @@ export function TableViewColumnHeader({ column, index }: ColumnHeaderProps) {
             className="w-40"
           >
             <DropdownMenuLabel className="text-[10px] text-muted-foreground">
-              {t("sql.table.sortActions")}
+              {"Sort actions"}
             </DropdownMenuLabel>
             <DropdownMenuItem
               className={cn(
@@ -105,7 +103,7 @@ export function TableViewColumnHeader({ column, index }: ColumnHeaderProps) {
               onSelect={() => actions.handleSort(column, "asc")}
             >
               <ArrowUpAZ className="h-3.5 w-3.5" />
-              {t("sql.table.sortAsc")}
+              {"Sort ascending"}
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
@@ -116,14 +114,14 @@ export function TableViewColumnHeader({ column, index }: ColumnHeaderProps) {
               onSelect={() => actions.handleSort(column, "desc")}
             >
               <ArrowDownAZ className="h-3.5 w-3.5" />
-              {t("sql.table.sortDesc")}
+              {"Sort descending"}
             </DropdownMenuItem>
             {state.sortColumn === column && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => actions.clearSort()}>
                   <X className="h-3.5 w-3.5" />
-                  {t("sql.table.clearSort")}
+                  {"Clear sort"}
                 </DropdownMenuItem>
               </>
             )}

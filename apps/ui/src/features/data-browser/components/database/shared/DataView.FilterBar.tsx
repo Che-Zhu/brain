@@ -1,5 +1,4 @@
 import { Button } from "@data-browser/components/ui/Button";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { X } from "lucide-react";
 import type { FilterChip } from "./types";
 
@@ -11,8 +10,6 @@ export function DataViewFilterBar({
   filters: FilterChip[];
   onClearAll: () => void;
 }) {
-  const { t } = useI18n();
-
   if (filters.length === 0) {
     return null;
   }
@@ -20,7 +17,7 @@ export function DataViewFilterBar({
   return (
     <div className="slide-in-from-top-2 flex animate-in flex-wrap items-center gap-2 border-border/50 border-b bg-muted/30 px-6 py-2 duration-200">
       <span className="mr-2 font-medium text-muted-foreground text-xs">
-        {t("common.filter.filteredBy")}
+        {"Filtered by"}
       </span>
       {filters.map((chip) => (
         <div
@@ -43,7 +40,7 @@ export function DataViewFilterBar({
         size="sm"
         variant="ghost"
       >
-        {t("common.actions.clearAll")}
+        {"Clear all"}
       </Button>
     </div>
   );

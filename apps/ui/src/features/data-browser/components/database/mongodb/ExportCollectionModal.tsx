@@ -9,7 +9,6 @@ import {
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import { downloadBlob } from "@data-browser/utils/export-utils";
@@ -99,12 +98,10 @@ function ExportCollectionProvider({
   collectionName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
-
   return (
     <ModalForm.Provider
       meta={{
-        title: t("mongodb.export.title"),
+        title: "Export collection",
         description: collectionName,
         icon: Download,
       }}
@@ -136,7 +133,6 @@ function ExportCollectionBridge({
   collectionName: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { connections } = useConnectionStore();
   const [format, setFormat] = useState<CollectionExportFormat>("json");
   const [filter, setFilter] = useState("");
@@ -152,7 +148,7 @@ function ExportCollectionBridge({
     try {
       const connection = connections.find((c) => c.id === connectionId);
       if (!connection) {
-        throw new Error(t("common.error.connectionNotFound"));
+        throw new Error("Connection not found");
       }
 
       const graphqlSchema = resolveSchemaParam(connection.type, databaseName);
@@ -175,10 +171,7 @@ function ExportCollectionBridge({
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(
-          text ||
-            t("mongodb.export.failedWithStatus", { status: response.status })
-        );
+        throw new Error(text || `Export failed with status ${response.status}`);
       }
 
       const disposition = response.headers.get("Content-Disposition");
@@ -194,8 +187,9 @@ function ExportCollectionBridge({
     } catch (e: any) {
       actions.setAlert({
         type: "error",
-        title: t("mongodb.export.failed"),
-        message: e.message || t("mongodb.export.errorOccurred"),
+        title: "Export failed",
+        message:
+          e.message || "An error occurred while exporting the collection.",
       });
     } finally {
       actions.setSubmitting(false);
@@ -209,7 +203,6 @@ function ExportCollectionBridge({
     filter,
     format,
     limit,
-    t,
   ]);
 
   return (
@@ -236,7 +229,6 @@ function ExportCollectionBridge({
 
 /** Format selector, filter query, row limit, and progress display. */
 function ExportCollectionFields() {
-  const { t } = useI18n();
   const { format, setFormat, filter, setFilter, limit, setLimit, isSuccess } =
     useExportCollectionCtx();
   const { state } = useModalForm();
@@ -253,23 +245,23 @@ function ExportCollectionFields() {
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("mongodb.export.filterQuery")}
+          {"Filter query"}
         </label>
         <Input
           className="font-mono text-sm"
           disabled={disabled}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder={t("mongodb.export.filterPlaceholder")}
+          placeholder={"{ }"}
           value={filter}
         />
         <p className="text-muted-foreground text-xs">
-          {t("mongodb.export.filterHint")}
+          {'Use a MongoDB query filter, for example { status: "active" }.'}
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-foreground text-sm">
-          {t("mongodb.export.limitRows")}
+          {"Limit rows"}
         </label>
         <Input
           className="font-mono text-sm"
@@ -278,7 +270,7 @@ function ExportCollectionFields() {
           onChange={(e) =>
             setLimit(e.target.value ? Number.parseInt(e.target.value, 10) : "")
           }
-          placeholder={t("mongodb.export.limitPlaceholder")}
+          placeholder={"Optional row limit"}
           type="number"
           value={limit}
         />

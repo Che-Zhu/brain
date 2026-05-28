@@ -6,7 +6,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@data-browser/components/ui/tooltip";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import {
   type Tab,
@@ -118,7 +117,6 @@ export function TabBar() {
     closeOtherTabs,
     closeAllTabs,
   } = useTabStore();
-  const { t } = useI18n();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -169,7 +167,7 @@ export function TabBar() {
       <div className="flex items-center pr-2">
         {tabs.map((tab) => (
           <TabItem
-            closeTitle={t("layout.tab.close")}
+            closeTitle={"Close tab"}
             isActive={tab.id === activeTabId}
             key={tab.id}
             onActivate={() => setActiveTab(tab.id)}
@@ -184,18 +182,18 @@ export function TabBar() {
         <ContextMenu
           items={[
             {
-              label: t("layout.tab.close"),
+              label: "Close tab",
               onClick: () => handleMenuAction("close"),
               icon: <X className="h-4 w-4" />,
             },
             {
-              label: t("layout.tab.closeOthers"),
+              label: "Close other tabs",
               onClick: () => handleMenuAction("closeOthers"),
               icon: <SplitSquareHorizontal className="h-4 w-4" />,
             },
             { separator: true } as const,
             {
-              label: t("layout.tab.closeAll"),
+              label: "Close all tabs",
               onClick: () => handleMenuAction("closeAll"),
               icon: <X className="h-4 w-4" />,
             },

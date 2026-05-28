@@ -4,7 +4,6 @@ import {
   useRawExecuteLazyQuery,
   useUpdateStorageUnitMutation,
 } from "@data-browser/generated/graphql";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { resolveSchemaParam } from "@data-browser/utils/database-features";
 import {
@@ -395,7 +394,6 @@ export function useDocumentChangesetManager({
   refresh,
   showAlert,
 }: UseDocumentChangesetManagerParams) {
-  const { t } = useI18n();
   const { connections } = useConnectionStore();
   const [deleteRowMutation] = useDeleteRowMutation();
   const [updateStorageUnitMutation] = useUpdateStorageUnitMutation();
@@ -440,11 +438,7 @@ export function useDocumentChangesetManager({
     try {
       const newDoc = parseMongoDocumentInput(state.addContent);
       if (Object.keys(newDoc).length === 0) {
-        showAlert(
-          t("common.alert.error"),
-          t("mongodb.error.emptyDocument"),
-          "error"
-        );
+        showAlert("Error", "Document cannot be empty.", "error");
         return;
       }
 
@@ -452,12 +446,12 @@ export function useDocumentChangesetManager({
       dispatch({ type: "stage-add", rowKey, document: newDoc });
     } catch (e: any) {
       showAlert(
-        t("common.alert.error"),
-        t("mongodb.alert.invalidJsonAdd", { error: e.message }),
+        "Error",
+        `Invalid JSON for new document: ${e.message}`,
         "error"
       );
     }
-  }, [showAlert, state.addContent, state.newRowCounter, t]);
+  }, [showAlert, state.addContent, state.newRowCounter]);
 
   const setShowAddModal = useCallback(
     (open: boolean) => {
@@ -549,8 +543,8 @@ export function useDocumentChangesetManager({
       });
     } catch (e: any) {
       showAlert(
-        t("common.alert.error"),
-        t("mongodb.alert.invalidJsonUpdate", { error: e.message }),
+        "Error",
+        `Invalid JSON for updated document: ${e.message}`,
         "error"
       );
     }
@@ -561,7 +555,6 @@ export function useDocumentChangesetManager({
     state.changes,
     state.editContent,
     state.editingRowKey,
-    t,
   ]);
 
   const cancelEdit = useCallback(() => {
@@ -668,7 +661,7 @@ export function useDocumentChangesetManager({
 
           if (errors?.length || !result?.DeleteRow.Status) {
             throw new Error(
-              errors?.[0]?.message ?? t("mongodb.alert.deleteFailed")
+              errors?.[0]?.message ?? "Failed to delete document"
             );
           }
         } else if (change.type === "update") {
@@ -694,7 +687,7 @@ export function useDocumentChangesetManager({
 
           if (errors?.length || !result?.UpdateStorageUnit.Status) {
             throw new Error(
-              errors?.[0]?.message ?? t("mongodb.alert.updateFailed")
+              errors?.[0]?.message ?? "Failed to update document"
             );
           }
         } else {
@@ -709,7 +702,7 @@ export function useDocumentChangesetManager({
           });
 
           if (error || !result?.RawExecute) {
-            throw new Error(error?.message ?? t("mongodb.alert.addFailed"));
+            throw new Error(error?.message ?? "Failed to add document");
           }
         }
 
@@ -725,8 +718,8 @@ export function useDocumentChangesetManager({
       dispatch({ type: "discard-all" });
       refresh();
       showAlert(
-        t("common.alert.success"),
-        t("mongodb.changes.submitSuccess"),
+        "Success",
+        "Document changes submitted successfully.",
         "success"
       );
       return;
@@ -734,11 +727,9 @@ export function useDocumentChangesetManager({
 
     dispatch({ type: "prune-successes", rowKeys: successfulRowKeys });
     refresh();
-    const summary = t("mongodb.changes.submitPartialFailure", {
-      count: failedMessages.length,
-    });
+    const summary = `${failedMessages.length} document change(s) failed.`;
     const details = failedMessages.join("\n");
-    showAlert(t("common.alert.error"), `${summary}\n\n${details}`, "error");
+    showAlert("Error", `${summary}\n\n${details}`, "error");
   }, [
     collectionName,
     connectionId,
@@ -749,7 +740,6 @@ export function useDocumentChangesetManager({
     refresh,
     showAlert,
     state.changes,
-    t,
     updateStorageUnitMutation,
   ]);
 

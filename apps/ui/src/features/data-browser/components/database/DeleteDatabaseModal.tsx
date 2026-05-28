@@ -1,7 +1,6 @@
 import { Dialog, DialogContent } from "@data-browser/components/ui/dialog";
 import { Input } from "@data-browser/components/ui/Input";
 import { ModalForm, useModalForm } from "@data-browser/components/ui/ModalForm";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -49,7 +48,6 @@ function DeleteDatabaseProvider({
   onSuccess?: () => void;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   const { deleteDatabase } = useConnectionStore();
   const [confirmName, setConfirmName] = useState("");
   const canDelete = confirmName === databaseName;
@@ -62,9 +60,9 @@ function DeleteDatabaseProvider({
     if (result.success) {
       onSuccess?.();
     } else {
-      throw new Error(result.message ?? t("common.unknownError"));
+      throw new Error(result.message ?? "Unknown error");
     }
-  }, [canDelete, databaseName, deleteDatabase, onSuccess, t]);
+  }, [canDelete, databaseName, deleteDatabase, onSuccess]);
 
   return (
     <DeleteDatabaseCtx
@@ -72,7 +70,7 @@ function DeleteDatabaseProvider({
     >
       <ModalForm.Provider
         meta={{
-          title: t("database.delete.title"),
+          title: "Delete database",
           icon: AlertTriangle,
           isDestructive: true,
         }}
@@ -90,16 +88,15 @@ function DeleteDatabaseProvider({
 
 /** Warning banner explaining the destructive action. */
 function DeleteDatabaseWarning() {
-  const { t } = useI18n();
   const { databaseName } = useDeleteDatabaseCtx();
 
   return (
     <div className="rounded-lg border border-destructive/10 bg-destructive/5 p-4 text-sm">
       <p className="font-medium text-destructive">
-        {t("database.delete.warningTitle")}
+        {"This action cannot be undone"}
       </p>
       <p className="mt-1 text-muted-foreground">
-        {t("database.delete.warningMessage", { databaseName })}
+        {`Database "${databaseName}" will be permanently deleted.`}
       </p>
     </div>
   );
@@ -107,14 +104,13 @@ function DeleteDatabaseWarning() {
 
 /** Confirmation input — user must type the database name to enable deletion. */
 function DeleteDatabaseConfirmation() {
-  const { t } = useI18n();
   const { confirmName, setConfirmName, databaseName } = useDeleteDatabaseCtx();
   const { state } = useModalForm();
 
   return (
     <div className="flex flex-col gap-1.5">
       <label className="font-medium text-foreground text-sm">
-        {t("database.delete.confirmName")}
+        {"Type the database name to confirm."}
       </label>
       <Input
         disabled={state.isSubmitting}
@@ -128,13 +124,9 @@ function DeleteDatabaseConfirmation() {
 
 /** Submit button disabled until confirmation name matches. */
 function DeleteSubmitButton() {
-  const { t } = useI18n();
   const { canDelete } = useDeleteDatabaseCtx();
   return (
-    <ModalForm.SubmitButton
-      disabled={!canDelete}
-      label={t("database.delete.submit")}
-    />
+    <ModalForm.SubmitButton disabled={!canDelete} label={"Delete database"} />
   );
 }
 

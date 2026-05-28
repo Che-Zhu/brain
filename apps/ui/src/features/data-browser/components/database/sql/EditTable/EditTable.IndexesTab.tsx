@@ -2,7 +2,6 @@ import { Button } from "@data-browser/components/ui/Button";
 import { Checkbox } from "@data-browser/components/ui/checkbox";
 import { Input } from "@data-browser/components/ui/Input";
 import { MultiSelect } from "@data-browser/components/ui/MultiSelect";
-import { useI18n } from "@data-browser/i18n/useI18n";
 import { cn } from "@data-browser/lib/utils";
 import { Plus, X } from "lucide-react";
 import { useEditTable } from "./EditTableProvider";
@@ -13,7 +12,6 @@ import { useEditTable } from "./EditTableProvider";
  * Consumes `useEditTable()` for all state and actions.
  */
 export function EditTableIndexesTab() {
-  const { t } = useI18n();
   const { state, actions } = useEditTable();
   const { indexes, columnNames, isExecuting } = state;
   const { addIndex, updateIndex, toggleIndexDeletion } = actions;
@@ -28,21 +26,17 @@ export function EditTableIndexesTab() {
           variant="link"
         >
           <Plus className="h-3 w-3" />
-          {t("sql.editTable.indexes.addIndex")}
+          {"Add index"}
         </Button>
       </div>
       <div className="rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.indexes.name")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium">
-                {t("sql.editTable.indexes.columns")}
-              </th>
+              <th className="px-3 py-2 text-left font-medium">{"Name"}</th>
+              <th className="px-3 py-2 text-left font-medium">{"Columns"}</th>
               <th className="w-16 px-3 py-2 text-center font-medium">
-                {t("sql.editTable.indexes.unique")}
+                {"Unique"}
               </th>
               <th className="w-8" />
             </tr>
@@ -54,7 +48,7 @@ export function EditTableIndexesTab() {
                   className="p-8 text-center text-muted-foreground"
                   colSpan={4}
                 >
-                  {t("sql.editTable.indexes.empty")}
+                  {"No indexes"}
                 </td>
               </tr>
             ) : (
@@ -78,7 +72,7 @@ export function EditTableIndexesTab() {
                       onChange={(e) =>
                         updateIndex(idx.id, "name", e.target.value)
                       }
-                      placeholder={t("sql.editTable.indexes.namePlaceholder")}
+                      placeholder={"Index name"}
                       value={idx.name}
                     />
                   </td>
@@ -94,9 +88,7 @@ export function EditTableIndexesTab() {
                         updateIndex(idx.id, "columns", newCols)
                       }
                       options={columnNames}
-                      placeholder={t(
-                        "sql.editTable.indexes.columnsPlaceholder"
-                      )}
+                      placeholder={"column1, column2"}
                       selected={idx.columns}
                     />
                   </td>
