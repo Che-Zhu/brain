@@ -366,7 +366,7 @@ export function RedisKeyDetailView({
           data-qa-state={loading ? "loading" : "ready"}
           data-testid="redis.key.toolbar"
         >
-          <div className="flex items-center">
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -388,20 +388,23 @@ export function RedisKeyDetailView({
               </TooltipTrigger>
               <TooltipContent>{"Refresh"}</TooltipContent>
             </Tooltip>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              className="min-w-[86px] gap-2.5 rounded-lg"
-              data-qa-action="export"
-              data-qa-module="redis"
-              data-qa-object="key-data"
-              data-testid="redis.key.export-button"
-              onClick={() => setShowExport(true)}
-            >
-              <Download className="h-4 w-4" />
-              {"Export"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label="Export"
+                  data-qa-action="export"
+                  data-qa-module="redis"
+                  data-qa-object="key-data"
+                  data-testid="redis.key.export-button"
+                  onClick={() => setShowExport(true)}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{"Export"}</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

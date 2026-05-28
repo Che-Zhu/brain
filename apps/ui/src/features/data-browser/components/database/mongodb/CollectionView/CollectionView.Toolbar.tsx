@@ -34,7 +34,7 @@ export function CollectionViewToolbar({
       }
       data-testid="mongodb.collection.toolbar"
     >
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -56,19 +56,23 @@ export function CollectionViewToolbar({
           </TooltipTrigger>
           <TooltipContent>{"Refresh"}</TooltipContent>
         </Tooltip>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          className="min-w-[86px] gap-2.5 rounded-lg"
-          data-qa-action="export"
-          data-qa-module="mongodb"
-          data-qa-object="collection-data"
-          data-testid="mongodb.collection.export-button"
-          onClick={() => actions.setShowExportModal(true)}
-        >
-          <Download className="h-4 w-4" />
-          {"Export"}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              aria-label="Export"
+              data-qa-action="export"
+              data-qa-module="mongodb"
+              data-qa-object="collection-data"
+              data-testid="mongodb.collection.export-button"
+              onClick={() => actions.setShowExportModal(true)}
+              size="icon"
+              variant="ghost"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{"Export"}</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
