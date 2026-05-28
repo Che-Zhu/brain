@@ -1,5 +1,8 @@
 "use client";
 
+import { MainLayout } from "@data-browser/components/layout/MainLayout";
+import { useConnectionStore } from "@data-browser/stores/useConnectionStore";
+import { useEffect } from "react";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { isDataBrowserEngineVisible } from "./capabilities";
 import { useI18n } from "./i18n/useI18n";
@@ -17,6 +20,15 @@ function DataBrowserPaneBody() {
   const runtime = useDataBrowserRuntime();
   const { t } = useI18n();
   const engineVisible = isDataBrowserEngineVisible(runtime.engine);
+  const initializeRuntimeConnection = useConnectionStore(
+    (state) => state.initializeRuntimeConnection
+  );
+
+  useEffect(() => {
+    if (engineVisible) {
+      initializeRuntimeConnection(runtime);
+    }
+  }, [engineVisible, initializeRuntimeConnection, runtime]);
 
   if (!engineVisible) {
     return (
@@ -31,14 +43,7 @@ function DataBrowserPaneBody() {
     );
   }
 
-  return (
-    <div data-browser-empty-state>
-      <div data-browser-empty-state-card>
-        <h3 data-browser-empty-state-title>{t("browser.placeholder.title")}</h3>
-        <p data-browser-empty-state-body>{t("browser.placeholder.body")}</p>
-      </div>
-    </div>
-  );
+  return <MainLayout />;
 }
 
 export function DataBrowserPane({
@@ -54,7 +59,10 @@ export function DataBrowserPane({
       projectUid={projectUid}
       selectedDatabaseData={selectedDatabaseData}
     >
-      <div className="data-browser-theme h-full min-h-0" data-browser-shell>
+      <div
+        className="data-browser-theme flex h-full min-h-0 w-full overflow-hidden bg-background"
+        data-browser-shell
+      >
         <DataBrowserPaneBody />
       </div>
     </DataBrowserRuntimeProvider>

@@ -8,3 +8,4 @@ export const dataBrowserMessages = {
 } as const;
 
 export type DataBrowserMessageKey = keyof typeof dataBrowserMessages;
+export type MessageKey = DataBrowserMessageKey | string;

@@ -5,6 +5,21 @@ export interface AccessObjectRef {
   path: string[];
 }
 
+export interface AccessObject {
+  childKinds?: string[];
+  displayName?: string;
+  hasChildren: boolean;
+  kind: string;
+  metadata?: Record<string, string>;
+  name: string;
+  ref: AccessObjectRef;
+}
+
+export interface AccessObjectsResult {
+  objects: AccessObject[];
+  truncated: boolean;
+}
+
 export interface DataBrowserDatabaseMetadata {
   displayEngine: string;
   engineKey?: string;

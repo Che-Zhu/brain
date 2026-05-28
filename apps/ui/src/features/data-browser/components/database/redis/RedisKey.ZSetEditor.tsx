@@ -1,0 +1,118 @@
+import { Button } from "@data-browser/components/ui/Button";
+import { useModalForm } from "@data-browser/components/ui/ModalForm";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@data-browser/components/ui/tooltip";
+import { useI18n } from "@data-browser/i18n/useI18n";
+import { Plus, Trash2 } from "lucide-react";
+import { useRedisKeyCtx } from "./RedisKeyProvider";
+
+/** Create-only editor for Redis sorted-set member/score pairs. */
+export function RedisKeyZSetEditor() {
+  const { t } = useI18n();
+  const { draft, setZsetItems } = useRedisKeyCtx();
+  const { state } = useModalForm();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <label className="font-medium text-foreground text-sm">
+          {t("redis.key.value")}
+        </label>
+        <Button
+          className="h-7 gap-1 px-2 text-primary text-xs hover:text-primary"
+          disabled={state.isSubmitting}
+          onClick={() =>
+            setZsetItems([...draft.zsetItems, { member: "", score: "0" }])
+          }
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <Plus className="h-3 w-3" />
+          {t("redis.key.addMember")}
+        </Button>
+      </div>
+      <div className="rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
+            <tr>
+              <th className="w-[140px] px-4 py-2 text-left font-medium">
+                {t("redis.key.zsetScorePlaceholder")}
+              </th>
+              <th className="px-4 py-2 text-left font-medium">
+                {t("redis.key.zsetMemberPlaceholder")}
+              </th>
+              <th className="w-10 px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {draft.zsetItems.map((item, index) => (
+              <tr className="group hover:bg-muted/30" key={index}>
+                <td className="p-2">
+                  <input
+                    className="w-full rounded border-transparent bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-primary focus:bg-background disabled:opacity-50"
+                    disabled={state.isSubmitting}
+                    onChange={(e) => {
+                      const next = [...draft.zsetItems];
+                      const current = next[index];
+                      if (!current) {
+                        return;
+                      }
+                      next[index] = { ...current, score: e.target.value };
+                      setZsetItems(next);
+                    }}
+                    placeholder={t("redis.key.zsetScorePlaceholder")}
+                    type="number"
+                    value={item.score}
+                  />
+                </td>
+                <td className="p-2">
+                  <input
+                    className="w-full rounded border-transparent bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-primary focus:bg-background disabled:opacity-50"
+                    disabled={state.isSubmitting}
+                    onChange={(e) => {
+                      const next = [...draft.zsetItems];
+                      const current = next[index];
+                      if (!current) {
+                        return;
+                      }
+                      next[index] = { ...current, member: e.target.value };
+                      setZsetItems(next);
+                    }}
+                    placeholder={t("redis.key.zsetMemberPlaceholder")}
+                    type="text"
+                    value={item.member}
+                  />
+                </td>
+                <td className="p-2 text-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className={`text-muted-foreground transition-opacity hover:text-destructive ${draft.zsetItems.length > 1 ? "opacity-0 group-hover:opacity-100" : "invisible"}`}
+                        disabled={state.isSubmitting}
+                        onClick={() =>
+                          setZsetItems(
+                            draft.zsetItems.filter((_, i) => i !== index)
+                          )
+                        }
+                        size="icon-sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("redis.key.removeItem")}</TooltipContent>
+                  </Tooltip>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
