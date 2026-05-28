@@ -70,20 +70,15 @@ export function SidePane({
     >
       <div
         className={cn(
-          "resource-pane-surface absolute inset-y-0 right-0 flex w-screen min-w-0 max-w-screen-sm flex-col overflow-hidden rounded-tl-lg border-resource-pane-input border-t border-l bg-resource-pane px-2.5 py-5 text-resource-pane-foreground shadow-lg transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
+          "resource-pane-surface absolute inset-y-0 right-0 flex w-screen min-w-0 max-w-screen-sm flex-col overflow-hidden rounded-tl-lg border-resource-pane-input border-t border-l bg-resource-pane text-resource-pane-foreground shadow-lg transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
           motionOpen ? "translate-x-0" : "translate-x-full",
           className
         )}
       >
-        <div
-          className={cn(
-            "scrollbar-chat-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2.5",
-            bodyClassName
-          )}
-        >
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
           <header
             className={cn(
-              "flex shrink-0 items-start justify-between gap-3",
+              "flex shrink-0 items-start justify-between gap-3 px-5 pt-5",
               headerClassName
             )}
           >
@@ -118,7 +113,16 @@ export function SidePane({
               <X aria-hidden className="size-3.5" />
             </Button>
           </header>
-          {children}
+          <div className="scrollbar-chat-thin min-h-0 flex-1 overflow-y-auto">
+            <div
+              className={cn(
+                "flex min-h-full min-w-0 flex-col gap-5 px-5 pt-2.5 pb-5",
+                bodyClassName
+              )}
+            >
+              {children}
+            </div>
+          </div>
         </div>
       </div>
     </aside>

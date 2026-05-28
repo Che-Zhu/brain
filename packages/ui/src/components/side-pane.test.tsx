@@ -19,8 +19,18 @@ const MOTION_REDUCE_TRANSITION_RE = /motion-reduce:transition-none/;
 const PANE_LABEL_RE = /aria-label="Details pane"/;
 const POINTER_EVENTS_NONE_RE = /pointer-events-none/;
 const RESOURCE_PANE_SURFACE_RE = /resource-pane-surface/;
+const SCROLL_BEFORE_CONTENT_GAP_RE = /flex min-h-0 flex-1 flex-col gap-2.5/;
+const SCROLL_BODY_RE = /scrollbar-chat-thin min-h-0 flex-1 overflow-y-auto/;
+const SCROLL_CONTENT_RE =
+  /flex min-h-full min-w-0 flex-col gap-5 px-5 pt-2.5 pb-5/;
 const TITLE_RE = /Details/;
 const TRANSLATE_CLOSED_RE = /translate-x-full/;
+
+function indexOfOrThrow(source: string, needle: string) {
+  const index = source.indexOf(needle);
+  assert.notEqual(index, -1, `${needle} should be present`);
+  return index;
+}
 
 test("side pane renders shared chrome, accessibility labels, and motion-safe classes", () => {
   const html = renderToStaticMarkup(
@@ -46,6 +56,24 @@ test("side pane renders shared chrome, accessibility labels, and motion-safe cla
   assert.match(html, BODY_RE);
   assert.match(html, RESOURCE_PANE_SURFACE_RE);
   assert.match(html, MOTION_REDUCE_TRANSITION_RE);
+  assert.match(html, SCROLL_BEFORE_CONTENT_GAP_RE);
+});
+
+test("side pane keeps shared header outside the edge-aligned scroll body", () => {
+  const html = renderToStaticMarkup(
+    <SidePane label="Details pane" onClose={noop} title="Details">
+      <p>Pane body</p>
+    </SidePane>
+  );
+
+  const headerIndex = indexOfOrThrow(html, "<header");
+  const scrollBodyIndex = indexOfOrThrow(html, SCROLL_BODY_RE.source);
+  const scrollContentIndex = indexOfOrThrow(html, SCROLL_CONTENT_RE.source);
+  const bodyIndex = indexOfOrThrow(html, "Pane body");
+
+  assert.ok(headerIndex < scrollBodyIndex);
+  assert.ok(scrollBodyIndex < scrollContentIndex);
+  assert.ok(scrollContentIndex < bodyIndex);
 });
 
 test("side pane closed state is non-interactive and keeps reduced-motion structure", () => {
