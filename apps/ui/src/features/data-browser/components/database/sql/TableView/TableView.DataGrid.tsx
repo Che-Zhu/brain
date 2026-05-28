@@ -163,7 +163,7 @@ export function TableViewDataGrid() {
         <thead className="border-border border-b bg-transparent">
           <tr>
             <th
-              className="sticky top-0 left-0 z-50 border-border/50 border-r border-b bg-input/30 px-2 py-2 text-center font-semibold text-muted-foreground text-xs backdrop-blur-2xl"
+              className="sticky top-0 left-0 z-50 border-border/50 border-r border-b bg-input/30 px-2 py-2 text-center font-semibold text-muted-foreground text-xs"
               style={{ width: 64, minWidth: 64, maxWidth: 64 }}
             >
               {" "}
@@ -173,7 +173,7 @@ export function TableViewDataGrid() {
             ))}
             {hiddenColumnCount > 0 && (
               <th
-                className="sticky top-0 z-40 border-border/50 border-b bg-input/30 px-4 py-2 text-center font-medium text-muted-foreground text-xs backdrop-blur-2xl"
+                className="sticky top-0 z-40 border-border/50 border-b bg-input/30 px-4 py-2 text-center font-medium text-muted-foreground text-xs"
                 title={`${hiddenColumnCount} hidden column(s)`}
               >
                 <div className="flex items-center justify-center gap-1">
@@ -182,7 +182,7 @@ export function TableViewDataGrid() {
                 </div>
               </th>
             )}
-            <th className="sticky top-0 z-40 w-full border-border/50 border-b bg-input/30 backdrop-blur-2xl" />
+            <th className="sticky top-0 z-40 w-full border-border/50 border-b bg-input/30" />
           </tr>
         </thead>
         <tbody className="bg-transparent">
@@ -215,7 +215,7 @@ export function TableViewDataGrid() {
               >
                 <td
                   className={cn(
-                    "sticky left-0 z-30 border-border/50 border-r border-b bg-transparent px-2 py-2 text-center font-normal text-sm backdrop-blur-2xl",
+                    "sticky left-0 z-30 border-border/50 border-r border-b bg-transparent px-2 py-2 text-center font-normal text-sm",
                     row.isInserted && "bg-blue-100/60",
                     row.isDeleted &&
                       "bg-red-100/60 text-muted-foreground line-through",
