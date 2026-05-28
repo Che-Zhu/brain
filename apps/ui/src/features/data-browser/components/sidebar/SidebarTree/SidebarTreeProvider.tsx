@@ -47,6 +47,18 @@ function scopedStorageKey(
   return dbAccessExpandedStorageKey(runtime);
 }
 
+function canPersistExpandedTreeState({
+  isRestoring,
+  restoredStorageKey,
+  storageKey,
+}: {
+  isRestoring: boolean;
+  restoredStorageKey: string | null;
+  storageKey: string;
+}) {
+  return !isRestoring && restoredStorageKey === storageKey;
+}
+
 function nodeTypeForObject(object: AccessObject): NodeType | null {
   if (!DATA_BROWSER_CAPABILITIES.visibleObjectKinds.has(object.kind)) {
     return null;
@@ -202,12 +214,17 @@ export function SidebarTreeProvider({
   const restoredStorageKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isRestoring) {
-      localStorage.setItem(
+    if (
+      !canPersistExpandedTreeState({
+        isRestoring,
+        restoredStorageKey: restoredStorageKey.current,
         storageKey,
-        JSON.stringify(Array.from(expandedItems))
-      );
+      })
+    ) {
+      return;
     }
+
+    localStorage.setItem(storageKey, JSON.stringify(Array.from(expandedItems)));
   }, [expandedItems, isRestoring, storageKey]);
 
   const buildChildren = useCallback(
@@ -444,3 +461,5 @@ export function SidebarTreeProvider({
 
 export const dataBrowserExpandedStorageKey = scopedStorageKey;
 export const dataBrowserObjectNodeId = objectNodeId;
+export const dataBrowserCanPersistExpandedTreeState =
+  canPersistExpandedTreeState;

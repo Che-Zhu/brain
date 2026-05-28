@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import type { AccessObject } from "@data-browser/api/access-types";
 import {
+  dataBrowserCanPersistExpandedTreeState,
   dataBrowserExpandedStorageKey,
   dataBrowserObjectNodeId,
   dataBrowserObjectToTreeNode,
@@ -140,5 +141,38 @@ test("expanded tree localStorage key is scoped by project and service", () => {
       projectUid: "project-uid",
     }),
     "data-browser:expanded:project-uid:database-system:postgres-main"
+  );
+});
+
+test("expanded tree state waits for the current DB Service key to restore before persisting", () => {
+  assert.equal(
+    dataBrowserCanPersistExpandedTreeState({
+      isRestoring: false,
+      restoredStorageKey:
+        "data-browser:expanded:project-uid:database-system:postgres-main",
+      storageKey:
+        "data-browser:expanded:project-uid:database-system:mysql-main",
+    }),
+    false
+  );
+  assert.equal(
+    dataBrowserCanPersistExpandedTreeState({
+      isRestoring: true,
+      restoredStorageKey:
+        "data-browser:expanded:project-uid:database-system:mysql-main",
+      storageKey:
+        "data-browser:expanded:project-uid:database-system:mysql-main",
+    }),
+    false
+  );
+  assert.equal(
+    dataBrowserCanPersistExpandedTreeState({
+      isRestoring: false,
+      restoredStorageKey:
+        "data-browser:expanded:project-uid:database-system:mysql-main",
+      storageKey:
+        "data-browser:expanded:project-uid:database-system:mysql-main",
+    }),
+    true
   );
 });
