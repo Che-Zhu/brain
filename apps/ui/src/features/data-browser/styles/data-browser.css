@@ -1,0 +1,55 @@
+.data-browser-theme {
+  --success: oklch(0.696 0.17 162.48);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.769 0.188 70.08);
+  --warning-foreground: oklch(1 0 0);
+  --highlight: oklch(0.623 0.214 259.815);
+  --highlight-foreground: oklch(1 0 0);
+  --highlight-background: oklch(0.962 0.02 255.585);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --data-browser-surface: var(--resource-pane);
+  --data-browser-foreground: var(--resource-pane-foreground);
+  --data-browser-muted: var(--resource-pane-muted);
+  --data-browser-border: var(--resource-pane-border);
+  color: var(--data-browser-foreground);
+  background: var(--data-browser-surface);
+}
+
+.data-browser-theme [data-browser-shell] {
+  height: 100%;
+  min-height: 0;
+}
+
+.data-browser-theme [data-browser-empty-state] {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 16rem;
+  padding: 2rem;
+}
+
+.data-browser-theme [data-browser-empty-state-card] {
+  width: min(100%, 28rem);
+  padding: 1rem;
+  background: color-mix(in oklab, var(--data-browser-surface) 88%, white);
+  border: 1px solid var(--data-browser-border);
+  border-radius: 0.5rem;
+}
+
+.data-browser-theme [data-browser-empty-state-title] {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+}
+
+.data-browser-theme [data-browser-empty-state-body] {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: var(--data-browser-muted);
+}

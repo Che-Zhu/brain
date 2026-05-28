@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
+import { createDataBrowserHostContext } from "./runtime";
+
+const databaseData = {
+  connections: [],
+  states: {
+    displayEngine: "PostgreSQL",
+    engineKey: "postgresql",
+    formattedVersion: "16.4",
+    name: "orders-db",
+  },
+  workload: {
+    name: "orders-db-claim",
+    namespace: "database-system",
+  },
+} satisfies CanvasDatabaseNodeData;
+
+test("data browser runtime is derived from host project and selected database", () => {
+  const runtime = createDataBrowserHostContext({
+    kubeconfig: " kube ",
+    namespace: "project-ns",
+    projectUid: "project-uid",
+    selectedDatabaseData: databaseData,
+  });
+
+  assert.equal(runtime.projectUid, "project-uid");
+  assert.equal(runtime.kubeconfig, " kube ");
+  assert.equal(runtime.namespace, "project-ns");
+  assert.equal(runtime.databaseWorkloadName, "orders-db-claim");
+  assert.equal(runtime.databaseWorkloadNamespace, "database-system");
+  assert.equal(runtime.database.name, "orders-db");
+  assert.equal(runtime.database.displayEngine, "PostgreSQL");
+  assert.equal(runtime.database.formattedVersion, "16.4");
+  assert.equal(runtime.engine, "POSTGRES");
+});

@@ -4,22 +4,33 @@ import { Button } from "@workspace/ui/components/button";
 import { Database, X } from "lucide-react";
 import { useEffect } from "react";
 
+import { DataBrowserPane } from "@/features/data-browser/DataBrowserPane";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { CANVAS_ACTION } from "@/store/canvas-store";
 
 export interface CanvasActionSurfaceProps {
   action: string | null | undefined;
+  dbAccessEnabled?: boolean;
+  kubeconfig: string;
+  namespace: string;
   onClose: () => void;
+  projectUid: string;
   selectedDatabaseData: CanvasDatabaseNodeData | null;
 }
 
 export function CanvasActionSurface({
   action,
+  dbAccessEnabled = true,
+  kubeconfig,
+  namespace,
   onClose,
+  projectUid,
   selectedDatabaseData,
 }: CanvasActionSurfaceProps) {
   const open =
-    action === CANVAS_ACTION.dbAccess && selectedDatabaseData != null;
+    dbAccessEnabled &&
+    action === CANVAS_ACTION.dbAccess &&
+    selectedDatabaseData != null;
 
   useEffect(() => {
     if (!open) {
@@ -81,7 +92,14 @@ export function CanvasActionSurface({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body" />
+      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body">
+        <DataBrowserPane
+          kubeconfig={kubeconfig}
+          namespace={namespace}
+          projectUid={projectUid}
+          selectedDatabaseData={selectedDatabaseData}
+        />
+      </div>
     </section>
   );
 }

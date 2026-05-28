@@ -24,6 +24,15 @@
       }
     },
     {
+      // DataFlow migration shim preserves the old `useI18n` call-site name from the plan.
+      "includes": ["apps/ui/src/features/data-browser/i18n/useI18n.ts"],
+      "linter": {
+        "rules": {
+          "style": { "useFilenamingConvention": "off" }
+        }
+      }
+    },
+    {
       // Compound facade for `@workspace/ui` ports-table module (dot-notation API).
       "includes": ["packages/ui/src/components/ports-table/ports-table.tsx"],
       "linter": {

@@ -214,7 +214,11 @@ export default function PreviewProjectPage() {
             />
             <CanvasActionSurface
               action={canvasAction}
+              dbAccessEnabled={false}
+              kubeconfig=""
+              namespace={ns}
               onClose={closeCanvasActionSurface}
+              projectUid={uid}
               selectedDatabaseData={selectedDatabaseData}
             />
             {settingsLeaveGuardDialog}
