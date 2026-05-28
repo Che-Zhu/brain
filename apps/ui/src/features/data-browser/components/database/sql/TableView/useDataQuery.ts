@@ -68,6 +68,9 @@ export function useDataQuery(params: UseDataQueryParams): {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const latestRequestIdRef = useRef(0);
+  const visibleColumnsCountRef = useRef(visibleColumnsCount);
+  visibleColumnsCountRef.current = visibleColumnsCount;
+
   const handleSubmitRequest = useCallback(
     async (overridePageOffset?: number) => {
       setLoading(true);
@@ -103,7 +106,10 @@ export function useDataQuery(params: UseDataQueryParams): {
         setData(tableData);
         setPrimaryKey(tableData.primaryKey);
         setForeignKeyColumns(tableData.foreignKeyColumns);
-        if (visibleColumnsCount === 0 && tableData.columns.length > 0) {
+        if (
+          visibleColumnsCountRef.current === 0 &&
+          tableData.columns.length > 0
+        ) {
           onInitVisibleColumns(tableData.columns);
         }
       } catch (err: any) {
@@ -124,7 +130,6 @@ export function useDataQuery(params: UseDataQueryParams): {
       pageSize,
       currentPage,
       objectRef,
-      visibleColumnsCount,
       onInitVisibleColumns,
     ]
   );

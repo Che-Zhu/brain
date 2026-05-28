@@ -150,7 +150,7 @@ export function DbAccessSessionProvider({
     store.set(dbAccessSessionAtom, (session) =>
       switchDbAccessSession(session, dbServiceKey)
     );
-  }, [dbServiceKey, runtime, store]);
+  }, [dbServiceKey, store]);
 
   return (
     <DbAccessRuntimeContext.Provider value={runtime}>

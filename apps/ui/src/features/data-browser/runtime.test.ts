@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
-import { createDataBrowserHostContext } from "./runtime";
+import {
+  createDataBrowserHostContext,
+  dataBrowserRuntimeParts,
+} from "./runtime";
 
 const databaseData = {
   connections: [],
@@ -35,4 +38,17 @@ test("data browser runtime is derived from host project and selected database", 
   assert.equal(runtime.database.displayEngine, "PostgreSQL");
   assert.equal(runtime.database.formattedVersion, "16.4");
   assert.equal(runtime.engine, "POSTGRES");
+});
+
+test("data browser runtime parts are stable across equivalent database node snapshots", () => {
+  const nextDatabaseData = {
+    connections: [],
+    states: { ...databaseData.states },
+    workload: { ...databaseData.workload },
+  } satisfies CanvasDatabaseNodeData;
+
+  assert.deepEqual(
+    dataBrowserRuntimeParts(nextDatabaseData),
+    dataBrowserRuntimeParts(databaseData)
+  );
 });

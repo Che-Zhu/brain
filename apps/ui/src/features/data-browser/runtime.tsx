@@ -18,28 +18,44 @@ export interface DataBrowserRuntimeProviderProps {
   selectedDatabaseData: CanvasDatabaseNodeData;
 }
 
+export function dataBrowserRuntimeParts(
+  selectedDatabaseData: CanvasDatabaseNodeData
+) {
+  const { states, workload } = selectedDatabaseData;
+
+  return {
+    databaseDisplayEngine: states.displayEngine,
+    databaseEngineKey: states.engineKey,
+    databaseFormattedVersion: states.formattedVersion,
+    databaseName: states.name,
+    databaseWorkloadName: workload.name,
+    databaseWorkloadNamespace: workload.namespace,
+    engine: normalizeDataBrowserEngine(states.engineKey),
+  };
+}
+
 export function createDataBrowserHostContext({
   kubeconfig,
   namespace,
   projectUid,
   selectedDatabaseData,
 }: Omit<DataBrowserRuntimeProviderProps, "children">): DataBrowserHostContext {
-  const { states, workload } = selectedDatabaseData;
+  const parts = dataBrowserRuntimeParts(selectedDatabaseData);
 
   return {
     database: {
-      displayEngine: states.displayEngine,
-      ...(states.engineKey === undefined
+      displayEngine: parts.databaseDisplayEngine,
+      ...(parts.databaseEngineKey === undefined
         ? {}
-        : { engineKey: states.engineKey }),
-      ...(states.formattedVersion === undefined
+        : { engineKey: parts.databaseEngineKey }),
+      ...(parts.databaseFormattedVersion === undefined
         ? {}
-        : { formattedVersion: states.formattedVersion }),
-      name: states.name,
+        : { formattedVersion: parts.databaseFormattedVersion }),
+      name: parts.databaseName,
     },
-    databaseWorkloadName: workload.name,
-    databaseWorkloadNamespace: workload.namespace,
-    engine: normalizeDataBrowserEngine(states.engineKey),
+    databaseWorkloadName: parts.databaseWorkloadName,
+    databaseWorkloadNamespace: parts.databaseWorkloadNamespace,
+    engine: parts.engine,
     kubeconfig,
     namespace,
     projectUid,
@@ -53,15 +69,46 @@ export function DataBrowserRuntimeProvider({
   projectUid,
   selectedDatabaseData,
 }: DataBrowserRuntimeProviderProps) {
-  const value = useMemo(
-    () =>
-      createDataBrowserHostContext({
-        kubeconfig,
-        namespace,
-        projectUid,
-        selectedDatabaseData,
-      }),
-    [kubeconfig, namespace, projectUid, selectedDatabaseData]
+  const {
+    databaseDisplayEngine,
+    databaseEngineKey,
+    databaseFormattedVersion,
+    databaseName,
+    databaseWorkloadName,
+    databaseWorkloadNamespace,
+    engine,
+  } = dataBrowserRuntimeParts(selectedDatabaseData);
+  const value = useMemo<DataBrowserHostContext>(
+    () => ({
+      database: {
+        displayEngine: databaseDisplayEngine,
+        ...(databaseEngineKey === undefined
+          ? {}
+          : { engineKey: databaseEngineKey }),
+        ...(databaseFormattedVersion === undefined
+          ? {}
+          : { formattedVersion: databaseFormattedVersion }),
+        name: databaseName,
+      },
+      databaseWorkloadName,
+      databaseWorkloadNamespace,
+      engine,
+      kubeconfig,
+      namespace,
+      projectUid,
+    }),
+    [
+      databaseDisplayEngine,
+      databaseEngineKey,
+      databaseFormattedVersion,
+      databaseName,
+      databaseWorkloadName,
+      databaseWorkloadNamespace,
+      engine,
+      kubeconfig,
+      namespace,
+      projectUid,
+    ]
   );
 
   return (
