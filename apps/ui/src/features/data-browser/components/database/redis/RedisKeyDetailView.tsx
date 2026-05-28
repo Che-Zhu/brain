@@ -599,7 +599,7 @@ export function RedisKeyDetailView({
                   {rows.map((row, rowIdx) => {
                     return (
                       <tr
-                        className="group transition-colors hover:bg-muted/50"
+                        className="group transition-colors hover:bg-input/30"
                         data-qa-module="redis"
                         data-qa-object="key-row"
                         data-qa-resource-id={`${keyName}:${rowIdx}`}
@@ -648,8 +648,8 @@ export function RedisKeyDetailView({
                               className={cn(
                                 "relative scroll-mt-14 overflow-hidden border-border/50 border-r border-b text-foreground/80 text-sm",
                                 "px-6 py-2",
-                                highlight === "current" && "bg-blue-200",
-                                highlight === "match" && "bg-blue-100/60"
+                                highlight === "current" && "bg-input",
+                                highlight === "match" && "bg-input/30"
                               )}
                               data-col={col}
                               data-find-current={

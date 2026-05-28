@@ -77,7 +77,7 @@ export function EditTableForeignKeysTab() {
               foreignKeys.map((fk) => (
                 <tr
                   className={cn(
-                    "group relative hover:bg-muted/30",
+                    "group relative hover:bg-input/30",
                     fk.isNew && !fk.isMarkedForDeletion && "bg-primary/5",
                     fk.isMarkedForDeletion && "bg-destructive/5 opacity-60"
                   )}

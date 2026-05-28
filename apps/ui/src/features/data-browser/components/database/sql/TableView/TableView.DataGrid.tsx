@@ -195,7 +195,7 @@ export function TableViewDataGrid() {
                   "group transition-colors",
                   row.isInserted && "bg-blue-100/20",
                   row.isDeleted && "bg-red-100/20",
-                  !(row.isInserted || row.isDeleted) && "hover:bg-muted/50"
+                  !(row.isInserted || row.isDeleted) && "hover:bg-input/30"
                 )}
                 data-qa-module="sql"
                 data-qa-object="table-row"
@@ -285,8 +285,8 @@ export function TableViewDataGrid() {
                           !row.isDeleted &&
                           !changed &&
                           "bg-primary/10",
-                        highlight === "current" && "bg-blue-200",
-                        highlight === "match" && "bg-blue-100/60",
+                        highlight === "current" && "bg-input",
+                        highlight === "match" && "bg-input/30",
                         editable && !isActiveCell && "cursor-default"
                       )}
                       data-find-current={

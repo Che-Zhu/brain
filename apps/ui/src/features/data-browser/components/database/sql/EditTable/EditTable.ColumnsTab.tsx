@@ -77,7 +77,7 @@ export function EditTableColumnsTab() {
             {columns.map((col) => (
               <tr
                 className={cn(
-                  "group relative hover:bg-muted/30",
+                  "group relative hover:bg-input/30",
                   col.isNew && !col.isMarkedForDeletion && "bg-primary/5",
                   col.isMarkedForDeletion && "bg-destructive/5 opacity-60"
                 )}

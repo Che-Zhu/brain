@@ -92,13 +92,13 @@ export function CollectionViewDocumentList() {
               // FindBar match styling (only when no change type)
               !item.changeType &&
                 hasCurrentMatch &&
-                "border border-blue-300 bg-blue-100 shadow-sm",
+                "border border-input bg-input shadow-sm",
               !(item.changeType || hasCurrentMatch) &&
                 hasMatch &&
-                "border border-blue-200 bg-blue-50/60",
+                "border border-input/30 bg-input/30",
               // Default styling
               !(item.changeType || hasMatch) &&
-                "border border-border/50 bg-background hover:bg-muted/30 hover:shadow-sm"
+                "border border-border/50 bg-background hover:bg-input/30 hover:shadow-sm"
             )}
             data-find-current={hasCurrentMatch ? "true" : undefined}
             data-qa-module="mongodb"

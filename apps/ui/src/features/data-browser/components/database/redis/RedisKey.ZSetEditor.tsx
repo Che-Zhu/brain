@@ -44,7 +44,7 @@ export function RedisKeyZSetEditor() {
           </thead>
           <tbody className="divide-y">
             {draft.zsetItems.map((item, index) => (
-              <tr className="group hover:bg-muted/30" key={index}>
+              <tr className="group hover:bg-input/30" key={index}>
                 <td className="p-2">
                   <input
                     className="w-full rounded border-transparent bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-primary focus:bg-background disabled:opacity-50"

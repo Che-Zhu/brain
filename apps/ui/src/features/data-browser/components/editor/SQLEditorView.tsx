@@ -962,7 +962,7 @@ export function SQLEditorView({
                                 {result.rows.length > 0 ? (
                                   result.rows.map((row, i) => (
                                     <tr
-                                      className="hover:bg-muted/10"
+                                      className="hover:bg-input/30"
                                       data-qa-module="sql"
                                       data-qa-object="result-row"
                                       data-qa-row-index={i}
