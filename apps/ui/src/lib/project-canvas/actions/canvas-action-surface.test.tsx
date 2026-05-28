@@ -14,6 +14,8 @@ const CLOSE_LABEL_RE = /Close canvas action surface/;
 const LABEL_RE = /aria-label="Canvas action surface"/;
 const NAME_RE = /orders-db/;
 const RESOURCE_PANE_SURFACE_RE = /resource-pane-surface/;
+const CANVAS_ACTION_BODY_BACKGROUND_RE =
+  /canvas-action-surface-body-background/;
 const DATA_BROWSER_RE = /data-browser-shell/;
 const SUBTITLE_RE = /Database PostgreSQL 16.4/;
 
@@ -47,6 +49,7 @@ test("canvas action surface renders shared chrome and empty body slot", () => {
   assert.match(html, SUBTITLE_RE);
   assert.match(html, CLOSE_LABEL_RE);
   assert.match(html, RESOURCE_PANE_SURFACE_RE);
+  assert.match(html, CANVAS_ACTION_BODY_BACKGROUND_RE);
   assert.match(html, DATA_BROWSER_RE);
 });
 

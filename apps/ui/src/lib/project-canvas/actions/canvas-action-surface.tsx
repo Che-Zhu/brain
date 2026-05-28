@@ -92,7 +92,10 @@ export function CanvasActionSurface({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1" data-slot="canvas-action-surface-body">
+      <div
+        className="canvas-action-surface-body-background min-h-0 flex-1"
+        data-slot="canvas-action-surface-body"
+      >
         <DataBrowserPane
           kubeconfig={kubeconfig}
           namespace={namespace}

@@ -50,7 +50,7 @@ export function MainLayout() {
   return (
     <TooltipProvider>
       <div
-        className="flex h-full min-h-0 w-full overflow-hidden bg-background"
+        className="flex h-full min-h-0 w-full overflow-hidden"
         data-qa-module="layout"
         data-qa-object="app-shell"
         data-qa-state="connections"
@@ -76,7 +76,7 @@ export function MainLayout() {
         </div>
 
         <main
-          className="relative flex flex-1 flex-col overflow-hidden bg-sidebar"
+          className="relative flex flex-1 flex-col overflow-hidden"
           data-qa-module="layout"
           data-qa-object="main"
           data-qa-state="connections"

@@ -16,12 +16,37 @@
   --data-browser-muted: var(--resource-pane-muted);
   --data-browser-border: var(--resource-pane-border);
   color: var(--data-browser-foreground);
-  background: var(--data-browser-surface);
+  background: transparent;
 }
 
 .data-browser-theme [data-browser-shell] {
   height: 100%;
   min-height: 0;
+}
+
+.canvas-action-surface-body-background {
+  position: relative;
+  overflow: hidden;
+  background-color: #0a0a0a;
+  isolation: isolate;
+}
+
+.canvas-action-surface-body-background::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  width: 134vw;
+  aspect-ratio: 1929 / 1255;
+  pointer-events: none;
+  content: "";
+  background: radial-gradient(
+    ellipse closest-side at center,
+    #1d4ed8 0%,
+    #0a0a0a 100%
+  );
+  opacity: 0.2;
+  transform: translate(-50%, -50%);
 }
 
 .data-browser-theme [data-browser-empty-state] {
