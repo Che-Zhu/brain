@@ -17,7 +17,7 @@ export function FindBarBar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-border/50 border-t border-b px-2",
+        "flex h-11 items-center justify-between border-border/50 border-t border-b px-2",
         className
       )}
     >
@@ -53,7 +53,7 @@ export function FindBarBar({ className }: { className?: string }) {
       <div className="flex shrink-0 items-center">
         {/* Shortcut hint — hidden when actively searching */}
         {!state.searchTerm && (
-          <span className="select-none px-4 text-foreground/20 text-sm">
+          <span className="flex size-9 select-none items-center justify-center text-foreground/20 text-sm">
             {shortcutLabel}
           </span>
         )}

@@ -24,7 +24,7 @@ export function TableViewToolbar({
   const { state, actions } = useTableView();
   return (
     <div
-      className="flex h-12 items-center justify-between px-2"
+      className="flex h-11 items-center justify-between px-2"
       data-qa-database={databaseName}
       data-qa-db-service-key={dbServiceKey}
       data-qa-module="sql"

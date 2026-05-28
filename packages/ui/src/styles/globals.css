@@ -253,21 +253,21 @@
     isolation: isolate;
   }
 
-  .canvas-action-surface-body-background::before {
+  .canvas-action-surface-body-background::after {
     position: absolute;
     top: 50%;
     left: 50%;
-    z-index: -1;
-    width: 134vw;
+    z-index: 60;
+    width: 124vw;
     aspect-ratio: 1929 / 1255;
     pointer-events: none;
     content: "";
     background: radial-gradient(
       ellipse closest-side at center,
       var(--color-canvas-glow) 0%,
-      var(--color-canvas-surface) 100%
+      transparent 100%
     );
-    opacity: 0.2;
+    opacity: 0.175;
     transform: translate(-50%, -50%);
   }
 }

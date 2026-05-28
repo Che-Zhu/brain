@@ -318,18 +318,7 @@ function SidebarInner() {
       data-testid="database.sidebar"
     >
       <div
-        className="flex shrink-0 items-center px-4 pt-5 pb-2"
-        data-qa-module="database"
-        data-qa-object="sidebar-header"
-        data-testid="database.sidebar.header"
-      >
-        <span className="font-medium text-sidebar-foreground text-xl">
-          {"Database"}
-        </span>
-      </div>
-
-      <div
-        className="flex-1 overflow-y-auto p-2"
+        className="flex-1 overflow-y-auto p-2 pt-4"
         data-qa-module="database"
         data-qa-object="db-service-tree"
         data-qa-state="ready"
