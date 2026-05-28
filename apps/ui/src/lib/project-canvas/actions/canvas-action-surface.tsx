@@ -1,12 +1,15 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
+import { useAtomValue } from "jotai";
 import { Database, X } from "lucide-react";
 import { useEffect } from "react";
 
 import { DataBrowserPane } from "@/features/data-browser/DataBrowserPane";
 import type { CanvasDatabaseNodeData } from "@/lib/project-canvas/nodes/types";
 import { CANVAS_ACTION } from "@/store/canvas-store";
+import { assistantPaneOpenAtom } from "@/store/layout-store";
 
 export interface CanvasActionSurfaceProps {
   action: string | null | undefined;
@@ -27,6 +30,7 @@ export function CanvasActionSurface({
   projectUid,
   selectedDatabaseData,
 }: CanvasActionSurfaceProps) {
+  const assistantPaneOpen = useAtomValue(assistantPaneOpenAtom);
   const open =
     dbAccessEnabled &&
     action === CANVAS_ACTION.dbAccess &&
@@ -61,13 +65,18 @@ export function CanvasActionSurface({
       className="resource-pane-surface absolute inset-0 z-30 flex min-h-0 min-w-0 flex-col overflow-hidden bg-resource-pane text-resource-pane-foreground"
       data-slot="canvas-action-surface"
     >
-      <header className="grid h-13 shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-resource-pane-border border-b px-4">
+      <header
+        className={cn(
+          "grid h-13 shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-resource-pane-border border-b py-0 pr-4 pl-4",
+          !assistantPaneOpen && "pr-12"
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-4 shrink-0 items-center justify-center text-blue-400">
             <Database aria-hidden className="size-4" strokeWidth={2} />
           </span>
           <h2
-            className="min-w-0 truncate font-medium text-lg text-resource-pane-foreground leading-none"
+            className="min-w-0 truncate font-medium text-base text-resource-pane-foreground leading-none"
             title={states.name}
           >
             {states.name}

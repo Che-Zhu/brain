@@ -255,7 +255,7 @@
 
   .canvas-action-surface-body-background::after {
     position: absolute;
-    top: 50%;
+    top: 46%;
     left: 50%;
     z-index: 60;
     width: 124vw;
