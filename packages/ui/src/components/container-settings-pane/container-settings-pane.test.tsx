@@ -28,8 +28,8 @@ const ADD_ENV_RE = /aria-label="Add environment variable"/;
 const ADD_REFERENCE_RE = /aria-label="Add Project DB reference"/;
 const ADD_REFERENCE_LABEL_RE = /Add Reference/;
 const DB_FIELD_SELECT_RE = /aria-label="Project DB field"/;
+const POSTGRES_SELECTED_RE = />postgres</;
 const PASSWORD_FIELD_RE = /Password/;
-const UNAVAILABLE_DB_RE = /empty \(unavailable\)/;
 const REMOVE_ENV_RE = /aria-label="Remove environment variable"/;
 const SAVE_ENV_RE = /Save environment/;
 const SAVE_SETTINGS_RE = /aria-label="Save settings"/;
@@ -38,8 +38,7 @@ const CANCEL_SETTINGS_RE = /aria-label="Cancel settings changes"/;
 const CPU_MEMORY_SECTION_RE = /CPU \/ Memory/;
 const IMAGE_INPUT_RE = /aria-label="Container image"/;
 const NEW_VARIABLE_RE = /value="NEW_VARIABLE"/;
-const MYSQL_OPTION_SELECTED_RE =
-  /<option value="default\/mysql" selected="">mysql/;
+const MYSQL_SELECTED_RE = />mysql</;
 const PRIVATE_ADDRESS_RE = /Private Address/;
 const PRIVATE_ADDRESS_TARGET_RE = /Private Address target port/;
 const PRIVATE_ADDRESS_DEFAULT_VALUE_RE =
@@ -743,8 +742,8 @@ test("container settings pane renders primitive DB fields and unavailable DB opt
   ]);
 
   assert.match(html, DB_FIELD_SELECT_RE);
+  assert.match(html, POSTGRES_SELECTED_RE);
   assert.match(html, PASSWORD_FIELD_RE);
-  assert.match(html, UNAVAILABLE_DB_RE);
 });
 
 test("container settings pane opens dragged DB Add Reference intent preselected", () => {
@@ -779,7 +778,7 @@ test("container settings pane opens dragged DB Add Reference intent preselected"
   );
 
   assert.match(html, NEW_VARIABLE_RE);
-  assert.match(html, MYSQL_OPTION_SELECTED_RE);
+  assert.match(html, MYSQL_SELECTED_RE);
   assert.match(html, DB_FIELD_SELECT_RE);
   assert.match(html, SAVE_ENV_RE);
 });

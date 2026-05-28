@@ -27,6 +27,12 @@ import {
 import { ScaleSlider } from "@workspace/ui/components/scale-slider/scale-slider";
 import { clampScale } from "@workspace/ui/components/scale-slider/scale-slider.utils";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@workspace/ui/components/select";
+import {
   SlidingToggle,
   type SlidingToggleOption,
 } from "@workspace/ui/components/sliding-toggle";
@@ -860,6 +866,13 @@ function dbDsnSourceHasFields(source: ContainerEnvDbDsnSource): boolean {
   return containerEnvDbDsnFieldOptions(source).length > 0;
 }
 
+function dbDsnSourceLabel(source: ContainerEnvDbDsnSource): string {
+  if (dbDsnSourceHasFields(source)) {
+    return source.name;
+  }
+  return `${source.name} (unavailable)`;
+}
+
 function dbDsnSourceMatchesTarget(
   source: ContainerEnvDbDsnSource,
   target: ContainerEnvDbDsnReferenceTarget
@@ -957,8 +970,10 @@ export function confirmedAddDbDsnReferencesFromEnvDraft(
   return Array.from(byIntentId.values());
 }
 
-const envReferenceSelectClassName =
-  "h-9 min-w-0 rounded-md border border-resource-pane-input bg-transparent px-3 text-resource-pane-foreground text-sm leading-5 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+const editableTextControlClassName =
+  "h-9 border-input bg-transparent text-foreground text-sm placeholder:text-muted-foreground dark:bg-transparent";
+const envReferenceSelectTriggerClassName =
+  "h-9 min-w-0 border-input bg-transparent text-foreground text-sm";
 
 function ReadOnlyEnvRows({ env }: { env: readonly ContainerEnvVar[] }) {
   return (
@@ -1039,6 +1054,11 @@ function EditableEnvValueControl({
   if (row.valueSource === "dbDsn" && row.dbDsn != null) {
     const selectedSource = sourceFromDbDsnRow(row, dbDsnReferenceSources);
     const selectedFields = containerEnvDbDsnFieldOptions(selectedSource);
+    const selectedSourceLabel =
+      selectedSource === undefined ? "" : dbDsnSourceLabel(selectedSource);
+    const selectedFieldLabel =
+      selectedFields.find((field) => field.field === row.dbDsn?.field)?.label ??
+      "No fields available";
     const updateReference = (
       source: ContainerEnvDbDsnSource | undefined,
       field: ContainerEnvDbDsnFieldOption | undefined
@@ -1051,51 +1071,57 @@ function EditableEnvValueControl({
 
     return (
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] gap-2">
-        <select
-          aria-label="Project DB"
-          className={envReferenceSelectClassName}
-          onChange={(event) => {
+        <Select
+          onValueChange={(value) => {
             const source = dbDsnReferenceSources.find(
-              (item) => dbDsnSourceKey(item) === event.target.value
+              (item) => dbDsnSourceKey(item) === value
             );
             updateReference(source, containerEnvDbDsnFieldOptions(source)[0]);
           }}
           value={dbDsnRowKey(row)}
         >
-          {dbDsnReferenceSources.map((source) => {
-            const hasFields = dbDsnSourceHasFields(source);
-            return (
-              <option
-                disabled={!hasFields}
-                key={dbDsnSourceKey(source)}
-                value={dbDsnSourceKey(source)}
-              >
-                {hasFields ? source.name : `${source.name} (unavailable)`}
-              </option>
-            );
-          })}
-        </select>
-        <select
-          aria-label="Project DB field"
-          className={envReferenceSelectClassName}
+          <SelectTrigger
+            aria-label="Project DB"
+            className={envReferenceSelectTriggerClassName}
+          >
+            <span className="min-w-0 truncate">{selectedSourceLabel}</span>
+          </SelectTrigger>
+          <SelectContent className="border-input bg-background text-foreground">
+            {dbDsnReferenceSources.map((source) => {
+              return (
+                <SelectItem
+                  disabled={!dbDsnSourceHasFields(source)}
+                  key={dbDsnSourceKey(source)}
+                  value={dbDsnSourceKey(source)}
+                >
+                  {dbDsnSourceLabel(source)}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        <Select
           disabled={selectedFields.length === 0}
-          onChange={(event) => {
-            const field = selectedFields.find(
-              (item) => item.field === event.target.value
-            );
+          onValueChange={(value) => {
+            const field = selectedFields.find((item) => item.field === value);
             updateReference(selectedSource, field);
           }}
           value={row.dbDsn.field}
         >
-          {selectedFields.length === 0 ? (
-            <option value="">No fields available</option>
-          ) : null}
-          {selectedFields.map((field) => (
-            <option key={field.field} value={field.field}>
-              {field.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            aria-label="Project DB field"
+            className={envReferenceSelectTriggerClassName}
+          >
+            <span className="min-w-0 truncate">{selectedFieldLabel}</span>
+          </SelectTrigger>
+          <SelectContent className="border-input bg-background text-foreground">
+            {selectedFields.map((field) => (
+              <SelectItem key={field.field} value={field.field}>
+                {field.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   }
@@ -1103,7 +1129,7 @@ function EditableEnvValueControl({
   return (
     <Input
       aria-label="Environment variable value"
-      className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
+      className={editableTextControlClassName}
       onChange={(event) =>
         onUpdateRow(index, {
           value: event.target.value,
@@ -1145,7 +1171,7 @@ function EditableEnvRows({
                 <Input
                   aria-invalid={error != null}
                   aria-label="Environment variable name"
-                  className="h-9 border-resource-pane-input bg-transparent text-resource-pane-foreground text-sm dark:bg-transparent"
+                  className={editableTextControlClassName}
                   onChange={(event) =>
                     onUpdateRow(index, {
                       name: event.target.value,
@@ -1735,7 +1761,7 @@ function CnameBindingDialog({
             <Label htmlFor={inputId}>Custom Domain</Label>
             <Input
               aria-invalid={error != null}
-              className="font-mono text-sm"
+              className={editableTextControlClassName}
               disabled={pending}
               id={inputId}
               onChange={(event) => {
@@ -1953,7 +1979,7 @@ function AddPublicAddressForm({
         <Input
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className="h-9 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-sm dark:bg-transparent"
+          className={cn(editableTextControlClassName, "max-w-32")}
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -2299,7 +2325,7 @@ function NetworkSettingsSection({
               effectivePortError == null ? undefined : `${networkInputId}-error`
             }
             aria-invalid={effectivePortError != null}
-            className="h-8 max-w-32 border-resource-pane-input bg-transparent font-mono text-resource-pane-foreground text-xs dark:bg-transparent"
+            className={cn(editableTextControlClassName, "max-w-32")}
             disabled={readOnly}
             id={networkInputId}
             inputMode="numeric"
@@ -3009,7 +3035,7 @@ function ImageSettingsSection({
         ) : (
           <Input
             aria-label="Container image"
-            className="h-9 border-resource-pane-input bg-transparent text-resource-pane-muted text-sm dark:bg-transparent"
+            className={editableTextControlClassName}
             id={imageInputId}
             onBlur={onBlur}
             onChange={(event) => onChange(event.target.value)}
