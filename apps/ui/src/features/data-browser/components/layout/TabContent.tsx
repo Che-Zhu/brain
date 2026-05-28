@@ -123,7 +123,7 @@ export function TabContent() {
         <div
           className={
             tab.id === activeTabId
-              ? "flex flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background"
+              ? "flex flex-1 flex-col overflow-hidden rounded-lg border border-border/50 bg-transparent"
               : "hidden"
           }
           data-qa-database={tab.databaseName}

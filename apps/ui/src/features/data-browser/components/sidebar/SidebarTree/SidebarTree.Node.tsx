@@ -19,9 +19,9 @@ import type React from "react";
 import { createContext, use } from "react";
 import { useSidebarTree } from "./SidebarTreeProvider";
 import type { NodeType, TreeNodeData } from "./types";
-import { DB_ICONS, EXPANDABLE_TYPES, NODE_ICON_COLORS } from "./types";
+import { DB_ICONS, EXPANDABLE_TYPES } from "./types";
 
-/** Per-DB-Service context passed by Sidebar to each service tree. */
+/** Interaction context passed by Sidebar to each service tree. */
 export interface TreeNodeContextValue {
   dbServiceEngineType: string;
   onContextMenu: (e: React.MouseEvent, node: TreeNodeData) => void;
@@ -77,8 +77,8 @@ interface TreeNodeProps {
 export function TreeNode({ node, depth }: TreeNodeProps) {
   const { expandedItems, isLoading: loadingItems, treeData } = useSidebarTree();
   const {
-    selectedItemId,
     dbServiceEngineType,
+    selectedItemId,
     onItemClick,
     onToggle,
     onContextMenu,
@@ -90,8 +90,6 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
   const isSelected = selectedItemId === node.id;
   const nodeIsLoading = !!loadingItems[node.id];
   const children = treeData[node.id];
-
-  const iconColor = NODE_ICON_COLORS[node.type];
 
   const Icon =
     node.type === "redis_key" && node.metadata.redisKeyType
@@ -105,8 +103,8 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
         className={cn(
           "group flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
           isSelected
-            ? "bg-input font-medium text-accent-foreground"
-            : "text-muted-foreground hover:bg-input hover:text-foreground"
+            ? "bg-resource-pane-input font-medium text-resource-pane-foreground"
+            : "text-resource-pane-primary hover:bg-resource-pane-input hover:text-resource-pane-foreground"
         )}
         data-qa-database={node.metadata.database}
         data-qa-db-service-key={node.dbServiceKey || node.id}
@@ -130,7 +128,9 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
           <button
             className={cn(
               "rounded p-0.5 transition-colors",
-              isSelected ? "hover:bg-primary/20" : "hover:bg-muted"
+              isSelected
+                ? "text-blue-400 hover:bg-resource-pane-input"
+                : "text-resource-pane-primary hover:bg-resource-pane-input"
             )}
             data-qa-action={isExpanded ? "collapse" : "expand"}
             data-qa-module="database"
@@ -165,14 +165,19 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
             src={brandIcon}
           />
         ) : (
-          <Icon className={cn("h-4 w-4", iconColor)} />
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              isSelected ? "text-blue-400" : "text-resource-pane-primary"
+            )}
+          />
         )}
 
         <span className="flex-1 truncate">{node.name}</span>
 
         {nodeIsLoading && (
           <Loader2
-            className="h-3 w-3 animate-spin text-muted-foreground"
+            className="h-3 w-3 animate-spin text-resource-pane-primary"
             data-qa-module="database"
             data-qa-object="sidebar-node"
             data-qa-resource-id={node.id}
@@ -185,7 +190,7 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
 
       {isExpanded && children && children.length > 0 && (
         <div
-          className="mt-1 ml-3 space-y-0.5 border-border/50 border-l pl-3"
+          className="mt-1 ml-3 space-y-0.5 border-resource-pane-border border-l pl-3"
           data-qa-module="database"
           data-qa-object="sidebar-node-children"
           data-qa-resource-id={node.id}

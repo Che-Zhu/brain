@@ -160,10 +160,10 @@ export function TableViewDataGrid() {
         data-qa-state={state.renderedRows.length > 0 ? "ready" : "empty"}
         data-testid="sql.table.grid"
       >
-        <thead className="border-border border-b bg-background">
+        <thead className="border-border border-b bg-transparent">
           <tr>
             <th
-              className="sticky top-0 left-0 z-50 border-border/50 border-r border-b bg-background px-2 py-2 text-center font-semibold text-muted-foreground text-xs"
+              className="sticky top-0 left-0 z-50 border-border/50 border-r border-b bg-input/30 px-2 py-2 text-center font-semibold text-muted-foreground text-xs backdrop-blur-2xl"
               style={{ width: 64, minWidth: 64, maxWidth: 64 }}
             >
               {" "}
@@ -173,7 +173,7 @@ export function TableViewDataGrid() {
             ))}
             {hiddenColumnCount > 0 && (
               <th
-                className="sticky top-0 z-40 border-border/50 border-b bg-background px-4 py-2 text-center font-medium text-muted-foreground text-xs"
+                className="sticky top-0 z-40 border-border/50 border-b bg-input/30 px-4 py-2 text-center font-medium text-muted-foreground text-xs backdrop-blur-2xl"
                 title={`${hiddenColumnCount} hidden column(s)`}
               >
                 <div className="flex items-center justify-center gap-1">
@@ -182,10 +182,10 @@ export function TableViewDataGrid() {
                 </div>
               </th>
             )}
-            <th className="sticky top-0 z-40 w-full border-border/50 border-b bg-background" />
+            <th className="sticky top-0 z-40 w-full border-border/50 border-b bg-input/30 backdrop-blur-2xl" />
           </tr>
         </thead>
-        <tbody className="bg-background">
+        <tbody className="bg-transparent">
           {state.renderedRows.map((row, rowIdx) => {
             const isSelected = state.selectedRowKeys.has(row.rowKey);
 
@@ -215,7 +215,7 @@ export function TableViewDataGrid() {
               >
                 <td
                   className={cn(
-                    "sticky left-0 z-30 border-border/50 border-r border-b bg-background px-2 py-2 text-center font-normal text-sm",
+                    "sticky left-0 z-30 border-border/50 border-r border-b bg-transparent px-2 py-2 text-center font-normal text-sm backdrop-blur-2xl",
                     row.isInserted && "bg-blue-100/60",
                     row.isDeleted &&
                       "bg-red-100/60 text-muted-foreground line-through",
@@ -420,9 +420,9 @@ export function TableViewDataGrid() {
                 })}
 
                 {hiddenColumnCount > 0 && (
-                  <td className="border-border/50 border-b bg-background" />
+                  <td className="border-border/50 border-b bg-transparent" />
                 )}
-                <td className="w-full border-border/50 border-b bg-background" />
+                <td className="w-full border-border/50 border-b bg-transparent" />
               </tr>
             );
           })}

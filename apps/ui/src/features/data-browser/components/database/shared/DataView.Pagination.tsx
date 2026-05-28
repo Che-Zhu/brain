@@ -37,7 +37,7 @@ export function DataViewPagination({
   const safeTotalPages = totalPages || 1;
 
   return (
-    <div className="flex items-center justify-between border-border/50 border-t bg-muted/20 px-4 py-3">
+    <div className="flex items-center justify-between border-border/50 border-t bg-transparent px-4 py-3">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground text-sm">
           {`${startRow}-${endRow} of ${total}${label}`}

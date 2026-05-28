@@ -40,20 +40,6 @@ export const EXPANDABLE_TYPES: ReadonlySet<NodeType> = new Set([
   "redis_keys_folder",
 ]);
 
-/** Icon color class per node type */
-export const NODE_ICON_COLORS: Record<NodeType, string> = {
-  db_service: "text-primary",
-  database: "text-chart-3",
-  schema: "text-chart-4",
-  table_folder: "text-chart-2",
-  view_folder: "text-muted-foreground",
-  table: "text-chart-2",
-  view: "text-muted-foreground",
-  collection: "text-chart-5",
-  redis_keys_folder: "text-chart-2",
-  redis_key: "text-muted-foreground",
-};
-
 /** Database brand icons keyed by DB Service engine type. */
 export const DB_ICONS: Record<string, string> = {
   MYSQL: "/images/mysql.svg",

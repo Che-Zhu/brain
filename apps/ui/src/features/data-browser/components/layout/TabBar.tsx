@@ -22,16 +22,18 @@ import {
 import type React from "react";
 import { useState } from "react";
 
-function getTabIcon(type: DbAccessTabType) {
+function getTabIcon(type: DbAccessTabType, isActive: boolean) {
+  const iconClassName = cn("h-4 w-4", isActive && "text-blue-400");
+
   switch (type) {
     case "query":
-      return <FileCode className="h-4 w-4" />;
+      return <FileCode className={iconClassName} />;
     case "table":
-      return <Table className="h-4 w-4" />;
+      return <Table className={iconClassName} />;
     case "collection":
-      return <Database className="h-4 w-4" />;
+      return <Database className={iconClassName} />;
     default:
-      return <FileCode className="h-4 w-4" />;
+      return <FileCode className={iconClassName} />;
   }
 }
 
@@ -56,7 +58,9 @@ function TabItem({
     <div
       className={cn(
         "group flex h-9 cursor-pointer select-none items-center gap-1 border-sidebar-border border-r p-2 pl-3 transition-colors duration-150",
-        isActive ? "bg-input text-foreground" : "text-foreground hover:bg-muted"
+        isActive
+          ? "bg-resource-pane-input text-foreground"
+          : "text-foreground hover:bg-resource-pane-input"
       )}
       data-qa-action="activate"
       data-qa-database={tab.databaseName}
@@ -77,7 +81,9 @@ function TabItem({
       onClick={onActivate}
       onContextMenu={onContextMenu}
     >
-      <span className="mr-1 flex-shrink-0">{getTabIcon(tab.type)}</span>
+      <span className="mr-1 flex-shrink-0">
+        {getTabIcon(tab.type, isActive)}
+      </span>
       <span className="truncate whitespace-nowrap font-normal text-sm">
         {tab.title}
         {tab.isDirty && <span className="ml-1 text-primary">•</span>}
