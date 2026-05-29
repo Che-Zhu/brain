@@ -19,6 +19,7 @@ import {
   closeOtherDbAccessTabs,
   createDbAccessSession,
   type DbAccessSessionState,
+  type DbAccessTab,
   type DbAccessTabInput,
   openDbAccessTab,
   setActiveDbAccessTab,
