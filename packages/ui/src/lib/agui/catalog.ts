@@ -9,22 +9,25 @@ const metricDataPointSchema = z.object({
 });
 
 const githubDeployerRepoSchema = z.object({
+  description: z.string().nullable().optional(),
   fullName: z.string().optional(),
   id: z.string(),
+  isPrivate: z.boolean().optional(),
   name: z.string(),
+  url: z.string().optional(),
 });
 
 export const catalog = defineCatalog(schema, {
   components: {
     GithubDeployer: {
       props: z.object({
-        githubToken: z.string().nullable().optional(),
+        isAuthorized: z.boolean().optional(),
         isLoading: z.boolean().optional(),
         repos: z.array(githubDeployerRepoSchema).optional(),
         deployedRepo: githubDeployerRepoSchema.nullable().optional(),
       }),
       description:
-        "GitHub deployer: `githubToken` falsy → auth; token + `repos` → picker; **`deployedRepo` alone is enough** for the completed summary card — omit other props when showing deploy result",
+        "GitHub deployer: `isAuthorized` false → auth; authorized + `repos` → picker; **`deployedRepo` alone is enough** for the completed summary card — omit other props when showing deploy result",
     },
     MetricsChart: {
       props: z.object({

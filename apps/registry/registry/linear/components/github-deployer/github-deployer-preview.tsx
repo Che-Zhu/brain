@@ -14,7 +14,7 @@ function DeployerCard({
 }: {
   states: {
     deployedRepo?: (typeof REPOS)[number] | null;
-    githubToken?: string | null;
+    isAuthorized?: boolean;
     isLoading?: boolean;
     repos: readonly (typeof REPOS)[number][];
   };
@@ -27,13 +27,7 @@ function DeployerCard({
       }}
       states={states}
     >
-      <GithubDeployer.Shell>
-        <GithubDeployer.Title />
-        <GithubDeployer.Subtitle />
-        <GithubDeployer.AuthButton />
-        <GithubDeployer.RepoSelect />
-        <GithubDeployer.Complete />
-      </GithubDeployer.Shell>
+      <GithubDeployer.Shell />
     </GithubDeployer.Root>
   );
 }
@@ -48,7 +42,7 @@ export default function GithubDeployerPreview() {
         <div className={cardChrome}>
           <DeployerCard
             states={{
-              githubToken: null,
+              isAuthorized: false,
               isLoading: true,
               repos: REPOS,
             }}
@@ -59,7 +53,7 @@ export default function GithubDeployerPreview() {
         <div className={cardChrome}>
           <DeployerCard
             states={{
-              githubToken: null,
+              isAuthorized: false,
               isLoading: false,
               repos: REPOS,
             }}
@@ -70,7 +64,7 @@ export default function GithubDeployerPreview() {
         <div className={cardChrome}>
           <DeployerCard
             states={{
-              githubToken: "gho_preview",
+              isAuthorized: true,
               isLoading: false,
               repos: REPOS,
             }}
@@ -81,7 +75,7 @@ export default function GithubDeployerPreview() {
         <div className={cardChrome}>
           <DeployerCard
             states={{
-              githubToken: "gho_preview",
+              isAuthorized: true,
               isLoading: false,
               repos: REPOS,
               deployedRepo: REPOS[0],

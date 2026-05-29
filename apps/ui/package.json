@@ -9,7 +9,8 @@
     "start": "next start",
     "check": "npx ultracite check",
     "fix": "npx ultracite fix",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.47",

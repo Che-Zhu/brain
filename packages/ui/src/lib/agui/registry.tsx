@@ -13,19 +13,13 @@ export const { registry } = defineRegistry(catalog, {
     }: ComponentContext<typeof catalog, "GithubDeployer">) => (
       <GithubDeployer.Root
         states={{
-          githubToken: props.githubToken ?? undefined,
+          isAuthorized: props.isAuthorized,
           isLoading: props.isLoading,
           repos: props.repos ?? [],
           deployedRepo: props.deployedRepo ?? undefined,
         }}
       >
-        <GithubDeployer.Shell>
-          <GithubDeployer.Title />
-          <GithubDeployer.Subtitle />
-          <GithubDeployer.AuthButton />
-          <GithubDeployer.RepoSelect />
-          <GithubDeployer.Complete />
-        </GithubDeployer.Shell>
+        <GithubDeployer.Shell />
       </GithubDeployer.Root>
     ),
     MetricsChart: ({

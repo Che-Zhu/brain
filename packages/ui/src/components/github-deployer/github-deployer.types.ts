@@ -1,7 +1,10 @@
 export interface GithubDeployerRepo {
+  description?: string | null;
   fullName?: string;
   id: string;
+  isPrivate?: boolean;
   name: string;
+  url?: string;
 }
 
 /**
@@ -15,7 +18,7 @@ export const GITHUB_DEPLOYER_AUTHORIZE_SIMULATE_EVENT =
 export const GITHUB_DEPLOYER_DEPLOY_EVENT =
   "agui:github-deployer:deploy" as const;
 
-/** Serializable deployer state from the app (`githubToken` + `repos` + optional `deployedRepo`). */
+/** Serializable deployer state from the app (`isAuthorized` + `repos` + optional `deployedRepo`). */
 export interface GithubDeployerStates {
   /**
    * When set, **complete** stage: deployment finished (host-driven).
@@ -23,15 +26,18 @@ export interface GithubDeployerStates {
    */
   deployedRepo?: GithubDeployerRepo | null;
   /**
-   * OAuth token / PAT from the host. Falsy (omitted, null, or `""`) → **unauthorized** stage
-   * (auth CTA unless `isLoading`).
+   * True when the host has a server-side GitHub credential for the current scope.
    */
-  githubToken?: string | null;
+  isAuthorized?: boolean;
   /**
    * Optional: show “Authorizing…” before a token exists, and “Loading repositories…” once
    * authorized while the host resolves `repos`.
    */
   isLoading?: boolean;
+  /** Repository list load error after authorization. */
+  repoError?: Error | string | null;
+  /** Retry repository list loading after an error. */
+  repoRetry?: () => void;
   repos: readonly GithubDeployerRepo[];
 }
 

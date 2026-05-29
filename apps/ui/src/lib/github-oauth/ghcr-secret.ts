@@ -6,22 +6,12 @@ import {
   namespaceFromKubeconfigText,
 } from "@/lib/chat-runtime/kubeconfig-namespace";
 
-const GITHUB_USER_API = "https://api.github.com/user";
-
 function safeDecodeKubeconfig(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {
     return "";
   }
-}
-
-async function fetchGithubLogin(accessToken: string): Promise<string> {
-  const res = await fetch(GITHUB_USER_API, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const body = (await res.json()) as { login?: string };
-  return body.login ?? "unknown";
 }
 
 /**
@@ -34,7 +24,7 @@ async function fetchGithubLogin(accessToken: string): Promise<string> {
  */
 export async function applyGhcrSecretIfAuthenticated(
   serverEncodedKubeconfig: string | undefined,
-  accessToken: string
+  input: { githubLogin: string; token: string }
 ): Promise<void> {
   const trimmed = serverEncodedKubeconfig?.trim();
   if (!trimmed) {
@@ -45,13 +35,12 @@ export async function applyGhcrSecretIfAuthenticated(
     if (kubeconfig === "") {
       return;
     }
-    const owner = await fetchGithubLogin(accessToken);
     const namespace =
       namespaceFromKubeconfigText(kubeconfig) ?? KUBECONFIG_DEFAULT_NAMESPACE;
     await applyGhcrSecret(kubeconfig, {
-      githubToken: accessToken,
+      githubToken: input.token,
       namespace,
-      owner,
+      owner: input.githubLogin,
     });
   } catch (error) {
     console.error("[github-oauth] applyGhcrSecret failed:", error);

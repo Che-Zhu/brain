@@ -27,7 +27,7 @@ function TranscriptGithubDeployerDemo({
 }) {
   const [gh, setGh] = useState({
     deployedRepo: null as GithubDeployerRepo | null,
-    githubToken: "",
+    isAuthorized: false,
     isLoading: false,
     repos: [...chatPreviewDemoRepos],
   });
@@ -39,7 +39,7 @@ function TranscriptGithubDeployerDemo({
           onAuthorize: () =>
             setGh((p) => ({
               ...p,
-              githubToken: "gho_preview_dummy",
+              isAuthorized: true,
               isLoading: false,
             })),
           onDeploy: (repo) => {
@@ -48,13 +48,7 @@ function TranscriptGithubDeployerDemo({
         }}
         states={gh}
       >
-        <GithubDeployer.Shell className="gap-3">
-          <GithubDeployer.Title />
-          <GithubDeployer.Subtitle />
-          <GithubDeployer.AuthButton />
-          <GithubDeployer.RepoSelect />
-          <GithubDeployer.Complete />
-        </GithubDeployer.Shell>
+        <GithubDeployer.Shell />
       </GithubDeployer.Root>
     </div>
   );

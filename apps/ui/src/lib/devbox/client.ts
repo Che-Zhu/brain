@@ -22,6 +22,7 @@ import type {
 } from "./types";
 
 const DEVBOX_REQUEST_TIMEOUT_MS = 60_000;
+const DEVBOX_NETWORK_RETRY_DELAYS_MS = [500, 1500, 3000];
 
 export class DevboxApiError extends Error {
   status: number;
@@ -76,6 +77,39 @@ async function parseJsonResponse<T>(
   return payload as DevboxEnvelope<T>;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableNetworkError(error: unknown): boolean {
+  if (error instanceof DevboxApiError) {
+    return false;
+  }
+
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const cause = error.cause;
+  const causeCode =
+    typeof cause === "object" &&
+    cause != null &&
+    "code" in cause &&
+    typeof cause.code === "string"
+      ? cause.code
+      : null;
+
+  return (
+    error.message === "fetch failed" ||
+    causeCode === "ECONNRESET" ||
+    causeCode === "ETIMEDOUT"
+  );
+}
+
 async function devboxRequest<T>(
   pathname: string,
   init?: Omit<RequestInit, "headers"> & {
@@ -96,35 +130,61 @@ async function devboxRequest<T>(
     timeoutMs,
     ...requestInit
   } = init ?? {};
-  const headers = new Headers(initHeaders);
 
-  if (!skipAuth) {
-    if (authNamespace == null || authNamespace.trim() === "") {
-      throw new Error("Devbox auth namespace is required.");
+  for (
+    let attempt = 0;
+    attempt <= DEVBOX_NETWORK_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    const headers = new Headers(initHeaders);
+
+    if (!skipAuth) {
+      if (authNamespace == null || authNamespace.trim() === "") {
+        throw new Error("Devbox auth namespace is required.");
+      }
+      const token = await getDevboxAuthToken(authNamespace);
+      headers.set("Authorization", `Bearer ${token}`);
     }
-    const token = await getDevboxAuthToken(authNamespace);
-    headers.set("Authorization", `Bearer ${token}`);
+
+    if (requestInit.body != null && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    const signal =
+      requestInit.signal ??
+      AbortSignal.timeout(timeoutMs ?? DEVBOX_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(
+        buildUrl(pathname, searchParams, includeApiPrefix),
+        {
+          ...requestInit,
+          cache: "no-store",
+          headers,
+          signal,
+        }
+      );
+
+      return await parseJsonResponse<T>(response);
+    } catch (error) {
+      const retryDelay = DEVBOX_NETWORK_RETRY_DELAYS_MS[attempt];
+      if (
+        !isRetryableNetworkError(error) ||
+        retryDelay === undefined ||
+        requestInit.signal != null
+      ) {
+        throw error;
+      }
+
+      console.warn(
+        `Devbox request failed with retryable network error; retrying in ${retryDelay}ms`,
+        error
+      );
+      await sleep(retryDelay);
+    }
   }
 
-  if (requestInit.body != null && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const signal =
-    requestInit.signal ??
-    AbortSignal.timeout(timeoutMs ?? DEVBOX_REQUEST_TIMEOUT_MS);
-
-  const response = await fetch(
-    buildUrl(pathname, searchParams, includeApiPrefix),
-    {
-      ...requestInit,
-      cache: "no-store",
-      headers,
-      signal,
-    }
-  );
-
-  return await parseJsonResponse<T>(response);
+  throw new Error("Devbox request failed after retries");
 }
 
 export async function getDevboxHealth() {

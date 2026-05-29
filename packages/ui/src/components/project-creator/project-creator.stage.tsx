@@ -25,7 +25,7 @@ function GithubPanel() {
 
   const states = githubDeployer?.states ?? {
     deployedRepo: null,
-    githubToken: null as string | null,
+    isAuthorized: false,
     isLoading: false,
     repos: [] as const,
   };
@@ -37,13 +37,7 @@ function GithubPanel() {
       data-slot="project-creator-github"
     >
       <GithubDeployer.Root actions={actions} states={states}>
-        <GithubDeployer.Shell className="gap-3">
-          <GithubDeployer.Title />
-          <GithubDeployer.Subtitle />
-          <GithubDeployer.AuthButton />
-          <GithubDeployer.RepoSelect />
-          <GithubDeployer.Complete />
-        </GithubDeployer.Shell>
+        <GithubDeployer.Shell />
       </GithubDeployer.Root>
     </div>
   );

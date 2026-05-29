@@ -80,16 +80,27 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
     serverNamespace: "",
   });
 
+  const devCredentials = (): ServerCredentials => {
+    if (!hasDevCredentialBypass()) {
+      return empty();
+    }
+    const credentials = devCredentialsFromEnv();
+    return {
+      serverEncodedKubeconfig: credentials.encodedKubeconfig,
+      serverNamespace: credentials.namespace,
+    };
+  };
+
   const apiUrlRaw = process.env.API_URL?.trim();
   if (!apiUrlRaw) {
-    return empty();
+    return devCredentials();
   }
 
   const cookieStore = await cookies();
   const regionToken =
     cookieStore.get(SEALOS_AUTH_TOKEN_COOKIE)?.value?.trim() ?? "";
   if (regionToken === "") {
-    return empty();
+    return devCredentials();
   }
 
   const url = new URL(API_ROUTES.auth.regionToken, apiUrlRaw);
@@ -103,18 +114,18 @@ export async function fetchServerCredentials(): Promise<ServerCredentials> {
       cache: "no-store",
     });
   } catch {
-    return empty();
+    return devCredentials();
   }
 
   if (!response.ok) {
-    return empty();
+    return devCredentials();
   }
 
   let raw: RegionTokenResponse;
   try {
     raw = (await response.json()) as RegionTokenResponse;
   } catch {
-    return empty();
+    return devCredentials();
   }
 
   return {

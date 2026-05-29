@@ -21,6 +21,18 @@ function trimmedEnv(value: string | undefined): string | undefined {
   return t && t.length > 0 ? t : undefined;
 }
 
+function resolveDevOpenAiConnection(): ResolveChatOpenAiOutcome | null {
+  const devApiKey = trimmedEnv(process.env.DEV_OPENAI_API_KEY);
+  const devBaseUrl = trimmedEnv(process.env.DEV_OPENAI_API_BASE_URL);
+  if (devApiKey && devBaseUrl) {
+    return {
+      ok: true,
+      connection: { apiKey: devApiKey, baseURL: devBaseUrl },
+    };
+  }
+  return null;
+}
+
 function resolveSystemOpenAiConnection(): ResolveChatOpenAiOutcome {
   const apiKey = trimmedEnv(process.env.SYSTEM_OPENAI_API_KEY);
   const baseURL = trimmedEnv(process.env.SYSTEM_OPENAI_API_BASE_URL);
@@ -37,6 +49,7 @@ function resolveSystemOpenAiConnection(): ResolveChatOpenAiOutcome {
 
 /**
  * Resolves `{ apiKey, baseURL }` for OpenAI-compatible chat:
+ * - `DEV_OPENAI_*` → local development override.
  * - `billing: "free"` → `SYSTEM_OPENAI_*` (platform token).
  * - `billing: "user"` → AI proxy token from kubeconfig.
  */
@@ -45,6 +58,11 @@ export async function resolveChatOpenAiConnection(options: {
   kubeconfigText: string;
   billing: ChatBillingMode;
 }): Promise<ResolveChatOpenAiOutcome> {
+  const dev = resolveDevOpenAiConnection();
+  if (dev != null) {
+    return dev;
+  }
+
   if (options.billing === "free") {
     return resolveSystemOpenAiConnection();
   }
