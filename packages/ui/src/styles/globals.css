@@ -267,6 +267,7 @@
       var(--color-canvas-glow) 0%,
       transparent 100%
     );
+    mix-blend-mode: screen;
     opacity: 0.175;
     transform: translate(-50%, -50%);
   }
