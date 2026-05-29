@@ -55,7 +55,7 @@ const AGUI_GITHUB_DEPLOYER_SPEC: Spec = {
     GithubDeployer: {
       type: "GithubDeployer",
       props: {
-        githubToken: "agui-display-token",
+        isAuthorized: true,
         isLoading: false,
         repos: [...SAMPLE_AGUI_REPOS],
       },

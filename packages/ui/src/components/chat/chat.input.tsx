@@ -95,15 +95,7 @@ export function ChatGithubDeployPopover({
         side="top"
       >
         <GithubDeployer.Root actions={actions} states={states}>
-          {children ?? (
-            <GithubDeployer.Shell className="gap-3 p-1">
-              <GithubDeployer.Title />
-              <GithubDeployer.Subtitle />
-              <GithubDeployer.AuthButton />
-              <GithubDeployer.RepoSelect />
-              <GithubDeployer.Complete />
-            </GithubDeployer.Shell>
-          )}
+          {children ?? <GithubDeployer.Shell className="p-1" />}
         </GithubDeployer.Root>
       </PopoverContent>
     </Popover>

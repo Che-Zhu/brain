@@ -24,6 +24,18 @@ export interface DevboxListItem {
 export interface DevboxInfo {
   creationTimestamp: string | null;
   deletionTimestamp: string | null;
+  gateway?: {
+    accessToken?: string | null;
+    accessURL?: string | null;
+    appURL?: string | null;
+    authToken?: string | null;
+    bearerToken?: string | null;
+    externalURL?: string | null;
+    jwt?: string | null;
+    route?: string | null;
+    token?: string | null;
+    url?: string | null;
+  } | null;
   name: string;
   state: DevboxState;
 }

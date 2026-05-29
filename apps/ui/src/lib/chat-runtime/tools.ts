@@ -8,6 +8,7 @@ import {
 import { type ToolSet, tool } from "ai";
 import type { AssistantContextPayload } from "@/lib/chat-persistence/types";
 import { createChatBashTool } from "@/lib/tool/chat-bash-tool";
+import { createDeployTaskTools } from "@/lib/tool/chat-deploy-task-tool";
 import { navigateAppTool } from "@/lib/tool/chat-navigate-app-tool";
 import { refreshFrontendSwrCachesTool } from "@/lib/tool/chat-refresh-frontend-swr-tool";
 import {
@@ -63,8 +64,13 @@ export async function buildChatToolset({
     discoverPublicSkills(),
     createChatBashTool({ kubeconfig, namespace: kubernetesNamespace }),
   ]);
+  const deployTaskTools = createDeployTaskTools({
+    assistantContext,
+    kubernetesNamespace,
+  });
 
   const tools = {
+    ...deployTaskTools,
     emitGenUISpec,
     navigateApp: navigateAppTool,
     refreshFrontendSwrCaches: refreshFrontendSwrCachesTool,

@@ -8,12 +8,20 @@ import {
   assistantChatMessages,
   assistantChats,
   assistantEntitlements,
+  deployTaskEvents,
+  deployTaskMessages,
+  deployTasks,
+  githubConnections,
 } from "./schema";
 
 const assistantSchema = {
   assistantChatMessages,
   assistantChats,
   assistantEntitlements,
+  deployTaskEvents,
+  deployTaskMessages,
+  deployTasks,
+  githubConnections,
 };
 
 export type AssistantPgDatabase = NodePgDatabase<typeof assistantSchema>;

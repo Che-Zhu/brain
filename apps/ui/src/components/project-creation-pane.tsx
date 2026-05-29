@@ -12,7 +12,7 @@ export type { ProjectCreationPaneEntryMode } from "./project-creation-pane-state
 
 const EMPTY_GITHUB_DEPLOYER_STATES: GithubDeployerStates = {
   deployedRepo: null,
-  githubToken: null,
+  isAuthorized: false,
   isLoading: false,
   repos: [],
 };
@@ -67,13 +67,7 @@ export function ProjectCreationPane({
           actions={githubDeployer?.actions}
           states={githubDeployer?.states ?? EMPTY_GITHUB_DEPLOYER_STATES}
         >
-          <GithubDeployer.Shell className="gap-3">
-            <GithubDeployer.Title />
-            <GithubDeployer.Subtitle />
-            <GithubDeployer.AuthButton />
-            <GithubDeployer.RepoSelect />
-            <GithubDeployer.Complete />
-          </GithubDeployer.Shell>
+          <GithubDeployer.Shell />
         </GithubDeployer.Root>
       </div>
     );

@@ -21,7 +21,9 @@ const AUTO_GENERATED_PUBLIC_ADDRESS_RE = /Auto-generated Public Address/;
 const PANE_LABEL_RE = /aria-label="Project creation pane"/;
 const PROJECT_NAME_RE = /Project Name/;
 const PROJECT_TITLE_RE = /Create New Project/;
-const REPO_SELECT_RE = /Search or choose repository/;
+const GITHUB_CONNECTED_RE = /GitHub Connected/;
+const GITHUB_REPO_CARD_RE = /data-slot="github-deployer-repo-card"/;
+const GITHUB_SEARCH_RE = /placeholder="Search"/;
 const SCENARIO_RE = /Scenario/;
 const TRAIL_BACK_RE = />Back</;
 const DATABASE_DEPLOYER_RE = /data-slot="database-deployer"/;
@@ -67,7 +69,7 @@ test("project creation pane GitHub direct entry starts at repository selection",
         githubDeployer: {
           states: {
             deployedRepo: null,
-            githubToken: "gho_test",
+            isAuthorized: true,
             isLoading: false,
             repos: [
               {
@@ -86,7 +88,9 @@ test("project creation pane GitHub direct entry starts at repository selection",
   );
 
   assert.match(html, PANE_LABEL_RE);
-  assert.match(html, REPO_SELECT_RE);
+  assert.match(html, GITHUB_CONNECTED_RE);
+  assert.match(html, GITHUB_SEARCH_RE);
+  assert.match(html, GITHUB_REPO_CARD_RE);
   assert.doesNotMatch(html, PROJECT_NAME_RE);
   assert.doesNotMatch(html, SCENARIO_RE);
   assert.doesNotMatch(html, TRAIL_BACK_RE);

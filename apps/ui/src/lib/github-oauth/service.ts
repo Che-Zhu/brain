@@ -3,8 +3,12 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import {
+  KUBECONFIG_DEFAULT_NAMESPACE,
+  namespaceFromKubeconfigText,
+} from "@/lib/chat-runtime/kubeconfig-namespace";
 import { fetchServerCredentials } from "@/lib/server-credentials";
-
+import { fetchGithubLogin, upsertGithubConnection } from "./connection-service";
 import {
   clearOAuthCookies,
   readCallbackCookies,
@@ -35,6 +39,23 @@ function jsonError(
     { error, error_description: description },
     { status }
   );
+}
+
+function parseNamespaceFromEncodedKubeconfig(
+  serverEncodedKubeconfig: string | undefined
+): string {
+  const raw = serverEncodedKubeconfig?.trim();
+  if (!raw) {
+    return KUBECONFIG_DEFAULT_NAMESPACE;
+  }
+  try {
+    return (
+      namespaceFromKubeconfigText(decodeURIComponent(raw)) ??
+      KUBECONFIG_DEFAULT_NAMESPACE
+    );
+  } catch {
+    return KUBECONFIG_DEFAULT_NAMESPACE;
+  }
 }
 
 async function exchangeCodeForToken(args: {
@@ -149,10 +170,18 @@ export async function completeAuthorization(
     );
   }
   const { serverEncodedKubeconfig } = await fetchServerCredentials();
-  await applyGhcrSecretIfAuthenticated(
-    serverEncodedKubeconfig,
-    data.access_token
-  );
+  const githubLogin = await fetchGithubLogin(data.access_token);
+  await upsertGithubConnection({
+    accessToken: data.access_token,
+    githubLogin,
+    namespace: parseNamespaceFromEncodedKubeconfig(serverEncodedKubeconfig),
+    scope: data.scope,
+    tokenType: data.token_type,
+  });
+  await applyGhcrSecretIfAuthenticated(serverEncodedKubeconfig, {
+    githubLogin,
+    token: data.access_token,
+  });
   const response = NextResponse.redirect(
     buildOAuthSuccessRedirectUrl(baseUrl, returnPath)
   );

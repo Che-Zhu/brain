@@ -112,3 +112,15 @@ export function createAssistantThread(namespaceRaw: string): Promise<{
     createThreadResponseSchema
   );
 }
+
+export function appendAssistantThreadMessage(input: {
+  chatId: string;
+  message: UIMessage;
+  namespace: string;
+}): Promise<{ ok: boolean } | null> {
+  return safeJsonPost(
+    "/api/chat/messages",
+    input,
+    z.object({ ok: z.literal(true) })
+  );
+}

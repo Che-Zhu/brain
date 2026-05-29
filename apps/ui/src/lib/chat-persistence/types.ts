@@ -37,6 +37,7 @@ export interface AssistantSessionPayload {
 
 /** Optional client-provided UI context for the model system prompt (project + selection). */
 export const assistantContextPayloadSchema = z.object({
+  projectName: z.string().max(512).optional(),
   projectUid: z.string().max(256).optional(),
   selectedWorkload: z
     .object({
@@ -63,6 +64,13 @@ export type ChatStreamRequest = z.infer<typeof chatStreamRequestSchema>;
 /** Body of `POST /api/chat/thread`. */
 export const createThreadBodySchema = z.object({
   namespace: z.string().optional(),
+});
+
+/** Body of `POST /api/chat/messages`. Used by UI event adapters. */
+export const appendMessageBodySchema = z.object({
+  chatId: z.string().min(1),
+  message: z.unknown(),
+  namespace: z.string(),
 });
 
 /** Server-side narrowing for the AI SDK `UIMessage` payloads we accept across the wire. */

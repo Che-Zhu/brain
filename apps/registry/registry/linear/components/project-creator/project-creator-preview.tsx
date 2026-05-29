@@ -24,7 +24,7 @@ export default function ProjectCreatorPreview() {
       },
       states: {
         deployedRepo: null,
-        githubToken: "preview-token",
+        isAuthorized: true,
         isLoading: false,
         repos: MOCK_GITHUB_REPOS,
       },
