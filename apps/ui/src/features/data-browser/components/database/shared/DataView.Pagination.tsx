@@ -37,7 +37,7 @@ export function DataViewPagination({
   const safeTotalPages = totalPages || 1;
 
   return (
-    <div className="flex items-center justify-between border-border/50 border-t bg-transparent px-4 py-3">
+    <div className="flex items-center justify-between border-border border-t bg-transparent px-4 py-3">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground text-sm">
           {`${startRow}-${endRow} of ${total}${label}`}
@@ -53,7 +53,7 @@ export function DataViewPagination({
             value={String(pageSize)}
           >
             <SelectTrigger
-              className="w-auto gap-1 border-border/50 bg-transparent"
+              className="w-auto gap-1 border-border bg-transparent"
               size="sm"
             >
               <SelectValue />

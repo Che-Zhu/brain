@@ -160,7 +160,7 @@ export default function ProjectUidPage() {
   const canvasActionSurfaceOpen = canvasAction != null;
   const terminalPlaneOpen =
     workloadPane === WORKLOAD_PANE.terminal && selectedNode != null;
-  
+
   const canvasResourcePaneOpen = Boolean(
     (terminalPlaneOpen ? null : workloadPane) ?? databasePane ?? entryPane
   );
