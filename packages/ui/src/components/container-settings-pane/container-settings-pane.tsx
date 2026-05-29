@@ -16,8 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { PaneInput } from "@workspace/ui/components/pane-input";
 import {
   ResourceSettingsDraftFooter,
   ResourceSettingsInset,
@@ -970,8 +970,6 @@ export function confirmedAddDbDsnReferencesFromEnvDraft(
   return Array.from(byIntentId.values());
 }
 
-const editableTextControlClassName =
-  "h-9 border-input bg-transparent text-foreground text-sm placeholder:text-muted-foreground dark:bg-transparent";
 const envReferenceSelectTriggerClassName =
   "h-9 min-w-0 border-input bg-transparent text-foreground text-sm";
 
@@ -1127,9 +1125,8 @@ function EditableEnvValueControl({
   }
 
   return (
-    <Input
+    <PaneInput
       aria-label="Environment variable value"
-      className={editableTextControlClassName}
       onChange={(event) =>
         onUpdateRow(index, {
           value: event.target.value,
@@ -1168,10 +1165,9 @@ function EditableEnvRows({
           return (
             <div className="grid min-w-0 gap-1.5" key={rowKey}>
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                <Input
+                <PaneInput
                   aria-invalid={error != null}
                   aria-label="Environment variable name"
-                  className={editableTextControlClassName}
                   onChange={(event) =>
                     onUpdateRow(index, {
                       name: event.target.value,
@@ -1759,9 +1755,8 @@ function CnameBindingDialog({
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor={inputId}>Custom Domain</Label>
-            <Input
+            <PaneInput
               aria-invalid={error != null}
-              className={editableTextControlClassName}
               disabled={pending}
               id={inputId}
               onChange={(event) => {
@@ -1976,10 +1971,10 @@ function AddPublicAddressForm({
     <div className="grid min-w-0 gap-3 rounded-md border border-resource-pane-border border-dashed bg-transparent p-3">
       <div className="grid min-w-0 gap-1.5">
         <Label htmlFor={portInputId}>Public Address target port</Label>
-        <Input
+        <PaneInput
           aria-describedby={error == null ? undefined : errorId}
           aria-invalid={error != null}
-          className={cn(editableTextControlClassName, "max-w-32")}
+          className="max-w-32"
           disabled={pending}
           id={portInputId}
           inputMode="numeric"
@@ -2320,12 +2315,12 @@ function NetworkSettingsSection({
           >
             Private Address target port
           </Label>
-          <Input
+          <PaneInput
             aria-describedby={
               effectivePortError == null ? undefined : `${networkInputId}-error`
             }
             aria-invalid={effectivePortError != null}
-            className={cn(editableTextControlClassName, "max-w-32")}
+            className="max-w-32"
             disabled={readOnly}
             id={networkInputId}
             inputMode="numeric"
@@ -3033,9 +3028,8 @@ function ImageSettingsSection({
             <span className="min-w-0 truncate">{shownImage}</span>
           </div>
         ) : (
-          <Input
+          <PaneInput
             aria-label="Container image"
-            className={editableTextControlClassName}
             id={imageInputId}
             onBlur={onBlur}
             onChange={(event) => onChange(event.target.value)}

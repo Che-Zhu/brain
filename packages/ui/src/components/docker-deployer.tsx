@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { PaneInput } from "@workspace/ui/components/pane-input";
 import { Spinner } from "@workspace/ui/components/spinner";
 import {
   DEFAULT_DOCKER_APP_LISTENING_PORT,
@@ -161,13 +161,12 @@ export function DockerDeployer({
       >
         <div className="flex min-w-0 flex-col gap-1.5">
           <Label htmlFor="docker-deployer-image">Docker image</Label>
-          <Input
+          <PaneInput
             aria-describedby={
               visibleImageError ? "docker-deployer-image-error" : undefined
             }
             aria-invalid={visibleImageError ? true : undefined}
             autoComplete="off"
-            className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
             disabled={busy}
             id="docker-deployer-image"
             onChange={(event) => {
@@ -231,10 +230,9 @@ export function DockerDeployer({
                     className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] gap-2"
                     key={row.id}
                   >
-                    <Input
+                    <PaneInput
                       aria-invalid={rowError ? true : undefined}
                       aria-label={`Environment variable ${index + 1} name`}
-                      className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
                       disabled={busy}
                       onChange={(event) => {
                         const nextName = event.currentTarget.value;
@@ -249,9 +247,8 @@ export function DockerDeployer({
                       placeholder="NAME"
                       value={row.name}
                     />
-                    <Input
+                    <PaneInput
                       aria-label={`Environment variable ${index + 1} value`}
-                      className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
                       disabled={busy}
                       onChange={(event) => {
                         const nextValue = event.currentTarget.value;
@@ -302,12 +299,11 @@ export function DockerDeployer({
         <div className="grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor="docker-deployer-port">App Listening Port</Label>
-            <Input
+            <PaneInput
               aria-describedby={
                 portError ? "docker-deployer-port-error" : undefined
               }
               aria-invalid={portError ? true : undefined}
-              className="border-resource-pane-input bg-transparent text-resource-pane-foreground placeholder:text-resource-pane-muted focus-visible:border-theme-blue focus-visible:ring-[1px] focus-visible:ring-theme-blue/50 dark:bg-transparent"
               disabled={busy}
               id="docker-deployer-port"
               inputMode="numeric"
