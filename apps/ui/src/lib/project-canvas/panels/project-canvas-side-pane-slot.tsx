@@ -8,6 +8,7 @@ export type ProjectCanvasSidePaneEntry =
   | { kind: "dockerDeployment" }
   | { kind: "githubDeployment" }
   | { kind: "resource" }
+  | { kind: "skillLibrary" }
   | null;
 
 export type ProjectCanvasSidePanePreferredEntry = Exclude<
@@ -21,12 +22,14 @@ export function resolveProjectCanvasSidePaneEntry({
   githubDeploymentPaneOpen,
   preferredEntry,
   resourcePaneOpen,
+  skillLibraryPaneOpen,
 }: {
   databaseDeploymentPaneOpen?: boolean;
   dockerDeploymentPaneOpen?: boolean;
   githubDeploymentPaneOpen: boolean;
   preferredEntry?: ProjectCanvasSidePanePreferredEntry | null;
   resourcePaneOpen: boolean;
+  skillLibraryPaneOpen?: boolean;
 }): ProjectCanvasSidePaneEntry {
   if (preferredEntry === "databaseDeployment" && databaseDeploymentPaneOpen) {
     return { kind: "databaseDeployment" };
@@ -38,6 +41,10 @@ export function resolveProjectCanvasSidePaneEntry({
 
   if (preferredEntry === "githubDeployment" && githubDeploymentPaneOpen) {
     return { kind: "githubDeployment" };
+  }
+
+  if (preferredEntry === "skillLibrary" && skillLibraryPaneOpen) {
+    return { kind: "skillLibrary" };
   }
 
   if (preferredEntry === "resource" && resourcePaneOpen) {
@@ -56,6 +63,10 @@ export function resolveProjectCanvasSidePaneEntry({
     return { kind: "dockerDeployment" };
   }
 
+  if (skillLibraryPaneOpen) {
+    return { kind: "skillLibrary" };
+  }
+
   if (resourcePaneOpen) {
     return { kind: "resource" };
   }
@@ -69,12 +80,14 @@ export function ProjectCanvasSidePaneSlot({
   entry,
   githubDeploymentPane,
   resourcePane,
+  skillLibraryPane,
 }: {
   databaseDeploymentPane?: ReactNode;
   dockerDeploymentPane?: ReactNode;
   entry: ProjectCanvasSidePaneEntry;
   githubDeploymentPane: ReactNode;
   resourcePane: ReactNode;
+  skillLibraryPane?: ReactNode;
 }) {
   let pane: ReactNode = null;
 
@@ -84,6 +97,8 @@ export function ProjectCanvasSidePaneSlot({
     pane = dockerDeploymentPane;
   } else if (entry?.kind === "githubDeployment") {
     pane = githubDeploymentPane;
+  } else if (entry?.kind === "skillLibrary") {
+    pane = skillLibraryPane;
   } else if (entry?.kind === "resource") {
     pane = resourcePane;
   }

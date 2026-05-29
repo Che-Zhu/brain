@@ -24,6 +24,7 @@ import {
   ChatGithubDeployButton,
   ChatGithubDeployPopover,
   ChatGithubMark,
+  ChatSkillLibraryButton,
 } from "./chat.input";
 import { ChatTranscript } from "./chat.transcript";
 
@@ -47,6 +48,7 @@ export type {
   ChatDockerDeployButtonProps,
   ChatGithubDeployButtonProps,
   ChatGithubDeployPopoverProps,
+  ChatSkillLibraryButtonProps,
 } from "./chat.input";
 export {
   ChatComposerContextIndicator,
@@ -56,6 +58,7 @@ export {
   ChatGithubDeployButton,
   ChatGithubDeployPopover,
   ChatGithubMark,
+  ChatSkillLibraryButton,
   GITHUB_MARK_PATH,
 } from "./chat.input";
 export type {
@@ -102,6 +105,7 @@ export const Chat = Object.assign(ChatShell, {
   NewThread: ChatHeaderNewThread,
   Root: ChatRoot,
   Setting: ChatHeaderSetting,
+  SkillLibraryButton: ChatSkillLibraryButton,
   ThreadSelect: ChatThreadSelect,
   Transcript: ChatTranscript,
 });

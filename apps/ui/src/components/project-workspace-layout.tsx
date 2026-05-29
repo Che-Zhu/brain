@@ -229,6 +229,7 @@ function ProjectAssistantChatSession({
   onDockerIntent,
   onCreateThread,
   onGithubIntent,
+  onSkillIntent,
   onSelectThread,
 }: {
   bootstrap: Pick<AssistantSessionPayload, "chatId" | "messages">;
@@ -240,6 +241,7 @@ function ProjectAssistantChatSession({
   onDockerIntent: () => void;
   onCreateThread: () => Promise<void>;
   onGithubIntent: () => void;
+  onSkillIntent: () => void;
   onSelectThread: (threadId: string) => Promise<void>;
 }) {
   const router = useRouter();
@@ -598,6 +600,7 @@ function ProjectAssistantChatSession({
                   <Chat.DatabaseDeployButton
                     onComposerAction={onDatabaseIntent}
                   />
+                  <Chat.SkillLibraryButton onComposerAction={onSkillIntent} />
                 </div>
                 <Chat.ComposerSend
                   onPrimaryAction={onPrimaryAction}
@@ -700,6 +703,11 @@ function ProjectAssistantChatPane() {
       .openAssistantIntent({ type: "docker" })
       .catch(() => undefined);
   }, [sidePaneController]);
+  const openSkillIntent = useCallback(() => {
+    sidePaneController
+      .openAssistantIntent({ type: "skill" })
+      .catch(() => undefined);
+  }, [sidePaneController]);
 
   if (sessionError) {
     return (
@@ -735,6 +743,7 @@ function ProjectAssistantChatPane() {
       onDockerIntent={openDockerIntent}
       onGithubIntent={openGithubIntent}
       onSelectThread={selectThread}
+      onSkillIntent={openSkillIntent}
       threads={session.threads}
     />
   );

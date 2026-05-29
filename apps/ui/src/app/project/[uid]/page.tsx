@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DatabaseDeploymentPane } from "@/components/database-deployment-pane";
 import { DockerDeploymentPane } from "@/components/docker-deployment-pane";
 import { GitHubDeploymentPane } from "@/components/github-deployment-pane";
+import { SkillLibraryPane } from "@/components/skill-library-pane";
 import { useProjectCanvas } from "@/hooks/use-project-canvas";
 import { useProjectCanvasLayout } from "@/hooks/use-project-canvas-layout";
 import { useProjectServices } from "@/hooks/use-project-services";
@@ -42,6 +43,7 @@ import { DATABASE_PANE, WORKLOAD_PANE } from "@/store/canvas-store";
 const GITHUB_DEPLOYMENT_PANE_QUERY_KEY = "githubDeployment" as const;
 const DATABASE_DEPLOYMENT_PANE_QUERY_KEY = "databaseDeployment" as const;
 const DOCKER_DEPLOYMENT_PANE_QUERY_KEY = "dockerDeployment" as const;
+const SKILL_LIBRARY_PANE_QUERY_KEY = "skillLibrary" as const;
 
 export default function ProjectUidPage() {
   const params = useParams<{ uid: string }>();
@@ -114,6 +116,10 @@ export default function ProjectUidPage() {
     DOCKER_DEPLOYMENT_PANE_QUERY_KEY,
     parseAsBoolean.withDefault(false)
   );
+  const [skillLibraryPaneOpen, setSkillLibraryPaneOpen] = useQueryState(
+    SKILL_LIBRARY_PANE_QUERY_KEY,
+    parseAsBoolean.withDefault(false)
+  );
   const replaceDeploymentWithResourcePane = useCallback(() => {
     setPreferredCanvasSidePaneEntry("resource");
     Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(() => undefined);
@@ -121,10 +127,12 @@ export default function ProjectUidPage() {
       () => undefined
     );
     Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(() => undefined);
+    Promise.resolve(setSkillLibraryPaneOpen(false)).catch(() => undefined);
   }, [
     setDatabaseDeploymentPaneOpen,
     setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
+    setSkillLibraryPaneOpen,
   ]);
 
   const {
@@ -187,6 +195,7 @@ export default function ProjectUidPage() {
           githubDeploymentPaneOpen,
           preferredEntry: preferredCanvasSidePaneEntry,
           resourcePaneOpen: canvasResourcePaneOpen,
+          skillLibraryPaneOpen,
         });
   const closeDatabaseDeploymentPane = useCallback(() => {
     Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
@@ -199,6 +208,9 @@ export default function ProjectUidPage() {
   const closeDockerDeploymentPane = useCallback(() => {
     Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(() => undefined);
   }, [setDockerDeploymentPaneOpen]);
+  const closeSkillLibraryPane = useCallback(() => {
+    Promise.resolve(setSkillLibraryPaneOpen(false)).catch(() => undefined);
+  }, [setSkillLibraryPaneOpen]);
   const openDatabaseDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
       setPreferredCanvasSidePaneEntry("databaseDeployment");
@@ -208,6 +220,7 @@ export default function ProjectUidPage() {
       Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
         () => undefined
       );
+      Promise.resolve(setSkillLibraryPaneOpen(false)).catch(() => undefined);
       Promise.resolve(setDatabaseDeploymentPaneOpen(true)).catch(
         () => undefined
       );
@@ -217,6 +230,7 @@ export default function ProjectUidPage() {
     setDatabaseDeploymentPaneOpen,
     setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
+    setSkillLibraryPaneOpen,
   ]);
   const openDockerDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
@@ -227,6 +241,7 @@ export default function ProjectUidPage() {
       Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
         () => undefined
       );
+      Promise.resolve(setSkillLibraryPaneOpen(false)).catch(() => undefined);
       Promise.resolve(setDockerDeploymentPaneOpen(true)).catch(() => undefined);
     });
   }, [
@@ -234,6 +249,7 @@ export default function ProjectUidPage() {
     setDatabaseDeploymentPaneOpen,
     setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
+    setSkillLibraryPaneOpen,
   ]);
   const openGithubDeploymentPane = useCallback(() => {
     requestResourcePaneReplacement(() => {
@@ -244,6 +260,7 @@ export default function ProjectUidPage() {
       Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(
         () => undefined
       );
+      Promise.resolve(setSkillLibraryPaneOpen(false)).catch(() => undefined);
       Promise.resolve(setGithubDeploymentPaneOpen(true)).catch(() => undefined);
     });
   }, [
@@ -251,6 +268,28 @@ export default function ProjectUidPage() {
     setDatabaseDeploymentPaneOpen,
     setDockerDeploymentPaneOpen,
     setGithubDeploymentPaneOpen,
+    setSkillLibraryPaneOpen,
+  ]);
+  const openSkillLibraryPane = useCallback(() => {
+    requestResourcePaneReplacement(() => {
+      setPreferredCanvasSidePaneEntry("skillLibrary");
+      Promise.resolve(setDatabaseDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setDockerDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setGithubDeploymentPaneOpen(false)).catch(
+        () => undefined
+      );
+      Promise.resolve(setSkillLibraryPaneOpen(true)).catch(() => undefined);
+    });
+  }, [
+    requestResourcePaneReplacement,
+    setDatabaseDeploymentPaneOpen,
+    setDockerDeploymentPaneOpen,
+    setGithubDeploymentPaneOpen,
+    setSkillLibraryPaneOpen,
   ]);
   const projectCanvasSidePaneSurface = useMemo<ProjectSidePaneSurface>(
     () => ({
@@ -267,6 +306,10 @@ export default function ProjectUidPage() {
           openDockerDeploymentPane();
           return { status: "handled" as const };
         }
+        if (entry?.kind === "skillLibrary") {
+          openSkillLibraryPane();
+          return { status: "handled" as const };
+        }
         if (entry?.kind !== "githubDeployment") {
           return { status: "ignored" as const };
         }
@@ -278,6 +321,7 @@ export default function ProjectUidPage() {
       openDatabaseDeploymentPane,
       openDockerDeploymentPane,
       openGithubDeploymentPane,
+      openSkillLibraryPane,
       uid,
     ]
   );
@@ -374,6 +418,9 @@ export default function ProjectUidPage() {
                       />
                     }
                     resourcePane={canvasResourcePane}
+                    skillLibraryPane={
+                      <SkillLibraryPane onClose={closeSkillLibraryPane} />
+                    }
                   />
                   <CanvasActionSurface
                     action={canvasAction}

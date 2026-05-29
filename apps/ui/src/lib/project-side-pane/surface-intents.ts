@@ -10,6 +10,10 @@ export type ProjectSidePaneEntry =
       placement: "reserved";
     }
   | {
+      kind: "skillLibrary";
+      placement: "reserved";
+    }
+  | {
       kind: "databaseDeployment";
       placement: "overlay";
       projectUid: string;
@@ -23,11 +27,22 @@ export type ProjectSidePaneEntry =
       kind: "githubDeployment";
       placement: "overlay";
       projectUid: string;
+    }
+  | {
+      kind: "skillLibrary";
+      placement: "overlay";
+      projectUid: string;
     };
 
 export function projectListEntryForAssistantIntent(
   intent: ProjectSidePaneAssistantIntent
 ): ProjectSidePaneEntry | null {
+  if (intent.type === "skill") {
+    return {
+      kind: "skillLibrary",
+      placement: "reserved",
+    };
+  }
   if (intent.type === "github") {
     return {
       entryMode: "githubDirect",
@@ -59,6 +74,13 @@ export function projectCanvasEntryForAssistantIntent(
   const uid = projectUid.trim();
   if (uid === "") {
     return null;
+  }
+  if (intent.type === "skill") {
+    return {
+      kind: "skillLibrary",
+      placement: "overlay",
+      projectUid: uid,
+    };
   }
   if (intent.type === "database") {
     return {

@@ -11,7 +11,7 @@ import {
 } from "@workspace/ui/components/popover";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
-import { Database, Square } from "lucide-react";
+import { Blocks, Database, Square } from "lucide-react";
 import { type ComponentProps, useEffect, useLayoutEffect, useRef } from "react";
 
 import { ProjectSourceDockerIcon } from "../../assets/project-source-icons";
@@ -40,6 +40,13 @@ export type ChatDatabaseDeployButtonProps = Omit<
 };
 
 export type ChatDockerDeployButtonProps = Omit<
+  ComponentProps<typeof Button>,
+  "children" | "onClick" | "size" | "type" | "variant"
+> & {
+  onComposerAction?: () => void;
+};
+
+export type ChatSkillLibraryButtonProps = Omit<
   ComponentProps<typeof Button>,
   "children" | "onClick" | "size" | "type" | "variant"
 > & {
@@ -408,6 +415,34 @@ export function ChatDockerDeployButton({
   );
 }
 
+/** Icon-only control for the static Skill library; omitted `onComposerAction` renders nothing. */
+export function ChatSkillLibraryButton({
+  className,
+  "aria-label": ariaLabel = "Skill library",
+  onComposerAction,
+  ...props
+}: ChatSkillLibraryButtonProps) {
+  if (!onComposerAction) {
+    return null;
+  }
+
+  return (
+    <Button
+      aria-label={ariaLabel}
+      className={cn("hoverable shrink-0 cursor-pointer rounded-xl", className)}
+      data-slot="chat-skill-library-button"
+      onClick={onComposerAction}
+      size="icon-lg"
+      title="Skill library"
+      type="button"
+      variant="ghost"
+      {...props}
+    >
+      <Blocks aria-hidden className="size-4 text-foreground opacity-90" />
+    </Button>
+  );
+}
+
 export interface ChatComposerSendProps {
   className?: string;
   onPrimaryAction: () => void;
@@ -487,6 +522,7 @@ export function ChatComposer({
             <ChatGithubDeployButton onComposerAction={onComposerAction} />
             <ChatDockerDeployButton onComposerAction={onComposerAction} />
             <ChatDatabaseDeployButton onComposerAction={onComposerAction} />
+            <ChatSkillLibraryButton onComposerAction={onComposerAction} />
           </div>
           <ChatComposerSend
             onPrimaryAction={onPrimaryAction}
@@ -510,4 +546,5 @@ ChatGithubDeployPopover.displayName = "Chat.GithubDeployPopover";
 ChatDatabaseDeployButton.displayName = "Chat.DatabaseDeployButton";
 ChatDockerDeployButton.displayName = "Chat.DockerDeployButton";
 ChatGithubDeployButton.displayName = "Chat.GithubDeployButton";
+ChatSkillLibraryButton.displayName = "Chat.SkillLibraryButton";
 ChatComposer.displayName = "Chat.Composer";

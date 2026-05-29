@@ -5,9 +5,10 @@ import { SidePanePresence } from "@workspace/ui/components/side-pane";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { ProjectCreationPane } from "@/components/project-creation-pane";
+import { SkillLibraryPane } from "@/components/skill-library-pane";
 import { useProjectCreator } from "@/hooks/use-project-creator";
 import { useProjectsExplorer } from "@/hooks/use-projects-explorer";
 import type { ProjectSidePaneSurface } from "@/lib/project-side-pane/controller";
@@ -49,26 +50,39 @@ export default function ProjectIndexPage() {
     namespace: ns,
     onProjectCreated,
   });
+  const [skillLibraryPaneOpen, setSkillLibraryPaneOpen] = useState(false);
+  const openProjectCreationPane = useCallback(
+    (entryMode?: Parameters<typeof openCreationPane>[0]) => {
+      setSkillLibraryPaneOpen(false);
+      openCreationPane(entryMode);
+    },
+    [openCreationPane]
+  );
 
   const projectListSidePaneSurface = useMemo<ProjectSidePaneSurface>(
     () => ({
       id: "project-list",
       openAssistantIntent: (intent) => {
         const entry = projectListEntryForAssistantIntent(intent);
+        if (entry?.kind === "skillLibrary") {
+          onCreationPaneOpenChange(false);
+          setSkillLibraryPaneOpen(true);
+          return { status: "handled" as const };
+        }
         if (entry?.kind !== "projectCreation") {
           return { status: "ignored" as const };
         }
-        openCreationPane(entry.entryMode);
+        openProjectCreationPane(entry.entryMode);
         return { status: "handled" as const };
       },
     }),
-    [openCreationPane]
+    [onCreationPaneOpenChange, openProjectCreationPane]
   );
   useProjectSidePaneSurface(projectListSidePaneSurface);
 
   const explorerActions = useMemo(
-    () => ({ ...actions, onNewProject: openCreationPane }),
-    [actions, openCreationPane]
+    () => ({ ...actions, onNewProject: openProjectCreationPane }),
+    [actions, openProjectCreationPane]
   );
 
   return (
@@ -100,7 +114,7 @@ export default function ProjectIndexPage() {
       <div
         className={cn(
           "relative flex min-h-0 flex-1 flex-col items-center gap-4 px-[52px] pt-[52px] pb-6 transition-[padding] duration-200 ease-out motion-reduce:transition-none",
-          creationPaneOpen && "xl:pr-[40rem]"
+          (creationPaneOpen || skillLibraryPaneOpen) && "xl:pr-[40rem]"
         )}
       >
         <ProjectExplorer.Root actions={explorerActions} states={states}>
@@ -120,6 +134,11 @@ export default function ProjectIndexPage() {
             onClose={() => onCreationPaneOpenChange(false)}
             resetKey={creatorResetKey}
           />
+        ) : null}
+      </SidePanePresence>
+      <SidePanePresence>
+        {skillLibraryPaneOpen ? (
+          <SkillLibraryPane onClose={() => setSkillLibraryPaneOpen(false)} />
         ) : null}
       </SidePanePresence>
     </div>

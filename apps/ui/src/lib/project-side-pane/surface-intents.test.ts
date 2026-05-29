@@ -30,6 +30,13 @@ test("Project List translates assistant Docker intent to Docker direct project c
   });
 });
 
+test("Project List translates assistant Skill intent to the Skill library", () => {
+  assert.deepEqual(projectListEntryForAssistantIntent({ type: "skill" }), {
+    kind: "skillLibrary",
+    placement: "reserved",
+  });
+});
+
 test("Project Canvas translates assistant GitHub intent to deployment in the current Project", () => {
   assert.deepEqual(
     projectCanvasEntryForAssistantIntent(
@@ -66,6 +73,20 @@ test("Project Canvas translates assistant Docker intent to deployment in the cur
     ),
     {
       kind: "dockerDeployment",
+      placement: "overlay",
+      projectUid: "project-1",
+    }
+  );
+});
+
+test("Project Canvas translates assistant Skill intent to the Skill library", () => {
+  assert.deepEqual(
+    projectCanvasEntryForAssistantIntent(
+      { type: "skill" },
+      { projectUid: "project-1" }
+    ),
+    {
+      kind: "skillLibrary",
       placement: "overlay",
       projectUid: "project-1",
     }
