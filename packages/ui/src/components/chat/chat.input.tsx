@@ -99,6 +99,7 @@ export function ChatGithubDeployPopover({
             <GithubDeployer.Shell className="gap-3 p-1">
               <GithubDeployer.Title />
               <GithubDeployer.Subtitle />
+              <GithubDeployer.UrlInput />
               <GithubDeployer.AuthButton />
               <GithubDeployer.RepoSelect />
               <GithubDeployer.Complete />

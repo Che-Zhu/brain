@@ -22,6 +22,7 @@ export const { registry } = defineRegistry(catalog, {
         <GithubDeployer.Shell>
           <GithubDeployer.Title />
           <GithubDeployer.Subtitle />
+          <GithubDeployer.UrlInput />
           <GithubDeployer.AuthButton />
           <GithubDeployer.RepoSelect />
           <GithubDeployer.Complete />

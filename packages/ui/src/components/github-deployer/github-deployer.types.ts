@@ -2,6 +2,7 @@ export interface GithubDeployerRepo {
   fullName?: string;
   id: string;
   name: string;
+  url?: string;
 }
 
 /**

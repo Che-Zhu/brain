@@ -9,10 +9,11 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@workspace/ui/components/combobox";
+import { Input } from "@workspace/ui/components/input";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { cn } from "@workspace/ui/lib/utils";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
-import { type ComponentProps, useMemo } from "react";
+import { CheckCircle2, Link2, ShieldCheck } from "lucide-react";
+import { type ComponentProps, useMemo, useState } from "react";
 
 import {
   GithubDeployerContext,
@@ -27,9 +28,48 @@ const GITHUB_MARK_PATH =
 
 const authRowClass =
   "inline-flex min-h-0 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-2 py-1.5 text-xs leading-none";
+const URL_PROTOCOL_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
+const GIT_SUFFIX_RE = /\.git$/i;
 
 function hasGithubToken(token: string | null | undefined): token is string {
   return typeof token === "string" && token.length > 0;
+}
+
+function githubUrlToRepo(input: string): GithubDeployerRepo | null {
+  const raw = input.trim();
+  if (raw === "") {
+    return null;
+  }
+
+  const withProtocol = URL_PROTOCOL_RE.test(raw) ? raw : `https://${raw}`;
+
+  let url: URL;
+  try {
+    url = new URL(withProtocol);
+  } catch {
+    return null;
+  }
+
+  if (url.hostname.toLowerCase() !== "github.com") {
+    return null;
+  }
+
+  const [owner, repoSegment] = url.pathname
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const repo = repoSegment?.replace(GIT_SUFFIX_RE, "");
+  if (!(owner && repo)) {
+    return null;
+  }
+
+  const fullName = `${owner}/${repo}`;
+  return {
+    fullName,
+    id: `github-url:${fullName}`,
+    name: repo,
+    url: `https://github.com/${fullName}`,
+  };
 }
 
 function GithubDeployerTitle({ className, ...props }: ComponentProps<"div">) {
@@ -114,6 +154,74 @@ function GithubDeployerAuthButton({ className }: { className?: string }) {
       <ShieldCheck aria-hidden className="size-4 shrink-0" strokeWidth={2} />
       <span className="min-w-0 truncate">Authorize GitHub</span>
     </Button>
+  );
+}
+
+function GithubDeployerUrlInput({ className }: { className?: string }) {
+  const {
+    actions: { onDeploy },
+    states: { deployedRepo, isLoading },
+  } = useGithubDeployer();
+  const [repoUrl, setRepoUrl] = useState("");
+  const parsedRepo = useMemo(() => githubUrlToRepo(repoUrl), [repoUrl]);
+  const showInvalid = repoUrl.trim() !== "" && !parsedRepo;
+
+  if (deployedRepo) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn("flex w-full min-w-0 flex-col gap-2", className)}
+      data-slot="github-deployer-url-input"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Link2
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={2}
+          />
+          <Input
+            aria-invalid={showInvalid || undefined}
+            className="pl-8"
+            disabled={isLoading}
+            onChange={(event) => setRepoUrl(event.currentTarget.value)}
+            placeholder="https://github.com/owner/repo"
+            type="url"
+            value={repoUrl}
+          />
+        </div>
+        <Button
+          data-slot="github-deployer-url-deploy"
+          disabled={!(parsedRepo && onDeploy) || isLoading}
+          onClick={() => {
+            if (parsedRepo && onDeploy) {
+              onDeploy(parsedRepo);
+            }
+          }}
+          type="button"
+        >
+          Deploy
+        </Button>
+      </div>
+      {showInvalid ? (
+        <p
+          className="text-destructive text-xs"
+          data-slot="github-deployer-url-error"
+        >
+          Enter a GitHub repository URL.
+        </p>
+      ) : (
+        <p
+          className="text-muted-foreground text-xs"
+          data-slot="github-deployer-url-help"
+        >
+          Paste a public GitHub repository URL, or authorize GitHub to choose
+          from private repositories.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -267,6 +375,7 @@ const GithubDeployerBase = Object.assign(GithubDeployerShell, {
   Shell: GithubDeployerShell,
   Subtitle: GithubDeployerSubtitle,
   Title: GithubDeployerTitle,
+  UrlInput: GithubDeployerUrlInput,
   useGithubDeployer,
 });
 
@@ -276,6 +385,7 @@ GithubDeployerRepoSelect.displayName = "GithubDeployer.RepoSelect";
 GithubDeployerShell.displayName = "GithubDeployer.Shell";
 GithubDeployerSubtitle.displayName = "GithubDeployer.Subtitle";
 GithubDeployerTitle.displayName = "GithubDeployer.Title";
+GithubDeployerUrlInput.displayName = "GithubDeployer.UrlInput";
 
 export const GithubDeployer = GithubDeployerBase;
 

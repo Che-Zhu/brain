@@ -70,6 +70,7 @@ export function ProjectCreationPane({
           <GithubDeployer.Shell className="gap-3">
             <GithubDeployer.Title />
             <GithubDeployer.Subtitle />
+            <GithubDeployer.UrlInput />
             <GithubDeployer.AuthButton />
             <GithubDeployer.RepoSelect />
             <GithubDeployer.Complete />

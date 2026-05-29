@@ -10,6 +10,7 @@ export function buildAssistantWorkspaceContextPrompt(opts: {
 }): string {
   const { kubernetesNamespace, assistantContext } = opts;
   const ns = kubernetesNamespace.trim();
+  const projectName = assistantContext?.projectName?.trim() ?? "";
   const uid = assistantContext?.projectUid?.trim() ?? "";
 
   const lines: string[] = [
@@ -20,6 +21,9 @@ export function buildAssistantWorkspaceContextPrompt(opts: {
   ];
 
   if (uid !== "") {
+    if (projectName !== "") {
+      lines.push(`- Project claim name: \`${escapeBackticks(projectName)}\``);
+    }
     lines.push(
       `- Project UID (claims label scope): \`${escapeBackticks(uid)}\``
     );

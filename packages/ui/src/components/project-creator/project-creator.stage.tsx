@@ -40,6 +40,7 @@ function GithubPanel() {
         <GithubDeployer.Shell className="gap-3">
           <GithubDeployer.Title />
           <GithubDeployer.Subtitle />
+          <GithubDeployer.UrlInput />
           <GithubDeployer.AuthButton />
           <GithubDeployer.RepoSelect />
           <GithubDeployer.Complete />

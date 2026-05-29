@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgSchema,
+  primaryKey,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -88,6 +89,171 @@ export const assistantEntitlements = ns.table(
   ]
 );
 
+export type DeployTaskStatus =
+  | "queued"
+  | "running"
+  | "blocked"
+  | "applying"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type DeployTaskPhase =
+  | "queued"
+  | "runtime"
+  | "workspace"
+  | "analyze"
+  | "configure"
+  | "generate"
+  | "apply"
+  | "preview"
+  | "ship";
+
+export interface DeployTaskArtifactSummary {
+  entrypointYaml?: string;
+  notes?: string;
+  outputJson?: unknown;
+  resources?: {
+    apiVersion: string;
+    kind: string;
+    name: string;
+    namespace: string;
+  }[];
+  resourceYamls?: string[];
+}
+
+export interface DeployTaskBlockingInput {
+  id: string;
+  label: string;
+  required: boolean;
+  type: "confirmation" | "env" | "secret" | "text";
+}
+
+export interface DeployTaskEventPayload {
+  [key: string]: unknown;
+}
+
+export const deployTasks = ns.table(
+  "deploy_tasks",
+  {
+    id: text("id").primaryKey(),
+    namespace: text("namespace").notNull(),
+    projectUid: text("project_uid"),
+    projectName: text("project_name"),
+    selectedWorkloadUid: text("selected_workload_uid"),
+    repoId: text("repo_id"),
+    repoFullName: text("repo_full_name").notNull(),
+    repoName: text("repo_name").notNull(),
+    repoUrl: text("repo_url").notNull(),
+    branch: text("branch"),
+    prompt: text("prompt"),
+    status: text("status").notNull().$type<DeployTaskStatus>(),
+    phase: text("phase").notNull().$type<DeployTaskPhase>(),
+    runtimeProvider: text("runtime_provider"),
+    runtimeName: text("runtime_name"),
+    runtimeState: text("runtime_state"),
+    gatewayUrl: text("gateway_url"),
+    gatewaySessionId: text("gateway_session_id"),
+    gatewayThreadId: text("gateway_thread_id"),
+    gatewayTurnId: text("gateway_turn_id"),
+    artifactSummary: jsonb("artifact_summary")
+      .notNull()
+      .$type<DeployTaskArtifactSummary>()
+      .default({}),
+    blockingInputs: jsonb("blocking_inputs")
+      .notNull()
+      .$type<DeployTaskBlockingInput[]>()
+      .default([]),
+    previewUrl: text("preview_url"),
+    resultUrl: text("result_url"),
+    error: text("error"),
+    heartbeatAt: timestamp("heartbeat_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    startedAt: timestamp("started_at", { mode: "date", withTimezone: true }),
+    completedAt: timestamp("completed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("deploy_tasks_namespace_updated_at_idx").on(
+      table.namespace,
+      table.updatedAt
+    ),
+    index("deploy_tasks_project_uid_updated_at_idx").on(
+      table.projectUid,
+      table.updatedAt
+    ),
+    index("deploy_tasks_status_updated_at_idx").on(
+      table.status,
+      table.updatedAt
+    ),
+  ]
+);
+
+export const deployTaskEvents = ns.table(
+  "deploy_task_events",
+  {
+    taskId: text("task_id")
+      .notNull()
+      .references(() => deployTasks.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    kind: text("kind").notNull(),
+    phase: text("phase").$type<DeployTaskPhase>(),
+    message: text("message"),
+    payload: jsonb("payload")
+      .notNull()
+      .$type<DeployTaskEventPayload>()
+      .default({}),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.taskId, table.seq],
+      name: "deploy_task_events_pk",
+    }),
+    index("deploy_task_events_task_created_at_idx").on(
+      table.taskId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const deployTaskMessages = ns.table(
+  "deploy_task_messages",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => deployTasks.id, { onDelete: "cascade" }),
+    role: text("role").notNull().$type<UIMessage["role"]>(),
+    parts: jsonb("parts").notNull().$type<UIMessage["parts"]>(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("deploy_task_messages_task_id_idx").on(table.taskId),
+    index("deploy_task_messages_task_created_idx").on(
+      table.taskId,
+      table.createdAt
+    ),
+  ]
+);
+
 export type AssistantChatRow = typeof assistantChats.$inferSelect;
 export type AssistantChatMessageRow = typeof assistantChatMessages.$inferSelect;
 export type AssistantEntitlementRow = typeof assistantEntitlements.$inferSelect;
+export type DeployTaskRow = typeof deployTasks.$inferSelect;
+export type DeployTaskEventRow = typeof deployTaskEvents.$inferSelect;
+export type DeployTaskMessageRow = typeof deployTaskMessages.$inferSelect;

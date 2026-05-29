@@ -27,6 +27,7 @@ import { useGithubRepos } from "@/hooks/use-github-repos";
 import type { CompositionListItem } from "@/lib/crossplane-composition-list";
 import { dbDeploymentChoicesFromCompositionRows } from "@/lib/db-composition-options";
 import { renderDbDeploymentYaml } from "@/lib/db-deployment-yaml";
+import { dispatchDeployTaskCreatedEvent } from "@/lib/deploy-task/browser-events";
 import {
   DEFAULT_DOCKER_AP_COMPOSITION_NAME,
   renderDockerDeploymentYaml,
@@ -89,6 +90,34 @@ function projectDisplayNameValidationError(
     return `A project named "${trimmed}" already exists.`;
   }
   return null;
+}
+
+function deployTaskErrorMessage(body: unknown): string {
+  if (body != null && typeof body === "object" && "error" in body) {
+    const error = (body as { error?: unknown }).error;
+    if (typeof error === "string" && error !== "") {
+      return error;
+    }
+  }
+  return "Could not create deploy task.";
+}
+
+function deployTaskSuccessMessage(body: unknown): string {
+  if (body == null || typeof body !== "object" || !("task" in body)) {
+    return "Deploy task queued.";
+  }
+  const task = (body as { task?: { id?: unknown } }).task;
+  return typeof task?.id === "string" && task.id !== ""
+    ? `Deploy task ${task.id} queued.`
+    : "Deploy task queued.";
+}
+
+function deployTaskId(body: unknown): string | null {
+  if (body == null || typeof body !== "object" || !("task" in body)) {
+    return null;
+  }
+  const task = (body as { task?: { id?: unknown } }).task;
+  return typeof task?.id === "string" && task.id !== "" ? task.id : null;
 }
 
 export interface UseProjectCreatorOptions {
@@ -177,48 +206,10 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
     return dbDeploymentChoicesFromCompositionRows(dbCompositionRows);
   }, [dbCompositionRows, hasKubeconfig]);
 
-  const handleGithubDeploy = useCallback(
-    (repo: GithubDeployerRepo) => {
-      const displayName = deriveGithubProjectDisplayName({
-        existingProjectDisplayNames: existingProjects.map(
-          (project) => project.name
-        ),
-        repository: repo,
-      });
-      setLastConfirmedKind(
-        `github:${repo.fullName ?? repo.name}:${displayName}`
-      );
-      toast.info(
-        `GitHub project creation for "${displayName}" isn’t ready yet — this feature is incomplete.`
-      );
-    },
-    [existingProjects]
-  );
-
   const githubDeployerLoading =
-    githubAuthLoading || (!!githubToken?.trim() && githubReposLoading);
-
-  const githubDeployer = useMemo(
-    () => ({
-      actions: {
-        onAuthorize: initiateGithubAuth,
-        onDeploy: handleGithubDeploy,
-      },
-      states: {
-        deployedRepo: null,
-        githubToken: githubToken ?? "",
-        isLoading: githubDeployerLoading,
-        repos: githubRepos,
-      },
-    }),
-    [
-      githubDeployerLoading,
-      githubRepos,
-      githubToken,
-      handleGithubDeploy,
-      initiateGithubAuth,
-    ]
-  );
+    confirmApplying ||
+    githubAuthLoading ||
+    (!!githubToken?.trim() && githubReposLoading);
 
   const applyWithBusyState = useCallback(
     async (fn: () => Promise<void>): Promise<void> => {
@@ -407,6 +398,131 @@ export function useProjectCreator(options?: UseProjectCreatorOptions): {
       namespace,
       onProjectCreated,
       projectCompositionRows,
+    ]
+  );
+
+  const handleGithubDeploy = useCallback(
+    async (repo: GithubDeployerRepo) => {
+      const displayName = deriveGithubProjectDisplayName({
+        existingProjectDisplayNames: existingProjects.map(
+          (project) => project.name
+        ),
+        repository: repo,
+      });
+      const displayNameError = projectDisplayNameValidationError(
+        existingProjects,
+        displayName
+      );
+      const fullName = repo.fullName?.trim();
+      const repoUrl =
+        repo.url?.trim() || (fullName ? `https://github.com/${fullName}` : "");
+
+      if (!(kubeconfig && namespace)) {
+        toast.error("Kubeconfig or namespace is missing.");
+        return;
+      }
+      if (displayNameError) {
+        toast.error(displayNameError);
+        return;
+      }
+      if (!(fullName && repoUrl)) {
+        toast.error("Repository full name is missing.");
+        return;
+      }
+
+      const projectTpl = pickProjectTemplate(projectCompositionRows);
+      if (!projectTpl?.trim()) {
+        toast.error(
+          "Could not load a Project composition template from the cluster."
+        );
+        return;
+      }
+
+      const projectClaimName = randomName();
+      const projectYaml = mergeProjectMetadataDisplayName(
+        renderCrossplaneCompositionTemplate(projectTpl, {
+          name: projectClaimName,
+          namespace,
+        }),
+        displayName
+      );
+
+      await applyWithBusyState(async () => {
+        await k8sApplyYaml(kubeconfig, projectYaml);
+        const projectUid = await fetchProjectUidByName(
+          kubeconfig,
+          namespace,
+          projectClaimName
+        );
+
+        const response = await fetch("/api/deploy-tasks", {
+          body: JSON.stringify({
+            encodedKubeconfig: encodeURIComponent(kubeconfig),
+            githubToken,
+            namespace,
+            projectName: projectClaimName,
+            projectUid,
+            repo: {
+              fullName,
+              id: repo.id,
+              name: repo.name,
+              url: repoUrl,
+            },
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        });
+        const body = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(deployTaskErrorMessage(body));
+        }
+        const taskId = deployTaskId(body);
+
+        toast.success(
+          `Created project "${displayName}". ${deployTaskSuccessMessage(body)}`
+        );
+        if (taskId != null) {
+          dispatchDeployTaskCreatedEvent({
+            projectName: projectClaimName,
+            repoFullName: fullName,
+            taskId,
+          });
+        }
+        setLastConfirmedKind(`github:${fullName}:${projectClaimName}`);
+        dispatchCreationPaneState({ type: "close" });
+        await onProjectCreated?.(projectUid);
+      });
+    },
+    [
+      applyWithBusyState,
+      existingProjects,
+      githubToken,
+      kubeconfig,
+      namespace,
+      onProjectCreated,
+      projectCompositionRows,
+    ]
+  );
+
+  const githubDeployer = useMemo(
+    () => ({
+      actions: {
+        onAuthorize: initiateGithubAuth,
+        onDeploy: handleGithubDeploy,
+      },
+      states: {
+        deployedRepo: null,
+        githubToken: githubToken ?? "",
+        isLoading: githubDeployerLoading,
+        repos: githubRepos,
+      },
+    }),
+    [
+      githubDeployerLoading,
+      githubRepos,
+      githubToken,
+      handleGithubDeploy,
+      initiateGithubAuth,
     ]
   );
 

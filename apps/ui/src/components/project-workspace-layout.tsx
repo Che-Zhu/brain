@@ -12,6 +12,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithToolCalls,
+  type UIMessage,
 } from "ai";
 import { useAtomValue, useSetAtom } from "jotai";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
@@ -29,6 +30,7 @@ import { useSWRConfig } from "swr";
 import { useCurrentProjectDisplayName } from "@/hooks/use-current-project-display-name";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import {
+  appendAssistantThreadMessage,
   createAssistantThread,
   fetchAssistantSession,
   fetchAssistantThreadMessages,
@@ -39,6 +41,11 @@ import type {
   AssistantSessionPayload,
   AssistantThreadDTO,
 } from "@/lib/chat-persistence/types";
+import {
+  consumePendingDeployTaskCreatedEvents,
+  DEPLOY_TASK_CREATED_EVENT,
+  type DeployTaskCreatedEvent,
+} from "@/lib/deploy-task/browser-events";
 import {
   ProjectSidePaneProvider,
   useProjectSidePaneController,
@@ -57,6 +64,26 @@ import { kubeconfigAtom, namespaceAtom } from "@/store/auth-store";
 import { CANVAS_SERVICE_QUERY_KEY } from "@/store/canvas-store";
 import { assistantPaneOpenAtom } from "@/store/layout-store";
 
+const DEPLOY_TASK_STATUS_POLL_MS = 3000;
+const TERMINAL_DEPLOY_TASK_STATUSES = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+interface DeployTaskStatusSnapshot {
+  events?: {
+    message: string | null;
+    phase: string | null;
+    seq: number;
+  }[];
+  task?: {
+    error?: string | null;
+    phase?: string;
+    status?: string;
+  };
+}
+
 type AssistantClientToolSubmission =
   | {
       tool: typeof NAVIGATE_APP_TOOL_NAME;
@@ -69,16 +96,124 @@ type AssistantClientToolSubmission =
       output: RefreshFrontendSwrCachesToolOutput;
     };
 
+function deployTaskChatMessage(input: {
+  error?: string | null;
+  events?: { message: string | null; phase: string | null; seq: number }[];
+  phase?: string;
+  projectName: string;
+  repoFullName: string;
+  status?: string;
+  taskId: string;
+}): UIMessage {
+  const events = input.events?.slice(-6) ?? [];
+  const statusLine =
+    input.status == null
+      ? "Status: queued"
+      : `Status: ${input.status}${input.phase ? ` (${input.phase})` : ""}`;
+  const eventLines =
+    events.length === 0
+      ? []
+      : [
+          "",
+          "Recent events:",
+          ...events.map((event) => {
+            const phase = event.phase ? ` [${event.phase}]` : "";
+            return `- #${event.seq}${phase} ${event.message ?? "No details"}`;
+          }),
+        ];
+  const errorLines = input.error ? ["", `Error: ${input.error}`] : [];
+
+  return {
+    id: `deploy-task-created-${input.taskId}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "text",
+        text: [
+          `GitHub deployment task **${input.taskId}** has been created for **${input.repoFullName}**.`,
+          "",
+          `Project: \`${input.projectName}\``,
+          "",
+          statusLine,
+          ...eventLines,
+          ...errorLines,
+        ].join("\n"),
+      },
+    ],
+  };
+}
+
+function deployTaskStatusUrl(input: {
+  kubeconfig: string;
+  namespace: string;
+  taskId: string;
+}): string {
+  const params = new URLSearchParams({
+    encodedKubeconfig: encodeURIComponent(input.kubeconfig),
+    namespace: input.namespace,
+  });
+  return `/api/deploy-tasks/${encodeURIComponent(input.taskId)}?${params.toString()}`;
+}
+
+async function fetchDeployTaskStatusSnapshot(input: {
+  kubeconfig: string;
+  namespace: string;
+  signal: AbortSignal;
+  taskId: string;
+}): Promise<DeployTaskStatusSnapshot> {
+  const response = await fetch(deployTaskStatusUrl(input), {
+    cache: "no-store",
+    signal: input.signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Deploy task status returned ${response.status}`);
+  }
+  return (await response.json()) as DeployTaskStatusSnapshot;
+}
+
+function deployTaskIsTerminal(snapshot: DeployTaskStatusSnapshot): boolean {
+  return (
+    snapshot.task?.status != null &&
+    TERMINAL_DEPLOY_TASK_STATUSES.has(snapshot.task.status)
+  );
+}
+
+function waitForDeployTaskPollDelay(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, DEPLOY_TASK_STATUS_POLL_MS);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+function logDeployTaskPollError(input: {
+  error: unknown;
+  signal: AbortSignal;
+}) {
+  if (!input.signal.aborted) {
+    console.error("[deploy-task-chat-adapter] poll failed:", input.error);
+  }
+}
+
 function buildAssistantContextPayload(
+  projectName: string | undefined,
   projectUid: string,
   selectedServiceUid: string
 ): AssistantContextPayload | undefined {
+  const pn = projectName?.trim() ?? "";
   const pu = projectUid.trim();
   const sw = selectedServiceUid.trim();
-  if (pu === "" && sw === "") {
+  if (pn === "" && pu === "" && sw === "") {
     return undefined;
   }
   return {
+    ...(pn === "" ? {} : { projectName: pn }),
     ...(pu === "" ? {} : { projectUid: pu }),
     ...(sw === "" ? {} : { selectedWorkload: { kubernetesUid: sw } }),
   };
@@ -110,6 +245,7 @@ function ProjectAssistantChatSession({
   const router = useRouter();
   const { mutate: revalidateScopeSwr } = useSWRConfig();
   const kubeconfig = useAtomValue(kubeconfigAtom);
+  const namespace = useAtomValue(namespaceAtom);
   const chatId = bootstrap.chatId;
   const addToolOutputRef = useRef<
     ((args: AssistantClientToolSubmission) => void | PromiseLike<void>) | null
@@ -117,6 +253,11 @@ function ProjectAssistantChatSession({
 
   const params = useParams<{ uid?: string }>();
   const projectUid = decodeURIComponent(params.uid ?? "");
+  const currentProject = useCurrentProjectDisplayName({
+    kubeconfig,
+    namespace,
+    projectUid,
+  });
   const [serviceUidQuery] = useQueryState(
     CANVAS_SERVICE_QUERY_KEY,
     parseAsString
@@ -152,6 +293,7 @@ function ProjectAssistantChatSession({
           }
           const wire = wireRef.current;
           const assistantContext = buildAssistantContextPayload(
+            currentProject.resourceName,
             wire.projectUid,
             wire.selectedServiceUid
           );
@@ -171,67 +313,174 @@ function ProjectAssistantChatSession({
           };
         },
       }),
-    [kubeconfig]
+    [currentProject.resourceName, kubeconfig]
   );
 
-  const { messages, sendMessage, status, stop, addToolOutput } = useAIChat({
-    id: chatId,
-    messages: bootstrap.messages,
-    transport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-    async onFinish() {
-      await onAssistantStreamFinished?.();
-    },
-    onToolCall({ toolCall }) {
-      if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
-        const result = runNavigateAppTool(toolCall.input, router.push);
-        const submit = addToolOutputRef.current;
-        if (submit == null) {
-          return;
-        }
-        Promise.resolve(
-          submit({
-            tool: NAVIGATE_APP_TOOL_NAME,
-            toolCallId: toolCall.toolCallId,
-            output: result,
-          })
-        ).catch((err: unknown) => {
-          console.error("[navigateApp] addToolOutput failed:", err);
-        });
-        return;
-      }
-
-      if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
-        return;
-      }
-      const submitRefresh = addToolOutputRef.current;
-      runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
-        .then((output) => {
-          if (submitRefresh == null) {
+  const { messages, sendMessage, setMessages, status, stop, addToolOutput } =
+    useAIChat({
+      id: chatId,
+      messages: bootstrap.messages,
+      transport,
+      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+      async onFinish() {
+        await onAssistantStreamFinished?.();
+      },
+      onToolCall({ toolCall }) {
+        if (toolCall.toolName === NAVIGATE_APP_TOOL_NAME) {
+          const result = runNavigateAppTool(toolCall.input, router.push);
+          const submit = addToolOutputRef.current;
+          if (submit == null) {
             return;
           }
           Promise.resolve(
-            submitRefresh({
-              tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
+            submit({
+              tool: NAVIGATE_APP_TOOL_NAME,
               toolCallId: toolCall.toolCallId,
-              output,
+              output: result,
             })
           ).catch((err: unknown) => {
-            console.error(
-              "[refreshFrontendSwrCaches] addToolOutput failed:",
-              err
-            );
+            console.error("[navigateApp] addToolOutput failed:", err);
           });
-        })
-        .catch((err: unknown) => {
-          console.error("[refreshFrontendSwrCaches] mutation failed:", err);
-        });
-    },
-  });
+          return;
+        }
+
+        if (toolCall.toolName !== REFRESH_FRONTEND_SWR_TOOL_NAME) {
+          return;
+        }
+        const submitRefresh = addToolOutputRef.current;
+        runRefreshFrontendSwrCachesTool(revalidateScopeSwr, toolCall.input)
+          .then((output) => {
+            if (submitRefresh == null) {
+              return;
+            }
+            Promise.resolve(
+              submitRefresh({
+                tool: REFRESH_FRONTEND_SWR_TOOL_NAME,
+                toolCallId: toolCall.toolCallId,
+                output,
+              })
+            ).catch((err: unknown) => {
+              console.error(
+                "[refreshFrontendSwrCaches] addToolOutput failed:",
+                err
+              );
+            });
+          })
+          .catch((err: unknown) => {
+            console.error("[refreshFrontendSwrCaches] mutation failed:", err);
+          });
+      },
+    });
 
   // console.log("messages", messages);
 
   addToolOutputRef.current = addToolOutput;
+  useEffect(() => {
+    const trackedTaskIds = new Set<string>();
+    const abortControllers = new Map<string, AbortController>();
+
+    const persistMessage = (message: UIMessage) => {
+      appendAssistantThreadMessage({
+        chatId,
+        message,
+        namespace: assistantNamespaceRaw,
+      }).catch((error: unknown) => {
+        console.error("[deploy-task-chat-adapter] persist failed:", error);
+      });
+    };
+
+    const upsertMessage = (message: UIMessage) => {
+      setMessages((current) => {
+        const index = current.findIndex((item) => item.id === message.id);
+        if (index === -1) {
+          return [...current, message];
+        }
+        const next = [...current];
+        next[index] = message;
+        return next;
+      });
+      persistMessage(message);
+    };
+
+    const trackDeployTask = (
+      detail: DeployTaskCreatedEvent["detail"]
+    ): void => {
+      if (trackedTaskIds.has(detail.taskId)) {
+        return;
+      }
+      trackedTaskIds.add(detail.taskId);
+      const controller = new AbortController();
+      abortControllers.set(detail.taskId, controller);
+
+      const poll = async (): Promise<void> => {
+        while (!controller.signal.aborted) {
+          try {
+            const snapshot = await fetchDeployTaskStatusSnapshot({
+              kubeconfig,
+              namespace: assistantNamespaceRaw,
+              signal: controller.signal,
+              taskId: detail.taskId,
+            });
+            const message = deployTaskChatMessage({
+              ...detail,
+              error: snapshot.task?.error ?? null,
+              events: snapshot.events,
+              phase: snapshot.task?.phase,
+              status: snapshot.task?.status,
+            });
+            upsertMessage(message);
+
+            if (deployTaskIsTerminal(snapshot)) {
+              return;
+            }
+          } catch (error) {
+            logDeployTaskPollError({ error, signal: controller.signal });
+          }
+
+          await waitForDeployTaskPollDelay(controller.signal);
+        }
+      };
+
+      poll().catch((error: unknown) => {
+        logDeployTaskPollError({ error, signal: controller.signal });
+      });
+    };
+
+    const showDeployTaskCreated = (
+      detail: DeployTaskCreatedEvent["detail"]
+    ) => {
+      if (
+        detail == null ||
+        typeof detail.taskId !== "string" ||
+        typeof detail.repoFullName !== "string" ||
+        typeof detail.projectName !== "string"
+      ) {
+        return;
+      }
+
+      const message = deployTaskChatMessage(detail);
+      upsertMessage(message);
+      trackDeployTask(detail);
+    };
+
+    const onDeployTaskCreated = (event: Event) => {
+      showDeployTaskCreated((event as DeployTaskCreatedEvent).detail);
+    };
+
+    for (const pending of consumePendingDeployTaskCreatedEvents()) {
+      showDeployTaskCreated(pending);
+    }
+    window.addEventListener(DEPLOY_TASK_CREATED_EVENT, onDeployTaskCreated);
+    return () => {
+      window.removeEventListener(
+        DEPLOY_TASK_CREATED_EVENT,
+        onDeployTaskCreated
+      );
+      for (const controller of abortControllers.values()) {
+        controller.abort();
+      }
+    };
+  }, [assistantNamespaceRaw, chatId, kubeconfig, setMessages]);
   const [input, setInput] = useState("");
   const { isAuthorized, isLoading: authLoading } = useGithubAuth();
 
