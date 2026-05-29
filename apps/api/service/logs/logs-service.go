@@ -31,11 +31,11 @@ var (
 )
 
 const (
-	defaultLogLimitAll        = "10" // per pod+container when querying all
-	defaultLogLimitSingle     = "50" // when querying specific container
-	defaultLogsRangeMin       = 60   // default time range in minutes
-	instanceLabel             = "app.kubernetes.io/instance"
-	appLabel                  = "app"
+	defaultLogLimitAll    = "10" // per pod+container when querying all
+	defaultLogLimitSingle = "50" // when querying specific container
+	defaultLogsRangeMin   = 60   // default time range in minutes
+	instanceLabel         = "app.kubernetes.io/instance"
+	appLabel              = "app"
 )
 
 // QueryOptions holds optional query parameters for log queries.
@@ -485,7 +485,7 @@ func executeLogsQuery(ctx context.Context, baseURL, query, start, end string) ([
 	}
 
 	// VictoriaLogs returns NDJSON (newline-delimited JSON), parse each line
-	var results []map[string]interface{}
+	results := make([]map[string]interface{}, 0)
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Bytes()

@@ -66,3 +66,27 @@ test("workload logs response normalizes VictoriaLogs fields and sorts newest fir
     },
   ]);
 });
+
+test("workload logs response skips empty null groups", () => {
+  const got = workloadLogsToLogEntries({
+    "postgresql/empty": null,
+    "postgresql/live": [
+      {
+        _msg: "ready",
+        _time: "2026-05-18T01:00:00.000Z",
+        container: "postgresql",
+      },
+    ],
+  });
+
+  assert.deepEqual(got, [
+    {
+      container: "postgresql",
+      message: "ready",
+      node: "",
+      pod: "",
+      stream: "",
+      time: "2026-05-18T01:00:00.000Z",
+    },
+  ]);
+});

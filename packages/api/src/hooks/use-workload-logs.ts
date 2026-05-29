@@ -23,7 +23,10 @@ export interface WorkloadLogEntry {
   [key: string]: unknown;
 }
 
-export type WorkloadLogsResponse = Record<string, WorkloadLogEntry[]>;
+export type WorkloadLogsResponse = Record<
+  string,
+  WorkloadLogEntry[] | null | undefined
+>;
 
 export type WorkloadLogsFetchRequest = Omit<FetcherOptions, "base">;
 

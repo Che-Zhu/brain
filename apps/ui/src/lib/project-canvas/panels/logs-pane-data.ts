@@ -62,14 +62,16 @@ export function workloadLogsToLogEntries(
     return [];
   }
   const entries = Object.values(data).flatMap((group) =>
-    group.map((entry) => ({
-      container: stringField(entry.container),
-      message: entryMessage(entry),
-      node: stringField(entry.node),
-      pod: stringField(entry.pod),
-      stream: stringField(entry.stream),
-      time: entryTime(entry),
-    }))
+    Array.isArray(group)
+      ? group.map((entry) => ({
+          container: stringField(entry.container),
+          message: entryMessage(entry),
+          node: stringField(entry.node),
+          pod: stringField(entry.pod),
+          stream: stringField(entry.stream),
+          time: entryTime(entry),
+        }))
+      : []
   );
   return entries.sort((a, b) => b.time.localeCompare(a.time));
 }
